@@ -2,14 +2,13 @@ import { beforeAll, describe, expect, test } from 'vitest';
 import { defineNativePipeline, defineNativePlugin, defineVisitor, transform } from '../../index';
 import type { Code } from '../../contracts/visitor';
 
-const values: { name: string; value: Code; fails: boolean }[] = [
-  { name: 'text-only composite', value: { kind: 'composite', parts: ['3'] }, fails: true },
+const values: { name: string; value: Code }[] = [
+  { name: 'text-only composite', value: { kind: 'composite', parts: ['3'] } },
   {
     name: 'mixed composite',
     value: { kind: 'composite', parts: ['1', { code: '+2', mapping: 'sourceless' }] },
-    fails: true,
   },
-  { name: 'ordinary code fragment', value: { code: '3', mapping: 'sourceless' }, fails: false },
+  { name: 'ordinary code fragment', value: { code: '3', mapping: 'sourceless' } },
 ];
 describe.each(values)('$name', entry => {
   let actual: unknown;

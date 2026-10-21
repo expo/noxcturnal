@@ -1,75 +1,66 @@
-import { transformSync, type NodePath } from '@babel/core';
-import { beforeAll, describe, expect, test } from 'vitest';
+import { expect, test } from 'vitest';
 import { defineNativePipeline, defineNativePlugin, defineVisitor, transform } from '../../index';
 const cases = [
-  ['repeated var', 'var value=3;var value;globalThis.result=value;', true],
-  ['var loop head', 'var value=3;for(var value of []){}globalThis.result=value;', true],
-  ['function then var', 'function value(){return 3}var value;globalThis.result=value();', true],
-  ['many redeclarations', `var value=3;${'var value;'.repeat(1000)}globalThis.result=value;`, true],
-  [
-    'initialized redeclarations',
-    'var value=1;var value=3;var value;globalThis.result=value;',
-    true,
-  ],
-  [
-    'reference before declaration',
-    'function read(){return value}var value=3;globalThis.result=read();',
-    true,
-  ],
-  [
-    'separate scoped redeclarations',
-    'var value=3;function shadow(){var value=9;var value;return value}var value;globalThis.result=value+shadow()-9;',
-    true,
-  ],
-  ['assignment shorthand', 'let value;({value}={value:3});globalThis.result=value;', false],
-  ['assignment default', 'let value;({value=9}={value:3});globalThis.result=value;', false],
-  ['assignment explicit', 'let value;({key:value}={key:3});globalThis.result=value;', false],
-] as const;
+  { name: 'repeated var', source: 'var value=3;var value;globalThis.result=value;' },
+  { name: 'var loop head', source: 'var value=3;for(var value of []){}globalThis.result=value;' },
+  {
+    name: 'function then var',
+    source: 'function value(){return 3}var value;globalThis.result=value();',
+  },
+  {
+    name: 'many redeclarations',
+    source: `var value=3;${'var value;'.repeat(1000)}globalThis.result=value;`,
+  },
+  {
+    name: 'initialized redeclarations',
+    source: 'var value=1;var value=3;var value;globalThis.result=value;',
+  },
+  {
+    name: 'reference before declaration',
+    source: 'function read(){return value}var value=3;globalThis.result=read();',
+  },
+  {
+    name: 'separate scoped redeclarations',
+    source:
+      'var value=3;function shadow(){var value=9;var value;return value}var value;globalThis.result=value+shadow()-9;',
+  },
+  {
+    name: 'assignment shorthand',
+    source: 'let value;({value}={value:3});globalThis.result=value;',
+  },
+  {
+    name: 'assignment default',
+    source: 'let value;({value=9}={value:3});globalThis.result=value;',
+  },
+  {
+    name: 'assignment explicit',
+    source: 'let value;({key:value}={key:3});globalThis.result=value;',
+  },
+];
 function run(source: string) {
   const context: Record<string, unknown> = {};
   new Function('globalThis', source)(context);
   return context.result;
 }
-describe.each(cases)('%s', (_name, source, fails) => {
-  let code: string, babel: string;
-  beforeAll(() => {
-    const plugin = defineNativePlugin({
-      name: 'rename-declaration',
-      visitors: [
-        defineVisitor('Program', { scope: true }, path => {
-          path.scope.rename('value', 'renamed');
-        }),
-      ],
-    });
-    const result = transform(
-      source,
-      'input.js',
-      defineNativePipeline({ phases: [{ name: 'rename', plugins: [plugin] }] }),
-    );
-    expect(result.status).toBe('complete');
-    if (result.status !== 'complete') throw new Error(result.reason);
-    code = result.code;
-    expect(code).not.toBe(source);
-    babel = transformSync(source, {
-      configFile: false,
-      babelrc: false,
-      sourceType: 'script',
-      plugins: [
-        () => ({
-          visitor: {
-            Program(path: NodePath) {
-              path.scope.rename('value', 'renamed');
-            },
-          },
-        }),
-      ],
-    })!.code!;
+test.each(cases)('rename preserves $name binding and returns 3', ({ source }) => {
+  const plugin = defineNativePlugin({
+    name: 'rename-declaration',
+    visitors: [
+      defineVisitor('Program', { scope: true }, path => {
+        path.scope.rename('value', 'renamed');
+      }),
+    ],
   });
-  test('original binding control', () => expect(run(source)).toBe(3));
-  test('Babel rename control', () => expect(run(babel)).toBe(3));
-  (fails ? test : test)('rename preserves all declarations of one binding', () =>
-    expect(run(code)).toBe(3),
+  const result = transform(
+    source,
+    'input.js',
+    defineNativePipeline({ phases: [{ name: 'rename', plugins: [plugin] }] }),
   );
+  expect(result.status).toBe('complete');
+  if (result.status !== 'complete') throw new Error(result.reason);
+  const code = result.code;
+  expect(code).not.toBe(source);
+  expect(run(code), 'native rename').toBe(3);
 });
 
 test('the public binding view keeps the latest declaration after redeclarations', () => {

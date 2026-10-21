@@ -1,201 +1,86 @@
 import { runFixtures, type FixtureCase } from '../fixture';
 
-const expectedOutputs = [
-  "var _construct2 = {\n  construct: require('@babel/runtime/helpers/construct'),\n  assertThisInitialized: require('@babel/runtime/helpers/assertThisInitialized'),\n};\nfunction _construct(t, e, r) {\n  return _construct2.construct(t, e, r);\n}\n_construct.assert = _construct2.assertThisInitialized;\nvar _get2 = { get: require('@babel/runtime/helpers/get') };\nfunction _get(e, t, r) {\n  return _get2.get(e, t, r);\n}\nlet Test = (__nox_super_0_231 => {\n  'use strict';\n  const Test = function Test() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this,\n      _newtarget = new.target;\n    function _super() {\n      _this = _construct(Object.getPrototypeOf(Test), arguments, _newtarget || Test);\n      return _this;\n    }\n    var _result = function () {\n      woops.super.test();\n      _super();\n      _get(Object.getPrototypeOf(Test.prototype), 'test', _construct.assert(_this)).call(\n        _construct.assert(_this),\n      );\n      _super(...arguments);\n      _super('test', ...arguments);\n      _get(Object.getPrototypeOf(Test.prototype), 'test', _construct.assert(_this)).call(\n        _construct.assert(_this),\n        ...arguments,\n      );\n      _get(Object.getPrototypeOf(Test.prototype), 'test', _construct.assert(_this)).call(\n        _construct.assert(_this),\n        'test',\n        ...arguments,\n      );\n    }.apply(void 0, arguments);\n    if (_result !== void 0) {\n      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n        return _result;\n      throw new TypeError('Derived constructors may only return object or undefined');\n    }\n    if (_this === void 0)\n      throw new ReferenceError(\"this hasn't been initialised - super() hasn't been called\");\n    return _this;\n  };\n  if (__nox_super_0_231 !== null && typeof __nox_super_0_231 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Test.prototype = Object.create(__nox_super_0_231 && __nox_super_0_231.prototype, {\n    constructor: {\n      value: Test,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Test, __nox_super_0_231);\n  else Test.__proto__ = __nox_super_0_231;\n  Object.defineProperty(Test, 'prototype', { writable: false });\n  return Test;\n})(Foo);",
-  "var _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nvar _get2 = { get: require('@babel/runtime/helpers/get') };\nfunction _get(e, t, r) {\n  return _get2.get(e, t, r);\n}\nlet Test = (__nox_super_0_102 => {\n  'use strict';\n  const Test = function Test() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(Object.getPrototypeOf(Test), [], new.target || Test);\n    var _result = function () {\n      _get(Object.getPrototypeOf(Test.prototype), 'test', this);\n      _get(Object.getPrototypeOf(Test.prototype), 'test', this).whatever;\n    }.apply(_this, arguments);\n    if (_result !== void 0) {\n      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n        return _result;\n      throw new TypeError('Derived constructors may only return object or undefined');\n    }\n    return _this;\n  };\n  if (__nox_super_0_102 !== null && typeof __nox_super_0_102 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Test.prototype = Object.create(__nox_super_0_102 && __nox_super_0_102.prototype, {\n    constructor: {\n      value: Test,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Test, __nox_super_0_102);\n  else Test.__proto__ = __nox_super_0_102;\n  Object.defineProperty(Test, 'prototype', { writable: false });\n  return Test;\n})(Foo);",
-  "var _construct2 = {\n  construct: require('@babel/runtime/helpers/construct'),\n  assertThisInitialized: require('@babel/runtime/helpers/assertThisInitialized'),\n};\nfunction _construct(t, e, r) {\n  return _construct2.construct(t, e, r);\n}\n_construct.assert = _construct2.assertThisInitialized;\nvar _get2 = { get: require('@babel/runtime/helpers/get') };\nfunction _get(e, t, r) {\n  return _get2.get(e, t, r);\n}\nlet Test = (__nox_super_0_87 => {\n  'use strict';\n  const Test = function Test() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this,\n      _newtarget = new.target;\n    function _super() {\n      _this = _construct(Object.getPrototypeOf(Test), arguments, _newtarget || Test);\n      return _this;\n    }\n    var _result = function () {\n      _get(Object.getPrototypeOf(Test.prototype), 'foo', _construct.assert(_this))?.bar;\n      _get(Object.getPrototypeOf(Test.prototype), 'foo', _construct.assert(_this))?.call(\n        _construct.assert(_this),\n      );\n    }.apply(void 0, arguments);\n    if (_result !== void 0) {\n      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n        return _result;\n      throw new TypeError('Derived constructors may only return object or undefined');\n    }\n    if (_this === void 0)\n      throw new ReferenceError(\"this hasn't been initialised - super() hasn't been called\");\n    return _this;\n  };\n  if (__nox_super_0_87 !== null && typeof __nox_super_0_87 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Test.prototype = Object.create(__nox_super_0_87 && __nox_super_0_87.prototype, {\n    constructor: {\n      value: Test,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Test, __nox_super_0_87);\n  else Test.__proto__ = __nox_super_0_87;\n  Object.defineProperty(Test, 'prototype', { writable: false });\n  return Test;\n})(Foo);",
-  "var _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nvar _get2 = { get: require('@babel/runtime/helpers/get') };\nfunction _get(e, t, r) {\n  return _get2.get(e, t, r);\n}\nlet Test = (__nox_super_0_153 => {\n  'use strict';\n  const Test = function Test() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(Object.getPrototypeOf(Test), [], new.target || Test);\n    var _result = function () {\n      _get(Object.getPrototypeOf(Test.prototype), 'test', this).whatever();\n      _get(Object.getPrototypeOf(Test.prototype), 'test', this).call(this);\n    }.apply(_this, arguments);\n    if (_result !== void 0) {\n      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n        return _result;\n      throw new TypeError('Derived constructors may only return object or undefined');\n    }\n    return _this;\n  };\n  if (__nox_super_0_153 !== null && typeof __nox_super_0_153 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Test.prototype = Object.create(__nox_super_0_153 && __nox_super_0_153.prototype, {\n    constructor: {\n      value: Test,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Test, __nox_super_0_153);\n  else Test.__proto__ = __nox_super_0_153;\n  Object.defineProperty(Test, 'test', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        return _get(Object.getPrototypeOf(Test), 'wow', this).call(this);\n      },\n      'name',\n      {\n        value: 'test',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Test, 'prototype', { writable: false });\n  return Test;\n})(Foo);",
-  "var _get2 = { get: require('@babel/runtime/helpers/get') };\nfunction _get(e, t, r) {\n  return _get2.get(e, t, r);\n}\nlet Test = (() => {\n  'use strict';\n  const Test = function Test() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    return super.constructor;\n  };\n  Object.defineProperty(Test, 'test', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        return _get(Object.getPrototypeOf(Test), 'constructor', this);\n      },\n      'name',\n      {\n        value: 'test',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Test, 'prototype', { writable: false });\n  return Test;\n})();\n// Instances\nexpect(Object.getPrototypeOf(Test.prototype)).toBe(Object.prototype);\nexpect(new Test()).toBe(Object);\n// Static\nexpect(Object.getPrototypeOf(Test)).toBe(Function.prototype);\nexpect(Test.test()).toBe(Function);",
-  "var _get2 = { get: require('@babel/runtime/helpers/get') };\nfunction _get(e, t, r) {\n  return _get2.get(e, t, r);\n}\nlet Test = (() => {\n  'use strict';\n  const Test = function Test() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    super.hasOwnProperty('test');\n  };\n  Object.defineProperty(Test, 'prototype', { writable: false });\n  return Test;\n})();",
-  "let A = (() => {\n  'use strict';\n  const A = function A() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(A, 'prototype', { writable: false });\n  return A;\n})();",
-  "let A = (() => {\n  'use strict';\n  const A = function A() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    console.log('a');\n  };\n  Object.defineProperty(A, 'prototype', { writable: false });\n  return A;\n})();\nlet B = (() => {\n  'use strict';\n  const B = function B() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(B.prototype, 'b', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        console.log('b');\n      },\n      'name',\n      {\n        value: 'b',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(B, 'prototype', { writable: false });\n  return B;\n})();",
-  "var _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nlet B = (() => {\n  'use strict';\n  const B = function B() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(B, 'prototype', { writable: false });\n  return B;\n})();\nlet A = (__nox_super_12_121 => {\n  'use strict';\n  const A = function A(_argument) {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this,\n      _newtarget = new.target;\n    function _super() {\n      _this = _construct(Object.getPrototypeOf(A), arguments, _newtarget || A);\n      return _this;\n    }\n    var _result = function (track) {\n      if (track !== undefined) _super(track);\n      else _super();\n    }.apply(void 0, arguments);\n    if (_result !== void 0) {\n      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n        return _result;\n      throw new TypeError('Derived constructors may only return object or undefined');\n    }\n    if (_this === void 0)\n      throw new ReferenceError(\"this hasn't been initialised - super() hasn't been called\");\n    return _this;\n  };\n  if (__nox_super_12_121 !== null && typeof __nox_super_12_121 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  A.prototype = Object.create(__nox_super_12_121 && __nox_super_12_121.prototype, {\n    constructor: {\n      value: A,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(A, __nox_super_12_121);\n  else A.__proto__ = __nox_super_12_121;\n  Object.defineProperty(A, 'prototype', { writable: false });\n  return A;\n})(B);",
-  "let Foo = (() => {\n  'use strict';\n  const Foo = function Foo() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Foo.prototype, 'bar', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      },\n      'name',\n      {\n        value: 'bar',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Foo, 'prototype', { writable: false });\n  return Foo;\n})();",
-  "var o = (() => {\n  'use strict';\n  const _Class = function _Class() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(_Class, 'name', {\n    value: 'o',\n    configurable: true,\n  });\n  Object.defineProperty(_Class.prototype, '𠮷野家', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      },\n      'name',\n      {\n        value: '𠮷野家',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(_Class, 'prototype', { writable: false });\n  return _Class;\n})();",
-  "// @flow\n// @flow\nlet C = (() => {\n  'use strict';\n  const C = function C() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(C.prototype, 'm', {\n    value: Object.defineProperty(\n      function (x) {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        return 'a';\n      },\n      'name',\n      {\n        value: 'm',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(C, 'prototype', { writable: false });\n  return C;\n})();",
-  "let Test = (() => {\n  'use strict';\n  const Test = function Test() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Test.prototype, 'a', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      },\n      'name',\n      {\n        value: 'a',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Test, 'b', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      },\n      'name',\n      {\n        value: 'b',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Test.prototype, 'c', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      },\n      'name',\n      {\n        value: 'c',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Test, 'prototype', { writable: false });\n  return Test;\n})();",
-  "'use strict';\nlet Foo = (() => {\n  'use strict';\n  const Foo = function Foo() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Foo.prototype, 'method', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      },\n      'name',\n      {\n        value: 'method',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Foo, 'prototype', { writable: false });\n  return Foo;\n})();",
-  "var _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nlet ListBuffer = (__nox_super_0_39 => {\n  'use strict';\n  const ListBuffer = function ListBuffer() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(Object.getPrototypeOf(ListBuffer), arguments, new.target || ListBuffer);\n    return _this;\n  };\n  if (__nox_super_0_39 !== null && typeof __nox_super_0_39 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  ListBuffer.prototype = Object.create(__nox_super_0_39 && __nox_super_0_39.prototype, {\n    constructor: {\n      value: ListBuffer,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(ListBuffer, __nox_super_0_39);\n  else ListBuffer.__proto__ = __nox_super_0_39;\n  Object.defineProperty(ListBuffer, 'prototype', { writable: false });\n  return ListBuffer;\n})(ArrayBuffer);\nexpect(new ListBuffer()).toBeInstanceOf(ListBuffer);\nexpect(new ListBuffer()).toBeInstanceOf(ArrayBuffer);",
-  "var _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nlet ListBuffer = (__nox_super_0_39 => {\n  'use strict';\n  const ListBuffer = function ListBuffer() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(Object.getPrototypeOf(ListBuffer), arguments, new.target || ListBuffer);\n    return _this;\n  };\n  if (__nox_super_0_39 !== null && typeof __nox_super_0_39 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  ListBuffer.prototype = Object.create(__nox_super_0_39 && __nox_super_0_39.prototype, {\n    constructor: {\n      value: ListBuffer,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(ListBuffer, __nox_super_0_39);\n  else ListBuffer.__proto__ = __nox_super_0_39;\n  Object.defineProperty(ListBuffer, 'prototype', { writable: false });\n  return ListBuffer;\n})(ArrayBuffer);",
-  "var _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nlet SharedListBuffer = (__nox_super_0_51 => {\n  'use strict';\n  const SharedListBuffer = function SharedListBuffer() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(\n      Object.getPrototypeOf(SharedListBuffer),\n      arguments,\n      new.target || SharedListBuffer,\n    );\n    return _this;\n  };\n  if (__nox_super_0_51 !== null && typeof __nox_super_0_51 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  SharedListBuffer.prototype = Object.create(__nox_super_0_51 && __nox_super_0_51.prototype, {\n    constructor: {\n      value: SharedListBuffer,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(SharedListBuffer, __nox_super_0_51);\n  else SharedListBuffer.__proto__ = __nox_super_0_51;\n  Object.defineProperty(SharedListBuffer, 'prototype', { writable: false });\n  return SharedListBuffer;\n})(SharedArrayBuffer);\nexpect(new SharedListBuffer()).toBeInstanceOf(SharedListBuffer);\nexpect(new SharedListBuffer()).toBeInstanceOf(SharedArrayBuffer);",
-  "var _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nlet SharedListBuffer = (__nox_super_0_51 => {\n  'use strict';\n  const SharedListBuffer = function SharedListBuffer() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(\n      Object.getPrototypeOf(SharedListBuffer),\n      arguments,\n      new.target || SharedListBuffer,\n    );\n    return _this;\n  };\n  if (__nox_super_0_51 !== null && typeof __nox_super_0_51 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  SharedListBuffer.prototype = Object.create(__nox_super_0_51 && __nox_super_0_51.prototype, {\n    constructor: {\n      value: SharedListBuffer,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(SharedListBuffer, __nox_super_0_51);\n  else SharedListBuffer.__proto__ = __nox_super_0_51;\n  Object.defineProperty(SharedListBuffer, 'prototype', { writable: false });\n  return SharedListBuffer;\n})(SharedArrayBuffer);",
-  "var _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nlet BigInt64List = (__nox_super_0_43 => {\n  'use strict';\n  const BigInt64List = function BigInt64List() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(\n      Object.getPrototypeOf(BigInt64List),\n      arguments,\n      new.target || BigInt64List,\n    );\n    return _this;\n  };\n  if (__nox_super_0_43 !== null && typeof __nox_super_0_43 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  BigInt64List.prototype = Object.create(__nox_super_0_43 && __nox_super_0_43.prototype, {\n    constructor: {\n      value: BigInt64List,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(BigInt64List, __nox_super_0_43);\n  else BigInt64List.__proto__ = __nox_super_0_43;\n  Object.defineProperty(BigInt64List, 'prototype', { writable: false });\n  return BigInt64List;\n})(BigInt64Array);\nexpect(new BigInt64List()).toBeInstanceOf(BigInt64List);\nexpect(new BigInt64List()).toBeInstanceOf(BigInt64Array);",
-  "var _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nlet BigInt64List = (__nox_super_0_43 => {\n  'use strict';\n  const BigInt64List = function BigInt64List() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(\n      Object.getPrototypeOf(BigInt64List),\n      arguments,\n      new.target || BigInt64List,\n    );\n    return _this;\n  };\n  if (__nox_super_0_43 !== null && typeof __nox_super_0_43 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  BigInt64List.prototype = Object.create(__nox_super_0_43 && __nox_super_0_43.prototype, {\n    constructor: {\n      value: BigInt64List,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(BigInt64List, __nox_super_0_43);\n  else BigInt64List.__proto__ = __nox_super_0_43;\n  Object.defineProperty(BigInt64List, 'prototype', { writable: false });\n  return BigInt64List;\n})(BigInt64Array);",
-  "var _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nlet MergedError = (__nox_super_0_43 => {\n  'use strict';\n  const MergedError = function MergedError() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(\n      Object.getPrototypeOf(MergedError),\n      arguments,\n      new.target || MergedError,\n    );\n    return _this;\n  };\n  if (__nox_super_0_43 !== null && typeof __nox_super_0_43 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  MergedError.prototype = Object.create(__nox_super_0_43 && __nox_super_0_43.prototype, {\n    constructor: {\n      value: MergedError,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(MergedError, __nox_super_0_43);\n  else MergedError.__proto__ = __nox_super_0_43;\n  Object.defineProperty(MergedError, 'prototype', { writable: false });\n  return MergedError;\n})(AggregateError);\nexpect(new MergedError([])).toBeInstanceOf(MergedError);\nexpect(new MergedError([])).toBeInstanceOf(AggregateError);",
-  "var _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nlet MergedError = (__nox_super_0_43 => {\n  'use strict';\n  const MergedError = function MergedError() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(\n      Object.getPrototypeOf(MergedError),\n      arguments,\n      new.target || MergedError,\n    );\n    return _this;\n  };\n  if (__nox_super_0_43 !== null && typeof __nox_super_0_43 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  MergedError.prototype = Object.create(__nox_super_0_43 && __nox_super_0_43.prototype, {\n    constructor: {\n      value: MergedError,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(MergedError, __nox_super_0_43);\n  else MergedError.__proto__ = __nox_super_0_43;\n  Object.defineProperty(MergedError, 'prototype', { writable: false });\n  return MergedError;\n})(AggregateError);",
-  "var _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nlet List = (__nox_super_0_27 => {\n  'use strict';\n  const List = function List() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(Object.getPrototypeOf(List), arguments, new.target || List);\n    return _this;\n  };\n  if (__nox_super_0_27 !== null && typeof __nox_super_0_27 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  List.prototype = Object.create(__nox_super_0_27 && __nox_super_0_27.prototype, {\n    constructor: {\n      value: List,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(List, __nox_super_0_27);\n  else List.__proto__ = __nox_super_0_27;\n  Object.defineProperty(List, 'prototype', { writable: false });\n  return List;\n})(Array);\nexpect(new List()).toBeInstanceOf(List);\nexpect(new List()).toBeInstanceOf(Array);",
-  "var _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nlet List = (__nox_super_0_27 => {\n  'use strict';\n  const List = function List() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(Object.getPrototypeOf(List), arguments, new.target || List);\n    return _this;\n  };\n  if (__nox_super_0_27 !== null && typeof __nox_super_0_27 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  List.prototype = Object.create(__nox_super_0_27 && __nox_super_0_27.prototype, {\n    constructor: {\n      value: List,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(List, __nox_super_0_27);\n  else List.__proto__ = __nox_super_0_27;\n  Object.defineProperty(List, 'prototype', { writable: false });\n  return List;\n})(Array);",
-  "var _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nlet RangeIterator = (__nox_super_0_39 => {\n  'use strict';\n  const RangeIterator = function RangeIterator() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(\n      Object.getPrototypeOf(RangeIterator),\n      arguments,\n      new.target || RangeIterator,\n    );\n    return _this;\n  };\n  if (__nox_super_0_39 !== null && typeof __nox_super_0_39 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  RangeIterator.prototype = Object.create(__nox_super_0_39 && __nox_super_0_39.prototype, {\n    constructor: {\n      value: RangeIterator,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(RangeIterator, __nox_super_0_39);\n  else RangeIterator.__proto__ = __nox_super_0_39;\n  Object.defineProperty(RangeIterator, 'prototype', { writable: false });\n  return RangeIterator;\n})(Iterator);\nexpect(() => new RangeIterator()).toThrow(\"Constructor Iterator requires 'new'\");",
-  "var _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\n// Iterator can not be invoked with new, so this example does not\n// satisfy the superIsCallableConstructor assumption, it will throw\n// a runtime error\nlet RangeIterator = (__nox_super_153_192 => {\n  'use strict';\n  const RangeIterator = function RangeIterator() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(\n      Object.getPrototypeOf(RangeIterator),\n      arguments,\n      new.target || RangeIterator,\n    );\n    return _this;\n  };\n  if (__nox_super_153_192 !== null && typeof __nox_super_153_192 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  RangeIterator.prototype = Object.create(__nox_super_153_192 && __nox_super_153_192.prototype, {\n    constructor: {\n      value: RangeIterator,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(RangeIterator, __nox_super_153_192);\n  else RangeIterator.__proto__ = __nox_super_153_192;\n  Object.defineProperty(RangeIterator, 'prototype', { writable: false });\n  return RangeIterator;\n})(Iterator);",
-  "var _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nlet BaseController = (__nox_super_0_52 => {\n  'use strict';\n  const BaseController = function BaseController() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(\n      Object.getPrototypeOf(BaseController),\n      arguments,\n      new.target || BaseController,\n    );\n    return _this;\n  };\n  if (__nox_super_0_52 !== null && typeof __nox_super_0_52 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  BaseController.prototype = Object.create(__nox_super_0_52 && __nox_super_0_52.prototype, {\n    constructor: {\n      value: BaseController,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(BaseController, __nox_super_0_52);\n  else BaseController.__proto__ = __nox_super_0_52;\n  Object.defineProperty(BaseController, 'prototype', { writable: false });\n  return BaseController;\n})(Chaplin.Controller);\nlet BaseController2 = (__nox_super_54_115 => {\n  'use strict';\n  const BaseController2 = function BaseController2() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(\n      Object.getPrototypeOf(BaseController2),\n      arguments,\n      new.target || BaseController2,\n    );\n    return _this;\n  };\n  if (__nox_super_54_115 !== null && typeof __nox_super_54_115 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  BaseController2.prototype = Object.create(__nox_super_54_115 && __nox_super_54_115.prototype, {\n    constructor: {\n      value: BaseController2,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(BaseController2, __nox_super_54_115);\n  else BaseController2.__proto__ = __nox_super_54_115;\n  Object.defineProperty(BaseController2, 'prototype', { writable: false });\n  return BaseController2;\n})(Chaplin.Controller.Another);",
-  "var _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nlet Test = (__nox_super_0_92 => {\n  'use strict';\n  const Test = function Test() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(Object.getPrototypeOf(Test), [], new.target || Test);\n    var _result = function () {\n      this;\n      this.prop = 1;\n    }.apply(_this, arguments);\n    if (_result !== void 0) {\n      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n        return _result;\n      throw new TypeError('Derived constructors may only return object or undefined');\n    }\n    return _this;\n  };\n  if (__nox_super_0_92 !== null && typeof __nox_super_0_92 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Test.prototype = Object.create(__nox_super_0_92 && __nox_super_0_92.prototype, {\n    constructor: {\n      value: Test,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Test, __nox_super_0_92);\n  else Test.__proto__ = __nox_super_0_92;\n  Object.defineProperty(Test, 'prototype', { writable: false });\n  return Test;\n})(Foo);",
-  "var _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nlet Test = (__nox_super_0_26 => {\n  'use strict';\n  const Test = function Test() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(Object.getPrototypeOf(Test), arguments, new.target || Test);\n    return _this;\n  };\n  if (__nox_super_0_26 !== null && typeof __nox_super_0_26 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Test.prototype = Object.create(__nox_super_0_26 && __nox_super_0_26.prototype, {\n    constructor: {\n      value: Test,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Test, __nox_super_0_26);\n  else Test.__proto__ = __nox_super_0_26;\n  Object.defineProperty(Test, 'prototype', { writable: false });\n  return Test;\n})(Foo);",
-  "var _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\n// JSON is wrapped because it starts with an uppercase letter, but it\n// should not be possible to extend it anyway.\nexpect(() =>\n  (__nox_super_131_163 => {\n    'use strict';\n    const BetterJSON = function BetterJSON() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n      var _this = _construct(\n        Object.getPrototypeOf(BetterJSON),\n        arguments,\n        new.target || BetterJSON,\n      );\n      return _this;\n    };\n    if (__nox_super_131_163 !== null && typeof __nox_super_131_163 !== 'function')\n      throw new TypeError('Super expression must either be null or a function');\n    BetterJSON.prototype = Object.create(__nox_super_131_163 && __nox_super_131_163.prototype, {\n      constructor: {\n        value: BetterJSON,\n        writable: true,\n        configurable: true,\n      },\n    });\n    if (Object.setPrototypeOf) Object.setPrototypeOf(BetterJSON, __nox_super_131_163);\n    else BetterJSON.__proto__ = __nox_super_131_163;\n    Object.defineProperty(BetterJSON, 'prototype', { writable: false });\n    return BetterJSON;\n  })(JSON),\n).toThrow();",
-  "var _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nvar _get2 = { get: require('@babel/runtime/helpers/get') };\nfunction _get(e, t, r) {\n  return _get2.get(e, t, r);\n}\n// Imported from\n// https://github.com/WebReflection/babel-plugin-transform-builtin-classes/blob/85efe1374e1c59a8323c7eddd4326f6c93d9f64f/test/test.js\nlet List = (__nox_super_152_292 => {\n  'use strict';\n  const List = function List(_argument) {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this,\n      _newtarget = new.target;\n    function _super() {\n      _this = _construct(Object.getPrototypeOf(List), arguments, _newtarget || List);\n      return _this;\n    }\n    var _result = function (value) {\n      _super().push(value);\n    }.apply(void 0, arguments);\n    if (_result !== void 0) {\n      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n        return _result;\n      throw new TypeError('Derived constructors may only return object or undefined');\n    }\n    if (_this === void 0)\n      throw new ReferenceError(\"this hasn't been initialised - super() hasn't been called\");\n    return _this;\n  };\n  if (__nox_super_152_292 !== null && typeof __nox_super_152_292 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  List.prototype = Object.create(__nox_super_152_292 && __nox_super_152_292.prototype, {\n    constructor: {\n      value: List,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(List, __nox_super_152_292);\n  else List.__proto__ = __nox_super_152_292;\n  Object.defineProperty(List.prototype, 'push', {\n    value: Object.defineProperty(\n      function (value) {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        _get(Object.getPrototypeOf(List.prototype), 'push', this).call(this, value);\n        return this;\n      },\n      'name',\n      {\n        value: 'push',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(List, 'prototype', { writable: false });\n  return List;\n})(Array);\nexpect(new List(1)).toBeInstanceOf(List);\nexpect(new List(2)).toBeInstanceOf(Array);\nvar l = new List(3);\nexpect(l).toHaveLength(1);\nexpect(l[0]).toBe(3);\nexpect(l.push(4)).toBe(l);\nexpect(l).toHaveLength(2);\nexpect(l.join()).toBe('3,4');\nlet SecondLevel = (__nox_super_535_603 => {\n  'use strict';\n  const SecondLevel = function SecondLevel() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(\n      Object.getPrototypeOf(SecondLevel),\n      arguments,\n      new.target || SecondLevel,\n    );\n    return _this;\n  };\n  if (__nox_super_535_603 !== null && typeof __nox_super_535_603 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  SecondLevel.prototype = Object.create(__nox_super_535_603 && __nox_super_535_603.prototype, {\n    constructor: {\n      value: SecondLevel,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(SecondLevel, __nox_super_535_603);\n  else SecondLevel.__proto__ = __nox_super_535_603;\n  Object.defineProperty(SecondLevel.prototype, 'method', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        return this;\n      },\n      'name',\n      {\n        value: 'method',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(SecondLevel, 'prototype', { writable: false });\n  return SecondLevel;\n})(List);\nexpect(new SecondLevel(1)).toBeInstanceOf(SecondLevel);\nexpect(new SecondLevel(2)).toBeInstanceOf(List);\nexpect(new SecondLevel(3)).toBeInstanceOf(Array);\nvar s = new SecondLevel(4);\nexpect(s).toHaveLength(1);\nexpect(s[0]).toBe(4);\nexpect(s.push(5)).toBe(s);\nexpect(s).toHaveLength(2);\nexpect(s.join()).toBe('4,5');\nexpect(s.method()).toBe(s);",
-  "var _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nvar env = { Array: null };\n// We need to use \"with\" to avoid leaking the modified Array to other tests.\nwith (env) {\n  let List = (__nox_super_123_150 => {\n    'use strict';\n    const List = function List() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n      var _this = _construct(Object.getPrototypeOf(List), arguments, new.target || List);\n      return _this;\n    };\n    if (__nox_super_123_150 !== null && typeof __nox_super_123_150 !== 'function')\n      throw new TypeError('Super expression must either be null or a function');\n    List.prototype = Object.create(__nox_super_123_150 && __nox_super_123_150.prototype, {\n      constructor: {\n        value: List,\n        writable: true,\n        configurable: true,\n      },\n    });\n    if (Object.setPrototypeOf) Object.setPrototypeOf(List, __nox_super_123_150);\n    else List.__proto__ = __nox_super_123_150;\n    Object.defineProperty(List, 'prototype', { writable: false });\n    return List;\n  })(Array);\n  expect(List.prototype.__proto__).toBeUndefined();\n}",
-  "var _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nlet Array = (() => {\n  'use strict';\n  const Array = function Array() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Array, 'prototype', { writable: false });\n  return Array;\n})();\nlet List = (__nox_super_16_43 => {\n  'use strict';\n  const List = function List() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(Object.getPrototypeOf(List), arguments, new.target || List);\n    return _this;\n  };\n  if (__nox_super_16_43 !== null && typeof __nox_super_16_43 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  List.prototype = Object.create(__nox_super_16_43 && __nox_super_16_43.prototype, {\n    constructor: {\n      value: List,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(List, __nox_super_16_43);\n  else List.__proto__ = __nox_super_16_43;\n  Object.defineProperty(List, 'prototype', { writable: false });\n  return List;\n})(Array);",
-  "var _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nvar called = false;\nvar env = {\n  Array: function Array() {\n    called = true;\n  },\n};\n// We need to use \"with\" to avoid leaking the modified Array to other tests.\nwith (env) {\n  let List = (__nox_super_180_207 => {\n    'use strict';\n    const List = function List() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n      var _this = _construct(Object.getPrototypeOf(List), arguments, new.target || List);\n      return _this;\n    };\n    if (__nox_super_180_207 !== null && typeof __nox_super_180_207 !== 'function')\n      throw new TypeError('Super expression must either be null or a function');\n    List.prototype = Object.create(__nox_super_180_207 && __nox_super_180_207.prototype, {\n      constructor: {\n        value: List,\n        writable: true,\n        configurable: true,\n      },\n    });\n    if (Object.setPrototypeOf) Object.setPrototypeOf(List, __nox_super_180_207);\n    else List.__proto__ = __nox_super_180_207;\n    Object.defineProperty(List, 'prototype', { writable: false });\n    return List;\n  })(Array);\n  new List();\n  expect(called).toBe(true);\n}",
-  "var _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\n// basic sanity check to confirm the external wrapNativeSuper helper works\nlet Test1 = (__nox_super_76_140 => {\n  'use strict';\n  const Test1 = function Test1() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(Object.getPrototypeOf(Test1), arguments, new.target || Test1);\n    return _this;\n  };\n  if (__nox_super_76_140 !== null && typeof __nox_super_76_140 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Test1.prototype = Object.create(__nox_super_76_140 && __nox_super_76_140.prototype, {\n    constructor: {\n      value: Test1,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Test1, __nox_super_76_140);\n  else Test1.__proto__ = __nox_super_76_140;\n  Object.defineProperty(Test1.prototype, 'name', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        return 'test1';\n      },\n      'name',\n      {\n        value: 'name',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Test1, 'prototype', { writable: false });\n  return Test1;\n})(Array);\nlet Test2 = (__nox_super_142_206 => {\n  'use strict';\n  const Test2 = function Test2() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(Object.getPrototypeOf(Test2), arguments, new.target || Test2);\n    return _this;\n  };\n  if (__nox_super_142_206 !== null && typeof __nox_super_142_206 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Test2.prototype = Object.create(__nox_super_142_206 && __nox_super_142_206.prototype, {\n    constructor: {\n      value: Test2,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Test2, __nox_super_142_206);\n  else Test2.__proto__ = __nox_super_142_206;\n  Object.defineProperty(Test2.prototype, 'name', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        return 'test2';\n      },\n      'name',\n      {\n        value: 'name',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Test2, 'prototype', { writable: false });\n  return Test2;\n})(Array);\nvar t1 = new Test1();\nvar t2 = new Test2();\nexpect(Test1).not.toBe(Test2);\nexpect(t1).not.toBe(t2);\nexpect(t1.name()).toBe('test1');\nexpect(t2.name()).toBe('test2');\nexpect(t1).toBeInstanceOf(Test1);\nexpect(t2).toBeInstanceOf(Test2);\nexpect(t1).toBeInstanceOf(Array);\nexpect(t2).toBeInstanceOf(Array);",
-  "'use strict';\nvar _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nvar _get2 = { get: require('@babel/runtime/helpers/get') };\nfunction _get(e, t, r) {\n  return _get2.get(e, t, r);\n}\nlet Base = (() => {\n  'use strict';\n  const Base = function Base() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Base.prototype, 'test', {\n    value: Object.defineProperty(\n      function (...args) {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        expect(this).toBe(obj);\n        expect(args).toEqual([1, 2, 3]);\n        return 1;\n      },\n      'name',\n      {\n        value: 'test',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Base, 'prototype', { writable: false });\n  return Base;\n})();\nlet Obj = (__nox_super_131_341 => {\n  'use strict';\n  const Obj = function Obj() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(Object.getPrototypeOf(Obj), arguments, new.target || Obj);\n    return _this;\n  };\n  if (__nox_super_131_341 !== null && typeof __nox_super_131_341 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Obj.prototype = Object.create(__nox_super_131_341 && __nox_super_131_341.prototype, {\n    constructor: {\n      value: Obj,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Obj, __nox_super_131_341);\n  else Obj.__proto__ = __nox_super_131_341;\n  Object.defineProperty(Obj.prototype, 'call', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        _get(Object.getPrototypeOf(Obj.prototype), 'test', this).call(this, 1, 2, 3);\n        _get(Object.getPrototypeOf(Obj.prototype), 'test', this).call(this, 1, ...[2, 3]);\n        _get(Object.getPrototypeOf(Obj.prototype), 'test', this).call(this, ...[1, 2, 3]);\n        return _get(Object.getPrototypeOf(Obj.prototype), 'test', this).call(this, ...arguments);\n      },\n      'name',\n      {\n        value: 'call',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Obj.prototype, 'test', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        throw new Error('called');\n      },\n      'name',\n      {\n        value: 'test',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Obj, 'prototype', { writable: false });\n  return Obj;\n})(Base);\nconst obj = new Obj();\nexpect(obj.call(1, 2, 3)).toBe(1);",
-  "'use strict';\nvar _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nvar _get2 = { get: require('@babel/runtime/helpers/get') };\nfunction _get(e, t, r) {\n  return _get2.get(e, t, r);\n}\nlet Base = (() => {\n  'use strict';\n  const Base = function Base() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Base.prototype, 'test', {\n    get: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        // This is incorrect according to the spec,\n        // but close enough for loose.\n        expect(this).toBe(Base.prototype);\n        return function (...args) {\n          expect(this).toBe(obj);\n          expect(args).toEqual([1, 2, 3]);\n          return 1;\n        };\n      },\n      'name',\n      {\n        value: 'get test',\n        configurable: true,\n      },\n    ),\n    configurable: true,\n  });\n  Object.defineProperty(Base, 'prototype', { writable: false });\n  return Base;\n})();\nlet Obj = (__nox_super_295_458 => {\n  'use strict';\n  const Obj = function Obj() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(Object.getPrototypeOf(Obj), arguments, new.target || Obj);\n    return _this;\n  };\n  if (__nox_super_295_458 !== null && typeof __nox_super_295_458 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Obj.prototype = Object.create(__nox_super_295_458 && __nox_super_295_458.prototype, {\n    constructor: {\n      value: Obj,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Obj, __nox_super_295_458);\n  else Obj.__proto__ = __nox_super_295_458;\n  Object.defineProperty(Obj.prototype, 'call', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        _get(Object.getPrototypeOf(Obj.prototype), 'test', this).call(this, 1, 2, 3);\n        _get(Object.getPrototypeOf(Obj.prototype), 'test', this).call(this, 1, ...[2, 3]);\n        _get(Object.getPrototypeOf(Obj.prototype), 'test', this).call(this, ...[1, 2, 3]);\n        return _get(Object.getPrototypeOf(Obj.prototype), 'test', this).call(this, ...arguments);\n      },\n      'name',\n      {\n        value: 'call',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Obj, 'prototype', { writable: false });\n  return Obj;\n})(Base);\nObject.defineProperty(Obj.prototype, 'test', {\n  writable: true,\n  configurable: true,\n  value() {\n    throw new Error('called');\n  },\n});\nconst obj = new Obj();\nexpect(obj.call(1, 2, 3)).toBe(1);",
-  "'use strict';\nvar _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nvar _get2 = { get: require('@babel/runtime/helpers/get') };\nfunction _get(e, t, r) {\n  return _get2.get(e, t, r);\n}\nlet Base = (() => {\n  'use strict';\n  const Base = function Base() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Base.prototype, 'test', {\n    get: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        // This is incorrect according to the spec,\n        // but close enough for loose.\n        expect(this).toBe(Base.prototype);\n        return function (...args) {\n          expect(this).toBe(obj);\n          expect(args).toEqual([1, 2, 3]);\n          return 1;\n        };\n      },\n      'name',\n      {\n        value: 'get test',\n        configurable: true,\n      },\n    ),\n    configurable: true,\n  });\n  Object.defineProperty(Base, 'prototype', { writable: false });\n  return Base;\n})();\nlet Obj = (__nox_super_295_505 => {\n  'use strict';\n  const Obj = function Obj() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(Object.getPrototypeOf(Obj), arguments, new.target || Obj);\n    return _this;\n  };\n  if (__nox_super_295_505 !== null && typeof __nox_super_295_505 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Obj.prototype = Object.create(__nox_super_295_505 && __nox_super_295_505.prototype, {\n    constructor: {\n      value: Obj,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Obj, __nox_super_295_505);\n  else Obj.__proto__ = __nox_super_295_505;\n  Object.defineProperty(Obj.prototype, 'call', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        _get(Object.getPrototypeOf(Obj.prototype), 'test', this).call(this, 1, 2, 3);\n        _get(Object.getPrototypeOf(Obj.prototype), 'test', this).call(this, 1, ...[2, 3]);\n        _get(Object.getPrototypeOf(Obj.prototype), 'test', this).call(this, ...[1, 2, 3]);\n        return _get(Object.getPrototypeOf(Obj.prototype), 'test', this).call(this, ...arguments);\n      },\n      'name',\n      {\n        value: 'call',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Obj.prototype, 'test', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        throw new Error('called');\n      },\n      'name',\n      {\n        value: 'test',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Obj, 'prototype', { writable: false });\n  return Obj;\n})(Base);\nconst obj = new Obj();\nexpect(obj.call(1, 2, 3)).toBe(1);",
-  "'use strict';\nvar _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nvar _get2 = { get: require('@babel/runtime/helpers/get') };\nfunction _get(e, t, r) {\n  return _get2.get(e, t, r);\n}\nlet Base = (() => {\n  'use strict';\n  const Base = function Base() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Base, 'prototype', { writable: false });\n  return Base;\n})();\nlet Obj = (__nox_super_30_149 => {\n  'use strict';\n  const Obj = function Obj() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(Object.getPrototypeOf(Obj), arguments, new.target || Obj);\n    return _this;\n  };\n  if (__nox_super_30_149 !== null && typeof __nox_super_30_149 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Obj.prototype = Object.create(__nox_super_30_149 && __nox_super_30_149.prototype, {\n    constructor: {\n      value: Obj,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Obj, __nox_super_30_149);\n  else Obj.__proto__ = __nox_super_30_149;\n  Object.defineProperty(Obj.prototype, 'call', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        return _get(Object.getPrototypeOf(Obj.prototype), 'test', this).call(this);\n      },\n      'name',\n      {\n        value: 'call',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Obj.prototype, 'test', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        throw new Error('gobbledygook');\n      },\n      'name',\n      {\n        value: 'test',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Obj, 'prototype', { writable: false });\n  return Obj;\n})(Base);\nconst obj = new Obj();\nexpect(() => {\n  obj.call();\n  // Assert that this throws, but that it's not\n  // Obj.p.test's error that is thrown\n}).toThrow(TypeError);",
-  "'use strict';\nvar _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nvar _get2 = { get: require('@babel/runtime/helpers/get') };\nfunction _get(e, t, r) {\n  return _get2.get(e, t, r);\n}\nlet Base = (() => {\n  'use strict';\n  const Base = function Base() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Base.prototype, 'test', {\n    set: Object.defineProperty(\n      function (v) {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        throw new Error('gobbledygook');\n      },\n      'name',\n      {\n        value: 'set test',\n        configurable: true,\n      },\n    ),\n    configurable: true,\n  });\n  Object.defineProperty(Base, 'prototype', { writable: false });\n  return Base;\n})();\nlet Obj = (__nox_super_87_153 => {\n  'use strict';\n  const Obj = function Obj() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(Object.getPrototypeOf(Obj), arguments, new.target || Obj);\n    return _this;\n  };\n  if (__nox_super_87_153 !== null && typeof __nox_super_87_153 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Obj.prototype = Object.create(__nox_super_87_153 && __nox_super_87_153.prototype, {\n    constructor: {\n      value: Obj,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Obj, __nox_super_87_153);\n  else Obj.__proto__ = __nox_super_87_153;\n  Object.defineProperty(Obj.prototype, 'call', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        return _get(Object.getPrototypeOf(Obj.prototype), 'test', this).call(this);\n      },\n      'name',\n      {\n        value: 'call',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Obj, 'prototype', { writable: false });\n  return Obj;\n})(Base);\nObject.defineProperty(Obj.prototype, 'test', {\n  writable: true,\n  configurable: true,\n  value() {\n    throw new Error('gobbledygook');\n  },\n});\nconst obj = new Obj();\nexpect(() => {\n  obj.call();\n  // Assert that this throws, but that it's not\n  // a gobbledygook error that is thrown\n}).toThrow(TypeError);",
-  "'use strict';\nvar _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nvar _get2 = { get: require('@babel/runtime/helpers/get') };\nfunction _get(e, t, r) {\n  return _get2.get(e, t, r);\n}\nlet Base = (() => {\n  'use strict';\n  const Base = function Base() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Base.prototype, 'test', {\n    set: Object.defineProperty(\n      function (v) {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        throw new Error('gobbledygook');\n      },\n      'name',\n      {\n        value: 'set test',\n        configurable: true,\n      },\n    ),\n    configurable: true,\n  });\n  Object.defineProperty(Base, 'prototype', { writable: false });\n  return Base;\n})();\nlet Obj = (__nox_super_87_206 => {\n  'use strict';\n  const Obj = function Obj() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(Object.getPrototypeOf(Obj), arguments, new.target || Obj);\n    return _this;\n  };\n  if (__nox_super_87_206 !== null && typeof __nox_super_87_206 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Obj.prototype = Object.create(__nox_super_87_206 && __nox_super_87_206.prototype, {\n    constructor: {\n      value: Obj,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Obj, __nox_super_87_206);\n  else Obj.__proto__ = __nox_super_87_206;\n  Object.defineProperty(Obj.prototype, 'call', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        return _get(Object.getPrototypeOf(Obj.prototype), 'test', this).call(this);\n      },\n      'name',\n      {\n        value: 'call',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Obj.prototype, 'test', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        throw new Error('gobbledygook');\n      },\n      'name',\n      {\n        value: 'test',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Obj, 'prototype', { writable: false });\n  return Obj;\n})(Base);\nconst obj = new Obj();\nexpect(() => {\n  obj.call();\n  // Assert that this throws, but that it's not\n  // a gobbledygook error that is thrown\n}).toThrow(TypeError);",
-  "'use strict';\nvar _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nvar _get2 = { get: require('@babel/runtime/helpers/get') };\nfunction _get(e, t, r) {\n  return _get2.get(e, t, r);\n}\nlet Base = (() => {\n  'use strict';\n  const Base = function Base() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Base, 'prototype', { writable: false });\n  return Base;\n})();\nObject.defineProperty(Base.prototype, 'test', {\n  value: 1,\n  writable: true,\n  configurable: true,\n});\nlet Obj = (__nox_super_134_197 => {\n  'use strict';\n  const Obj = function Obj() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(Object.getPrototypeOf(Obj), arguments, new.target || Obj);\n    return _this;\n  };\n  if (__nox_super_134_197 !== null && typeof __nox_super_134_197 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Obj.prototype = Object.create(__nox_super_134_197 && __nox_super_134_197.prototype, {\n    constructor: {\n      value: Obj,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Obj, __nox_super_134_197);\n  else Obj.__proto__ = __nox_super_134_197;\n  Object.defineProperty(Obj.prototype, 'get', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        return _get(Object.getPrototypeOf(Obj.prototype), 'test', this);\n      },\n      'name',\n      {\n        value: 'get',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Obj, 'prototype', { writable: false });\n  return Obj;\n})(Base);\nObject.defineProperty(Obj.prototype, 'test', {\n  value: 2,\n  writable: true,\n  configurable: true,\n});\nconst obj = new Obj();\nexpect(obj.test).toBe(2);\nexpect(obj.get()).toBe(1);",
-  "'use strict';\nvar _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nvar _get2 = { get: require('@babel/runtime/helpers/get') };\nfunction _get(e, t, r) {\n  return _get2.get(e, t, r);\n}\nlet Base = (() => {\n  'use strict';\n  const Base = function Base() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Base, 'prototype', { writable: false });\n  return Base;\n})();\nBase.prototype.test = 1;\nlet Obj = (__nox_super_55_118 => {\n  'use strict';\n  const Obj = function Obj() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(Object.getPrototypeOf(Obj), arguments, new.target || Obj);\n    return _this;\n  };\n  if (__nox_super_55_118 !== null && typeof __nox_super_55_118 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Obj.prototype = Object.create(__nox_super_55_118 && __nox_super_55_118.prototype, {\n    constructor: {\n      value: Obj,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Obj, __nox_super_55_118);\n  else Obj.__proto__ = __nox_super_55_118;\n  Object.defineProperty(Obj.prototype, 'get', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        return _get(Object.getPrototypeOf(Obj.prototype), 'test', this);\n      },\n      'name',\n      {\n        value: 'get',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Obj, 'prototype', { writable: false });\n  return Obj;\n})(Base);\nObj.prototype.test = 2;\nconst obj = new Obj();\nexpect(obj.test).toBe(2);\nexpect(obj.get()).toBe(1);",
-  "'use strict';\nvar _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nvar _get2 = { get: require('@babel/runtime/helpers/get') };\nfunction _get(e, t, r) {\n  return _get2.get(e, t, r);\n}\nlet Base = (() => {\n  'use strict';\n  const Base = function Base() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Base.prototype, 'test', {\n    get: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        // This is incorrect according to the spec,\n        // but close enough for loose.\n        expect(this).toBe(Base.prototype);\n        return 1;\n      },\n      'name',\n      {\n        value: 'get test',\n        configurable: true,\n      },\n    ),\n    configurable: true,\n  });\n  Object.defineProperty(Base, 'prototype', { writable: false });\n  return Base;\n})();\nlet Obj = (__nox_super_185_248 => {\n  'use strict';\n  const Obj = function Obj() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(Object.getPrototypeOf(Obj), arguments, new.target || Obj);\n    return _this;\n  };\n  if (__nox_super_185_248 !== null && typeof __nox_super_185_248 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Obj.prototype = Object.create(__nox_super_185_248 && __nox_super_185_248.prototype, {\n    constructor: {\n      value: Obj,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Obj, __nox_super_185_248);\n  else Obj.__proto__ = __nox_super_185_248;\n  Object.defineProperty(Obj.prototype, 'get', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        return _get(Object.getPrototypeOf(Obj.prototype), 'test', this);\n      },\n      'name',\n      {\n        value: 'get',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Obj, 'prototype', { writable: false });\n  return Obj;\n})(Base);\nObject.defineProperty(Obj.prototype, 'test', {\n  value: 2,\n  writable: true,\n  configurable: true,\n});\nconst obj = new Obj();\nexpect(obj.test).toBe(2);\nexpect(obj.get()).toBe(1);",
-  "'use strict';\nvar _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nvar _get2 = { get: require('@babel/runtime/helpers/get') };\nfunction _get(e, t, r) {\n  return _get2.get(e, t, r);\n}\nlet Base = (() => {\n  'use strict';\n  const Base = function Base() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Base, 'prototype', { writable: false });\n  return Base;\n})();\nlet Obj = (__nox_super_30_93 => {\n  'use strict';\n  const Obj = function Obj() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(Object.getPrototypeOf(Obj), arguments, new.target || Obj);\n    return _this;\n  };\n  if (__nox_super_30_93 !== null && typeof __nox_super_30_93 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Obj.prototype = Object.create(__nox_super_30_93 && __nox_super_30_93.prototype, {\n    constructor: {\n      value: Obj,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Obj, __nox_super_30_93);\n  else Obj.__proto__ = __nox_super_30_93;\n  Object.defineProperty(Obj.prototype, 'get', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        return _get(Object.getPrototypeOf(Obj.prototype), 'test', this);\n      },\n      'name',\n      {\n        value: 'get',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Obj, 'prototype', { writable: false });\n  return Obj;\n})(Base);\nObject.defineProperty(Obj.prototype, 'test', {\n  value: 2,\n  writable: true,\n  configurable: true,\n});\nconst obj = new Obj();\nexpect(obj.test).toBe(2);\nexpect(obj.get()).toBeUndefined();",
-  "'use strict';\nvar _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nvar _get2 = { get: require('@babel/runtime/helpers/get') };\nfunction _get(e, t, r) {\n  return _get2.get(e, t, r);\n}\nlet Base = (() => {\n  'use strict';\n  const Base = function Base() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Base.prototype, 'test', {\n    set: Object.defineProperty(\n      function (v) {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        throw new Error('called');\n      },\n      'name',\n      {\n        value: 'set test',\n        configurable: true,\n      },\n    ),\n    configurable: true,\n  });\n  Object.defineProperty(Base, 'prototype', { writable: false });\n  return Base;\n})();\nlet Obj = (__nox_super_81_144 => {\n  'use strict';\n  const Obj = function Obj() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(Object.getPrototypeOf(Obj), arguments, new.target || Obj);\n    return _this;\n  };\n  if (__nox_super_81_144 !== null && typeof __nox_super_81_144 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Obj.prototype = Object.create(__nox_super_81_144 && __nox_super_81_144.prototype, {\n    constructor: {\n      value: Obj,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Obj, __nox_super_81_144);\n  else Obj.__proto__ = __nox_super_81_144;\n  Object.defineProperty(Obj.prototype, 'get', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        return _get(Object.getPrototypeOf(Obj.prototype), 'test', this);\n      },\n      'name',\n      {\n        value: 'get',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Obj, 'prototype', { writable: false });\n  return Obj;\n})(Base);\nObject.defineProperty(Obj.prototype, 'test', {\n  value: 2,\n  writable: true,\n  configurable: true,\n});\nconst obj = new Obj();\nexpect(obj.test).toBe(2);\nexpect(obj.get()).toBeUndefined();",
-  "'use strict';\nvar _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nvar _superReference2 = {\n  get: require('@babel/runtime/helpers/get'),\n  set: require('@babel/runtime/helpers/set'),\n};\nfunction _get(e, t, r) {\n  return _superReference2.get(e, t, r);\n}\nfunction _superReference(e, t, r) {\n  return {\n    get value() {\n      return _superReference2.get(e, t, r);\n    },\n    set value(u) {\n      _superReference2.set(e, t, u, r, !0);\n    },\n  };\n}\n_superReference.set = function (e, t, r, u) {\n  return _superReference2.set(e, t, u, r, !0);\n};\nlet Base = (() => {\n  'use strict';\n  const Base = function Base() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Base, 'prototype', { writable: false });\n  return Base;\n})();\nObject.defineProperty(Base.prototype, 0, {\n  value: 0,\n  writable: true,\n  configurable: true,\n});\nObject.defineProperty(Base.prototype, 1, {\n  value: 1,\n  writable: true,\n  configurable: true,\n});\nlet i = 0;\nconst proper = {\n  get prop() {\n    return i++;\n  },\n};\nlet Obj = (__nox_super_295_405 => {\n  'use strict';\n  const Obj = function Obj() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(Object.getPrototypeOf(Obj), arguments, new.target || Obj);\n    return _this;\n  };\n  if (__nox_super_295_405 !== null && typeof __nox_super_295_405 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Obj.prototype = Object.create(__nox_super_295_405 && __nox_super_295_405.prototype, {\n    constructor: {\n      value: Obj,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Obj, __nox_super_295_405);\n  else Obj.__proto__ = __nox_super_295_405;\n  Object.defineProperty(Obj.prototype, 'assign', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        _superReference(Object.getPrototypeOf(Obj.prototype), proper.prop, this).value += 1;\n      },\n      'name',\n      {\n        value: 'assign',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Obj.prototype, 'assign2', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        _superReference(Object.getPrototypeOf(Obj.prototype), i, this).value += 1;\n      },\n      'name',\n      {\n        value: 'assign2',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Obj, 'prototype', { writable: false });\n  return Obj;\n})(Base);\nconst obj = new Obj();\nobj.assign();\nexpect(i).toBe(1);\nexpect(obj[0]).toBe(1);\nexpect(obj[1]).toBe(1);\nobj.assign2();\nexpect(i).toBe(1);\nexpect(obj[0]).toBe(1);\nexpect(obj[1]).toBe(2);",
-  "'use strict';\nvar _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nvar _superReference2 = {\n  get: require('@babel/runtime/helpers/get'),\n  set: require('@babel/runtime/helpers/set'),\n};\nfunction _get(e, t, r) {\n  return _superReference2.get(e, t, r);\n}\nfunction _superReference(e, t, r) {\n  return {\n    get value() {\n      return _superReference2.get(e, t, r);\n    },\n    set value(u) {\n      _superReference2.set(e, t, u, r, !0);\n    },\n  };\n}\n_superReference.set = function (e, t, r, u) {\n  return _superReference2.set(e, t, u, r, !0);\n};\nlet Base = (() => {\n  'use strict';\n  const Base = function Base() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Base, 'prototype', { writable: false });\n  return Base;\n})();\nObject.defineProperty(Base.prototype, 0, {\n  value: 0,\n  writable: true,\n  configurable: true,\n});\nObject.defineProperty(Base.prototype, 1, {\n  value: 1,\n  writable: true,\n  configurable: true,\n});\nlet i = 0;\nconst proper = {\n  get prop() {\n    return i++;\n  },\n};\nlet Obj = (__nox_super_295_399 => {\n  'use strict';\n  const Obj = function Obj() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(Object.getPrototypeOf(Obj), arguments, new.target || Obj);\n    return _this;\n  };\n  if (__nox_super_295_399 !== null && typeof __nox_super_295_399 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Obj.prototype = Object.create(__nox_super_295_399 && __nox_super_295_399.prototype, {\n    constructor: {\n      value: Obj,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Obj, __nox_super_295_399);\n  else Obj.__proto__ = __nox_super_295_399;\n  Object.defineProperty(Obj.prototype, 'update', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        _superReference(Object.getPrototypeOf(Obj.prototype), proper.prop, this).value++;\n      },\n      'name',\n      {\n        value: 'update',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Obj.prototype, 'update2', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        _superReference(Object.getPrototypeOf(Obj.prototype), i, this).value++;\n      },\n      'name',\n      {\n        value: 'update2',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Obj, 'prototype', { writable: false });\n  return Obj;\n})(Base);\nconst obj = new Obj();\nobj.update();\nexpect(i).toBe(1);\nexpect(obj[0]).toBe(1);\nexpect(obj[1]).toBe(1);\nobj.update2();\nexpect(i).toBe(1);\nexpect(obj[0]).toBe(1);\nexpect(obj[1]).toBe(2);",
-  "let C = (() => {\n  'use strict';\n  const C = function C() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(C.prototype, 'a', {\n    get: Object.defineProperty(\n      function () {\n        /* before get a */\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        return 42;\n      },\n      'name',\n      {\n        value: 'get a',\n        configurable: true,\n      },\n    ),\n    configurable: true,\n  });\n  Object.defineProperty(C.prototype, 'a', {\n    set: Object.defineProperty(\n      function (v) {\n        /* after get a */\n        /* before set a */\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      },\n      'name',\n      {\n        value: 'set a',\n        configurable: true,\n      },\n    ),\n    configurable: true,\n  });\n  Object.defineProperty(C, 'prototype', { writable: false });\n  return C;\n  /* after set a */\n})();",
-  "'use strict';\nvar _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nvar _superReference2 = { set: require('@babel/runtime/helpers/set') },\n  _superReference = {\n    set: function (e, r, t, s) {\n      return _superReference2.set(e, r, s, t, !0);\n    },\n  };\nlet Base = (() => {\n  'use strict';\n  const Base = function Base() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Base, 'prototype', { writable: false });\n  return Base;\n})();\nObject.defineProperty(Base.prototype, 'test', {\n  value: 1,\n  writable: true,\n  configurable: true,\n});\nlet Obj = (__nox_super_135_202 => {\n  'use strict';\n  const Obj = function Obj() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(Object.getPrototypeOf(Obj), arguments, new.target || Obj);\n    return _this;\n  };\n  if (__nox_super_135_202 !== null && typeof __nox_super_135_202 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Obj.prototype = Object.create(__nox_super_135_202 && __nox_super_135_202.prototype, {\n    constructor: {\n      value: Obj,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Obj, __nox_super_135_202);\n  else Obj.__proto__ = __nox_super_135_202;\n  Object.defineProperty(Obj.prototype, 'set', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        return _superReference.set(Object.getPrototypeOf(Obj.prototype), 'test', this, 3);\n      },\n      'name',\n      {\n        value: 'set',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Obj, 'prototype', { writable: false });\n  return Obj;\n})(Base);\nObject.defineProperty(Obj.prototype, 'test', {\n  value: 2,\n  writable: true,\n  configurable: true,\n});\nconst obj = new Obj();\nexpect(obj.set()).toBe(3);\nexpect(Base.prototype.test).toBe(1);\nexpect(Obj.prototype.test).toBe(2);\nexpect(obj.test).toBe(3);",
-  "'use strict';\nvar _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nvar _superReference2 = { set: require('@babel/runtime/helpers/set') },\n  _superReference = {\n    set: function (e, r, t, s) {\n      return _superReference2.set(e, r, s, t, !0);\n    },\n  };\nlet called = false;\nlet Base = (() => {\n  'use strict';\n  const Base = function Base() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Base.prototype, 'test', {\n    get: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        called = true;\n        return 1;\n      },\n      'name',\n      {\n        value: 'get test',\n        configurable: true,\n      },\n    ),\n    configurable: true,\n  });\n  Object.defineProperty(Base, 'prototype', { writable: false });\n  return Base;\n})();\nlet Obj = (__nox_super_103_170 => {\n  'use strict';\n  const Obj = function Obj() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(Object.getPrototypeOf(Obj), arguments, new.target || Obj);\n    return _this;\n  };\n  if (__nox_super_103_170 !== null && typeof __nox_super_103_170 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Obj.prototype = Object.create(__nox_super_103_170 && __nox_super_103_170.prototype, {\n    constructor: {\n      value: Obj,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Obj, __nox_super_103_170);\n  else Obj.__proto__ = __nox_super_103_170;\n  Object.defineProperty(Obj.prototype, 'set', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        return _superReference.set(Object.getPrototypeOf(Obj.prototype), 'test', this, 3);\n      },\n      'name',\n      {\n        value: 'set',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Obj, 'prototype', { writable: false });\n  return Obj;\n})(Base);\nObject.defineProperty(Obj.prototype, 'test', {\n  value: 2,\n  writable: true,\n  configurable: true,\n});\nconst obj = new Obj();\n// This is incorrect according to the spec,\n// but close enough for loose.\n// expect(() => {\nexpect(obj.set()).toBe(3);\n// }).toThrow(TypeError);\nexpect(called).toBe(false);\nexpect(Base.prototype.test).toBe(1);\nexpect(Obj.prototype.test).toBe(2);\nexpect(obj.test).toBe(3);",
-  "'use strict';\nvar _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nvar _superReference2 = { set: require('@babel/runtime/helpers/set') },\n  _superReference = {\n    set: function (e, r, t, s) {\n      return _superReference2.set(e, r, s, t, !0);\n    },\n  };\nlet Base = (() => {\n  'use strict';\n  const Base = function Base() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Base, 'prototype', { writable: false });\n  return Base;\n})();\nlet Obj = (__nox_super_30_97 => {\n  'use strict';\n  const Obj = function Obj() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(Object.getPrototypeOf(Obj), arguments, new.target || Obj);\n    return _this;\n  };\n  if (__nox_super_30_97 !== null && typeof __nox_super_30_97 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Obj.prototype = Object.create(__nox_super_30_97 && __nox_super_30_97.prototype, {\n    constructor: {\n      value: Obj,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Obj, __nox_super_30_97);\n  else Obj.__proto__ = __nox_super_30_97;\n  Object.defineProperty(Obj.prototype, 'set', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        return _superReference.set(Object.getPrototypeOf(Obj.prototype), 'test', this, 3);\n      },\n      'name',\n      {\n        value: 'set',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Obj, 'prototype', { writable: false });\n  return Obj;\n})(Base);\nObject.defineProperty(Obj.prototype, 'test', {\n  value: 2,\n  writable: true,\n  configurable: true,\n});\nconst obj = new Obj();\nexpect(obj.set()).toBe(3);\nexpect(Base.prototype.test).toBeUndefined();\nexpect(Obj.prototype.test).toBe(2);\nexpect(obj.test).toBe(3);",
-  "'use strict';\nvar _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nvar _superReference2 = { set: require('@babel/runtime/helpers/set') },\n  _superReference = {\n    set: function (e, r, t, s) {\n      return _superReference2.set(e, r, s, t, !0);\n    },\n  };\nlet Base = (() => {\n  'use strict';\n  const Base = function Base() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Base, 'prototype', { writable: false });\n  return Base;\n})();\nlet called = false;\nlet Obj = (__nox_super_50_156 => {\n  'use strict';\n  const Obj = function Obj() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(Object.getPrototypeOf(Obj), arguments, new.target || Obj);\n    return _this;\n  };\n  if (__nox_super_50_156 !== null && typeof __nox_super_50_156 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Obj.prototype = Object.create(__nox_super_50_156 && __nox_super_50_156.prototype, {\n    constructor: {\n      value: Obj,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Obj, __nox_super_50_156);\n  else Obj.__proto__ = __nox_super_50_156;\n  Object.defineProperty(Obj.prototype, 'test', {\n    get: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        called = true;\n      },\n      'name',\n      {\n        value: 'get test',\n        configurable: true,\n      },\n    ),\n    configurable: true,\n  });\n  Object.defineProperty(Obj.prototype, 'set', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        return _superReference.set(Object.getPrototypeOf(Obj.prototype), 'test', this, 3);\n      },\n      'name',\n      {\n        value: 'set',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Obj, 'prototype', { writable: false });\n  return Obj;\n})(Base);\nconst obj = new Obj();\n// This is incorrect according to the spec,\n// but close enough for loose.\n// expect(obj.set()).toBe(3);\nexpect(() => {\n  obj.set();\n}).toThrow(TypeError);\nexpect(called).toBe(false);\nexpect(Base.prototype.test).toBeUndefined();\nexpect(Obj.prototype.test).toBeUndefined();\nexpect(obj.test).toBe(undefined);",
-  "'use strict';\nvar _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nvar _superReference2 = { set: require('@babel/runtime/helpers/set') },\n  _superReference = {\n    set: function (e, r, t, s) {\n      return _superReference2.set(e, r, s, t, !0);\n    },\n  };\nlet Base = (() => {\n  'use strict';\n  const Base = function Base() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Base, 'prototype', { writable: false });\n  return Base;\n})();\nlet Obj = (__nox_super_30_97 => {\n  'use strict';\n  const Obj = function Obj() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(Object.getPrototypeOf(Obj), arguments, new.target || Obj);\n    return _this;\n  };\n  if (__nox_super_30_97 !== null && typeof __nox_super_30_97 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Obj.prototype = Object.create(__nox_super_30_97 && __nox_super_30_97.prototype, {\n    constructor: {\n      value: Obj,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Obj, __nox_super_30_97);\n  else Obj.__proto__ = __nox_super_30_97;\n  Object.defineProperty(Obj.prototype, 'set', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        return _superReference.set(Object.getPrototypeOf(Obj.prototype), 'test', this, 3);\n      },\n      'name',\n      {\n        value: 'set',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Obj, 'prototype', { writable: false });\n  return Obj;\n})(Base);\nconst obj = new Obj();\nexpect(obj.set()).toBe(3);\nexpect(Base.prototype.test).toBeUndefined();\nexpect(Obj.prototype.test).toBeUndefined();\nexpect(obj.test).toBe(3);",
-  "'use strict';\nvar _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nvar _superReference2 = { set: require('@babel/runtime/helpers/set') },\n  _superReference = {\n    set: function (e, r, t, s) {\n      return _superReference2.set(e, r, s, t, !0);\n    },\n  };\nlet Base = (() => {\n  'use strict';\n  const Base = function Base() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Base, 'prototype', { writable: false });\n  return Base;\n})();\nlet value = 2;\nlet Obj = (__nox_super_45_148 => {\n  'use strict';\n  const Obj = function Obj() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(Object.getPrototypeOf(Obj), arguments, new.target || Obj);\n    return _this;\n  };\n  if (__nox_super_45_148 !== null && typeof __nox_super_45_148 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Obj.prototype = Object.create(__nox_super_45_148 && __nox_super_45_148.prototype, {\n    constructor: {\n      value: Obj,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Obj, __nox_super_45_148);\n  else Obj.__proto__ = __nox_super_45_148;\n  Object.defineProperty(Obj.prototype, 'test', {\n    set: Object.defineProperty(\n      function (v) {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        value = v;\n      },\n      'name',\n      {\n        value: 'set test',\n        configurable: true,\n      },\n    ),\n    configurable: true,\n  });\n  Object.defineProperty(Obj.prototype, 'set', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        return _superReference.set(Object.getPrototypeOf(Obj.prototype), 'test', this, 3);\n      },\n      'name',\n      {\n        value: 'set',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Obj, 'prototype', { writable: false });\n  return Obj;\n})(Base);\nconst obj = new Obj();\nexpect(obj.set()).toBe(3);\nexpect(Base.prototype.test).toBeUndefined();\nexpect(Obj.prototype.test).toBeUndefined();\n// This is incorrect according to the spec,\n// but close enough for loose.\nexpect(value).toBe(3);\nexpect(obj.test).toBe(undefined);",
-  "'use strict';\nvar _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nvar _superReference2 = { set: require('@babel/runtime/helpers/set') },\n  _superReference = {\n    set: function (e, r, t, s) {\n      return _superReference2.set(e, r, s, t, !0);\n    },\n  };\nlet value = 1;\nlet Base = (() => {\n  'use strict';\n  const Base = function Base() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Base.prototype, 'test', {\n    set: Object.defineProperty(\n      function (v) {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        value = v;\n      },\n      'name',\n      {\n        value: 'set test',\n        configurable: true,\n      },\n    ),\n    configurable: true,\n  });\n  Object.defineProperty(Base, 'prototype', { writable: false });\n  return Base;\n})();\nlet Obj = (__nox_super_80_147 => {\n  'use strict';\n  const Obj = function Obj() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(Object.getPrototypeOf(Obj), arguments, new.target || Obj);\n    return _this;\n  };\n  if (__nox_super_80_147 !== null && typeof __nox_super_80_147 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Obj.prototype = Object.create(__nox_super_80_147 && __nox_super_80_147.prototype, {\n    constructor: {\n      value: Obj,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Obj, __nox_super_80_147);\n  else Obj.__proto__ = __nox_super_80_147;\n  Object.defineProperty(Obj.prototype, 'set', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        return _superReference.set(Object.getPrototypeOf(Obj.prototype), 'test', this, 3);\n      },\n      'name',\n      {\n        value: 'set',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Obj, 'prototype', { writable: false });\n  return Obj;\n})(Base);\nObject.defineProperty(Obj.prototype, 'test', {\n  value: 2,\n  writable: true,\n  configurable: true,\n});\nconst obj = new Obj();\nexpect(obj.set()).toBe(3);\n// todo\nexpect(value).toBe(1);\nexpect(Base.prototype.test).toBeUndefined();\nexpect(Obj.prototype.test).toBe(2);\n// todo\nexpect(obj.test).toBe(3);",
-  "'use strict';\nvar _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nvar _superReference2 = { set: require('@babel/runtime/helpers/set') },\n  _superReference = {\n    set: function (e, r, t, s) {\n      return _superReference2.set(e, r, s, t, !0);\n    },\n  };\nlet value = 1;\nlet Base = (() => {\n  'use strict';\n  const Base = function Base() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Base.prototype, 'test', {\n    set: Object.defineProperty(\n      function (v) {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        value = v;\n      },\n      'name',\n      {\n        value: 'set test',\n        configurable: true,\n      },\n    ),\n    configurable: true,\n  });\n  Object.defineProperty(Base, 'prototype', { writable: false });\n  return Base;\n})();\nlet Obj = (__nox_super_80_147 => {\n  'use strict';\n  const Obj = function Obj() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(Object.getPrototypeOf(Obj), arguments, new.target || Obj);\n    return _this;\n  };\n  if (__nox_super_80_147 !== null && typeof __nox_super_80_147 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Obj.prototype = Object.create(__nox_super_80_147 && __nox_super_80_147.prototype, {\n    constructor: {\n      value: Obj,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Obj, __nox_super_80_147);\n  else Obj.__proto__ = __nox_super_80_147;\n  Object.defineProperty(Obj.prototype, 'set', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        return _superReference.set(Object.getPrototypeOf(Obj.prototype), 'test', this, 3);\n      },\n      'name',\n      {\n        value: 'set',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Obj, 'prototype', { writable: false });\n  return Obj;\n})(Base);\nObject.defineProperty(Obj.prototype, 'test', {\n  value: 2,\n  writable: true,\n  configurable: true,\n});\nconst obj = new Obj();\nexpect(obj.set()).toBe(3);\n// This is incorrect according to the spec,\n// but close enough for loose.\n// expect(value).toBe(3);\nexpect(value).toBe(1);\nexpect(Base.prototype.test).toBeUndefined();\nexpect(Obj.prototype.test).toBe(2);\n// This is incorrect according to the spec,\n// but close enough for loose.\n// expect(obj.test).toBe(2);\nexpect(obj.test).toBe(3);",
-  "'use strict';\nvar _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nvar _get2 = { get: require('@babel/runtime/helpers/get') };\nfunction _get(e, t, r) {\n  return _get2.get(e, t, r);\n}\nlet Base = (() => {\n  'use strict';\n  const Base = function Base() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Base.prototype, 'test', {\n    get: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        expect(this).toBe(obj);\n        return function (...args) {\n          expect(this).toBe(obj);\n          expect(args).toEqual([1, 2, 3]);\n          return 1;\n        };\n      },\n      'name',\n      {\n        value: 'get test',\n        configurable: true,\n      },\n    ),\n    configurable: true,\n  });\n  Object.defineProperty(Base, 'prototype', { writable: false });\n  return Base;\n})();\nlet Obj = (__nox_super_200_410 => {\n  'use strict';\n  const Obj = function Obj() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(Object.getPrototypeOf(Obj), arguments, new.target || Obj);\n    return _this;\n  };\n  if (__nox_super_200_410 !== null && typeof __nox_super_200_410 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Obj.prototype = Object.create(__nox_super_200_410 && __nox_super_200_410.prototype, {\n    constructor: {\n      value: Obj,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Obj, __nox_super_200_410);\n  else Obj.__proto__ = __nox_super_200_410;\n  Object.defineProperty(Obj.prototype, 'call', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        _get(Object.getPrototypeOf(Obj.prototype), 'test', this).call(this, 1, 2, 3);\n        _get(Object.getPrototypeOf(Obj.prototype), 'test', this).call(this, 1, ...[2, 3]);\n        _get(Object.getPrototypeOf(Obj.prototype), 'test', this).call(this, ...[1, 2, 3]);\n        return _get(Object.getPrototypeOf(Obj.prototype), 'test', this).call(this, ...arguments);\n      },\n      'name',\n      {\n        value: 'call',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Obj.prototype, 'test', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        throw new Error('called');\n      },\n      'name',\n      {\n        value: 'test',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Obj, 'prototype', { writable: false });\n  return Obj;\n})(Base);\nconst obj = new Obj();\nexpect(obj.call(1, 2, 3)).toBe(1);",
-  "var _classKey2 = { toPropertyKey: require('@babel/runtime/helpers/toPropertyKey') },\n  _classKey = _classKey2.toPropertyKey;\nlet x = 1;\nlet A = ((_key, _key16, _key17) => {\n  'use strict';\n  _key = _classKey(_key);\n  _key16 = _classKey(_key16);\n  _key17 = _classKey(_key17);\n  const A = function A() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(A.prototype, _key, {\n    get: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      },\n      'name',\n      {\n        value:\n          'get ' +\n          (typeof _key === 'symbol' ? { [_key]: function () {} }[_key].name : String(_key)),\n        configurable: true,\n      },\n    ),\n    configurable: true,\n  });\n  Object.defineProperty(A.prototype, _key16, {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      },\n      'name',\n      {\n        value:\n          typeof _key16 === 'symbol' ? { [_key16]: function () {} }[_key16].name : String(_key16),\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(A.prototype, _key17, {\n    set: Object.defineProperty(\n      function (_) {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      },\n      'name',\n      {\n        value:\n          'set ' +\n          (typeof _key17 === 'symbol' ? { [_key17]: function () {} }[_key17].name : String(_key17)),\n        configurable: true,\n      },\n    ),\n    configurable: true,\n  });\n  Object.defineProperty(A, 'prototype', { writable: false });\n  return A;\n})(x, ((x = 3), 2), x);\nexpect(Object.getOwnPropertyDescriptors(A.prototype)).toMatchObject({\n  1: {\n    get: expect.any(Function),\n    set: undefined,\n  },\n  2: { value: expect.any(Function) },\n  3: {\n    get: undefined,\n    set: expect.any(Function),\n  },\n});",
-  "var _classKey2 = { toPropertyKey: require('@babel/runtime/helpers/toPropertyKey') },\n  _classKey = _classKey2.toPropertyKey;\nlet A = ((_key, _key15, _key16) => {\n  'use strict';\n  _key = _classKey(_key);\n  _key15 = _classKey(_key15);\n  _key16 = _classKey(_key16);\n  const A = function A() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(A.prototype, _key, {\n    get: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      },\n      'name',\n      {\n        value:\n          'get ' +\n          (typeof _key === 'symbol' ? { [_key]: function () {} }[_key].name : String(_key)),\n        configurable: true,\n      },\n    ),\n    configurable: true,\n  });\n  Object.defineProperty(A.prototype, _key15, {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      },\n      'name',\n      {\n        value:\n          typeof _key15 === 'symbol' ? { [_key15]: function () {} }[_key15].name : String(_key15),\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(A.prototype, _key16, {\n    set: Object.defineProperty(\n      function (_) {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      },\n      'name',\n      {\n        value:\n          'set ' +\n          (typeof _key16 === 'symbol' ? { [_key16]: function () {} }[_key16].name : String(_key16)),\n        configurable: true,\n      },\n    ),\n    configurable: true,\n  });\n  Object.defineProperty(A, 'prototype', { writable: false });\n  return A;\n})(x, ((x = 2), 3), x);",
-  "'use strict';\nvar _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nvar _get2 = { get: require('@babel/runtime/helpers/get') };\nfunction _get(e, t, r) {\n  return _get2.get(e, t, r);\n}\nlet Base = (() => {\n  'use strict';\n  const Base = function Base() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Base.prototype, 'test', {\n    get: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        expect(this).toBe(obj);\n        return 1;\n      },\n      'name',\n      {\n        value: 'get test',\n        configurable: true,\n      },\n    ),\n    configurable: true,\n  });\n  Object.defineProperty(Base, 'prototype', { writable: false });\n  return Base;\n})();\nlet Obj = (__nox_super_91_154 => {\n  'use strict';\n  const Obj = function Obj() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(Object.getPrototypeOf(Obj), arguments, new.target || Obj);\n    return _this;\n  };\n  if (__nox_super_91_154 !== null && typeof __nox_super_91_154 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Obj.prototype = Object.create(__nox_super_91_154 && __nox_super_91_154.prototype, {\n    constructor: {\n      value: Obj,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Obj, __nox_super_91_154);\n  else Obj.__proto__ = __nox_super_91_154;\n  Object.defineProperty(Obj.prototype, 'get', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        return _get(Object.getPrototypeOf(Obj.prototype), 'test', this);\n      },\n      'name',\n      {\n        value: 'get',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Obj, 'prototype', { writable: false });\n  return Obj;\n})(Base);\nObject.defineProperty(Obj.prototype, 'test', {\n  value: 2,\n  writable: true,\n  configurable: true,\n});\nconst obj = new Obj();\nexpect(obj.test).toBe(2);\nexpect(obj.get()).toBe(1);",
-  "let A = (() => {\n  'use strict';\n  const A = function A() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(A.prototype, 'x', {\n    get: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      },\n      'name',\n      {\n        value: 'get x',\n        configurable: true,\n      },\n    ),\n    configurable: true,\n  });\n  Object.defineProperty(A.prototype, 'x', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      },\n      'name',\n      {\n        value: 'x',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(A.prototype, 'x', {\n    set: Object.defineProperty(\n      function (_) {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      },\n      'name',\n      {\n        value: 'set x',\n        configurable: true,\n      },\n    ),\n    configurable: true,\n  });\n  Object.defineProperty(A, 'prototype', { writable: false });\n  return A;\n})();\nexpect(Object.getOwnPropertyDescriptors(A.prototype)).toMatchObject({\n  x: {\n    get: undefined,\n    set: expect.any(Function),\n  },\n});",
-  "let A = (() => {\n  'use strict';\n  const A = function A() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(A.prototype, 'x', {\n    get: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      },\n      'name',\n      {\n        value: 'get x',\n        configurable: true,\n      },\n    ),\n    configurable: true,\n  });\n  Object.defineProperty(A.prototype, 'x', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      },\n      'name',\n      {\n        value: 'x',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(A.prototype, 'x', {\n    set: Object.defineProperty(\n      function (_) {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      },\n      'name',\n      {\n        value: 'set x',\n        configurable: true,\n      },\n    ),\n    configurable: true,\n  });\n  Object.defineProperty(A, 'prototype', { writable: false });\n  return A;\n})();",
-  "var _classKey2 = { toPropertyKey: require('@babel/runtime/helpers/toPropertyKey') },\n  _classKey = _classKey2.toPropertyKey;\nlet A = ((_key, _key15) => {\n  'use strict';\n  _key = _classKey(_key);\n  _key15 = _classKey(_key15);\n  const A = function A() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(A.prototype, 1, {\n    get: function () {\n      if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n    },\n    configurable: true,\n  });\n  Object.defineProperty(A.prototype, _key, {\n    set: Object.defineProperty(\n      function (_) {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      },\n      'name',\n      {\n        value:\n          'set ' +\n          (typeof _key === 'symbol' ? { [_key]: function () {} }[_key].name : String(_key)),\n        configurable: true,\n      },\n    ),\n    configurable: true,\n  });\n  Object.defineProperty(A.prototype, 2, {\n    get: function () {\n      if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n    },\n    configurable: true,\n  });\n  Object.defineProperty(A.prototype, '2', {\n    set: Object.defineProperty(\n      function (_) {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      },\n      'name',\n      {\n        value: 'set 2',\n        configurable: true,\n      },\n    ),\n    configurable: true,\n  });\n  Object.defineProperty(A.prototype, 3n, {\n    get: function () {\n      if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n    },\n    configurable: true,\n  });\n  Object.defineProperty(A.prototype, 3, {\n    set: function (_) {\n      if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n    },\n    configurable: true,\n  });\n  Object.defineProperty(A.prototype, _key15, {\n    get: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      },\n      'name',\n      {\n        value:\n          'get ' +\n          (typeof _key15 === 'symbol' ? { [_key15]: function () {} }[_key15].name : String(_key15)),\n        configurable: true,\n      },\n    ),\n    configurable: true,\n  });\n  Object.defineProperty(A.prototype, '4', {\n    set: Object.defineProperty(\n      function (_) {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      },\n      'name',\n      {\n        value: 'set 4',\n        configurable: true,\n      },\n    ),\n    configurable: true,\n  });\n  Object.defineProperty(A.prototype, 5n, {\n    get: function () {\n      // Different keys\n      if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n    },\n    configurable: true,\n  });\n  Object.defineProperty(A.prototype, '5n', {\n    set: Object.defineProperty(\n      function (_) {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      },\n      'name',\n      {\n        value: 'set 5n',\n        configurable: true,\n      },\n    ),\n    configurable: true,\n  });\n  Object.defineProperty(A, 'prototype', { writable: false });\n  return A;\n})(1, 4n);",
-  "'use strict';\nvar _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nvar _superReference2 = { set: require('@babel/runtime/helpers/set') },\n  _superReference = {\n    set: function (e, r, t, s) {\n      return _superReference2.set(e, r, s, t, !0);\n    },\n  };\nlet called = false;\nlet Base = (() => {\n  'use strict';\n  const Base = function Base() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Base.prototype, 'test', {\n    get: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        called = true;\n        return 1;\n      },\n      'name',\n      {\n        value: 'get test',\n        configurable: true,\n      },\n    ),\n    configurable: true,\n  });\n  Object.defineProperty(Base, 'prototype', { writable: false });\n  return Base;\n})();\nlet Obj = (__nox_super_103_170 => {\n  'use strict';\n  const Obj = function Obj() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(Object.getPrototypeOf(Obj), arguments, new.target || Obj);\n    return _this;\n  };\n  if (__nox_super_103_170 !== null && typeof __nox_super_103_170 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Obj.prototype = Object.create(__nox_super_103_170 && __nox_super_103_170.prototype, {\n    constructor: {\n      value: Obj,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Obj, __nox_super_103_170);\n  else Obj.__proto__ = __nox_super_103_170;\n  Object.defineProperty(Obj.prototype, 'set', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        return _superReference.set(Object.getPrototypeOf(Obj.prototype), 'test', this, 3);\n      },\n      'name',\n      {\n        value: 'set',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Obj, 'prototype', { writable: false });\n  return Obj;\n})(Base);\nObject.defineProperty(Obj.prototype, 'test', {\n  value: 2,\n  writable: true,\n  configurable: true,\n});\nconst obj = new Obj();\nexpect(() => {\n  obj.set();\n}).toThrow(TypeError);\nexpect(called).toBe(false);\nexpect(Base.prototype.test).toBe(1);\nexpect(Obj.prototype.test).toBe(2);\nexpect(obj.test).toBe(2);",
-  "'use strict';\nvar _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nvar _superReference2 = { set: require('@babel/runtime/helpers/set') },\n  _superReference = {\n    set: function (e, r, t, s) {\n      return _superReference2.set(e, r, s, t, !0);\n    },\n  };\nlet Base = (() => {\n  'use strict';\n  const Base = function Base() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Base.prototype, 'test', {\n    get: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        return 1;\n      },\n      'name',\n      {\n        value: 'get test',\n        configurable: true,\n      },\n    ),\n    configurable: true,\n  });\n  Object.defineProperty(Base, 'prototype', { writable: false });\n  return Base;\n})();\nlet Obj = (__nox_super_64_131 => {\n  'use strict';\n  const Obj = function Obj() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(Object.getPrototypeOf(Obj), arguments, new.target || Obj);\n    return _this;\n  };\n  if (__nox_super_64_131 !== null && typeof __nox_super_64_131 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Obj.prototype = Object.create(__nox_super_64_131 && __nox_super_64_131.prototype, {\n    constructor: {\n      value: Obj,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Obj, __nox_super_64_131);\n  else Obj.__proto__ = __nox_super_64_131;\n  Object.defineProperty(Obj.prototype, 'set', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        return _superReference.set(Object.getPrototypeOf(Obj.prototype), 'test', this, 3);\n      },\n      'name',\n      {\n        value: 'set',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Obj, 'prototype', { writable: false });\n  return Obj;\n})(Base);\nObject.defineProperty(Obj.prototype, 'test', {\n  value: 2,\n  writable: true,\n  configurable: true,\n});\nconst obj = new Obj();\nexpect(() => {\n  // this requires helpers to be in file (not external), so they\n  // are in \"strict\" mode code.\n  obj.set();\n}).toThrow(TypeError);\nexpect(Base.prototype.test).toBe(1);\nexpect(Obj.prototype.test).toBe(2);\nexpect(obj.test).toBe(2);",
-  "'use strict';\nvar _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nvar _superReference2 = { set: require('@babel/runtime/helpers/set') },\n  _superReference = {\n    set: function (e, r, t, s) {\n      return _superReference2.set(e, r, s, t, !0);\n    },\n  };\nlet Base = (() => {\n  'use strict';\n  const Base = function Base() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Base, 'prototype', { writable: false });\n  return Base;\n})();\nlet called = false;\nlet Obj = (__nox_super_50_156 => {\n  'use strict';\n  const Obj = function Obj() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(Object.getPrototypeOf(Obj), arguments, new.target || Obj);\n    return _this;\n  };\n  if (__nox_super_50_156 !== null && typeof __nox_super_50_156 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Obj.prototype = Object.create(__nox_super_50_156 && __nox_super_50_156.prototype, {\n    constructor: {\n      value: Obj,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Obj, __nox_super_50_156);\n  else Obj.__proto__ = __nox_super_50_156;\n  Object.defineProperty(Obj.prototype, 'test', {\n    get: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        called = true;\n      },\n      'name',\n      {\n        value: 'get test',\n        configurable: true,\n      },\n    ),\n    configurable: true,\n  });\n  Object.defineProperty(Obj.prototype, 'set', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        return _superReference.set(Object.getPrototypeOf(Obj.prototype), 'test', this, 3);\n      },\n      'name',\n      {\n        value: 'set',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Obj, 'prototype', { writable: false });\n  return Obj;\n})(Base);\nconst obj = new Obj();\nexpect(obj.set()).toBe(3);\nexpect(called).toBe(false);\nexpect(Base.prototype.test).toBeUndefined();\nexpect(Obj.prototype.test).toBeUndefined();\nexpect(obj.test).toBe(3);",
-  "'use strict';\nvar _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nvar _superReference2 = { set: require('@babel/runtime/helpers/set') },\n  _superReference = {\n    set: function (e, r, t, s) {\n      return _superReference2.set(e, r, s, t, !0);\n    },\n  };\nlet Base = (() => {\n  'use strict';\n  const Base = function Base() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Base, 'prototype', { writable: false });\n  return Base;\n})();\nlet Obj = (__nox_super_30_115 => {\n  'use strict';\n  const Obj = function Obj() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(Object.getPrototypeOf(Obj), arguments, new.target || Obj);\n    return _this;\n  };\n  if (__nox_super_30_115 !== null && typeof __nox_super_30_115 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Obj.prototype = Object.create(__nox_super_30_115 && __nox_super_30_115.prototype, {\n    constructor: {\n      value: Obj,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Obj, __nox_super_30_115);\n  else Obj.__proto__ = __nox_super_30_115;\n  Object.defineProperty(Obj.prototype, 'test', {\n    get: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      },\n      'name',\n      {\n        value: 'get test',\n        configurable: true,\n      },\n    ),\n    configurable: true,\n  });\n  Object.defineProperty(Obj.prototype, 'set', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        return _superReference.set(Object.getPrototypeOf(Obj.prototype), 'test', this, 3);\n      },\n      'name',\n      {\n        value: 'set',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Obj, 'prototype', { writable: false });\n  return Obj;\n})(Base);\nconst obj = new Obj();\nexpect(obj.set()).toBe(3);\nexpect(Base.prototype.test).toBeUndefined();\nexpect(Obj.prototype.test).toBeUndefined();\nexpect(obj.test).toBe(3);",
-  "'use strict';\nvar _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nvar _superReference2 = { set: require('@babel/runtime/helpers/set') },\n  _superReference = {\n    set: function (e, r, t, s) {\n      return _superReference2.set(e, r, s, t, !0);\n    },\n  };\nlet Base = (() => {\n  'use strict';\n  const Base = function Base() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Base, 'prototype', { writable: false });\n  return Base;\n})();\nlet value = 2;\nlet Obj = (__nox_super_45_148 => {\n  'use strict';\n  const Obj = function Obj() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(Object.getPrototypeOf(Obj), arguments, new.target || Obj);\n    return _this;\n  };\n  if (__nox_super_45_148 !== null && typeof __nox_super_45_148 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Obj.prototype = Object.create(__nox_super_45_148 && __nox_super_45_148.prototype, {\n    constructor: {\n      value: Obj,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Obj, __nox_super_45_148);\n  else Obj.__proto__ = __nox_super_45_148;\n  Object.defineProperty(Obj.prototype, 'test', {\n    set: Object.defineProperty(\n      function (v) {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        value = v;\n      },\n      'name',\n      {\n        value: 'set test',\n        configurable: true,\n      },\n    ),\n    configurable: true,\n  });\n  Object.defineProperty(Obj.prototype, 'set', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        return _superReference.set(Object.getPrototypeOf(Obj.prototype), 'test', this, 3);\n      },\n      'name',\n      {\n        value: 'set',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Obj, 'prototype', { writable: false });\n  return Obj;\n})(Base);\nconst obj = new Obj();\nexpect(obj.set()).toBe(3);\nexpect(Base.prototype.test).toBeUndefined();\nexpect(Obj.prototype.test).toBeUndefined();\nexpect(value).toBe(2);\nexpect(obj.test).toBe(3);",
-  "'use strict';\nvar _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nvar _superReference2 = { set: require('@babel/runtime/helpers/set') },\n  _superReference = {\n    set: function (e, r, t, s) {\n      return _superReference2.set(e, r, s, t, !0);\n    },\n  };\nlet Base = (() => {\n  'use strict';\n  const Base = function Base() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Base, 'prototype', { writable: false });\n  return Base;\n})();\nlet value = 2;\nlet Obj = (__nox_super_45_176 => {\n  'use strict';\n  const Obj = function Obj() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(Object.getPrototypeOf(Obj), arguments, new.target || Obj);\n    return _this;\n  };\n  if (__nox_super_45_176 !== null && typeof __nox_super_45_176 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Obj.prototype = Object.create(__nox_super_45_176 && __nox_super_45_176.prototype, {\n    constructor: {\n      value: Obj,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Obj, __nox_super_45_176);\n  else Obj.__proto__ = __nox_super_45_176;\n  Object.defineProperty(Obj.prototype, 'test', {\n    set: Object.defineProperty(\n      function (v) {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        expect(this).toBe(obj);\n        value = v;\n      },\n      'name',\n      {\n        value: 'set test',\n        configurable: true,\n      },\n    ),\n    configurable: true,\n  });\n  Object.defineProperty(Obj.prototype, 'set', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        return _superReference.set(Object.getPrototypeOf(Obj.prototype), 'test', this, 3);\n      },\n      'name',\n      {\n        value: 'set',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Obj, 'prototype', { writable: false });\n  return Obj;\n})(Base);\nconst obj = new Obj();\nexpect(obj.set()).toBe(3);\nexpect(Base.prototype.test).toBeUndefined();\nexpect(Obj.prototype.test).toBeUndefined();\nexpect(value).toBe(2);\nexpect(obj.test).toBe(3);",
-  "'use strict';\nvar _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nvar _superReference2 = { set: require('@babel/runtime/helpers/set') },\n  _superReference = {\n    set: function (e, r, t, s) {\n      return _superReference2.set(e, r, s, t, !0);\n    },\n  };\nlet value = 1;\nlet Base = (() => {\n  'use strict';\n  const Base = function Base() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Base.prototype, 'test', {\n    set: Object.defineProperty(\n      function (v) {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        value = v;\n      },\n      'name',\n      {\n        value: 'set test',\n        configurable: true,\n      },\n    ),\n    configurable: true,\n  });\n  Object.defineProperty(Base, 'prototype', { writable: false });\n  return Base;\n})();\nlet Obj = (__nox_super_80_147 => {\n  'use strict';\n  const Obj = function Obj() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(Object.getPrototypeOf(Obj), arguments, new.target || Obj);\n    return _this;\n  };\n  if (__nox_super_80_147 !== null && typeof __nox_super_80_147 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Obj.prototype = Object.create(__nox_super_80_147 && __nox_super_80_147.prototype, {\n    constructor: {\n      value: Obj,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Obj, __nox_super_80_147);\n  else Obj.__proto__ = __nox_super_80_147;\n  Object.defineProperty(Obj.prototype, 'set', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        return _superReference.set(Object.getPrototypeOf(Obj.prototype), 'test', this, 3);\n      },\n      'name',\n      {\n        value: 'set',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Obj, 'prototype', { writable: false });\n  return Obj;\n})(Base);\nObject.defineProperty(Obj.prototype, 'test', {\n  value: 2,\n  writable: true,\n  configurable: true,\n});\nconst obj = new Obj();\nexpect(obj.set()).toBe(3);\nexpect(value).toBe(3);\nexpect(Base.prototype.test).toBeUndefined();\nexpect(Obj.prototype.test).toBe(2);\nexpect(obj.test).toBe(2);",
-  "function t() {\n  'use strict';\n  let Foo = (() => {\n    'use strict';\n    const Foo = function Foo() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n    };\n    Object.defineProperty(Foo.prototype, 'method', {\n      value: Object.defineProperty(\n        function () {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        },\n        'name',\n        {\n          value: 'method',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(Foo, 'prototype', { writable: false });\n    return Foo;\n  })();\n}",
-  "let x = (() => {\n  'use strict';\n  const x = function x() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    4;\n    5;\n    6;\n  };\n  Object.defineProperty(x.prototype, 'f', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        1;\n        2;\n        3;\n      },\n      'name',\n      {\n        value: 'f',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(x, 'prototype', { writable: false });\n  return x;\n})();",
-  "var _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nlet Bar = (() => {\n  'use strict';\n  const Bar = function Bar() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Bar, 'prototype', { writable: false });\n  return Bar;\n})();\nlet Foo = (__nox_super_14_62 => {\n  'use strict';\n  const Foo = function Foo() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this,\n      _newtarget = new.target;\n    function _super() {\n      _this = _construct(Object.getPrototypeOf(Foo), arguments, _newtarget || Foo);\n      return _this;\n    }\n    var _result = function () {}.apply(void 0, arguments);\n    if (_result !== void 0) {\n      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n        return _result;\n      throw new TypeError('Derived constructors may only return object or undefined');\n    }\n    if (_this === void 0)\n      throw new ReferenceError(\"this hasn't been initialised - super() hasn't been called\");\n    return _this;\n  };\n  if (__nox_super_14_62 !== null && typeof __nox_super_14_62 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Foo.prototype = Object.create(__nox_super_14_62 && __nox_super_14_62.prototype, {\n    constructor: {\n      value: Foo,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo, __nox_super_14_62);\n  else Foo.__proto__ = __nox_super_14_62;\n  Object.defineProperty(Foo, 'prototype', { writable: false });\n  return Foo;\n})(Bar);\nexpect(() => new Foo()).toThrow(ReferenceError, \"this hasn't been initialised\");",
-  "var _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nlet Foo = (__nox_super_0_48 => {\n  'use strict';\n  const Foo = function Foo() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this,\n      _newtarget = new.target;\n    function _super() {\n      _this = _construct(Object.getPrototypeOf(Foo), arguments, _newtarget || Foo);\n      return _this;\n    }\n    var _result = function () {}.apply(void 0, arguments);\n    if (_result !== void 0) {\n      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n        return _result;\n      throw new TypeError('Derived constructors may only return object or undefined');\n    }\n    if (_this === void 0)\n      throw new ReferenceError(\"this hasn't been initialised - super() hasn't been called\");\n    return _this;\n  };\n  if (__nox_super_0_48 !== null && typeof __nox_super_0_48 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Foo.prototype = Object.create(__nox_super_0_48 && __nox_super_0_48.prototype, {\n    constructor: {\n      value: Foo,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo, __nox_super_0_48);\n  else Foo.__proto__ = __nox_super_0_48;\n  Object.defineProperty(Foo, 'prototype', { writable: false });\n  return Foo;\n})(Bar);",
-  "var _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nlet Child = (__nox_super_0_73 => {\n  'use strict';\n  const Child = function Child() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this,\n      _newtarget = new.target;\n    function _super() {\n      _this = _construct(Object.getPrototypeOf(Child), arguments, _newtarget || Child);\n      return _this;\n    }\n    var _result = function () {\n      return false;\n    }.apply(void 0, arguments);\n    if (_result !== void 0) {\n      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n        return _result;\n      throw new TypeError('Derived constructors may only return object or undefined');\n    }\n    if (_this === void 0)\n      throw new ReferenceError(\"this hasn't been initialised - super() hasn't been called\");\n    return _this;\n  };\n  if (__nox_super_0_73 !== null && typeof __nox_super_0_73 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Child.prototype = Object.create(__nox_super_0_73 && __nox_super_0_73.prototype, {\n    constructor: {\n      value: Child,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Child, __nox_super_0_73);\n  else Child.__proto__ = __nox_super_0_73;\n  Object.defineProperty(Child, 'prototype', { writable: false });\n  return Child;\n})(Base);",
-  "var _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nlet Child = (__nox_super_0_70 => {\n  'use strict';\n  const Child = function Child() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this,\n      _newtarget = new.target;\n    function _super() {\n      _this = _construct(Object.getPrototypeOf(Child), arguments, _newtarget || Child);\n      return _this;\n    }\n    var _result = function () {\n      return {};\n    }.apply(void 0, arguments);\n    if (_result !== void 0) {\n      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n        return _result;\n      throw new TypeError('Derived constructors may only return object or undefined');\n    }\n    if (_this === void 0)\n      throw new ReferenceError(\"this hasn't been initialised - super() hasn't been called\");\n    return _this;\n  };\n  if (__nox_super_0_70 !== null && typeof __nox_super_0_70 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Child.prototype = Object.create(__nox_super_0_70 && __nox_super_0_70.prototype, {\n    constructor: {\n      value: Child,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Child, __nox_super_0_70);\n  else Child.__proto__ = __nox_super_0_70;\n  Object.defineProperty(Child, 'prototype', { writable: false });\n  return Child;\n})(Base);",
-  "let C = (() => {\n  'use strict';\n  const C = function C() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(C.prototype, 'a', {\n    value: Object.defineProperty(\n      function () {\n        /* before a */\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      },\n      'name',\n      {\n        value: 'a',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(C, 'prototype', { writable: false });\n  return C;\n  /* after a */\n})();",
-  "'use strict';\nvar _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nlet Foo = (() => {\n  'use strict';\n  const Foo = function Foo() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    return { x: 1 };\n  };\n  Object.defineProperty(Foo, 'prototype', { writable: false });\n  return Foo;\n})();\nexpect(new Foo().x).toBe(1);\nlet Bar = (__nox_super_102_174 => {\n  'use strict';\n  const Bar = function Bar() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(Object.getPrototypeOf(Bar), [], new.target || Bar);\n    var _result = function () {\n      return;\n    }.apply(_this, arguments);\n    if (_result !== void 0) {\n      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n        return _result;\n      throw new TypeError('Derived constructors may only return object or undefined');\n    }\n    return _this;\n  };\n  if (__nox_super_102_174 !== null && typeof __nox_super_102_174 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Bar.prototype = Object.create(__nox_super_102_174 && __nox_super_102_174.prototype, {\n    constructor: {\n      value: Bar,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Bar, __nox_super_102_174);\n  else Bar.__proto__ = __nox_super_102_174;\n  Object.defineProperty(Bar, 'prototype', { writable: false });\n  return Bar;\n})(Foo);\nexpect(new Bar().x).toBe(1);\nlet Bar2 = (__nox_super_206_316 => {\n  'use strict';\n  const Bar2 = function Bar2() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(Object.getPrototypeOf(Bar2), [], new.target || Bar2);\n    var _result = function () {\n      expect(this.x).toBe(1);\n      return { x: 2 };\n    }.apply(_this, arguments);\n    if (_result !== void 0) {\n      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n        return _result;\n      throw new TypeError('Derived constructors may only return object or undefined');\n    }\n    return _this;\n  };\n  if (__nox_super_206_316 !== null && typeof __nox_super_206_316 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Bar2.prototype = Object.create(__nox_super_206_316 && __nox_super_206_316.prototype, {\n    constructor: {\n      value: Bar2,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Bar2, __nox_super_206_316);\n  else Bar2.__proto__ = __nox_super_206_316;\n  Object.defineProperty(Bar2, 'prototype', { writable: false });\n  return Bar2;\n})(Foo);\nexpect(new Bar2().x).toBe(2);\nlet singleton;\nlet Sub = (__nox_super_365_488 => {\n  'use strict';\n  const Sub = function Sub() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this,\n      _newtarget = new.target;\n    function _super() {\n      _this = _construct(Object.getPrototypeOf(Sub), arguments, _newtarget || Sub);\n      return _this;\n    }\n    var _result = function () {\n      if (singleton) {\n        return singleton;\n      }\n      singleton = _super();\n    }.apply(void 0, arguments);\n    if (_result !== void 0) {\n      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n        return _result;\n      throw new TypeError('Derived constructors may only return object or undefined');\n    }\n    if (_this === void 0)\n      throw new ReferenceError(\"this hasn't been initialised - super() hasn't been called\");\n    return _this;\n  };\n  if (__nox_super_365_488 !== null && typeof __nox_super_365_488 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Sub.prototype = Object.create(__nox_super_365_488 && __nox_super_365_488.prototype, {\n    constructor: {\n      value: Sub,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Sub, __nox_super_365_488);\n  else Sub.__proto__ = __nox_super_365_488;\n  Object.defineProperty(Sub, 'prototype', { writable: false });\n  return Sub;\n})(Foo);\nlet instance = new Sub();\nexpect(instance).toBe(singleton);\ninstance = new Sub();\nexpect(instance).toBe(singleton);",
-  "var _superReference2 = {\n  get: require('@babel/runtime/helpers/get'),\n  set: require('@babel/runtime/helpers/set'),\n};\nfunction _get(e, t, r) {\n  return _superReference2.get(e, t, r);\n}\nfunction _superReference(e, t, r) {\n  return {\n    get value() {\n      return _superReference2.get(e, t, r);\n    },\n    set value(u) {\n      _superReference2.set(e, t, u, r, !0);\n    },\n  };\n}\n_superReference.set = function (e, t, r, u) {\n  return _superReference2.set(e, t, u, r, !0);\n};\nlet Foo = (() => {\n  'use strict';\n  const Foo = function Foo() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Foo.prototype, 'foo', {\n    value: Object.defineProperty(\n      function (props) {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        [x, ..._superReference(Object.getPrototypeOf(Foo.prototype), 'client', this).value] = props;\n      },\n      'name',\n      {\n        value: 'foo',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Foo, 'prototype', { writable: false });\n  return Foo;\n})();",
-  "var _superReference2 = {\n  get: require('@babel/runtime/helpers/get'),\n  set: require('@babel/runtime/helpers/set'),\n};\nfunction _get(e, t, r) {\n  return _superReference2.get(e, t, r);\n}\nfunction _superReference(e, t, r) {\n  return {\n    get value() {\n      return _superReference2.get(e, t, r);\n    },\n    set value(u) {\n      _superReference2.set(e, t, u, r, !0);\n    },\n  };\n}\n_superReference.set = function (e, t, r, u) {\n  return _superReference2.set(e, t, u, r, !0);\n};\nlet Foo = (() => {\n  'use strict';\n  const Foo = function Foo() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Foo.prototype, 'foo', {\n    value: Object.defineProperty(\n      function (props) {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        [_superReference(Object.getPrototypeOf(Foo.prototype), 'client', this).value] = props;\n      },\n      'name',\n      {\n        value: 'foo',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Foo, 'prototype', { writable: false });\n  return Foo;\n})();",
-  "var _superReference2 = {\n  get: require('@babel/runtime/helpers/get'),\n  set: require('@babel/runtime/helpers/set'),\n};\nfunction _get(e, t, r) {\n  return _superReference2.get(e, t, r);\n}\nfunction _superReference(e, t, r) {\n  return {\n    get value() {\n      return _superReference2.get(e, t, r);\n    },\n    set value(u) {\n      _superReference2.set(e, t, u, r, !0);\n    },\n  };\n}\n_superReference.set = function (e, t, r, u) {\n  return _superReference2.set(e, t, u, r, !0);\n};\nlet Foo = (() => {\n  'use strict';\n  const Foo = function Foo() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Foo.prototype, 'foo', {\n    value: Object.defineProperty(\n      function (props) {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        ({ x, ..._superReference(Object.getPrototypeOf(Foo.prototype), 'client', this).value } =\n          props);\n      },\n      'name',\n      {\n        value: 'foo',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Foo, 'prototype', { writable: false });\n  return Foo;\n})();",
-  "var _superReference2 = {\n  get: require('@babel/runtime/helpers/get'),\n  set: require('@babel/runtime/helpers/set'),\n};\nfunction _get(e, t, r) {\n  return _superReference2.get(e, t, r);\n}\nfunction _superReference(e, t, r) {\n  return {\n    get value() {\n      return _superReference2.get(e, t, r);\n    },\n    set value(u) {\n      _superReference2.set(e, t, u, r, !0);\n    },\n  };\n}\n_superReference.set = function (e, t, r, u) {\n  return _superReference2.set(e, t, u, r, !0);\n};\nlet Foo = (() => {\n  'use strict';\n  const Foo = function Foo() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Foo.prototype, 'foo', {\n    value: Object.defineProperty(\n      function (props) {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        ({ client: _superReference(Object.getPrototypeOf(Foo.prototype), 'client', this).value } =\n          props);\n      },\n      'name',\n      {\n        value: 'foo',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Foo, 'prototype', { writable: false });\n  return Foo;\n})();",
-  "let Database = (() => {\n  'use strict';\n  const Database = function Database() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Database.prototype, 'transaction', {\n    value: Object.defineProperty(\n      function (callback) {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        return this.table.transaction(x => callback(new DaoTransaction(x)));\n      },\n      'name',\n      {\n        value: 'transaction',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Database, 'prototype', { writable: false });\n  return Database;\n})();",
-  "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\nlet Test = (() => {\n  'use strict';\n  var _key = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Test_key');\n  function _initialize() {\n    Object.defineProperty(this, _key, {\n      writable: true,\n      value: '',\n    });\n  }\n  const Test = function Test() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    _initialize.call(this);\n  };\n  Object.defineProperty(Test.prototype, 'method', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        return _classPrivateFieldLooseBase(this, _key)[_key];\n      },\n      'name',\n      {\n        value: 'method',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Test, 'prototype', { writable: false });\n  return Test;\n})();",
-  "let Test = (() => {\n  'use strict';\n  function _initialize() {\n    Object.defineProperty(this, 'key', {\n      value: '',\n      enumerable: true,\n      configurable: true,\n      writable: true,\n    });\n  }\n  const Test = function Test() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    _initialize.call(this);\n  };\n  Object.defineProperty(Test.prototype, 'method', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        return this.key;\n      },\n      'name',\n      {\n        value: 'method',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Test, 'prototype', { writable: false });\n  return Test;\n})();",
-  "var _construct2 = {\n  construct: require('@babel/runtime/helpers/construct'),\n  assertThisInitialized: require('@babel/runtime/helpers/assertThisInitialized'),\n};\nfunction _construct(t, e, r) {\n  return _construct2.construct(t, e, r);\n}\n_construct.assert = _construct2.assertThisInitialized;\nlet Foo = (__nox_super_0_85 => {\n  'use strict';\n  const Foo = function Foo() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this,\n      _newtarget = new.target;\n    function _super() {\n      _this = _construct(Object.getPrototypeOf(Foo), arguments, _newtarget || Foo);\n      return _this;\n    }\n    var _result = function () {\n      if (dynamic()) _super();\n      _construct.assert(_this);\n    }.apply(void 0, arguments);\n    if (_result !== void 0) {\n      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n        return _result;\n      throw new TypeError('Derived constructors may only return object or undefined');\n    }\n    if (_this === void 0)\n      throw new ReferenceError(\"this hasn't been initialised - super() hasn't been called\");\n    return _this;\n  };\n  if (__nox_super_0_85 !== null && typeof __nox_super_0_85 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Foo.prototype = Object.create(__nox_super_0_85 && __nox_super_0_85.prototype, {\n    constructor: {\n      value: Foo,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo, __nox_super_0_85);\n  else Foo.__proto__ = __nox_super_0_85;\n  Object.defineProperty(Foo, 'prototype', { writable: false });\n  return Foo;\n})(Bar);",
-  "var _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nlet Foo = (__nox_super_0_64 => {\n  'use strict';\n  const Foo = function Foo() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(Object.getPrototypeOf(Foo), [this], new.target || Foo);\n    var _result = function () {}.apply(_this, arguments);\n    if (_result !== void 0) {\n      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n        return _result;\n      throw new TypeError('Derived constructors may only return object or undefined');\n    }\n    return _this;\n  };\n  if (__nox_super_0_64 !== null && typeof __nox_super_0_64 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Foo.prototype = Object.create(__nox_super_0_64 && __nox_super_0_64.prototype, {\n    constructor: {\n      value: Foo,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo, __nox_super_0_64);\n  else Foo.__proto__ = __nox_super_0_64;\n  Object.defineProperty(Foo, 'prototype', { writable: false });\n  return Foo;\n})(Bar);",
-  "var _construct2 = {\n  construct: require('@babel/runtime/helpers/construct'),\n  assertThisInitialized: require('@babel/runtime/helpers/assertThisInitialized'),\n};\nfunction _construct(t, e, r) {\n  return _construct2.construct(t, e, r);\n}\n_construct.assert = _construct2.assertThisInitialized;\nlet Foo = (__nox_super_0_70 => {\n  'use strict';\n  const Foo = function Foo() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    _construct.assert(_this);\n    var _this = _construct(Object.getPrototypeOf(Foo), [], new.target || Foo);\n    var _result = function () {}.apply(_this, arguments);\n    if (_result !== void 0) {\n      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n        return _result;\n      throw new TypeError('Derived constructors may only return object or undefined');\n    }\n    return _this;\n  };\n  if (__nox_super_0_70 !== null && typeof __nox_super_0_70 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Foo.prototype = Object.create(__nox_super_0_70 && __nox_super_0_70.prototype, {\n    constructor: {\n      value: Foo,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo, __nox_super_0_70);\n  else Foo.__proto__ = __nox_super_0_70;\n  Object.defineProperty(Foo, 'prototype', { writable: false });\n  return Foo;\n})(Bar);",
-  "var _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nlet C = (__nox_super_0_69 => {\n  'use strict';\n  const C = function C() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this,\n      _newtarget = new.target;\n    function _super() {\n      _this = _construct(Object.getPrototypeOf(C), arguments, _newtarget || C);\n      return _this;\n    }\n    var _result = function () {\n      _super(_super(_super()));\n    }.apply(void 0, arguments);\n    if (_result !== void 0) {\n      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n        return _result;\n      throw new TypeError('Derived constructors may only return object or undefined');\n    }\n    if (_this === void 0)\n      throw new ReferenceError(\"this hasn't been initialised - super() hasn't been called\");\n    return _this;\n  };\n  if (__nox_super_0_69 !== null && typeof __nox_super_0_69 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  C.prototype = Object.create(__nox_super_0_69 && __nox_super_0_69.prototype, {\n    constructor: {\n      value: C,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(C, __nox_super_0_69);\n  else C.__proto__ = __nox_super_0_69;\n  Object.defineProperty(C, 'prototype', { writable: false });\n  return C;\n})(P);",
-  "import _babelHelper from '@babel/runtime/helpers/construct';\nimport _babelHelper2 from '@babel/runtime/helpers/assertThisInitialized';\nvar _construct2 = {\n  construct: _babelHelper,\n  assertThisInitialized: _babelHelper2,\n};\nfunction _construct(t, e, r) {\n  return _construct2.construct(t, e, r);\n}\n_construct.assert = _construct2.assertThisInitialized;\nimport net from 'net';\nimport { EventEmitter } from 'events';\nimport BinarySerializer from './helpers/binary-serializer';\n// import ...\nlet Connection = (__nox_super_152_501 => {\n  'use strict';\n  const Connection = function Connection(_argument, _argument22, _argument23, _argument24) {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this,\n      _newtarget = new.target;\n    function _super() {\n      _this = _construct(Object.getPrototypeOf(Connection), arguments, _newtarget || Connection);\n      return _this;\n    }\n    var _result = function (endpoint, joinKey, joinData, roomId) {\n      _super();\n      _construct.assert(_this).isConnected = false;\n      _construct.assert(_this).roomId = roomId;\n    }.apply(void 0, arguments);\n    if (_result !== void 0) {\n      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n        return _result;\n      throw new TypeError('Derived constructors may only return object or undefined');\n    }\n    if (_this === void 0)\n      throw new ReferenceError(\"this hasn't been initialised - super() hasn't been called\");\n    return _this;\n    // ...\n  };\n  if (__nox_super_152_501 !== null && typeof __nox_super_152_501 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Connection.prototype = Object.create(__nox_super_152_501 && __nox_super_152_501.prototype, {\n    constructor: {\n      value: Connection,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Connection, __nox_super_152_501);\n  else Connection.__proto__ = __nox_super_152_501;\n  Object.defineProperty(Connection.prototype, 'send', {\n    value: Object.defineProperty(\n      function (message) {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        this.sock.write(BinarySerializer.serializeMessage(message));\n      },\n      'name',\n      {\n        value: 'send',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Connection.prototype, 'disconnect', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        this.sock.close();\n      },\n      'name',\n      {\n        value: 'disconnect',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Connection, 'prototype', { writable: false });\n  return Connection;\n})(EventEmitter);\nexport default Connection;",
-  "import _babelHelper from '@babel/runtime/helpers/construct';\nimport _babelHelper2 from '@babel/runtime/helpers/get';\nvar _construct2 = { construct: _babelHelper };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nvar _get2 = { get: _babelHelper2 };\nfunction _get(e, t, r) {\n  return _get2.get(e, t, r);\n}\nimport BaseFoo from './BaseFoo';\nlet SubFoo = (__nox_super_49_153 => {\n  'use strict';\n  const SubFoo = function SubFoo() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(Object.getPrototypeOf(SubFoo), arguments, new.target || SubFoo);\n    return _this;\n  };\n  if (__nox_super_49_153 !== null && typeof __nox_super_49_153 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  SubFoo.prototype = Object.create(__nox_super_49_153 && __nox_super_49_153.prototype, {\n    constructor: {\n      value: SubFoo,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(SubFoo, __nox_super_49_153);\n  else SubFoo.__proto__ = __nox_super_49_153;\n  Object.defineProperty(SubFoo, 'talk', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        _get(Object.getPrototypeOf(SubFoo), 'talk', this).call(this);\n        console.log('SubFoo.talk');\n      },\n      'name',\n      {\n        value: 'talk',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(SubFoo, 'prototype', { writable: false });\n  return SubFoo;\n})(BaseFoo);\nexport default SubFoo;",
-  "import _babelHelper from '@babel/runtime/helpers/construct';\nvar _construct2 = { construct: _babelHelper };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nimport React, { Component } from 'react';\nlet RandomComponent = (__nox_super_56_255 => {\n  'use strict';\n  const RandomComponent = function RandomComponent() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(\n      Object.getPrototypeOf(RandomComponent),\n      [],\n      new.target || RandomComponent,\n    );\n    var _result = function () {}.apply(_this, arguments);\n    if (_result !== void 0) {\n      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n        return _result;\n      throw new TypeError('Derived constructors may only return object or undefined');\n    }\n    return _this;\n  };\n  if (__nox_super_56_255 !== null && typeof __nox_super_56_255 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  RandomComponent.prototype = Object.create(__nox_super_56_255 && __nox_super_56_255.prototype, {\n    constructor: {\n      value: RandomComponent,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(RandomComponent, __nox_super_56_255);\n  else RandomComponent.__proto__ = __nox_super_56_255;\n  Object.defineProperty(RandomComponent.prototype, 'render', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        return (\n          <div className=\"sui-RandomComponent\">\n            <h2>Hi there!</h2>\n          </div>\n        );\n      },\n      'name',\n      {\n        value: 'render',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(RandomComponent, 'prototype', { writable: false });\n  return RandomComponent;\n})(Component);\nexport default RandomComponent;",
-  "let _Class = (() => {\n  'use strict';\n  const _Class = function _Class() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(_Class, 'prototype', { writable: false });\n  return _Class;\n})();\nexport default _Class;",
-  "import _babelHelper from '@babel/runtime/helpers/construct';\nvar _construct2 = { construct: _babelHelper };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nlet b = (() => {\n  'use strict';\n  const b = function b() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(b, 'prototype', { writable: false });\n  return b;\n})();\nlet a1 = (__nox_super_13_95 => {\n  'use strict';\n  const a1 = function a1() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(Object.getPrototypeOf(a1), [], new.target || a1);\n    var _result = function () {\n      this.x = () => this;\n    }.apply(_this, arguments);\n    if (_result !== void 0) {\n      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n        return _result;\n      throw new TypeError('Derived constructors may only return object or undefined');\n    }\n    return _this;\n  };\n  if (__nox_super_13_95 !== null && typeof __nox_super_13_95 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  a1.prototype = Object.create(__nox_super_13_95 && __nox_super_13_95.prototype, {\n    constructor: {\n      value: a1,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(a1, __nox_super_13_95);\n  else a1.__proto__ = __nox_super_13_95;\n  Object.defineProperty(a1, 'prototype', { writable: false });\n  return a1;\n})(b);\nlet a2 = (__nox_super_112_194 => {\n  'use strict';\n  const a2 = function a2() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(Object.getPrototypeOf(a2), [], new.target || a2);\n    var _result = function () {\n      this.x = () => this;\n    }.apply(_this, arguments);\n    if (_result !== void 0) {\n      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n        return _result;\n      throw new TypeError('Derived constructors may only return object or undefined');\n    }\n    return _this;\n  };\n  if (__nox_super_112_194 !== null && typeof __nox_super_112_194 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  a2.prototype = Object.create(__nox_super_112_194 && __nox_super_112_194.prototype, {\n    constructor: {\n      value: a2,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(a2, __nox_super_112_194);\n  else a2.__proto__ = __nox_super_112_194;\n  Object.defineProperty(a2, 'prototype', { writable: false });\n  return a2;\n})(b);\nexport default a2;",
-  "var _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nvar _superReference2 = {\n  get: require('@babel/runtime/helpers/get'),\n  set: require('@babel/runtime/helpers/set'),\n};\nfunction _get(e, r, t) {\n  return _superReference2.get(e, r, t);\n}\nvar _superReference = {\n  set: function (e, r, t, u) {\n    return _superReference2.set(e, r, u, t, !0);\n  },\n};\nlet Point = (() => {\n  'use strict';\n  const Point = function Point() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Point.prototype, 'getX', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        expect(this.x).toBe(3);\n      },\n      'name',\n      {\n        value: 'getX',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Point, 'prototype', { writable: false });\n  return Point;\n})();\nlet ColorPoint = (__nox_super_65_274 => {\n  'use strict';\n  const ColorPoint = function ColorPoint() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(Object.getPrototypeOf(ColorPoint), [], new.target || ColorPoint);\n    var _result = function () {\n      this.x = 2;\n      _superReference.set(Object.getPrototypeOf(ColorPoint.prototype), 'x', this, 3);\n      expect(this.x).toBe(3);\n      expect(_get(Object.getPrototypeOf(ColorPoint.prototype), 'x', this)).toBeUndefined();\n    }.apply(_this, arguments);\n    if (_result !== void 0) {\n      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n        return _result;\n      throw new TypeError('Derived constructors may only return object or undefined');\n    }\n    return _this;\n  };\n  if (__nox_super_65_274 !== null && typeof __nox_super_65_274 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  ColorPoint.prototype = Object.create(__nox_super_65_274 && __nox_super_65_274.prototype, {\n    constructor: {\n      value: ColorPoint,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(ColorPoint, __nox_super_65_274);\n  else ColorPoint.__proto__ = __nox_super_65_274;\n  Object.defineProperty(ColorPoint.prototype, 'm', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        this.getX();\n      },\n      'name',\n      {\n        value: 'm',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(ColorPoint, 'prototype', { writable: false });\n  return ColorPoint;\n})(Point);\nconst cp = new ColorPoint();\ncp.m();",
-  "var _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nvar _superReference2 = {\n  get: require('@babel/runtime/helpers/get'),\n  set: require('@babel/runtime/helpers/set'),\n};\nfunction _get(e, r, t) {\n  return _superReference2.get(e, r, t);\n}\nvar _superReference = {\n  set: function (e, r, t, u) {\n    return _superReference2.set(e, r, u, t, !0);\n  },\n};\nlet Point = (() => {\n  'use strict';\n  const Point = function Point() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Point.prototype, 'getX', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        expect(this.x).toBe(3);\n      },\n      'name',\n      {\n        value: 'getX',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Point, 'prototype', { writable: false });\n  return Point;\n})();\nlet ColorPoint = (__nox_super_65_275 => {\n  'use strict';\n  const ColorPoint = function ColorPoint() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(Object.getPrototypeOf(ColorPoint), [], new.target || ColorPoint);\n    var _result = function () {\n      this.x = 2;\n      _superReference.set(Object.getPrototypeOf(ColorPoint.prototype), 'x', this, 3);\n      expect(this.x).toBe(3);\n      expect(_get(Object.getPrototypeOf(ColorPoint.prototype), 'x', this)).toBeUndefined();\n    }.apply(_this, arguments);\n    if (_result !== void 0) {\n      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n        return _result;\n      throw new TypeError('Derived constructors may only return object or undefined');\n    }\n    return _this;\n  };\n  if (__nox_super_65_275 !== null && typeof __nox_super_65_275 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  ColorPoint.prototype = Object.create(__nox_super_65_275 && __nox_super_65_275.prototype, {\n    constructor: {\n      value: ColorPoint,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(ColorPoint, __nox_super_65_275);\n  else ColorPoint.__proto__ = __nox_super_65_275;\n  Object.defineProperty(ColorPoint.prototype, 'm', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        this.getX();\n      },\n      'name',\n      {\n        value: 'm',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(ColorPoint, 'prototype', { writable: false });\n  return ColorPoint;\n})(Point);\nconst cp = new ColorPoint();\ncp.m();",
-  "var _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\n// https://github.com/babel/babel/issues/5817\nlet Parent = (() => {\n  'use strict';\n  const Parent = function Parent() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Parent, 'prototype', { writable: false });\n  return Parent;\n})();\nlet Table = (__nox_super_64_191 => {\n  'use strict';\n  const Table = function Table() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(Object.getPrototypeOf(Table), [], new.target || Table);\n    var _result = function () {\n      this.returnParam = param => {\n        return param;\n      };\n    }.apply(_this, arguments);\n    if (_result !== void 0) {\n      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n        return _result;\n      throw new TypeError('Derived constructors may only return object or undefined');\n    }\n    return _this;\n  };\n  if (__nox_super_64_191 !== null && typeof __nox_super_64_191 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Table.prototype = Object.create(__nox_super_64_191 && __nox_super_64_191.prototype, {\n    constructor: {\n      value: Table,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Table, __nox_super_64_191);\n  else Table.__proto__ = __nox_super_64_191;\n  Object.defineProperty(Table, 'prototype', { writable: false });\n  return Table;\n})(Parent);\nconst table = new Table();\nexpect(table.returnParam(false)).toBe(false);",
-  "var _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nlet A = (__nox_super_0_125 => {\n  'use strict';\n  const A = function A() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(Object.getPrototypeOf(A), [], new.target || A);\n    var _result = function () {\n      this.arrow1 = x => {\n        return x;\n      };\n      this.arrow2 = x => x;\n    }.apply(_this, arguments);\n    if (_result !== void 0) {\n      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n        return _result;\n      throw new TypeError('Derived constructors may only return object or undefined');\n    }\n    return _this;\n  };\n  if (__nox_super_0_125 !== null && typeof __nox_super_0_125 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  A.prototype = Object.create(__nox_super_0_125 && __nox_super_0_125.prototype, {\n    constructor: {\n      value: A,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(A, __nox_super_0_125);\n  else A.__proto__ = __nox_super_0_125;\n  Object.defineProperty(A, 'prototype', { writable: false });\n  return A;\n})(B);",
-  "var _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\n// Pretend that `Reflect.construct` isn't supported.\nglobal.Reflect = undefined;\nglobal.HTMLElement = function () {\n  // Here, `this.HTMLElement` is this function, not the original HTMLElement\n  // constructor. `this.constructor` should be this function too, but isn't.\n  constructor = this.constructor;\n};\nvar constructor;\nlet CustomElement = (__nox_super_326_368 => {\n  'use strict';\n  const CustomElement = function CustomElement() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(\n      Object.getPrototypeOf(CustomElement),\n      arguments,\n      new.target || CustomElement,\n    );\n    return _this;\n  };\n  if (__nox_super_326_368 !== null && typeof __nox_super_326_368 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  CustomElement.prototype = Object.create(__nox_super_326_368 && __nox_super_326_368.prototype, {\n    constructor: {\n      value: CustomElement,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(CustomElement, __nox_super_326_368);\n  else CustomElement.__proto__ = __nox_super_326_368;\n  Object.defineProperty(CustomElement, 'prototype', { writable: false });\n  return CustomElement;\n})(HTMLElement);\nnew CustomElement();\nexpect(constructor).toBe(CustomElement);",
-  "var _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nconst oldReflect = this.Reflect;\nconst oldHTMLElement = this.HTMLElement;\ntry {\n  // Pretend that `Reflect.construct` isn't supported.\n  this.Reflect = undefined;\n  this.HTMLElement = function () {\n    // Here, `this.HTMLElement` is this function, not the original HTMLElement\n    // constructor. `this.constructor` should be this function too, but isn't.\n    constructor = this.constructor;\n  };\n  var constructor;\n  let CustomElement = (__nox_super_421_463 => {\n    'use strict';\n    const CustomElement = function CustomElement() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n      var _this = _construct(\n        Object.getPrototypeOf(CustomElement),\n        arguments,\n        new.target || CustomElement,\n      );\n      return _this;\n    };\n    if (__nox_super_421_463 !== null && typeof __nox_super_421_463 !== 'function')\n      throw new TypeError('Super expression must either be null or a function');\n    CustomElement.prototype = Object.create(__nox_super_421_463 && __nox_super_421_463.prototype, {\n      constructor: {\n        value: CustomElement,\n        writable: true,\n        configurable: true,\n      },\n    });\n    if (Object.setPrototypeOf) Object.setPrototypeOf(CustomElement, __nox_super_421_463);\n    else CustomElement.__proto__ = __nox_super_421_463;\n    Object.defineProperty(CustomElement, 'prototype', { writable: false });\n    return CustomElement;\n  })(HTMLElement);\n  new CustomElement();\n  expect(constructor).toBe(CustomElement);\n} finally {\n  // Restore original env\n  this.Reflect = oldReflect;\n  this.HTMLElement = oldHTMLElement;\n}",
-  "var _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nvar x = {\n  Foo: (__nox_super_17_37 => {\n    'use strict';\n    const _Class = function _Class() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n      var _this = _construct(Object.getPrototypeOf(_Class), arguments, new.target || _Class);\n      return _this;\n    };\n    Object.defineProperty(_Class, 'name', {\n      value: 'Foo',\n      configurable: true,\n    });\n    if (__nox_super_17_37 !== null && typeof __nox_super_17_37 !== 'function')\n      throw new TypeError('Super expression must either be null or a function');\n    _Class.prototype = Object.create(__nox_super_17_37 && __nox_super_17_37.prototype, {\n      constructor: {\n        value: _Class,\n        writable: true,\n        configurable: true,\n      },\n    });\n    if (Object.setPrototypeOf) Object.setPrototypeOf(_Class, __nox_super_17_37);\n    else _Class.__proto__ = __nox_super_17_37;\n    Object.defineProperty(_Class, 'prototype', { writable: false });\n    return _Class;\n  })(Foo),\n};",
-  "var _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nlet A = (() => {\n  'use strict';\n  const A = function A() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(A, 'prototype', { writable: false });\n  return A;\n})();\nlet B = (__nox_super_12_75 => {\n  'use strict';\n  const B = function B() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(Object.getPrototypeOf(B), [], new.target || B);\n    var _result = function () {\n      return this;\n    }.apply(_this, arguments);\n    if (_result !== void 0) {\n      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n        return _result;\n      throw new TypeError('Derived constructors may only return object or undefined');\n    }\n    return _this;\n  };\n  if (__nox_super_12_75 !== null && typeof __nox_super_12_75 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  B.prototype = Object.create(__nox_super_12_75 && __nox_super_12_75.prototype, {\n    constructor: {\n      value: B,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(B, __nox_super_12_75);\n  else B.__proto__ = __nox_super_12_75;\n  Object.defineProperty(B, 'prototype', { writable: false });\n  return B;\n})(A);",
-  "let A = (() => {\n  'use strict';\n  const A = function A() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(A.prototype, 'foo', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        const foo = 2;\n      },\n      'name',\n      {\n        value: 'foo',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(A, 'prototype', { writable: false });\n  return A;\n})();",
-  "export default function () {\n  return (() => {\n    'use strict';\n    const Select = function Select() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n    };\n    Object.defineProperty(Select.prototype, 'query', {\n      value: Object.defineProperty(\n        function (query) {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        },\n        'name',\n        {\n          value: 'query',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(Select, 'prototype', { writable: false });\n    return Select;\n  })();\n}",
-  "let Example = (() => {\n  'use strict';\n  const Example = function Example() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Example.prototype, 'test1', {\n    value: Object.defineProperty(\n      async function () {\n        await Promise.resolve(2);\n      },\n      'name',\n      {\n        value: 'test1',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Example.prototype, 'test2', {\n    value: Object.defineProperty(\n      function* () {\n        yield 3;\n      },\n      'name',\n      {\n        value: 'test2',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Example, 'prototype', { writable: false });\n  return Example;\n})();",
-  "let Foo = (() => {\n  'use strict';\n  const Foo = function Foo(val) {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    this._val = val;\n  };\n  Object.defineProperty(Foo.prototype, 'foo2', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        return foo2(this._val);\n      },\n      'name',\n      {\n        value: 'foo2',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Foo, 'prototype', { writable: false });\n  return Foo;\n})();",
-  "var _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nlet Foo = (__nox_super_0_167 => {\n  'use strict';\n  const Foo = function Foo(_argument) {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this,\n      _newtarget = new.target;\n    function _super() {\n      _this = _construct(Object.getPrototypeOf(Foo), arguments, _newtarget || Foo);\n      return _this;\n    }\n    var _result = function (options) {\n      let parentOptions = {};\n      parentOptions.init = function () {\n        this;\n      };\n      _super(parentOptions);\n    }.apply(void 0, arguments);\n    if (_result !== void 0) {\n      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n        return _result;\n      throw new TypeError('Derived constructors may only return object or undefined');\n    }\n    if (_this === void 0)\n      throw new ReferenceError(\"this hasn't been initialised - super() hasn't been called\");\n    return _this;\n  };\n  if (__nox_super_0_167 !== null && typeof __nox_super_0_167 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Foo.prototype = Object.create(__nox_super_0_167 && __nox_super_0_167.prototype, {\n    constructor: {\n      value: Foo,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo, __nox_super_0_167);\n  else Foo.__proto__ = __nox_super_0_167;\n  Object.defineProperty(Foo, 'prototype', { writable: false });\n  return Foo;\n})(Bar);",
-  "var _construct2 = {\n  construct: require('@babel/runtime/helpers/construct'),\n  assertThisInitialized: require('@babel/runtime/helpers/assertThisInitialized'),\n};\nfunction _construct(t, e, r) {\n  return _construct2.construct(t, e, r);\n}\n_construct.assert = _construct2.assertThisInitialized;\nvar _get2 = { get: require('@babel/runtime/helpers/get') };\nfunction _get(e, t, r) {\n  return _get2.get(e, t, r);\n}\nlet Test = (__nox_super_0_438 => {\n  'use strict';\n  const Test = function Test() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this,\n      _newtarget = new.target;\n    function _super() {\n      _this = _construct(Object.getPrototypeOf(Test), arguments, _newtarget || Test);\n      return _this;\n    }\n    var _result = function () {\n      woops.super.test();\n      _super();\n      _get(Object.getPrototypeOf(Test.prototype), 'test', _construct.assert(_this)).call(\n        _construct.assert(_this),\n      );\n      _super(...arguments);\n      _super('test', ...arguments);\n      _get(Object.getPrototypeOf(Test.prototype), 'test', _construct.assert(_this)).call(\n        _construct.assert(_this),\n        ...arguments,\n      );\n      _get(Object.getPrototypeOf(Test.prototype), 'test', _construct.assert(_this)).call(\n        _construct.assert(_this),\n        'test',\n        ...arguments,\n      );\n    }.apply(void 0, arguments);\n    if (_result !== void 0) {\n      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n        return _result;\n      throw new TypeError('Derived constructors may only return object or undefined');\n    }\n    if (_this === void 0)\n      throw new ReferenceError(\"this hasn't been initialised - super() hasn't been called\");\n    return _this;\n  };\n  if (__nox_super_0_438 !== null && typeof __nox_super_0_438 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Test.prototype = Object.create(__nox_super_0_438 && __nox_super_0_438.prototype, {\n    constructor: {\n      value: Test,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Test, __nox_super_0_438);\n  else Test.__proto__ = __nox_super_0_438;\n  Object.defineProperty(Test.prototype, 'test', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        _get(Object.getPrototypeOf(Test.prototype), 'test', this).call(this);\n        _get(Object.getPrototypeOf(Test.prototype), 'test', this).call(this, ...arguments);\n        _get(Object.getPrototypeOf(Test.prototype), 'test', this).call(this, 'test', ...arguments);\n      },\n      'name',\n      {\n        value: 'test',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Test, 'foo', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        _get(Object.getPrototypeOf(Test), 'foo', this).call(this);\n        _get(Object.getPrototypeOf(Test), 'foo', this).call(this, ...arguments);\n        _get(Object.getPrototypeOf(Test), 'foo', this).call(this, 'test', ...arguments);\n      },\n      'name',\n      {\n        value: 'foo',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Test, 'prototype', { writable: false });\n  return Test;\n})(Foo);",
-  "var _classKey2 = { toPropertyKey: require('@babel/runtime/helpers/toPropertyKey') },\n  _classKey = _classKey2.toPropertyKey;\nexpect(() => {\n  let A = (_key => {\n    'use strict';\n    _key = _classKey(_key);\n    const A = function A() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n    };\n    Object.defineProperty(A.prototype, _key, {\n      value: Object.defineProperty(\n        function () {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        },\n        'name',\n        {\n          value: typeof _key === 'symbol' ? { [_key]: function () {} }[_key].name : String(_key),\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(A, 'prototype', { writable: false });\n    return A;\n  })(A.name);\n}).toThrow(ReferenceError);",
-  "var _classKey2 = { toPropertyKey: require('@babel/runtime/helpers/toPropertyKey') },\n  _classKey = _classKey2.toPropertyKey;\nvar log = [];\nlet A = ((_key, _key15, _key16, _key17) => {\n  'use strict';\n  _key = _classKey(_key);\n  _key15 = _classKey(_key15);\n  _key16 = _classKey(_key16);\n  _key17 = _classKey(_key17);\n  const A = function A() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(A.prototype, _key, {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      },\n      'name',\n      {\n        value: typeof _key === 'symbol' ? { [_key]: function () {} }[_key].name : String(_key),\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(A, _key15, {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      },\n      'name',\n      {\n        value:\n          typeof _key15 === 'symbol' ? { [_key15]: function () {} }[_key15].name : String(_key15),\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(A.prototype, _key16, {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      },\n      'name',\n      {\n        value:\n          typeof _key16 === 'symbol' ? { [_key16]: function () {} }[_key16].name : String(_key16),\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(A, _key17, {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      },\n      'name',\n      {\n        value:\n          typeof _key17 === 'symbol' ? { [_key17]: function () {} }[_key17].name : String(_key17),\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(A, 'prototype', { writable: false });\n  return A;\n})(log.push(1), log.push(2), log.push(3), log.push(4));\nexpect(log).toEqual([1, 2, 3, 4]);",
-  "var _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nvar _classKey2 = { toPropertyKey: require('@babel/runtime/helpers/toPropertyKey') },\n  _classKey = _classKey2.toPropertyKey;\nasync function* fn() {\n  let A = (_key => {\n    'use strict';\n    _key = _classKey(_key);\n    const A = function A() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n    };\n    Object.defineProperty(A.prototype, _key, {\n      value: Object.defineProperty(\n        function () {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        },\n        'name',\n        {\n          value: typeof _key === 'symbol' ? { [_key]: function () {} }[_key].name : String(_key),\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(A, 'prototype', { writable: false });\n    return A;\n  })(yield 1);\n  let B = ((__nox_super_61_103, _key18) => {\n    'use strict';\n    _key18 = _classKey(_key18);\n    const B = function B() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n      var _this = _construct(Object.getPrototypeOf(B), arguments, new.target || B);\n      return _this;\n    };\n    if (__nox_super_61_103 !== null && typeof __nox_super_61_103 !== 'function')\n      throw new TypeError('Super expression must either be null or a function');\n    B.prototype = Object.create(__nox_super_61_103 && __nox_super_61_103.prototype, {\n      constructor: {\n        value: B,\n        writable: true,\n        configurable: true,\n      },\n    });\n    if (Object.setPrototypeOf) Object.setPrototypeOf(B, __nox_super_61_103);\n    else B.__proto__ = __nox_super_61_103;\n    Object.defineProperty(B.prototype, _key18, {\n      value: Object.defineProperty(\n        function () {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        },\n        'name',\n        {\n          value:\n            typeof _key18 === 'symbol' ? { [_key18]: function () {} }[_key18].name : String(_key18),\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(B, 'prototype', { writable: false });\n    return B;\n  })(A, await 1);\n}",
-  "var _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nvar _get2 = { get: require('@babel/runtime/helpers/get') };\nfunction _get(e, t, r) {\n  return _get2.get(e, t, r);\n}\nvar _classKey2 = { toPropertyKey: require('@babel/runtime/helpers/toPropertyKey') },\n  _classKey = _classKey2.toPropertyKey;\nconst sym = Symbol();\nlet Foo = (_key => {\n  'use strict';\n  _key = _classKey(_key);\n  const Foo = function Foo() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Foo.prototype, _key, {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        return 1;\n      },\n      'name',\n      {\n        value: typeof _key === 'symbol' ? { [_key]: function () {} }[_key].name : String(_key),\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Foo, 'prototype', { writable: false });\n  return Foo;\n})(sym);\nlet Bar = ((__nox_super_69_140, _key19) => {\n  'use strict';\n  _key19 = _classKey(_key19);\n  const Bar = function Bar() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(Object.getPrototypeOf(Bar), arguments, new.target || Bar);\n    return _this;\n  };\n  if (__nox_super_69_140 !== null && typeof __nox_super_69_140 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Bar.prototype = Object.create(__nox_super_69_140 && __nox_super_69_140.prototype, {\n    constructor: {\n      value: Bar,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Bar, __nox_super_69_140);\n  else Bar.__proto__ = __nox_super_69_140;\n  Object.defineProperty(Bar.prototype, _key19, {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        return _get(Object.getPrototypeOf(Bar.prototype), sym, this).call(this) + 2;\n      },\n      'name',\n      {\n        value:\n          typeof _key19 === 'symbol' ? { [_key19]: function () {} }[_key19].name : String(_key19),\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Bar, 'prototype', { writable: false });\n  return Bar;\n})(Foo, sym);\nlet i = new Bar();\nexpect(i[sym]()).toBe(3);",
-  "var _classKey2 = { toPropertyKey: require('@babel/runtime/helpers/toPropertyKey') },\n  _classKey = _classKey2.toPropertyKey;\nlet Foo = ((_key, _key14) => {\n  'use strict';\n  _key = _classKey(_key);\n  _key14 = _classKey(_key14);\n  const Foo = function Foo() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Foo.prototype, 'foo', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      },\n      'name',\n      {\n        value: 'foo',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Foo.prototype, 'foo', {\n    value: Object.defineProperty(\n      function () {\n        'second';\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      },\n      'name',\n      {\n        value: 'foo',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Foo.prototype, _key, {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      },\n      'name',\n      {\n        value: typeof _key === 'symbol' ? { [_key]: function () {} }[_key].name : String(_key),\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Foo.prototype, _key14, {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      },\n      'name',\n      {\n        value:\n          typeof _key14 === 'symbol' ? { [_key14]: function () {} }[_key14].name : String(_key14),\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Foo, 'prototype', { writable: false });\n  return Foo;\n})(bar, bar + 'foo');",
-  "var _classKey2 = { toPropertyKey: require('@babel/runtime/helpers/toPropertyKey') },\n  _classKey = _classKey2.toPropertyKey;\nconst foo = { [Symbol.toPrimitive]: () => 'foo' };\nexpect(\n  new ((_key => {\n    'use strict';\n    _key = _classKey(_key);\n    const _Class = function _Class() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n    };\n    Object.defineProperty(_Class.prototype, _key, {\n      value: Object.defineProperty(\n        function () {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          return 0;\n        },\n        'name',\n        {\n          value: typeof _key === 'symbol' ? { [_key]: function () {} }[_key].name : String(_key),\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(_Class, 'prototype', { writable: false });\n    return _Class;\n  })(foo))().foo(),\n).toBe(0);\nexpect(\n  new ((_key20 => {\n    'use strict';\n    _key20 = _classKey(_key20);\n    const _Class19 = function _Class19() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n    };\n    Object.defineProperty(_Class19.prototype, _key20, {\n      get: Object.defineProperty(\n        function () {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          return 0;\n        },\n        'name',\n        {\n          value:\n            'get ' +\n            (typeof _key20 === 'symbol'\n              ? { [_key20]: function () {} }[_key20].name\n              : String(_key20)),\n          configurable: true,\n        },\n      ),\n      configurable: true,\n    });\n    Object.defineProperty(_Class19, 'prototype', { writable: false });\n    return _Class19;\n  })(foo))().foo,\n).toBe(0);\nexpect(\n  (new ((_key24 => {\n    'use strict';\n    _key24 = _classKey(_key24);\n    const _Class23 = function _Class23() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n    };\n    Object.defineProperty(_Class23.prototype, _key24, {\n      set: Object.defineProperty(\n        function (v) {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          return v;\n        },\n        'name',\n        {\n          value:\n            'set ' +\n            (typeof _key24 === 'symbol'\n              ? { [_key24]: function () {} }[_key24].name\n              : String(_key24)),\n          configurable: true,\n        },\n      ),\n      configurable: true,\n    });\n    Object.defineProperty(_Class23, 'prototype', { writable: false });\n    return _Class23;\n  })(foo))().foo = 0),\n).toBe(0);\nconst arrayLike = { [Symbol.toPrimitive]: () => [] };\nexpect(\n  () =>\n    new ((_key28 => {\n      'use strict';\n      _key28 = _classKey(_key28);\n      const _Class27 = function _Class27() {\n        if (!new.target) throw new TypeError('Cannot call a class as a function');\n      };\n      Object.defineProperty(_Class27.prototype, _key28, {\n        value: Object.defineProperty(\n          function () {\n            if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n            return 0;\n          },\n          'name',\n          {\n            value:\n              typeof _key28 === 'symbol'\n                ? { [_key28]: function () {} }[_key28].name\n                : String(_key28),\n            configurable: true,\n          },\n        ),\n        writable: true,\n        configurable: true,\n      });\n      Object.defineProperty(_Class27, 'prototype', { writable: false });\n      return _Class27;\n    })(arrayLike))(),\n).toThrow('@@toPrimitive must return a primitive value.');\nexpect(\n  () =>\n    new ((_key32 => {\n      'use strict';\n      _key32 = _classKey(_key32);\n      const _Class31 = function _Class31() {\n        if (!new.target) throw new TypeError('Cannot call a class as a function');\n      };\n      Object.defineProperty(_Class31.prototype, _key32, {\n        get: Object.defineProperty(\n          function () {\n            if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n            return 0;\n          },\n          'name',\n          {\n            value:\n              'get ' +\n              (typeof _key32 === 'symbol'\n                ? { [_key32]: function () {} }[_key32].name\n                : String(_key32)),\n            configurable: true,\n          },\n        ),\n        configurable: true,\n      });\n      Object.defineProperty(_Class31, 'prototype', { writable: false });\n      return _Class31;\n    })(arrayLike))(),\n).toThrow('@@toPrimitive must return a primitive value.');\nexpect(\n  () =>\n    new ((_key36 => {\n      'use strict';\n      _key36 = _classKey(_key36);\n      const _Class35 = function _Class35() {\n        if (!new.target) throw new TypeError('Cannot call a class as a function');\n      };\n      Object.defineProperty(_Class35.prototype, _key36, {\n        set: Object.defineProperty(\n          function (v) {\n            if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n            return v;\n          },\n          'name',\n          {\n            value:\n              'set ' +\n              (typeof _key36 === 'symbol'\n                ? { [_key36]: function () {} }[_key36].name\n                : String(_key36)),\n            configurable: true,\n          },\n        ),\n        configurable: true,\n      });\n      Object.defineProperty(_Class35, 'prototype', { writable: false });\n      return _Class35;\n    })(arrayLike))(),\n).toThrow('@@toPrimitive must return a primitive value.');",
-  "let Example = (() => {\n  'use strict';\n  const Example = function Example() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var Example;\n  };\n  Object.defineProperty(Example, 'prototype', { writable: false });\n  return Example;\n})();\nvar t = new Example();",
-  "let Foo = (() => {\n  'use strict';\n  const Foo = function Foo() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Foo, 'prototype', { writable: false });\n  return Foo;\n})();",
-  "var _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nlet Test = (() => {\n  'use strict';\n  const Test = function Test() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    this.state = 'test';\n  };\n  Object.defineProperty(Test, 'prototype', { writable: false });\n  return Test;\n})();\nlet Foo = (__nox_super_63_148 => {\n  'use strict';\n  const Foo = function Foo() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(Object.getPrototypeOf(Foo), [], new.target || Foo);\n    var _result = function () {\n      this.state = 'test';\n    }.apply(_this, arguments);\n    if (_result !== void 0) {\n      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n        return _result;\n      throw new TypeError('Derived constructors may only return object or undefined');\n    }\n    return _this;\n  };\n  if (__nox_super_63_148 !== null && typeof __nox_super_63_148 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Foo.prototype = Object.create(__nox_super_63_148 && __nox_super_63_148.prototype, {\n    constructor: {\n      value: Foo,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo, __nox_super_63_148);\n  else Foo.__proto__ = __nox_super_63_148;\n  Object.defineProperty(Foo, 'prototype', { writable: false });\n  return Foo;\n})(Bar);\nlet ConstructorScoping = (() => {\n  'use strict';\n  const ConstructorScoping = function ConstructorScoping() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    let bar;\n    {\n      let bar;\n    }\n  };\n  Object.defineProperty(ConstructorScoping, 'prototype', { writable: false });\n  return ConstructorScoping;\n})();",
-  "var _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nlet Foo = (__nox_super_0_90 => {\n  'use strict';\n  const Foo = function Foo() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(\n      Object.getPrototypeOf(Foo),\n      [\n        () => {\n          this.test;\n        },\n      ],\n      new.target || Foo,\n    );\n    var _result = function () {}.apply(_this, arguments);\n    if (_result !== void 0) {\n      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n        return _result;\n      throw new TypeError('Derived constructors may only return object or undefined');\n    }\n    return _this;\n  };\n  if (__nox_super_0_90 !== null && typeof __nox_super_0_90 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Foo.prototype = Object.create(__nox_super_0_90 && __nox_super_0_90.prototype, {\n    constructor: {\n      value: Foo,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo, __nox_super_0_90);\n  else Foo.__proto__ = __nox_super_0_90;\n  Object.defineProperty(Foo, 'prototype', { writable: false });\n  return Foo;\n})(Bar);",
-  "var _get2 = { get: require('@babel/runtime/helpers/get') };\nfunction _get(e, t, r) {\n  return _get2.get(e, t, r);\n}\n// [Symbol.toPrimitive] must be called if exist\nvar counter = 0;\nexpect(() => {\n  new ((() => {\n    'use strict';\n    const _Class = function _Class() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n    };\n    Object.defineProperty(_Class.prototype, 'f', {\n      value: Object.defineProperty(\n        function () {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          delete _get(\n            Object.getPrototypeOf(_Class.prototype),\n            {\n              [Symbol.toPrimitive]: function () {\n                ++counter;\n                return 0;\n              },\n            },\n            this,\n          );\n        },\n        'name',\n        {\n          value: 'f',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(_Class, 'prototype', { writable: false });\n    return _Class;\n  })())().f();\n}).toThrow(ReferenceError);\nexpect(counter).toBe(1);\n// [Symbol.toPrimitive] must return a primitive value\nexpect(() => {\n  new ((() => {\n    'use strict';\n    const _Class16 = function _Class16() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n    };\n    Object.defineProperty(_Class16.prototype, 'f', {\n      value: Object.defineProperty(\n        function () {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          delete _get(\n            Object.getPrototypeOf(_Class16.prototype),\n            {\n              [Symbol.toPrimitive]: function () {\n                return {};\n              },\n            },\n            this,\n          );\n        },\n        'name',\n        {\n          value: 'f',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(_Class16, 'prototype', { writable: false });\n    return _Class16;\n  })())().f();\n}).toThrow(TypeError);",
-  "var _get2 = { get: require('@babel/runtime/helpers/get') };\nfunction _get(e, t, r) {\n  return _get2.get(e, t, r);\n}\n// [Symbol.toPrimitive] must be called if exist\nvar counter = 0;\nnew ((() => {\n  'use strict';\n  const _Class = function _Class() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(_Class.prototype, 'f', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        delete _get(\n          Object.getPrototypeOf(_Class.prototype),\n          {\n            [Symbol.toPrimitive]: function () {\n              ++counter;\n              return 0;\n            },\n          },\n          this,\n        );\n      },\n      'name',\n      {\n        value: 'f',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(_Class, 'prototype', { writable: false });\n  return _Class;\n})())().f();\n// [Symbol.toPrimitive] must return a primitive value\nnew ((() => {\n  'use strict';\n  const _Class16 = function _Class16() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(_Class16.prototype, 'f', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        delete _get(\n          Object.getPrototypeOf(_Class16.prototype),\n          {\n            [Symbol.toPrimitive]: function () {\n              return {};\n            },\n          },\n          this,\n        );\n      },\n      'name',\n      {\n        value: 'f',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(_Class16, 'prototype', { writable: false });\n  return _Class16;\n})())().f();",
-  "var _get2 = { get: require('@babel/runtime/helpers/get') };\nfunction _get(e, t, r) {\n  return _get2.get(e, t, r);\n}\nexpect(() => {\n  new ((() => {\n    'use strict';\n    const _Class = function _Class() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n    };\n    Object.defineProperty(_Class.prototype, 'f', {\n      value: Object.defineProperty(\n        function () {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          delete _get(Object.getPrototypeOf(_Class.prototype), 'x', this);\n        },\n        'name',\n        {\n          value: 'f',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(_Class, 'prototype', { writable: false });\n    return _Class;\n  })())().f();\n}).toThrow(ReferenceError);\nexpect(() => {\n  new ((() => {\n    'use strict';\n    const _Class16 = function _Class16() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n    };\n    Object.defineProperty(_Class16.prototype, 'f', {\n      value: Object.defineProperty(\n        function () {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          delete _get(Object.getPrototypeOf(_Class16.prototype), 0, this);\n        },\n        'name',\n        {\n          value: 'f',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(_Class16, 'prototype', { writable: false });\n    return _Class16;\n  })())().f();\n}).toThrow(ReferenceError);\n// [expr] should be evaluated\nvar counter = 0;\nexpect(() => {\n  new ((() => {\n    'use strict';\n    const _Class19 = function _Class19() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n    };\n    Object.defineProperty(_Class19.prototype, 'f', {\n      value: Object.defineProperty(\n        function () {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          delete _get(Object.getPrototypeOf(_Class19.prototype), ++counter, this);\n        },\n        'name',\n        {\n          value: 'f',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(_Class19, 'prototype', { writable: false });\n    return _Class19;\n  })())().f();\n}).toThrow(ReferenceError);\nexpect(counter).toBe(1);\n// TypeError before ReferenceError\nexpect(() => {\n  new ((() => {\n    'use strict';\n    const _Class22 = function _Class22() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n    };\n    Object.defineProperty(_Class22.prototype, 'f', {\n      value: Object.defineProperty(\n        function () {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          delete _get(Object.getPrototypeOf(_Class22.prototype), 0(), this);\n        },\n        'name',\n        {\n          value: 'f',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(_Class22, 'prototype', { writable: false });\n    return _Class22;\n  })())().f();\n}).toThrow(TypeError);",
-  "var _get2 = { get: require('@babel/runtime/helpers/get') };\nfunction _get(e, t, r) {\n  return _get2.get(e, t, r);\n}\nnew ((() => {\n  'use strict';\n  const _Class = function _Class() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(_Class.prototype, 'f', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        delete _get(Object.getPrototypeOf(_Class.prototype), 'x', this);\n      },\n      'name',\n      {\n        value: 'f',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(_Class, 'prototype', { writable: false });\n  return _Class;\n})())().f();\nnew ((() => {\n  'use strict';\n  const _Class16 = function _Class16() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(_Class16.prototype, 'f', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        delete _get(Object.getPrototypeOf(_Class16.prototype), 0, this);\n      },\n      'name',\n      {\n        value: 'f',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(_Class16, 'prototype', { writable: false });\n  return _Class16;\n})())().f();\n// [expr] should be evaluated\nvar counter = 0;\nnew ((() => {\n  'use strict';\n  const _Class19 = function _Class19() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(_Class19.prototype, 'f', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        delete _get(Object.getPrototypeOf(_Class19.prototype), ++counter, this);\n      },\n      'name',\n      {\n        value: 'f',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(_Class19, 'prototype', { writable: false });\n  return _Class19;\n})())().f();\n// TypeError before ReferenceError\nnew ((() => {\n  'use strict';\n  const _Class22 = function _Class22() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(_Class22.prototype, 'f', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        delete _get(Object.getPrototypeOf(_Class22.prototype), 0(), this);\n      },\n      'name',\n      {\n        value: 'f',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(_Class22, 'prototype', { writable: false });\n  return _Class22;\n})())().f();",
-  "var _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nlet Bar = (() => {\n  'use strict';\n  const Bar = function Bar() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Bar, 'prototype', { writable: false });\n  return Bar;\n})();\nlet Foo = (__nox_super_14_93 => {\n  'use strict';\n  const Foo = function Foo() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this,\n      _newtarget = new.target;\n    function _super() {\n      _this = _construct(Object.getPrototypeOf(Foo), arguments, _newtarget || Foo);\n      return _this;\n    }\n    var _result = function () {\n      if (eval('false')) _super();\n    }.apply(void 0, arguments);\n    if (_result !== void 0) {\n      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n        return _result;\n      throw new TypeError('Derived constructors may only return object or undefined');\n    }\n    if (_this === void 0)\n      throw new ReferenceError(\"this hasn't been initialised - super() hasn't been called\");\n    return _this;\n  };\n  if (__nox_super_14_93 !== null && typeof __nox_super_14_93 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Foo.prototype = Object.create(__nox_super_14_93 && __nox_super_14_93.prototype, {\n    constructor: {\n      value: Foo,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo, __nox_super_14_93);\n  else Foo.__proto__ = __nox_super_14_93;\n  Object.defineProperty(Foo, 'prototype', { writable: false });\n  return Foo;\n})(Bar);\nexpect(() => new Foo()).toThrow(\"this hasn't been initialised\");",
-  "var _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nlet Foo = (__nox_super_0_79 => {\n  'use strict';\n  const Foo = function Foo() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this,\n      _newtarget = new.target;\n    function _super() {\n      _this = _construct(Object.getPrototypeOf(Foo), arguments, _newtarget || Foo);\n      return _this;\n    }\n    var _result = function () {\n      if (eval('false')) _super();\n    }.apply(void 0, arguments);\n    if (_result !== void 0) {\n      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n        return _result;\n      throw new TypeError('Derived constructors may only return object or undefined');\n    }\n    if (_this === void 0)\n      throw new ReferenceError(\"this hasn't been initialised - super() hasn't been called\");\n    return _this;\n  };\n  if (__nox_super_0_79 !== null && typeof __nox_super_0_79 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Foo.prototype = Object.create(__nox_super_0_79 && __nox_super_0_79.prototype, {\n    constructor: {\n      value: Foo,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo, __nox_super_0_79);\n  else Foo.__proto__ = __nox_super_0_79;\n  Object.defineProperty(Foo, 'prototype', { writable: false });\n  return Foo;\n})(Bar);",
-  "var _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nlet Bar = (() => {\n  'use strict';\n  const Bar = function Bar() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Bar, 'prototype', { writable: false });\n  return Bar;\n})();\nlet Foo = (__nox_super_14_101 => {\n  'use strict';\n  const Foo = function Foo() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this,\n      _newtarget = new.target;\n    function _super() {\n      _this = _construct(Object.getPrototypeOf(Foo), arguments, _newtarget || Foo);\n      return _this;\n    }\n    var _result = function () {\n      const fn = () => _super();\n      fn();\n    }.apply(void 0, arguments);\n    if (_result !== void 0) {\n      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n        return _result;\n      throw new TypeError('Derived constructors may only return object or undefined');\n    }\n    if (_this === void 0)\n      throw new ReferenceError(\"this hasn't been initialised - super() hasn't been called\");\n    return _this;\n  };\n  if (__nox_super_14_101 !== null && typeof __nox_super_14_101 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Foo.prototype = Object.create(__nox_super_14_101 && __nox_super_14_101.prototype, {\n    constructor: {\n      value: Foo,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo, __nox_super_14_101);\n  else Foo.__proto__ = __nox_super_14_101;\n  Object.defineProperty(Foo, 'prototype', { writable: false });\n  return Foo;\n})(Bar);\nnew Foo();",
-  "var _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nlet Foo = (__nox_super_0_87 => {\n  'use strict';\n  const Foo = function Foo() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this,\n      _newtarget = new.target;\n    function _super() {\n      _this = _construct(Object.getPrototypeOf(Foo), arguments, _newtarget || Foo);\n      return _this;\n    }\n    var _result = function () {\n      const fn = () => _super();\n      fn();\n    }.apply(void 0, arguments);\n    if (_result !== void 0) {\n      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n        return _result;\n      throw new TypeError('Derived constructors may only return object or undefined');\n    }\n    if (_this === void 0)\n      throw new ReferenceError(\"this hasn't been initialised - super() hasn't been called\");\n    return _this;\n  };\n  if (__nox_super_0_87 !== null && typeof __nox_super_0_87 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Foo.prototype = Object.create(__nox_super_0_87 && __nox_super_0_87.prototype, {\n    constructor: {\n      value: Foo,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo, __nox_super_0_87);\n  else Foo.__proto__ = __nox_super_0_87;\n  Object.defineProperty(Foo, 'prototype', { writable: false });\n  return Foo;\n})(Bar);",
-  "var _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nlet Bar = (() => {\n  'use strict';\n  const Bar = function Bar() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Bar, 'prototype', { writable: false });\n  return Bar;\n})();\nlet Foo = (__nox_super_14_91 => {\n  'use strict';\n  const Foo = function Foo() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this,\n      _newtarget = new.target;\n    function _super() {\n      _this = _construct(Object.getPrototypeOf(Foo), arguments, _newtarget || Foo);\n      return _this;\n    }\n    var _result = function () {\n      const fn = () => _super();\n    }.apply(void 0, arguments);\n    if (_result !== void 0) {\n      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n        return _result;\n      throw new TypeError('Derived constructors may only return object or undefined');\n    }\n    if (_this === void 0)\n      throw new ReferenceError(\"this hasn't been initialised - super() hasn't been called\");\n    return _this;\n  };\n  if (__nox_super_14_91 !== null && typeof __nox_super_14_91 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Foo.prototype = Object.create(__nox_super_14_91 && __nox_super_14_91.prototype, {\n    constructor: {\n      value: Foo,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo, __nox_super_14_91);\n  else Foo.__proto__ = __nox_super_14_91;\n  Object.defineProperty(Foo, 'prototype', { writable: false });\n  return Foo;\n})(Bar);\nexpect(() => new Foo()).toThrow(\"this hasn't been initialised\");",
-  "var _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nlet Foo = (__nox_super_0_77 => {\n  'use strict';\n  const Foo = function Foo() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this,\n      _newtarget = new.target;\n    function _super() {\n      _this = _construct(Object.getPrototypeOf(Foo), arguments, _newtarget || Foo);\n      return _this;\n    }\n    var _result = function () {\n      const fn = () => _super();\n    }.apply(void 0, arguments);\n    if (_result !== void 0) {\n      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n        return _result;\n      throw new TypeError('Derived constructors may only return object or undefined');\n    }\n    if (_this === void 0)\n      throw new ReferenceError(\"this hasn't been initialised - super() hasn't been called\");\n    return _this;\n  };\n  if (__nox_super_0_77 !== null && typeof __nox_super_0_77 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Foo.prototype = Object.create(__nox_super_0_77 && __nox_super_0_77.prototype, {\n    constructor: {\n      value: Foo,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo, __nox_super_0_77);\n  else Foo.__proto__ = __nox_super_0_77;\n  Object.defineProperty(Foo, 'prototype', { writable: false });\n  return Foo;\n})(Bar);",
-  "var _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nlet Bar = (() => {\n  'use strict';\n  const Bar = function Bar() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Bar, 'prototype', { writable: false });\n  return Bar;\n})();\nlet Foo = (__nox_super_14_62 => {\n  'use strict';\n  const Foo = function Foo() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this,\n      _newtarget = new.target;\n    function _super() {\n      _this = _construct(Object.getPrototypeOf(Foo), arguments, _newtarget || Foo);\n      return _this;\n    }\n    var _result = function () {}.apply(void 0, arguments);\n    if (_result !== void 0) {\n      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n        return _result;\n      throw new TypeError('Derived constructors may only return object or undefined');\n    }\n    if (_this === void 0)\n      throw new ReferenceError(\"this hasn't been initialised - super() hasn't been called\");\n    return _this;\n  };\n  if (__nox_super_14_62 !== null && typeof __nox_super_14_62 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Foo.prototype = Object.create(__nox_super_14_62 && __nox_super_14_62.prototype, {\n    constructor: {\n      value: Foo,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo, __nox_super_14_62);\n  else Foo.__proto__ = __nox_super_14_62;\n  Object.defineProperty(Foo, 'prototype', { writable: false });\n  return Foo;\n})(Bar);\nexpect(() => new Foo()).toThrow(\"this hasn't been initialised\");",
-  "var _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nlet Bar = (() => {\n  'use strict';\n  const Bar = function Bar() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Bar, 'prototype', { writable: false });\n  return Bar;\n})();\nlet Foo = (__nox_super_14_88 => {\n  'use strict';\n  const Foo = function Foo() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(Object.getPrototypeOf(Foo), [], new.target || Foo);\n    var _result = function () {\n      return 3;\n    }.apply(_this, arguments);\n    if (_result !== void 0) {\n      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n        return _result;\n      throw new TypeError('Derived constructors may only return object or undefined');\n    }\n    return _this;\n  };\n  if (__nox_super_14_88 !== null && typeof __nox_super_14_88 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Foo.prototype = Object.create(__nox_super_14_88 && __nox_super_14_88.prototype, {\n    constructor: {\n      value: Foo,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo, __nox_super_14_88);\n  else Foo.__proto__ = __nox_super_14_88;\n  Object.defineProperty(Foo, 'prototype', { writable: false });\n  return Foo;\n})(Bar);\nlet Foo2 = (__nox_super_90_168 => {\n  'use strict';\n  const Foo2 = function Foo2() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(Object.getPrototypeOf(Foo2), [], new.target || Foo2);\n    var _result = function () {\n      return null;\n    }.apply(_this, arguments);\n    if (_result !== void 0) {\n      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n        return _result;\n      throw new TypeError('Derived constructors may only return object or undefined');\n    }\n    return _this;\n  };\n  if (__nox_super_90_168 !== null && typeof __nox_super_90_168 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Foo2.prototype = Object.create(__nox_super_90_168 && __nox_super_90_168.prototype, {\n    constructor: {\n      value: Foo2,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo2, __nox_super_90_168);\n  else Foo2.__proto__ = __nox_super_90_168;\n  Object.defineProperty(Foo2, 'prototype', { writable: false });\n  return Foo2;\n})(Bar);\nexpect(() => new Foo()).toThrow('Derived constructors may only return object or undefined');\nexpect(() => new Foo2()).toThrow('Derived constructors may only return object or undefined');",
-  "var _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nlet Foo = (__nox_super_0_74 => {\n  'use strict';\n  const Foo = function Foo() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(Object.getPrototypeOf(Foo), [], new.target || Foo);\n    var _result = function () {\n      return 3;\n    }.apply(_this, arguments);\n    if (_result !== void 0) {\n      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n        return _result;\n      throw new TypeError('Derived constructors may only return object or undefined');\n    }\n    return _this;\n  };\n  if (__nox_super_0_74 !== null && typeof __nox_super_0_74 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Foo.prototype = Object.create(__nox_super_0_74 && __nox_super_0_74.prototype, {\n    constructor: {\n      value: Foo,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo, __nox_super_0_74);\n  else Foo.__proto__ = __nox_super_0_74;\n  Object.defineProperty(Foo, 'prototype', { writable: false });\n  return Foo;\n})(Bar);",
-  "let Foo = (() => {\n  'use strict';\n  const Foo = function Foo() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Foo, 'prototype', { writable: false });\n  return Foo;\n})();\nexport default Foo;",
-  "import _babelHelper from '@babel/runtime/helpers/construct';\nvar _construct2 = { construct: _babelHelper };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nlet _Class = (__nox_super_15_33 => {\n  'use strict';\n  const _Class = function _Class() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(Object.getPrototypeOf(_Class), arguments, new.target || _Class);\n    return _this;\n  };\n  if (__nox_super_15_33 !== null && typeof __nox_super_15_33 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  _Class.prototype = Object.create(__nox_super_15_33 && __nox_super_15_33.prototype, {\n    constructor: {\n      value: _Class,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(_Class, __nox_super_15_33);\n  else _Class.__proto__ = __nox_super_15_33;\n  Object.defineProperty(_Class, 'prototype', { writable: false });\n  return _Class;\n})(A);\nexport default _Class;",
-  "'use strict';\nvar _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nvar _get2 = { get: require('@babel/runtime/helpers/get') };\nfunction _get(e, t, r) {\n  return _get2.get(e, t, r);\n}\nvar log = [];\nvar SuperClass = require('module-which-exports-native-class');\nlet SubClass = (__nox_super_93_297 => {\n  'use strict';\n  const SubClass = function SubClass() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    log.push(4);\n    var _this = _construct(Object.getPrototypeOf(SubClass), [], new.target || SubClass);\n    var _result = function () {}.apply(_this, arguments);\n    if (_result !== void 0) {\n      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n        return _result;\n      throw new TypeError('Derived constructors may only return object or undefined');\n    }\n    return _this;\n  };\n  if (__nox_super_93_297 !== null && typeof __nox_super_93_297 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  SubClass.prototype = Object.create(__nox_super_93_297 && __nox_super_93_297.prototype, {\n    constructor: {\n      value: SubClass,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(SubClass, __nox_super_93_297);\n  else SubClass.__proto__ = __nox_super_93_297;\n  Object.defineProperty(SubClass.prototype, 'method', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        log.push(5);\n        _get(Object.getPrototypeOf(SubClass.prototype), 'method', this).call(this);\n      },\n      'name',\n      {\n        value: 'method',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(SubClass, 'method', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        log.push(6);\n        _get(Object.getPrototypeOf(SubClass), 'method', this).call(this);\n      },\n      'name',\n      {\n        value: 'method',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(SubClass, 'prototype', { writable: false });\n  return SubClass;\n})(SuperClass);\nnew SubClass().method();\nSubClass.method();\nexpect(log).toEqual([4, 1, 5, 2, 6, 3]);\n// Magic function to avoid transpiling class\nfunction require() {\n  return eval(`(\n    class SuperClass {\n      constructor() { log.push(1); }\n      method() { log.push(2); }\n      static method() { log.push(3); }\n    }\n  )`);\n}",
-  "var o = {\n  foo: (() => {\n    'use strict';\n    const foo = function foo() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n    };\n    Object.defineProperty(foo, 'prototype', { writable: false });\n    return foo;\n  })(),\n};",
-  "let Test = (() => {\n  'use strict';\n  const Test = function Test() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Test.prototype, 'test', {\n    get: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        return 5 + 5;\n      },\n      'name',\n      {\n        value: 'get test',\n        configurable: true,\n      },\n    ),\n    configurable: true,\n  });\n  Object.defineProperty(Test.prototype, 'test', {\n    set: Object.defineProperty(\n      function (val) {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        this._test = val;\n      },\n      'name',\n      {\n        value: 'set test',\n        configurable: true,\n      },\n    ),\n    configurable: true,\n  });\n  Object.defineProperty(Test, 'prototype', { writable: false });\n  return Test;\n})();",
-  "let Test = (() => {\n  'use strict';\n  const Test = function Test() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Test.prototype, 'test', {\n    get: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        return 5 + 5;\n      },\n      'name',\n      {\n        value: 'get test',\n        configurable: true,\n      },\n    ),\n    configurable: true,\n  });\n  Object.defineProperty(Test, 'prototype', { writable: false });\n  return Test;\n})();",
-  "let Test = (() => {\n  'use strict';\n  const Test = function Test() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Test.prototype, 'test', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        return 5 + 5;\n      },\n      'name',\n      {\n        value: 'test',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Test, 'prototype', { writable: false });\n  return Test;\n})();",
-  "let Test = (() => {\n  'use strict';\n  const Test = function Test() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Test.prototype, 'test', {\n    set: Object.defineProperty(\n      function (val) {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        this._test = val;\n      },\n      'name',\n      {\n        value: 'set test',\n        configurable: true,\n      },\n    ),\n    configurable: true,\n  });\n  Object.defineProperty(Test, 'prototype', { writable: false });\n  return Test;\n})();",
-  "var _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nvar _get2 = { get: require('@babel/runtime/helpers/get') };\nfunction _get(e, t, r) {\n  return _get2.get(e, t, r);\n}\nvar _classKey2 = { toPropertyKey: require('@babel/runtime/helpers/toPropertyKey') },\n  _classKey = _classKey2.toPropertyKey;\nlet Foo = (__nox_super_0_154 => {\n  'use strict';\n  const Foo = function Foo() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(Object.getPrototypeOf(Foo), [], new.target || Foo);\n    var _result = function () {\n      let X = (_key => {\n        'use strict';\n        _key = _classKey(_key);\n        const X = function X() {\n          if (!new.target) throw new TypeError('Cannot call a class as a function');\n        };\n        Object.defineProperty(X.prototype, _key, {\n          value: Object.defineProperty(\n            function () {\n              if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n            },\n            'name',\n            {\n              value:\n                typeof _key === 'symbol' ? { [_key]: function () {} }[_key].name : String(_key),\n              configurable: true,\n            },\n          ),\n          writable: true,\n          configurable: true,\n        });\n        Object.defineProperty(X, 'prototype', { writable: false });\n        return X;\n      })(\n        (() => {\n          let Foo;\n          _get(Object.getPrototypeOf(Foo.prototype), 'method', this).call(this);\n        })(),\n      );\n    }.apply(_this, arguments);\n    if (_result !== void 0) {\n      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n        return _result;\n      throw new TypeError('Derived constructors may only return object or undefined');\n    }\n    return _this;\n  };\n  if (__nox_super_0_154 !== null && typeof __nox_super_0_154 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Foo.prototype = Object.create(__nox_super_0_154 && __nox_super_0_154.prototype, {\n    constructor: {\n      value: Foo,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo, __nox_super_0_154);\n  else Foo.__proto__ = __nox_super_0_154;\n  Object.defineProperty(Foo, 'prototype', { writable: false });\n  return Foo;\n})(Bar);",
-  "var _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nvar _get2 = { get: require('@babel/runtime/helpers/get') };\nfunction _get(e, t, r) {\n  return _get2.get(e, t, r);\n}\nlet Base = (() => {\n  'use strict';\n  const Base = function Base() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Base.prototype, 'method', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      },\n      'name',\n      {\n        value: 'method',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Base, 'prototype', { writable: false });\n  return Base;\n})();\nlet Foo = (__nox_super_30_167 => {\n  'use strict';\n  const Foo = function Foo() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(Object.getPrototypeOf(Foo), [], new.target || Foo);\n    var _result = function () {\n      if (true) {\n        let Foo;\n        _get(Object.getPrototypeOf(Foo.prototype), 'method', this).call(this);\n      }\n    }.apply(_this, arguments);\n    if (_result !== void 0) {\n      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n        return _result;\n      throw new TypeError('Derived constructors may only return object or undefined');\n    }\n    return _this;\n  };\n  if (__nox_super_30_167 !== null && typeof __nox_super_30_167 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Foo.prototype = Object.create(__nox_super_30_167 && __nox_super_30_167.prototype, {\n    constructor: {\n      value: Foo,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo, __nox_super_30_167);\n  else Foo.__proto__ = __nox_super_30_167;\n  Object.defineProperty(Foo.prototype, 'method', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      },\n      'name',\n      {\n        value: 'method',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Foo, 'prototype', { writable: false });\n  return Foo;\n})(Base);",
-  "var _get2 = { get: require('@babel/runtime/helpers/get') };\nfunction _get(e, t, r) {\n  return _get2.get(e, t, r);\n}\nlet Foo = (() => {\n  'use strict';\n  const Foo = function Foo() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Foo.prototype, 'method', {\n    value: Object.defineProperty(\n      function (Foo) {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        return _get(Object.getPrototypeOf(Foo.prototype), 'method', this).call(this, Foo);\n      },\n      'name',\n      {\n        value: 'method',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Foo, 'prototype', { writable: false });\n  return Foo;\n})();\nlet Bar = (() => {\n  'use strict';\n  const Bar = function Bar() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Bar.prototype, 'method', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        return () => {\n          let Bar;\n          return _get(Object.getPrototypeOf(Bar.prototype), 'method', this).call(this, Bar);\n        };\n      },\n      'name',\n      {\n        value: 'method',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Bar, 'prototype', { writable: false });\n  return Bar;\n})();\nlet Baz = (() => {\n  'use strict';\n  const Baz = function Baz() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Baz.prototype, 'method', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        let Baz = (() => {\n          'use strict';\n          const Baz = function Baz() {\n            if (!new.target) throw new TypeError('Cannot call a class as a function');\n          };\n          Object.defineProperty(Baz.prototype, 'f', {\n            value: Object.defineProperty(\n              function () {\n                if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n                let Baz = 1;\n                return Baz;\n              },\n              'name',\n              {\n                value: 'f',\n                configurable: true,\n              },\n            ),\n            writable: true,\n            configurable: true,\n          });\n          Object.defineProperty(Baz, 'prototype', { writable: false });\n          return Baz;\n        })();\n        return _get(Object.getPrototypeOf(Baz.prototype), 'method', this).call(this, Baz);\n      },\n      'name',\n      {\n        value: 'method',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Baz, 'prototype', { writable: false });\n  return Baz;\n})();",
-  "import { a } from './a';\nlet Foo = (() => {\n  'use strict';\n  const Foo = function Foo() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Foo.prototype, '_a', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        a();\n      },\n      'name',\n      {\n        value: '_a',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Foo, 'prototype', { writable: false });\n  return Foo;\n})();",
-  "'use strict';\nvar _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nvar _classKey2 = { toPropertyKey: require('@babel/runtime/helpers/toPropertyKey') },\n  _classKey = _classKey2.toPropertyKey;\nlet Hello = (() => {\n  'use strict';\n  const Hello = function Hello() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    return {\n      toString() {\n        return 'hello';\n      },\n    };\n  };\n  Object.defineProperty(Hello, 'prototype', { writable: false });\n  return Hello;\n})();\nlet Outer = (__nox_super_125_277 => {\n  'use strict';\n  const Outer = function Outer() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this,\n      _newtarget = new.target;\n    function _super() {\n      _this = _construct(Object.getPrototypeOf(Outer), arguments, _newtarget || Outer);\n      return _this;\n    }\n    var _result = function () {\n      let Inner = (_key => {\n        'use strict';\n        _key = _classKey(_key);\n        const Inner = function Inner() {\n          if (!new.target) throw new TypeError('Cannot call a class as a function');\n        };\n        Object.defineProperty(Inner.prototype, _key, {\n          value: Object.defineProperty(\n            function () {\n              if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n              return 'hello';\n            },\n            'name',\n            {\n              value:\n                typeof _key === 'symbol' ? { [_key]: function () {} }[_key].name : String(_key),\n              configurable: true,\n            },\n          ),\n          writable: true,\n          configurable: true,\n        });\n        Object.defineProperty(Inner, 'prototype', { writable: false });\n        return Inner;\n      })(_super());\n      return new Inner();\n    }.apply(void 0, arguments);\n    if (_result !== void 0) {\n      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n        return _result;\n      throw new TypeError('Derived constructors may only return object or undefined');\n    }\n    if (_this === void 0)\n      throw new ReferenceError(\"this hasn't been initialised - super() hasn't been called\");\n    return _this;\n  };\n  if (__nox_super_125_277 !== null && typeof __nox_super_125_277 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Outer.prototype = Object.create(__nox_super_125_277 && __nox_super_125_277.prototype, {\n    constructor: {\n      value: Outer,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Outer, __nox_super_125_277);\n  else Outer.__proto__ = __nox_super_125_277;\n  Object.defineProperty(Outer, 'prototype', { writable: false });\n  return Outer;\n})(Hello);\nexpect(new Outer().hello()).toBe('hello');",
-  "'use strict';\nvar _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nvar _get2 = { get: require('@babel/runtime/helpers/get') };\nfunction _get(e, t, r) {\n  return _get2.get(e, t, r);\n}\nvar _classKey2 = { toPropertyKey: require('@babel/runtime/helpers/toPropertyKey') },\n  _classKey = _classKey2.toPropertyKey;\nlet Hello = (() => {\n  'use strict';\n  const Hello = function Hello() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Hello.prototype, 'toString', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        return 'hello';\n      },\n      'name',\n      {\n        value: 'toString',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Hello, 'prototype', { writable: false });\n  return Hello;\n})();\nlet Outer = (__nox_super_70_244 => {\n  'use strict';\n  const Outer = function Outer() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(Object.getPrototypeOf(Outer), [], new.target || Outer);\n    var _result = function () {\n      let Inner = (_key => {\n        'use strict';\n        _key = _classKey(_key);\n        const Inner = function Inner() {\n          if (!new.target) throw new TypeError('Cannot call a class as a function');\n        };\n        Object.defineProperty(Inner.prototype, _key, {\n          value: Object.defineProperty(\n            function () {\n              if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n              return 'hello';\n            },\n            'name',\n            {\n              value:\n                typeof _key === 'symbol' ? { [_key]: function () {} }[_key].name : String(_key),\n              configurable: true,\n            },\n          ),\n          writable: true,\n          configurable: true,\n        });\n        Object.defineProperty(Inner, 'prototype', { writable: false });\n        return Inner;\n      })(_get(Object.getPrototypeOf(Outer.prototype), 'toString', this).call(this));\n      return new Inner();\n    }.apply(_this, arguments);\n    if (_result !== void 0) {\n      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n        return _result;\n      throw new TypeError('Derived constructors may only return object or undefined');\n    }\n    return _this;\n  };\n  if (__nox_super_70_244 !== null && typeof __nox_super_70_244 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Outer.prototype = Object.create(__nox_super_70_244 && __nox_super_70_244.prototype, {\n    constructor: {\n      value: Outer,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Outer, __nox_super_70_244);\n  else Outer.__proto__ = __nox_super_70_244;\n  Object.defineProperty(Outer, 'prototype', { writable: false });\n  return Outer;\n})(Hello);\nexpect(new Outer().hello()).toBe('hello');",
-  "'use strict';\nvar _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nlet Hello = (() => {\n  'use strict';\n  const Hello = function Hello() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    return {\n      toString() {\n        return 'hello';\n      },\n    };\n  };\n  Object.defineProperty(Hello, 'prototype', { writable: false });\n  return Hello;\n})();\nlet Outer = (__nox_super_125_275 => {\n  'use strict';\n  const Outer = function Outer() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this,\n      _newtarget = new.target;\n    function _super() {\n      _this = _construct(Object.getPrototypeOf(Outer), arguments, _newtarget || Outer);\n      return _this;\n    }\n    var _result = function () {\n      const Inner = {\n        [_super()]() {\n          return 'hello';\n        },\n      };\n      return Inner;\n    }.apply(void 0, arguments);\n    if (_result !== void 0) {\n      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n        return _result;\n      throw new TypeError('Derived constructors may only return object or undefined');\n    }\n    if (_this === void 0)\n      throw new ReferenceError(\"this hasn't been initialised - super() hasn't been called\");\n    return _this;\n  };\n  if (__nox_super_125_275 !== null && typeof __nox_super_125_275 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Outer.prototype = Object.create(__nox_super_125_275 && __nox_super_125_275.prototype, {\n    constructor: {\n      value: Outer,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Outer, __nox_super_125_275);\n  else Outer.__proto__ = __nox_super_125_275;\n  Object.defineProperty(Outer, 'prototype', { writable: false });\n  return Outer;\n})(Hello);\nexpect(new Outer().hello()).toBe('hello');",
-  "'use strict';\nvar _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nvar _get2 = { get: require('@babel/runtime/helpers/get') };\nfunction _get(e, t, r) {\n  return _get2.get(e, t, r);\n}\nlet Hello = (() => {\n  'use strict';\n  const Hello = function Hello() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Hello.prototype, 'toString', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        return 'hello';\n      },\n      'name',\n      {\n        value: 'toString',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Hello, 'prototype', { writable: false });\n  return Hello;\n})();\nlet Outer = (__nox_super_70_242 => {\n  'use strict';\n  const Outer = function Outer() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(Object.getPrototypeOf(Outer), [], new.target || Outer);\n    var _result = function () {\n      const Inner = {\n        [_get(Object.getPrototypeOf(Outer.prototype), 'toString', this).call(this)]() {\n          return 'hello';\n        },\n      };\n      return Inner;\n    }.apply(_this, arguments);\n    if (_result !== void 0) {\n      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n        return _result;\n      throw new TypeError('Derived constructors may only return object or undefined');\n    }\n    return _this;\n  };\n  if (__nox_super_70_242 !== null && typeof __nox_super_70_242 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Outer.prototype = Object.create(__nox_super_70_242 && __nox_super_70_242.prototype, {\n    constructor: {\n      value: Outer,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Outer, __nox_super_70_242);\n  else Outer.__proto__ = __nox_super_70_242;\n  Object.defineProperty(Outer, 'prototype', { writable: false });\n  return Outer;\n})(Hello);\nexpect(new Outer().hello()).toBe('hello');",
-  "let Test = (() => {\n  'use strict';\n  const Test = function Test() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Test, 'prototype', { writable: false });\n  return Test;\n})();",
-  "let MyCtrl = (() => {\n  'use strict';\n  const MyCtrl = function MyCtrl(a) {\n    'any directive prologue';\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    foo;\n  };\n  Object.defineProperty(MyCtrl, 'prototype', { writable: false });\n  return MyCtrl;\n})();\nlet MyCtrl2 = (() => {\n  'use strict';\n  const MyCtrl2 = function MyCtrl2(a) {\n    'a';\n    'b';\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    foo;\n  };\n  Object.defineProperty(MyCtrl2, 'prototype', { writable: false });\n  return MyCtrl2;\n})();\nlet MyCtrl3 = (() => {\n  'use strict';\n  const MyCtrl3 = function MyCtrl3(a) {\n    'a';\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    foo;\n    ('b');\n  };\n  Object.defineProperty(MyCtrl3, 'prototype', { writable: false });\n  return MyCtrl3;\n})();",
-  "var _classKey2 = { toPropertyKey: require('@babel/runtime/helpers/toPropertyKey') },\n  _classKey = _classKey2.toPropertyKey;\n// #1649\nlet Foo = ((_key, _key14) => {\n  'use strict';\n  _key = _classKey(_key);\n  _key14 = _classKey(_key14);\n  const Foo = function Foo() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Foo.prototype, _key, {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      },\n      'name',\n      {\n        value: typeof _key === 'symbol' ? { [_key]: function () {} }[_key].name : String(_key),\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Foo.prototype, _key14, {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      },\n      'name',\n      {\n        value:\n          typeof _key14 === 'symbol' ? { [_key14]: function () {} }[_key14].name : String(_key14),\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Foo, 'prototype', { writable: false });\n  return Foo;\n})(Symbol(), Symbol());",
-  "'use strict';\nvar _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nlet Foo = (() => {\n  'use strict';\n  const Foo = function Foo() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    return { x: 1 };\n  };\n  Object.defineProperty(Foo, 'prototype', { writable: false });\n  return Foo;\n})();\nexpect(new Foo().x).toBe(1);\nlet Bar = (__nox_super_102_174 => {\n  'use strict';\n  const Bar = function Bar() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(Object.getPrototypeOf(Bar), [], new.target || Bar);\n    var _result = function () {\n      return;\n    }.apply(_this, arguments);\n    if (_result !== void 0) {\n      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n        return _result;\n      throw new TypeError('Derived constructors may only return object or undefined');\n    }\n    return _this;\n  };\n  if (__nox_super_102_174 !== null && typeof __nox_super_102_174 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Bar.prototype = Object.create(__nox_super_102_174 && __nox_super_102_174.prototype, {\n    constructor: {\n      value: Bar,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Bar, __nox_super_102_174);\n  else Bar.__proto__ = __nox_super_102_174;\n  Object.defineProperty(Bar, 'prototype', { writable: false });\n  return Bar;\n})(Foo);\nexpect(new Bar().x).toBe(1);\nlet Bar2 = (__nox_super_206_316 => {\n  'use strict';\n  const Bar2 = function Bar2() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(Object.getPrototypeOf(Bar2), [], new.target || Bar2);\n    var _result = function () {\n      expect(this.x).toBe(1);\n      return { x: 2 };\n    }.apply(_this, arguments);\n    if (_result !== void 0) {\n      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n        return _result;\n      throw new TypeError('Derived constructors may only return object or undefined');\n    }\n    return _this;\n  };\n  if (__nox_super_206_316 !== null && typeof __nox_super_206_316 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Bar2.prototype = Object.create(__nox_super_206_316 && __nox_super_206_316.prototype, {\n    constructor: {\n      value: Bar2,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Bar2, __nox_super_206_316);\n  else Bar2.__proto__ = __nox_super_206_316;\n  Object.defineProperty(Bar2, 'prototype', { writable: false });\n  return Bar2;\n})(Foo);\nexpect(new Bar2().x).toBe(2);\nlet singleton;\nlet Sub = (__nox_super_365_488 => {\n  'use strict';\n  const Sub = function Sub() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this,\n      _newtarget = new.target;\n    function _super() {\n      _this = _construct(Object.getPrototypeOf(Sub), arguments, _newtarget || Sub);\n      return _this;\n    }\n    var _result = function () {\n      if (singleton) {\n        return singleton;\n      }\n      singleton = _super();\n    }.apply(void 0, arguments);\n    if (_result !== void 0) {\n      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n        return _result;\n      throw new TypeError('Derived constructors may only return object or undefined');\n    }\n    if (_this === void 0)\n      throw new ReferenceError(\"this hasn't been initialised - super() hasn't been called\");\n    return _this;\n  };\n  if (__nox_super_365_488 !== null && typeof __nox_super_365_488 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Sub.prototype = Object.create(__nox_super_365_488 && __nox_super_365_488.prototype, {\n    constructor: {\n      value: Sub,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Sub, __nox_super_365_488);\n  else Sub.__proto__ = __nox_super_365_488;\n  Object.defineProperty(Sub, 'prototype', { writable: false });\n  return Sub;\n})(Foo);\nlet instance = new Sub();\nexpect(instance).toBe(singleton);\ninstance = new Sub();\nexpect(instance).toBe(singleton);\nlet Undefined = (__nox_super_604_720 => {\n  'use strict';\n  const Undefined = function Undefined() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this,\n      _newtarget = new.target;\n    function _super() {\n      _this = _construct(Object.getPrototypeOf(Undefined), arguments, _newtarget || Undefined);\n      return _this;\n    }\n    var _result = function () {\n      if (false) {\n        _super();\n      }\n      return;\n      _super();\n    }.apply(void 0, arguments);\n    if (_result !== void 0) {\n      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n        return _result;\n      throw new TypeError('Derived constructors may only return object or undefined');\n    }\n    if (_this === void 0)\n      throw new ReferenceError(\"this hasn't been initialised - super() hasn't been called\");\n    return _this;\n  };\n  if (__nox_super_604_720 !== null && typeof __nox_super_604_720 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Undefined.prototype = Object.create(__nox_super_604_720 && __nox_super_604_720.prototype, {\n    constructor: {\n      value: Undefined,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Undefined, __nox_super_604_720);\n  else Undefined.__proto__ = __nox_super_604_720;\n  Object.defineProperty(Undefined, 'prototype', { writable: false });\n  return Undefined;\n})(Foo);\nexpect(() => {\n  new Undefined();\n}).toThrow('this');",
-  "var BaseView = (() => {\n  'use strict';\n  const BaseView = function BaseView() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    this.autoRender = true;\n  };\n  Object.defineProperty(BaseView, 'prototype', { writable: false });\n  return BaseView;\n})();\nvar BaseView = (() => {\n  'use strict';\n  const _Class = function _Class() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    this.autoRender = true;\n  };\n  Object.defineProperty(_Class, 'name', {\n    value: 'BaseView',\n    configurable: true,\n  });\n  Object.defineProperty(_Class, 'prototype', { writable: false });\n  return _Class;\n})();\nvar BaseView = (() => {\n  'use strict';\n  const _Class18 = function _Class18() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(_Class18, 'name', {\n    value: 'BaseView',\n    configurable: true,\n  });\n  Object.defineProperty(_Class18.prototype, 'foo', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        this.autoRender = true;\n      },\n      'name',\n      {\n        value: 'foo',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(_Class18, 'prototype', { writable: false });\n  return _Class18;\n})();",
-  "let A = (() => {\n  'use strict';\n  const A = function A() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(A, 'a', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      },\n      'name',\n      {\n        value: 'a',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(A, 'b', {\n    get: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      },\n      'name',\n      {\n        value: 'get b',\n        configurable: true,\n      },\n    ),\n    configurable: true,\n  });\n  Object.defineProperty(A, 'b', {\n    set: Object.defineProperty(\n      function (b) {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      },\n      'name',\n      {\n        value: 'set b',\n        configurable: true,\n      },\n    ),\n    configurable: true,\n  });\n  Object.defineProperty(A, 'prototype', { writable: false });\n  return A;\n})();",
-  "var _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nlet TestEmpty = (__nox_super_0_38 => {\n  'use strict';\n  const TestEmpty = function TestEmpty() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(Object.getPrototypeOf(TestEmpty), arguments, new.target || TestEmpty);\n    return _this;\n  };\n  if (__nox_super_0_38 !== null && typeof __nox_super_0_38 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  TestEmpty.prototype = Object.create(__nox_super_0_38 && __nox_super_0_38.prototype, {\n    constructor: {\n      value: TestEmpty,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(TestEmpty, __nox_super_0_38);\n  else TestEmpty.__proto__ = __nox_super_0_38;\n  Object.defineProperty(TestEmpty, 'prototype', { writable: false });\n  return TestEmpty;\n})(\n  (() => {\n    'use strict';\n    const _Class = function _Class() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n    };\n    Object.defineProperty(_Class, 'prototype', { writable: false });\n    return _Class;\n  })(),\n);\nlet TestConstructorOnly = (__nox_super_40_106 => {\n  'use strict';\n  const TestConstructorOnly = function TestConstructorOnly() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(\n      Object.getPrototypeOf(TestConstructorOnly),\n      arguments,\n      new.target || TestConstructorOnly,\n    );\n    return _this;\n  };\n  if (__nox_super_40_106 !== null && typeof __nox_super_40_106 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  TestConstructorOnly.prototype = Object.create(\n    __nox_super_40_106 && __nox_super_40_106.prototype,\n    {\n      constructor: {\n        value: TestConstructorOnly,\n        writable: true,\n        configurable: true,\n      },\n    },\n  );\n  if (Object.setPrototypeOf) Object.setPrototypeOf(TestConstructorOnly, __nox_super_40_106);\n  else TestConstructorOnly.__proto__ = __nox_super_40_106;\n  Object.defineProperty(TestConstructorOnly, 'prototype', { writable: false });\n  return TestConstructorOnly;\n})(\n  (() => {\n    'use strict';\n    const _Class24 = function _Class24() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n    };\n    Object.defineProperty(_Class24, 'prototype', { writable: false });\n    return _Class24;\n  })(),\n);\nlet TestMethodOnly = (__nox_super_108_164 => {\n  'use strict';\n  const TestMethodOnly = function TestMethodOnly() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(\n      Object.getPrototypeOf(TestMethodOnly),\n      arguments,\n      new.target || TestMethodOnly,\n    );\n    return _this;\n  };\n  if (__nox_super_108_164 !== null && typeof __nox_super_108_164 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  TestMethodOnly.prototype = Object.create(__nox_super_108_164 && __nox_super_108_164.prototype, {\n    constructor: {\n      value: TestMethodOnly,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(TestMethodOnly, __nox_super_108_164);\n  else TestMethodOnly.__proto__ = __nox_super_108_164;\n  Object.defineProperty(TestMethodOnly, 'prototype', { writable: false });\n  return TestMethodOnly;\n})(\n  (() => {\n    'use strict';\n    const _Class29 = function _Class29() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n    };\n    Object.defineProperty(_Class29.prototype, 'method', {\n      value: Object.defineProperty(\n        function () {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        },\n        'name',\n        {\n          value: 'method',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(_Class29, 'prototype', { writable: false });\n    return _Class29;\n  })(),\n);\nlet TestConstructorAndMethod = (__nox_super_166_253 => {\n  'use strict';\n  const TestConstructorAndMethod = function TestConstructorAndMethod() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(\n      Object.getPrototypeOf(TestConstructorAndMethod),\n      arguments,\n      new.target || TestConstructorAndMethod,\n    );\n    return _this;\n  };\n  if (__nox_super_166_253 !== null && typeof __nox_super_166_253 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  TestConstructorAndMethod.prototype = Object.create(\n    __nox_super_166_253 && __nox_super_166_253.prototype,\n    {\n      constructor: {\n        value: TestConstructorAndMethod,\n        writable: true,\n        configurable: true,\n      },\n    },\n  );\n  if (Object.setPrototypeOf) Object.setPrototypeOf(TestConstructorAndMethod, __nox_super_166_253);\n  else TestConstructorAndMethod.__proto__ = __nox_super_166_253;\n  Object.defineProperty(TestConstructorAndMethod, 'prototype', { writable: false });\n  return TestConstructorAndMethod;\n})(\n  (() => {\n    'use strict';\n    const _Class34 = function _Class34() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n    };\n    Object.defineProperty(_Class34.prototype, 'method', {\n      value: Object.defineProperty(\n        function () {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        },\n        'name',\n        {\n          value: 'method',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(_Class34, 'prototype', { writable: false });\n    return _Class34;\n  })(),\n);\nlet TestMultipleMethods = (__nox_super_255_323 => {\n  'use strict';\n  const TestMultipleMethods = function TestMultipleMethods() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(\n      Object.getPrototypeOf(TestMultipleMethods),\n      arguments,\n      new.target || TestMultipleMethods,\n    );\n    return _this;\n  };\n  if (__nox_super_255_323 !== null && typeof __nox_super_255_323 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  TestMultipleMethods.prototype = Object.create(\n    __nox_super_255_323 && __nox_super_255_323.prototype,\n    {\n      constructor: {\n        value: TestMultipleMethods,\n        writable: true,\n        configurable: true,\n      },\n    },\n  );\n  if (Object.setPrototypeOf) Object.setPrototypeOf(TestMultipleMethods, __nox_super_255_323);\n  else TestMultipleMethods.__proto__ = __nox_super_255_323;\n  Object.defineProperty(TestMultipleMethods, 'prototype', { writable: false });\n  return TestMultipleMethods;\n})(\n  (() => {\n    'use strict';\n    const _Class39 = function _Class39() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n    };\n    Object.defineProperty(_Class39.prototype, 'm1', {\n      value: Object.defineProperty(\n        function () {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        },\n        'name',\n        {\n          value: 'm1',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(_Class39.prototype, 'm2', {\n      value: Object.defineProperty(\n        function () {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        },\n        'name',\n        {\n          value: 'm2',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(_Class39, 'prototype', { writable: false });\n    return _Class39;\n  })(),\n);",
-  "'use strict';\nvar _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nconst oldReflect = global.Reflect;\ntry {\n  global.Reflect = undefined;\n  let NewTarget;\n  let A = (() => {\n    'use strict';\n    const A = function A() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n      NewTarget = new.target;\n    };\n    Object.defineProperty(A, 'prototype', { writable: false });\n    return A;\n  })();\n  let B = (__nox_super_169_189 => {\n    'use strict';\n    const B = function B() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n      var _this = _construct(Object.getPrototypeOf(B), arguments, new.target || B);\n      return _this;\n    };\n    if (__nox_super_169_189 !== null && typeof __nox_super_169_189 !== 'function')\n      throw new TypeError('Super expression must either be null or a function');\n    B.prototype = Object.create(__nox_super_169_189 && __nox_super_169_189.prototype, {\n      constructor: {\n        value: B,\n        writable: true,\n        configurable: true,\n      },\n    });\n    if (Object.setPrototypeOf) Object.setPrototypeOf(B, __nox_super_169_189);\n    else B.__proto__ = __nox_super_169_189;\n    Object.defineProperty(B, 'prototype', { writable: false });\n    return B;\n  })(A);\n  new A();\n  expect(NewTarget).toBe(A);\n  new B();\n  expect(NewTarget).toBe(B);\n} finally {\n  global.Reflect = oldReflect;\n}",
-  "'use strict';\nvar _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nlet NewTarget;\nlet A = (() => {\n  'use strict';\n  const A = function A() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    NewTarget = new.target;\n  };\n  Object.defineProperty(A, 'prototype', { writable: false });\n  return A;\n})();\nlet B = (__nox_super_87_107 => {\n  'use strict';\n  const B = function B() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(Object.getPrototypeOf(B), arguments, new.target || B);\n    return _this;\n  };\n  if (__nox_super_87_107 !== null && typeof __nox_super_87_107 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  B.prototype = Object.create(__nox_super_87_107 && __nox_super_87_107.prototype, {\n    constructor: {\n      value: B,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(B, __nox_super_87_107);\n  else B.__proto__ = __nox_super_87_107;\n  Object.defineProperty(B, 'prototype', { writable: false });\n  return B;\n})(A);\nnew A();\nexpect(NewTarget).toBe(A);\nnew B();\nexpect(NewTarget).toBe(B);",
-  "var _superReference2 = {\n  get: require('@babel/runtime/helpers/get'),\n  set: require('@babel/runtime/helpers/set'),\n};\nfunction _get(e, t, r) {\n  return _superReference2.get(e, t, r);\n}\nfunction _superReference(e, t, r) {\n  return {\n    get value() {\n      return _superReference2.get(e, t, r);\n    },\n    set value(u) {\n      _superReference2.set(e, t, u, r, !0);\n    },\n  };\n}\n_superReference.set = function (e, t, r, u) {\n  return _superReference2.set(e, t, u, r, !0);\n};\nlet Foo = (() => {\n  'use strict';\n  const Foo = function Foo(props) {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    [x, ...super.client] = props;\n  };\n  Object.defineProperty(Foo, 'prototype', { writable: false });\n  return Foo;\n})();",
-  "var _superReference2 = {\n  get: require('@babel/runtime/helpers/get'),\n  set: require('@babel/runtime/helpers/set'),\n};\nfunction _get(e, t, r) {\n  return _superReference2.get(e, t, r);\n}\nfunction _superReference(e, t, r) {\n  return {\n    get value() {\n      return _superReference2.get(e, t, r);\n    },\n    set value(u) {\n      _superReference2.set(e, t, u, r, !0);\n    },\n  };\n}\n_superReference.set = function (e, t, r, u) {\n  return _superReference2.set(e, t, u, r, !0);\n};\nlet Foo = (() => {\n  'use strict';\n  const Foo = function Foo(props) {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    [super.client] = props;\n  };\n  Object.defineProperty(Foo, 'prototype', { writable: false });\n  return Foo;\n})();",
-  "var _superReference2 = {\n  get: require('@babel/runtime/helpers/get'),\n  set: require('@babel/runtime/helpers/set'),\n};\nfunction _get(e, t, r) {\n  return _superReference2.get(e, t, r);\n}\nfunction _superReference(e, t, r) {\n  return {\n    get value() {\n      return _superReference2.get(e, t, r);\n    },\n    set value(u) {\n      _superReference2.set(e, t, u, r, !0);\n    },\n  };\n}\n_superReference.set = function (e, t, r, u) {\n  return _superReference2.set(e, t, u, r, !0);\n};\nlet Foo = (() => {\n  'use strict';\n  const Foo = function Foo(props) {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    ({ x, ...super.client } = props);\n  };\n  Object.defineProperty(Foo, 'prototype', { writable: false });\n  return Foo;\n})();",
-  "var _superReference2 = {\n  get: require('@babel/runtime/helpers/get'),\n  set: require('@babel/runtime/helpers/set'),\n};\nfunction _get(e, t, r) {\n  return _superReference2.get(e, t, r);\n}\nfunction _superReference(e, t, r) {\n  return {\n    get value() {\n      return _superReference2.get(e, t, r);\n    },\n    set value(u) {\n      _superReference2.set(e, t, u, r, !0);\n    },\n  };\n}\n_superReference.set = function (e, t, r, u) {\n  return _superReference2.set(e, t, u, r, !0);\n};\nlet Foo = (() => {\n  'use strict';\n  const Foo = function Foo(props) {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    ({ client: super.client } = props);\n  };\n  Object.defineProperty(Foo, 'prototype', { writable: false });\n  return Foo;\n})();",
-  "var _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nlet Base = (() => {\n  'use strict';\n  const Base = function Base() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Base, 'prototype', { writable: false });\n  return Base;\n})();\nnew ((__nox_super_20_85 => {\n  'use strict';\n  const _Class = function _Class() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this,\n      _newtarget = new.target;\n    function _super() {\n      _this = _construct(Object.getPrototypeOf(_Class), arguments, _newtarget || _Class);\n      return _this;\n    }\n    var _result = function () {\n      _super() || null;\n    }.apply(void 0, arguments);\n    if (_result !== void 0) {\n      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n        return _result;\n      throw new TypeError('Derived constructors may only return object or undefined');\n    }\n    if (_this === void 0)\n      throw new ReferenceError(\"this hasn't been initialised - super() hasn't been called\");\n    return _this;\n  };\n  if (__nox_super_20_85 !== null && typeof __nox_super_20_85 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  _Class.prototype = Object.create(__nox_super_20_85 && __nox_super_20_85.prototype, {\n    constructor: {\n      value: _Class,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(_Class, __nox_super_20_85);\n  else _Class.__proto__ = __nox_super_20_85;\n  Object.defineProperty(_Class, 'prototype', { writable: false });\n  return _Class;\n})(Base))();\nnew ((__nox_super_91_152 => {\n  'use strict';\n  const _Class18 = function _Class18() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this,\n      _newtarget = new.target;\n    function _super() {\n      _this = _construct(Object.getPrototypeOf(_Class18), arguments, _newtarget || _Class18);\n      return _this;\n    }\n    var _result = function () {\n      _super()?.();\n    }.apply(void 0, arguments);\n    if (_result !== void 0) {\n      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n        return _result;\n      throw new TypeError('Derived constructors may only return object or undefined');\n    }\n    if (_this === void 0)\n      throw new ReferenceError(\"this hasn't been initialised - super() hasn't been called\");\n    return _this;\n  };\n  if (__nox_super_91_152 !== null && typeof __nox_super_91_152 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  _Class18.prototype = Object.create(__nox_super_91_152 && __nox_super_91_152.prototype, {\n    constructor: {\n      value: _Class18,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(_Class18, __nox_super_91_152);\n  else _Class18.__proto__ = __nox_super_91_152;\n  Object.defineProperty(_Class18, 'prototype', { writable: false });\n  return _Class18;\n})(Base))();\nnew ((__nox_super_158_223 => {\n  'use strict';\n  const _Class21 = function _Class21() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this,\n      _newtarget = new.target;\n    function _super() {\n      _this = _construct(Object.getPrototypeOf(_Class21), arguments, _newtarget || _Class21);\n      return _this;\n    }\n    var _result = function () {\n      _super()?.[null];\n    }.apply(void 0, arguments);\n    if (_result !== void 0) {\n      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n        return _result;\n      throw new TypeError('Derived constructors may only return object or undefined');\n    }\n    if (_this === void 0)\n      throw new ReferenceError(\"this hasn't been initialised - super() hasn't been called\");\n    return _this;\n  };\n  if (__nox_super_158_223 !== null && typeof __nox_super_158_223 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  _Class21.prototype = Object.create(__nox_super_158_223 && __nox_super_158_223.prototype, {\n    constructor: {\n      value: _Class21,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(_Class21, __nox_super_158_223);\n  else _Class21.__proto__ = __nox_super_158_223;\n  Object.defineProperty(_Class21, 'prototype', { writable: false });\n  return _Class21;\n})(Base))();\nnew ((__nox_super_229_290 => {\n  'use strict';\n  const _Class24 = function _Class24() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this,\n      _newtarget = new.target;\n    function _super() {\n      _this = _construct(Object.getPrototypeOf(_Class24), arguments, _newtarget || _Class24);\n      return _this;\n    }\n    var _result = function () {\n      1 + _super();\n    }.apply(void 0, arguments);\n    if (_result !== void 0) {\n      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n        return _result;\n      throw new TypeError('Derived constructors may only return object or undefined');\n    }\n    if (_this === void 0)\n      throw new ReferenceError(\"this hasn't been initialised - super() hasn't been called\");\n    return _this;\n  };\n  if (__nox_super_229_290 !== null && typeof __nox_super_229_290 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  _Class24.prototype = Object.create(__nox_super_229_290 && __nox_super_229_290.prototype, {\n    constructor: {\n      value: _Class24,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(_Class24, __nox_super_229_290);\n  else _Class24.__proto__ = __nox_super_229_290;\n  Object.defineProperty(_Class24, 'prototype', { writable: false });\n  return _Class24;\n})(Base))();",
-  '[syntax-error] invalid-input',
-  "var _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nlet Base = (() => {\n  'use strict';\n  const Base = function Base() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Base, 'prototype', { writable: false });\n  return Base;\n})();\nexpect(\n  () =>\n    new ((__nox_super_33_106 => {\n      'use strict';\n      const _Class = function _Class() {\n        if (!new.target) throw new TypeError('Cannot call a class as a function');\n        var _this,\n          _newtarget = new.target;\n        function _super() {\n          _this = _construct(Object.getPrototypeOf(_Class), arguments, _newtarget || _Class);\n          return _this;\n        }\n        var _result = function () {\n          x: {\n            break x;\n            _super();\n          }\n        }.apply(void 0, arguments);\n        if (_result !== void 0) {\n          if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n            return _result;\n          throw new TypeError('Derived constructors may only return object or undefined');\n        }\n        if (_this === void 0)\n          throw new ReferenceError(\"this hasn't been initialised - super() hasn't been called\");\n        return _this;\n      };\n      if (__nox_super_33_106 !== null && typeof __nox_super_33_106 !== 'function')\n        throw new TypeError('Super expression must either be null or a function');\n      _Class.prototype = Object.create(__nox_super_33_106 && __nox_super_33_106.prototype, {\n        constructor: {\n          value: _Class,\n          writable: true,\n          configurable: true,\n        },\n      });\n      if (Object.setPrototypeOf) Object.setPrototypeOf(_Class, __nox_super_33_106);\n      else _Class.__proto__ = __nox_super_33_106;\n      Object.defineProperty(_Class, 'prototype', { writable: false });\n      return _Class;\n    })(Base))(),\n).toThrow();\nexpect(\n  () =>\n    new ((__nox_super_137_211 => {\n      'use strict';\n      const _Class18 = function _Class18() {\n        if (!new.target) throw new TypeError('Cannot call a class as a function');\n        var _this,\n          _newtarget = new.target;\n        function _super() {\n          _this = _construct(Object.getPrototypeOf(_Class18), arguments, _newtarget || _Class18);\n          return _this;\n        }\n        var _result = function () {\n          try {\n          } catch {\n            _super();\n          }\n        }.apply(void 0, arguments);\n        if (_result !== void 0) {\n          if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n            return _result;\n          throw new TypeError('Derived constructors may only return object or undefined');\n        }\n        if (_this === void 0)\n          throw new ReferenceError(\"this hasn't been initialised - super() hasn't been called\");\n        return _this;\n      };\n      if (__nox_super_137_211 !== null && typeof __nox_super_137_211 !== 'function')\n        throw new TypeError('Super expression must either be null or a function');\n      _Class18.prototype = Object.create(__nox_super_137_211 && __nox_super_137_211.prototype, {\n        constructor: {\n          value: _Class18,\n          writable: true,\n          configurable: true,\n        },\n      });\n      if (Object.setPrototypeOf) Object.setPrototypeOf(_Class18, __nox_super_137_211);\n      else _Class18.__proto__ = __nox_super_137_211;\n      Object.defineProperty(_Class18, 'prototype', { writable: false });\n      return _Class18;\n    })(Base))(),\n).toThrow();\nexpect(\n  () =>\n    new ((__nox_super_242_325 => {\n      'use strict';\n      const _Class21 = function _Class21() {\n        if (!new.target) throw new TypeError('Cannot call a class as a function');\n        var _this,\n          _newtarget = new.target;\n        function _super() {\n          _this = _construct(Object.getPrototypeOf(_Class21), arguments, _newtarget || _Class21);\n          return _this;\n        }\n        var _result = function () {\n          try {\n            throw 0;\n            _super();\n          } catch {}\n        }.apply(void 0, arguments);\n        if (_result !== void 0) {\n          if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n            return _result;\n          throw new TypeError('Derived constructors may only return object or undefined');\n        }\n        if (_this === void 0)\n          throw new ReferenceError(\"this hasn't been initialised - super() hasn't been called\");\n        return _this;\n      };\n      if (__nox_super_242_325 !== null && typeof __nox_super_242_325 !== 'function')\n        throw new TypeError('Super expression must either be null or a function');\n      _Class21.prototype = Object.create(__nox_super_242_325 && __nox_super_242_325.prototype, {\n        constructor: {\n          value: _Class21,\n          writable: true,\n          configurable: true,\n        },\n      });\n      if (Object.setPrototypeOf) Object.setPrototypeOf(_Class21, __nox_super_242_325);\n      else _Class21.__proto__ = __nox_super_242_325;\n      Object.defineProperty(_Class21, 'prototype', { writable: false });\n      return _Class21;\n    })(Base))(),\n).toThrow();\nexpect(\n  () =>\n    new ((__nox_super_356_421 => {\n      'use strict';\n      const _Class24 = function _Class24() {\n        if (!new.target) throw new TypeError('Cannot call a class as a function');\n        var _this,\n          _newtarget = new.target;\n        function _super() {\n          _this = _construct(Object.getPrototypeOf(_Class24), arguments, _newtarget || _Class24);\n          return _this;\n        }\n        var _result = function () {\n          true || _super();\n        }.apply(void 0, arguments);\n        if (_result !== void 0) {\n          if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n            return _result;\n          throw new TypeError('Derived constructors may only return object or undefined');\n        }\n        if (_this === void 0)\n          throw new ReferenceError(\"this hasn't been initialised - super() hasn't been called\");\n        return _this;\n      };\n      if (__nox_super_356_421 !== null && typeof __nox_super_356_421 !== 'function')\n        throw new TypeError('Super expression must either be null or a function');\n      _Class24.prototype = Object.create(__nox_super_356_421 && __nox_super_356_421.prototype, {\n        constructor: {\n          value: _Class24,\n          writable: true,\n          configurable: true,\n        },\n      });\n      if (Object.setPrototypeOf) Object.setPrototypeOf(_Class24, __nox_super_356_421);\n      else _Class24.__proto__ = __nox_super_356_421;\n      Object.defineProperty(_Class24, 'prototype', { writable: false });\n      return _Class24;\n    })(Base))(),\n).toThrow();\nexpect(\n  () =>\n    new ((__nox_super_452_517 => {\n      'use strict';\n      const _Class27 = function _Class27() {\n        if (!new.target) throw new TypeError('Cannot call a class as a function');\n        var _this,\n          _newtarget = new.target;\n        function _super() {\n          _this = _construct(Object.getPrototypeOf(_Class27), arguments, _newtarget || _Class27);\n          return _this;\n        }\n        var _result = function () {\n          ({}) ?? _super();\n        }.apply(void 0, arguments);\n        if (_result !== void 0) {\n          if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n            return _result;\n          throw new TypeError('Derived constructors may only return object or undefined');\n        }\n        if (_this === void 0)\n          throw new ReferenceError(\"this hasn't been initialised - super() hasn't been called\");\n        return _this;\n      };\n      if (__nox_super_452_517 !== null && typeof __nox_super_452_517 !== 'function')\n        throw new TypeError('Super expression must either be null or a function');\n      _Class27.prototype = Object.create(__nox_super_452_517 && __nox_super_452_517.prototype, {\n        constructor: {\n          value: _Class27,\n          writable: true,\n          configurable: true,\n        },\n      });\n      if (Object.setPrototypeOf) Object.setPrototypeOf(_Class27, __nox_super_452_517);\n      else _Class27.__proto__ = __nox_super_452_517;\n      Object.defineProperty(_Class27, 'prototype', { writable: false });\n      return _Class27;\n    })(Base))(),\n).toThrow();\nexpect(\n  () =>\n    new ((__nox_super_548_614 => {\n      'use strict';\n      const _Class30 = function _Class30() {\n        if (!new.target) throw new TypeError('Cannot call a class as a function');\n        var _this,\n          _newtarget = new.target;\n        function _super() {\n          _this = _construct(Object.getPrototypeOf(_Class30), arguments, _newtarget || _Class30);\n          return _this;\n        }\n        var _result = function () {\n          false && _super();\n        }.apply(void 0, arguments);\n        if (_result !== void 0) {\n          if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n            return _result;\n          throw new TypeError('Derived constructors may only return object or undefined');\n        }\n        if (_this === void 0)\n          throw new ReferenceError(\"this hasn't been initialised - super() hasn't been called\");\n        return _this;\n      };\n      if (__nox_super_548_614 !== null && typeof __nox_super_548_614 !== 'function')\n        throw new TypeError('Super expression must either be null or a function');\n      _Class30.prototype = Object.create(__nox_super_548_614 && __nox_super_548_614.prototype, {\n        constructor: {\n          value: _Class30,\n          writable: true,\n          configurable: true,\n        },\n      });\n      if (Object.setPrototypeOf) Object.setPrototypeOf(_Class30, __nox_super_548_614);\n      else _Class30.__proto__ = __nox_super_548_614;\n      Object.defineProperty(_Class30, 'prototype', { writable: false });\n      return _Class30;\n    })(Base))(),\n).toThrow();\nexpect(\n  () =>\n    new ((__nox_super_645_710 => {\n      'use strict';\n      const _Class33 = function _Class33() {\n        if (!new.target) throw new TypeError('Cannot call a class as a function');\n        var _this,\n          _newtarget = new.target;\n        function _super() {\n          _this = _construct(Object.getPrototypeOf(_Class33), arguments, _newtarget || _Class33);\n          return _this;\n        }\n        var _result = function () {\n          null?.(_super());\n        }.apply(void 0, arguments);\n        if (_result !== void 0) {\n          if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n            return _result;\n          throw new TypeError('Derived constructors may only return object or undefined');\n        }\n        if (_this === void 0)\n          throw new ReferenceError(\"this hasn't been initialised - super() hasn't been called\");\n        return _this;\n      };\n      if (__nox_super_645_710 !== null && typeof __nox_super_645_710 !== 'function')\n        throw new TypeError('Super expression must either be null or a function');\n      _Class33.prototype = Object.create(__nox_super_645_710 && __nox_super_645_710.prototype, {\n        constructor: {\n          value: _Class33,\n          writable: true,\n          configurable: true,\n        },\n      });\n      if (Object.setPrototypeOf) Object.setPrototypeOf(_Class33, __nox_super_645_710);\n      else _Class33.__proto__ = __nox_super_645_710;\n      Object.defineProperty(_Class33, 'prototype', { writable: false });\n      return _Class33;\n    })(Base))(),\n).toThrow();\nexpect(\n  () =>\n    new ((__nox_super_742_807 => {\n      'use strict';\n      const _Class36 = function _Class36() {\n        if (!new.target) throw new TypeError('Cannot call a class as a function');\n        var _this,\n          _newtarget = new.target;\n        function _super() {\n          _this = _construct(Object.getPrototypeOf(_Class36), arguments, _newtarget || _Class36);\n          return _this;\n        }\n        var _result = function () {\n          null?.[_super()];\n        }.apply(void 0, arguments);\n        if (_result !== void 0) {\n          if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n            return _result;\n          throw new TypeError('Derived constructors may only return object or undefined');\n        }\n        if (_this === void 0)\n          throw new ReferenceError(\"this hasn't been initialised - super() hasn't been called\");\n        return _this;\n      };\n      if (__nox_super_742_807 !== null && typeof __nox_super_742_807 !== 'function')\n        throw new TypeError('Super expression must either be null or a function');\n      _Class36.prototype = Object.create(__nox_super_742_807 && __nox_super_742_807.prototype, {\n        constructor: {\n          value: _Class36,\n          writable: true,\n          configurable: true,\n        },\n      });\n      if (Object.setPrototypeOf) Object.setPrototypeOf(_Class36, __nox_super_742_807);\n      else _Class36.__proto__ = __nox_super_742_807;\n      Object.defineProperty(_Class36, 'prototype', { writable: false });\n      return _Class36;\n    })(Base))(),\n).toThrow();",
-  "var _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nvar A_called = false;\nvar X_called = false;\nlet A = (() => {\n  'use strict';\n  const A = function A() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    A_called = true;\n  };\n  Object.defineProperty(A, 'prototype', { writable: false });\n  return A;\n})();\nlet X = (() => {\n  'use strict';\n  const X = function X() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    X_called = true;\n  };\n  Object.defineProperty(X, 'prototype', { writable: false });\n  return X;\n})();\nlet B = (__nox_super_137_157 => {\n  'use strict';\n  const B = function B() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(Object.getPrototypeOf(B), arguments, new.target || B);\n    return _this;\n  };\n  if (__nox_super_137_157 !== null && typeof __nox_super_137_157 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  B.prototype = Object.create(__nox_super_137_157 && __nox_super_137_157.prototype, {\n    constructor: {\n      value: B,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(B, __nox_super_137_157);\n  else B.__proto__ = __nox_super_137_157;\n  Object.defineProperty(B, 'prototype', { writable: false });\n  return B;\n})(A);\nB.prototype.__proto__ = X.prototype;\nB.__proto__ = X;\nexpect(new B() instanceof B).toBe(true);\nexpect(new B() instanceof A).toBe(false);\nexpect(new B() instanceof X).toBe(true);\nexpect(A_called).toBe(false);\nexpect(X_called).toBe(true);",
-  "var _construct2 = {\n  construct: require('@babel/runtime/helpers/construct'),\n  assertThisInitialized: require('@babel/runtime/helpers/assertThisInitialized'),\n};\nfunction _construct(t, e, r) {\n  return _construct2.construct(t, e, r);\n}\n_construct.assert = _construct2.assertThisInitialized;\nvar _get2 = { get: require('@babel/runtime/helpers/get') };\nfunction _get(e, t, r) {\n  return _get2.get(e, t, r);\n}\nlet Bar = (() => {\n  'use strict';\n  const Bar = function Bar() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Bar, 'prototype', { writable: false });\n  return Bar;\n})();\nlet Foo = (__nox_super_14_85 => {\n  'use strict';\n  const Foo = function Foo() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this,\n      _newtarget = new.target;\n    function _super() {\n      _this = _construct(Object.getPrototypeOf(Foo), arguments, _newtarget || Foo);\n      return _this;\n    }\n    var _result = function () {\n      _get(Object.getPrototypeOf(Foo.prototype), 'foo', _construct.assert(_this)).call(\n        _construct.assert(_this),\n        _super(),\n      );\n    }.apply(void 0, arguments);\n    if (_result !== void 0) {\n      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n        return _result;\n      throw new TypeError('Derived constructors may only return object or undefined');\n    }\n    if (_this === void 0)\n      throw new ReferenceError(\"this hasn't been initialised - super() hasn't been called\");\n    return _this;\n  };\n  if (__nox_super_14_85 !== null && typeof __nox_super_14_85 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Foo.prototype = Object.create(__nox_super_14_85 && __nox_super_14_85.prototype, {\n    constructor: {\n      value: Foo,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo, __nox_super_14_85);\n  else Foo.__proto__ = __nox_super_14_85;\n  Object.defineProperty(Foo, 'prototype', { writable: false });\n  return Foo;\n})(Bar);\nexpect(() => new Foo()).toThrow(\"this hasn't been initialised\");",
-  "var _construct2 = {\n  construct: require('@babel/runtime/helpers/construct'),\n  assertThisInitialized: require('@babel/runtime/helpers/assertThisInitialized'),\n};\nfunction _construct(t, e, r) {\n  return _construct2.construct(t, e, r);\n}\n_construct.assert = _construct2.assertThisInitialized;\nvar _get2 = { get: require('@babel/runtime/helpers/get') };\nfunction _get(e, t, r) {\n  return _get2.get(e, t, r);\n}\nlet Foo = (__nox_super_0_71 => {\n  'use strict';\n  const Foo = function Foo() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this,\n      _newtarget = new.target;\n    function _super() {\n      _this = _construct(Object.getPrototypeOf(Foo), arguments, _newtarget || Foo);\n      return _this;\n    }\n    var _result = function () {\n      _get(Object.getPrototypeOf(Foo.prototype), 'foo', _construct.assert(_this)).call(\n        _construct.assert(_this),\n        _super(),\n      );\n    }.apply(void 0, arguments);\n    if (_result !== void 0) {\n      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n        return _result;\n      throw new TypeError('Derived constructors may only return object or undefined');\n    }\n    if (_this === void 0)\n      throw new ReferenceError(\"this hasn't been initialised - super() hasn't been called\");\n    return _this;\n  };\n  if (__nox_super_0_71 !== null && typeof __nox_super_0_71 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Foo.prototype = Object.create(__nox_super_0_71 && __nox_super_0_71.prototype, {\n    constructor: {\n      value: Foo,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo, __nox_super_0_71);\n  else Foo.__proto__ = __nox_super_0_71;\n  Object.defineProperty(Foo, 'prototype', { writable: false });\n  return Foo;\n})(Bar);",
-  "var _construct2 = {\n  construct: require('@babel/runtime/helpers/construct'),\n  assertThisInitialized: require('@babel/runtime/helpers/assertThisInitialized'),\n};\nfunction _construct(t, e, r) {\n  return _construct2.construct(t, e, r);\n}\n_construct.assert = _construct2.assertThisInitialized;\nvar _get2 = { get: require('@babel/runtime/helpers/get') };\nfunction _get(e, t, r) {\n  return _get2.get(e, t, r);\n}\nlet Bar = (() => {\n  'use strict';\n  const Bar = function Bar() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Bar, 'prototype', { writable: false });\n  return Bar;\n})();\nlet Foo = (__nox_super_14_91 => {\n  'use strict';\n  const Foo = function Foo() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    _get(Object.getPrototypeOf(Foo.prototype), 'foo', _construct.assert(_this)).call(\n      _construct.assert(_this),\n    );\n    var _this = _construct(Object.getPrototypeOf(Foo), [], new.target || Foo);\n    var _result = function () {}.apply(_this, arguments);\n    if (_result !== void 0) {\n      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n        return _result;\n      throw new TypeError('Derived constructors may only return object or undefined');\n    }\n    return _this;\n  };\n  if (__nox_super_14_91 !== null && typeof __nox_super_14_91 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Foo.prototype = Object.create(__nox_super_14_91 && __nox_super_14_91.prototype, {\n    constructor: {\n      value: Foo,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo, __nox_super_14_91);\n  else Foo.__proto__ = __nox_super_14_91;\n  Object.defineProperty(Foo, 'prototype', { writable: false });\n  return Foo;\n})(Bar);\nexpect(() => new Foo()).toThrow(\"this hasn't been initialised\");",
-  "var _construct2 = {\n  construct: require('@babel/runtime/helpers/construct'),\n  assertThisInitialized: require('@babel/runtime/helpers/assertThisInitialized'),\n};\nfunction _construct(t, e, r) {\n  return _construct2.construct(t, e, r);\n}\n_construct.assert = _construct2.assertThisInitialized;\nvar _get2 = { get: require('@babel/runtime/helpers/get') };\nfunction _get(e, t, r) {\n  return _get2.get(e, t, r);\n}\nlet Foo = (__nox_super_0_77 => {\n  'use strict';\n  const Foo = function Foo() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    _get(Object.getPrototypeOf(Foo.prototype), 'foo', _construct.assert(_this)).call(\n      _construct.assert(_this),\n    );\n    var _this = _construct(Object.getPrototypeOf(Foo), [], new.target || Foo);\n    var _result = function () {}.apply(_this, arguments);\n    if (_result !== void 0) {\n      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n        return _result;\n      throw new TypeError('Derived constructors may only return object or undefined');\n    }\n    return _this;\n  };\n  if (__nox_super_0_77 !== null && typeof __nox_super_0_77 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Foo.prototype = Object.create(__nox_super_0_77 && __nox_super_0_77.prototype, {\n    constructor: {\n      value: Foo,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo, __nox_super_0_77);\n  else Foo.__proto__ = __nox_super_0_77;\n  Object.defineProperty(Foo, 'prototype', { writable: false });\n  return Foo;\n})(Bar);",
-  "var _construct2 = {\n  construct: require('@babel/runtime/helpers/construct'),\n  assertThisInitialized: require('@babel/runtime/helpers/assertThisInitialized'),\n};\nfunction _construct(t, e, r) {\n  return _construct2.construct(t, e, r);\n}\n_construct.assert = _construct2.assertThisInitialized;\nvar _get2 = { get: require('@babel/runtime/helpers/get') };\nfunction _get(e, t, r) {\n  return _get2.get(e, t, r);\n}\nlet Bar = (() => {\n  'use strict';\n  const Bar = function Bar() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Bar.prototype, 'test', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      },\n      'name',\n      {\n        value: 'test',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Bar, 'prototype', { writable: false });\n  return Bar;\n})();\nlet Foo = (__nox_super_27_129 => {\n  'use strict';\n  const Foo = function Foo() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    const t = () =>\n      _get(Object.getPrototypeOf(Foo.prototype), 'test', _construct.assert(_this)).call(\n        _construct.assert(_this),\n      );\n    t();\n    var _this = _construct(Object.getPrototypeOf(Foo), [], new.target || Foo);\n    var _result = function () {}.apply(_this, arguments);\n    if (_result !== void 0) {\n      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n        return _result;\n      throw new TypeError('Derived constructors may only return object or undefined');\n    }\n    return _this;\n  };\n  if (__nox_super_27_129 !== null && typeof __nox_super_27_129 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Foo.prototype = Object.create(__nox_super_27_129 && __nox_super_27_129.prototype, {\n    constructor: {\n      value: Foo,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo, __nox_super_27_129);\n  else Foo.__proto__ = __nox_super_27_129;\n  Object.defineProperty(Foo, 'prototype', { writable: false });\n  return Foo;\n})(Bar);\nexpect(() => new Foo()).toThrow(\"this hasn't been initialised\");",
-  "var _construct2 = {\n  construct: require('@babel/runtime/helpers/construct'),\n  assertThisInitialized: require('@babel/runtime/helpers/assertThisInitialized'),\n};\nfunction _construct(t, e, r) {\n  return _construct2.construct(t, e, r);\n}\n_construct.assert = _construct2.assertThisInitialized;\nvar _get2 = { get: require('@babel/runtime/helpers/get') };\nfunction _get(e, t, r) {\n  return _get2.get(e, t, r);\n}\nlet Foo = (__nox_super_0_108 => {\n  'use strict';\n  const Foo = function Foo() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var t = () =>\n      _get(Object.getPrototypeOf(Foo.prototype), 'test', _construct.assert(_this)).call(\n        _construct.assert(_this),\n      );\n    _get(Object.getPrototypeOf(Foo.prototype), 'foo', _construct.assert(_this)).call(\n      _construct.assert(_this),\n    );\n    var _this = _construct(Object.getPrototypeOf(Foo), [], new.target || Foo);\n    var _result = function () {}.apply(_this, arguments);\n    if (_result !== void 0) {\n      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n        return _result;\n      throw new TypeError('Derived constructors may only return object or undefined');\n    }\n    return _this;\n  };\n  if (__nox_super_0_108 !== null && typeof __nox_super_0_108 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Foo.prototype = Object.create(__nox_super_0_108 && __nox_super_0_108.prototype, {\n    constructor: {\n      value: Foo,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo, __nox_super_0_108);\n  else Foo.__proto__ = __nox_super_0_108;\n  Object.defineProperty(Foo, 'prototype', { writable: false });\n  return Foo;\n})(Bar);",
-  "var _construct2 = {\n  construct: require('@babel/runtime/helpers/construct'),\n  assertThisInitialized: require('@babel/runtime/helpers/assertThisInitialized'),\n};\nfunction _construct(t, e, r) {\n  return _construct2.construct(t, e, r);\n}\n_construct.assert = _construct2.assertThisInitialized;\nvar _get2 = { get: require('@babel/runtime/helpers/get') };\nfunction _get(e, t, r) {\n  return _get2.get(e, t, r);\n}\nlet Bar = (() => {\n  'use strict';\n  const Bar = function Bar() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Bar.prototype, 'test', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      },\n      'name',\n      {\n        value: 'test',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Bar, 'prototype', { writable: false });\n  return Bar;\n})();\nlet Foo = (__nox_super_27_129 => {\n  'use strict';\n  const Foo = function Foo() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    const t = () =>\n      _get(Object.getPrototypeOf(Foo.prototype), 'test', _construct.assert(_this)).call(\n        _construct.assert(_this),\n      );\n    var _this = _construct(Object.getPrototypeOf(Foo), [], new.target || Foo);\n    var _result = function () {\n      t();\n    }.apply(_this, arguments);\n    if (_result !== void 0) {\n      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n        return _result;\n      throw new TypeError('Derived constructors may only return object or undefined');\n    }\n    return _this;\n  };\n  if (__nox_super_27_129 !== null && typeof __nox_super_27_129 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Foo.prototype = Object.create(__nox_super_27_129 && __nox_super_27_129.prototype, {\n    constructor: {\n      value: Foo,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo, __nox_super_27_129);\n  else Foo.__proto__ = __nox_super_27_129;\n  Object.defineProperty(Foo, 'prototype', { writable: false });\n  return Foo;\n})(Bar);\nnew Foo();",
-  "var _construct2 = {\n  construct: require('@babel/runtime/helpers/construct'),\n  assertThisInitialized: require('@babel/runtime/helpers/assertThisInitialized'),\n};\nfunction _construct(t, e, r) {\n  return _construct2.construct(t, e, r);\n}\n_construct.assert = _construct2.assertThisInitialized;\nvar _get2 = { get: require('@babel/runtime/helpers/get') };\nfunction _get(e, t, r) {\n  return _get2.get(e, t, r);\n}\nlet Foo = (__nox_super_0_102 => {\n  'use strict';\n  const Foo = function Foo() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    const t = () =>\n      _get(Object.getPrototypeOf(Foo.prototype), 'test', _construct.assert(_this)).call(\n        _construct.assert(_this),\n      );\n    var _this = _construct(Object.getPrototypeOf(Foo), [], new.target || Foo);\n    var _result = function () {\n      t();\n    }.apply(_this, arguments);\n    if (_result !== void 0) {\n      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n        return _result;\n      throw new TypeError('Derived constructors may only return object or undefined');\n    }\n    return _this;\n  };\n  if (__nox_super_0_102 !== null && typeof __nox_super_0_102 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Foo.prototype = Object.create(__nox_super_0_102 && __nox_super_0_102.prototype, {\n    constructor: {\n      value: Foo,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo, __nox_super_0_102);\n  else Foo.__proto__ = __nox_super_0_102;\n  Object.defineProperty(Foo, 'prototype', { writable: false });\n  return Foo;\n})(Bar);",
-  "var _construct2 = {\n  construct: require('@babel/runtime/helpers/construct'),\n  assertThisInitialized: require('@babel/runtime/helpers/assertThisInitialized'),\n};\nfunction _construct(t, e, r) {\n  return _construct2.construct(t, e, r);\n}\n_construct.assert = _construct2.assertThisInitialized;\nvar _get2 = { get: require('@babel/runtime/helpers/get') };\nfunction _get(e, t, r) {\n  return _get2.get(e, t, r);\n}\nlet Bar = (() => {\n  'use strict';\n  const Bar = function Bar() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Bar.prototype, 'test', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      },\n      'name',\n      {\n        value: 'test',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Bar, 'prototype', { writable: false });\n  return Bar;\n})();\nlet Foo = (__nox_super_27_120 => {\n  'use strict';\n  const Foo = function Foo() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    const t = () =>\n      _get(Object.getPrototypeOf(Foo.prototype), 'test', _construct.assert(_this)).call(\n        _construct.assert(_this),\n      );\n    var _this = _construct(Object.getPrototypeOf(Foo), [], new.target || Foo);\n    var _result = function () {}.apply(_this, arguments);\n    if (_result !== void 0) {\n      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n        return _result;\n      throw new TypeError('Derived constructors may only return object or undefined');\n    }\n    return _this;\n  };\n  if (__nox_super_27_120 !== null && typeof __nox_super_27_120 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Foo.prototype = Object.create(__nox_super_27_120 && __nox_super_27_120.prototype, {\n    constructor: {\n      value: Foo,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo, __nox_super_27_120);\n  else Foo.__proto__ = __nox_super_27_120;\n  Object.defineProperty(Foo, 'prototype', { writable: false });\n  return Foo;\n})(Bar);\nnew Foo();",
-  "var _construct2 = {\n  construct: require('@babel/runtime/helpers/construct'),\n  assertThisInitialized: require('@babel/runtime/helpers/assertThisInitialized'),\n};\nfunction _construct(t, e, r) {\n  return _construct2.construct(t, e, r);\n}\n_construct.assert = _construct2.assertThisInitialized;\nvar _get2 = { get: require('@babel/runtime/helpers/get') };\nfunction _get(e, t, r) {\n  return _get2.get(e, t, r);\n}\nlet Foo = (__nox_super_0_93 => {\n  'use strict';\n  const Foo = function Foo() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    const t = () =>\n      _get(Object.getPrototypeOf(Foo.prototype), 'test', _construct.assert(_this)).call(\n        _construct.assert(_this),\n      );\n    var _this = _construct(Object.getPrototypeOf(Foo), [], new.target || Foo);\n    var _result = function () {}.apply(_this, arguments);\n    if (_result !== void 0) {\n      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n        return _result;\n      throw new TypeError('Derived constructors may only return object or undefined');\n    }\n    return _this;\n  };\n  if (__nox_super_0_93 !== null && typeof __nox_super_0_93 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Foo.prototype = Object.create(__nox_super_0_93 && __nox_super_0_93.prototype, {\n    constructor: {\n      value: Foo,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo, __nox_super_0_93);\n  else Foo.__proto__ = __nox_super_0_93;\n  Object.defineProperty(Foo, 'prototype', { writable: false });\n  return Foo;\n})(Bar);",
-  "var _construct2 = {\n  construct: require('@babel/runtime/helpers/construct'),\n  assertThisInitialized: require('@babel/runtime/helpers/assertThisInitialized'),\n};\nfunction _construct(t, e, r) {\n  return _construct2.construct(t, e, r);\n}\n_construct.assert = _construct2.assertThisInitialized;\nvar _get2 = { get: require('@babel/runtime/helpers/get') };\nfunction _get(e, t, r) {\n  return _get2.get(e, t, r);\n}\nlet called = false;\nlet A = (() => {\n  'use strict';\n  const A = function A() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(A.prototype, 'prop', {\n    get: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        called = true;\n      },\n      'name',\n      {\n        value: 'get prop',\n        configurable: true,\n      },\n    ),\n    configurable: true,\n  });\n  Object.defineProperty(A, 'prototype', { writable: false });\n  return A;\n})();\nlet B = (__nox_super_72_139 => {\n  'use strict';\n  const B = function B() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this,\n      _newtarget = new.target;\n    function _super() {\n      _this = _construct(Object.getPrototypeOf(B), arguments, _newtarget || B);\n      return _this;\n    }\n    var _result = function () {\n      _get(Object.getPrototypeOf(B.prototype), _super().prop, _construct.assert(_this));\n    }.apply(void 0, arguments);\n    if (_result !== void 0) {\n      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n        return _result;\n      throw new TypeError('Derived constructors may only return object or undefined');\n    }\n    if (_this === void 0)\n      throw new ReferenceError(\"this hasn't been initialised - super() hasn't been called\");\n    return _this;\n  };\n  if (__nox_super_72_139 !== null && typeof __nox_super_72_139 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  B.prototype = Object.create(__nox_super_72_139 && __nox_super_72_139.prototype, {\n    constructor: {\n      value: B,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(B, __nox_super_72_139);\n  else B.__proto__ = __nox_super_72_139;\n  Object.defineProperty(B, 'prototype', { writable: false });\n  return B;\n})(A);\nexpect(() => {\n  new B();\n}).toThrow(ReferenceError);\nexpect(called).toBe(false);",
-  "var _construct2 = {\n  construct: require('@babel/runtime/helpers/construct'),\n  assertThisInitialized: require('@babel/runtime/helpers/assertThisInitialized'),\n};\nfunction _construct(t, e, r) {\n  return _construct2.construct(t, e, r);\n}\n_construct.assert = _construct2.assertThisInitialized;\nvar _get2 = { get: require('@babel/runtime/helpers/get') };\nfunction _get(e, t, r) {\n  return _get2.get(e, t, r);\n}\nlet Foo = (__nox_super_0_76 => {\n  'use strict';\n  const Foo = function Foo() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this,\n      _newtarget = new.target;\n    function _super() {\n      _this = _construct(Object.getPrototypeOf(Foo), arguments, _newtarget || Foo);\n      return _this;\n    }\n    var _result = function () {\n      _get(Object.getPrototypeOf(Foo.prototype), _super().method, _construct.assert(_this)).call(\n        _construct.assert(_this),\n      );\n    }.apply(void 0, arguments);\n    if (_result !== void 0) {\n      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n        return _result;\n      throw new TypeError('Derived constructors may only return object or undefined');\n    }\n    if (_this === void 0)\n      throw new ReferenceError(\"this hasn't been initialised - super() hasn't been called\");\n    return _this;\n  };\n  if (__nox_super_0_76 !== null && typeof __nox_super_0_76 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Foo.prototype = Object.create(__nox_super_0_76 && __nox_super_0_76.prototype, {\n    constructor: {\n      value: Foo,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo, __nox_super_0_76);\n  else Foo.__proto__ = __nox_super_0_76;\n  Object.defineProperty(Foo, 'prototype', { writable: false });\n  return Foo;\n})(Bar);",
-  "var _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\n// test262/test/language/expressions/super/call-spread-err-sngl-err-itr-get-get.js\nvar iter = {};\nObject.defineProperty(iter, Symbol.iterator, {\n  get: function () {\n    throw new Error('err');\n  },\n});\nlet Test262ParentClass = (() => {\n  'use strict';\n  const Test262ParentClass = function Test262ParentClass() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Test262ParentClass, 'prototype', { writable: false });\n  return Test262ParentClass;\n})();\nlet Test262ChildClass = (__nox_super_252_348 => {\n  'use strict';\n  const Test262ChildClass = function Test262ChildClass() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(\n      Object.getPrototypeOf(Test262ChildClass),\n      [...iter],\n      new.target || Test262ChildClass,\n    );\n    var _result = function () {}.apply(_this, arguments);\n    if (_result !== void 0) {\n      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n        return _result;\n      throw new TypeError('Derived constructors may only return object or undefined');\n    }\n    return _this;\n  };\n  if (__nox_super_252_348 !== null && typeof __nox_super_252_348 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Test262ChildClass.prototype = Object.create(\n    __nox_super_252_348 && __nox_super_252_348.prototype,\n    {\n      constructor: {\n        value: Test262ChildClass,\n        writable: true,\n        configurable: true,\n      },\n    },\n  );\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Test262ChildClass, __nox_super_252_348);\n  else Test262ChildClass.__proto__ = __nox_super_252_348;\n  Object.defineProperty(Test262ChildClass, 'prototype', { writable: false });\n  return Test262ChildClass;\n})(Test262ParentClass);\nexpect(() => {\n  new Test262ChildClass();\n}).toThrow('err');",
-  "var _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nlet Bar = (() => {\n  'use strict';\n  const Bar = function Bar() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Bar, 'prototype', { writable: false });\n  return Bar;\n})();\nlet Foo = (__nox_super_14_78 => {\n  'use strict';\n  const Foo = function Foo() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this = _construct(Object.getPrototypeOf(Foo), [this], new.target || Foo);\n    var _result = function () {}.apply(_this, arguments);\n    if (_result !== void 0) {\n      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n        return _result;\n      throw new TypeError('Derived constructors may only return object or undefined');\n    }\n    return _this;\n  };\n  if (__nox_super_14_78 !== null && typeof __nox_super_14_78 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Foo.prototype = Object.create(__nox_super_14_78 && __nox_super_14_78.prototype, {\n    constructor: {\n      value: Foo,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo, __nox_super_14_78);\n  else Foo.__proto__ = __nox_super_14_78;\n  Object.defineProperty(Foo, 'prototype', { writable: false });\n  return Foo;\n})(Bar);\nexpect(() => new Foo()).toThrow(\"this hasn't been initialised\");",
-  "var _construct2 = {\n  construct: require('@babel/runtime/helpers/construct'),\n  assertThisInitialized: require('@babel/runtime/helpers/assertThisInitialized'),\n};\nfunction _construct(t, e, r) {\n  return _construct2.construct(t, e, r);\n}\n_construct.assert = _construct2.assertThisInitialized;\nlet Bar = (() => {\n  'use strict';\n  const Bar = function Bar() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Bar, 'prototype', { writable: false });\n  return Bar;\n})();\nlet Foo = (__nox_super_14_111 => {\n  'use strict';\n  const Foo = function Foo() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    const fn = () => _construct.assert(_this);\n    fn();\n    var _this = _construct(Object.getPrototypeOf(Foo), [], new.target || Foo);\n    var _result = function () {}.apply(_this, arguments);\n    if (_result !== void 0) {\n      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n        return _result;\n      throw new TypeError('Derived constructors may only return object or undefined');\n    }\n    return _this;\n  };\n  if (__nox_super_14_111 !== null && typeof __nox_super_14_111 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Foo.prototype = Object.create(__nox_super_14_111 && __nox_super_14_111.prototype, {\n    constructor: {\n      value: Foo,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo, __nox_super_14_111);\n  else Foo.__proto__ = __nox_super_14_111;\n  Object.defineProperty(Foo, 'prototype', { writable: false });\n  return Foo;\n})(Bar);\nexpect(() => new Foo()).toThrow(\"this hasn't been initialised\");",
-  "var _construct2 = {\n  construct: require('@babel/runtime/helpers/construct'),\n  assertThisInitialized: require('@babel/runtime/helpers/assertThisInitialized'),\n};\nfunction _construct(t, e, r) {\n  return _construct2.construct(t, e, r);\n}\n_construct.assert = _construct2.assertThisInitialized;\nlet Foo = (__nox_super_0_97 => {\n  'use strict';\n  const Foo = function Foo() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    const fn = () => _construct.assert(_this);\n    fn();\n    var _this = _construct(Object.getPrototypeOf(Foo), [], new.target || Foo);\n    var _result = function () {}.apply(_this, arguments);\n    if (_result !== void 0) {\n      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n        return _result;\n      throw new TypeError('Derived constructors may only return object or undefined');\n    }\n    return _this;\n  };\n  if (__nox_super_0_97 !== null && typeof __nox_super_0_97 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Foo.prototype = Object.create(__nox_super_0_97 && __nox_super_0_97.prototype, {\n    constructor: {\n      value: Foo,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo, __nox_super_0_97);\n  else Foo.__proto__ = __nox_super_0_97;\n  Object.defineProperty(Foo, 'prototype', { writable: false });\n  return Foo;\n})(Bar);",
-  "var _construct2 = {\n  construct: require('@babel/runtime/helpers/construct'),\n  assertThisInitialized: require('@babel/runtime/helpers/assertThisInitialized'),\n};\nfunction _construct(t, e, r) {\n  return _construct2.construct(t, e, r);\n}\n_construct.assert = _construct2.assertThisInitialized;\nlet Bar = (() => {\n  'use strict';\n  const Bar = function Bar() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Bar, 'prototype', { writable: false });\n  return Bar;\n})();\nlet Foo = (__nox_super_14_111 => {\n  'use strict';\n  const Foo = function Foo() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    const fn = () => _construct.assert(_this);\n    var _this = _construct(Object.getPrototypeOf(Foo), [], new.target || Foo);\n    var _result = function () {\n      fn();\n    }.apply(_this, arguments);\n    if (_result !== void 0) {\n      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n        return _result;\n      throw new TypeError('Derived constructors may only return object or undefined');\n    }\n    return _this;\n  };\n  if (__nox_super_14_111 !== null && typeof __nox_super_14_111 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Foo.prototype = Object.create(__nox_super_14_111 && __nox_super_14_111.prototype, {\n    constructor: {\n      value: Foo,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo, __nox_super_14_111);\n  else Foo.__proto__ = __nox_super_14_111;\n  Object.defineProperty(Foo, 'prototype', { writable: false });\n  return Foo;\n})(Bar);\nnew Foo();",
-  "var _construct2 = {\n  construct: require('@babel/runtime/helpers/construct'),\n  assertThisInitialized: require('@babel/runtime/helpers/assertThisInitialized'),\n};\nfunction _construct(t, e, r) {\n  return _construct2.construct(t, e, r);\n}\n_construct.assert = _construct2.assertThisInitialized;\nlet Foo = (__nox_super_0_97 => {\n  'use strict';\n  const Foo = function Foo() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    const fn = () => _construct.assert(_this);\n    var _this = _construct(Object.getPrototypeOf(Foo), [], new.target || Foo);\n    var _result = function () {\n      fn();\n    }.apply(_this, arguments);\n    if (_result !== void 0) {\n      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n        return _result;\n      throw new TypeError('Derived constructors may only return object or undefined');\n    }\n    return _this;\n  };\n  if (__nox_super_0_97 !== null && typeof __nox_super_0_97 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Foo.prototype = Object.create(__nox_super_0_97 && __nox_super_0_97.prototype, {\n    constructor: {\n      value: Foo,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo, __nox_super_0_97);\n  else Foo.__proto__ = __nox_super_0_97;\n  Object.defineProperty(Foo, 'prototype', { writable: false });\n  return Foo;\n})(Bar);",
-  "var _construct2 = {\n  construct: require('@babel/runtime/helpers/construct'),\n  assertThisInitialized: require('@babel/runtime/helpers/assertThisInitialized'),\n};\nfunction _construct(t, e, r) {\n  return _construct2.construct(t, e, r);\n}\n_construct.assert = _construct2.assertThisInitialized;\nlet Bar = (() => {\n  'use strict';\n  const Bar = function Bar() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Bar, 'prototype', { writable: false });\n  return Bar;\n})();\nlet Foo = (__nox_super_14_76 => {\n  'use strict';\n  const Foo = function Foo() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this,\n      _newtarget = new.target;\n    function _super() {\n      _this = _construct(Object.getPrototypeOf(Foo), arguments, _newtarget || Foo);\n      return _this;\n    }\n    var _result = function () {\n      Foo[_construct.assert(_this)];\n    }.apply(void 0, arguments);\n    if (_result !== void 0) {\n      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n        return _result;\n      throw new TypeError('Derived constructors may only return object or undefined');\n    }\n    if (_this === void 0)\n      throw new ReferenceError(\"this hasn't been initialised - super() hasn't been called\");\n    return _this;\n  };\n  if (__nox_super_14_76 !== null && typeof __nox_super_14_76 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Foo.prototype = Object.create(__nox_super_14_76 && __nox_super_14_76.prototype, {\n    constructor: {\n      value: Foo,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo, __nox_super_14_76);\n  else Foo.__proto__ = __nox_super_14_76;\n  Object.defineProperty(Foo, 'prototype', { writable: false });\n  return Foo;\n})(Bar);\nexpect(() => new Foo()).toThrow(\"this hasn't been initialised\");",
-  "var _construct2 = {\n  construct: require('@babel/runtime/helpers/construct'),\n  assertThisInitialized: require('@babel/runtime/helpers/assertThisInitialized'),\n};\nfunction _construct(t, e, r) {\n  return _construct2.construct(t, e, r);\n}\n_construct.assert = _construct2.assertThisInitialized;\nlet Foo = (__nox_super_0_62 => {\n  'use strict';\n  const Foo = function Foo() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    var _this,\n      _newtarget = new.target;\n    function _super() {\n      _this = _construct(Object.getPrototypeOf(Foo), arguments, _newtarget || Foo);\n      return _this;\n    }\n    var _result = function () {\n      Foo[_construct.assert(_this)];\n    }.apply(void 0, arguments);\n    if (_result !== void 0) {\n      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n        return _result;\n      throw new TypeError('Derived constructors may only return object or undefined');\n    }\n    if (_this === void 0)\n      throw new ReferenceError(\"this hasn't been initialised - super() hasn't been called\");\n    return _this;\n  };\n  if (__nox_super_0_62 !== null && typeof __nox_super_0_62 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Foo.prototype = Object.create(__nox_super_0_62 && __nox_super_0_62.prototype, {\n    constructor: {\n      value: Foo,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo, __nox_super_0_62);\n  else Foo.__proto__ = __nox_super_0_62;\n  Object.defineProperty(Foo, 'prototype', { writable: false });\n  return Foo;\n})(Bar);",
-  "var _construct2 = {\n  construct: require('@babel/runtime/helpers/construct'),\n  assertThisInitialized: require('@babel/runtime/helpers/assertThisInitialized'),\n};\nfunction _construct(t, e, r) {\n  return _construct2.construct(t, e, r);\n}\n_construct.assert = _construct2.assertThisInitialized;\nlet Bar = (() => {\n  'use strict';\n  const Bar = function Bar() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Bar, 'prototype', { writable: false });\n  return Bar;\n})();\nlet Foo = (__nox_super_14_96 => {\n  'use strict';\n  const Foo = function Foo() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    _construct.assert(_this).foo = 'bar';\n    var _this = _construct(Object.getPrototypeOf(Foo), [], new.target || Foo);\n    var _result = function () {}.apply(_this, arguments);\n    if (_result !== void 0) {\n      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n        return _result;\n      throw new TypeError('Derived constructors may only return object or undefined');\n    }\n    return _this;\n  };\n  if (__nox_super_14_96 !== null && typeof __nox_super_14_96 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Foo.prototype = Object.create(__nox_super_14_96 && __nox_super_14_96.prototype, {\n    constructor: {\n      value: Foo,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo, __nox_super_14_96);\n  else Foo.__proto__ = __nox_super_14_96;\n  Object.defineProperty(Foo, 'prototype', { writable: false });\n  return Foo;\n})(Bar);\nexpect(() => new Foo()).toThrow();",
-  "var _construct2 = {\n  construct: require('@babel/runtime/helpers/construct'),\n  assertThisInitialized: require('@babel/runtime/helpers/assertThisInitialized'),\n};\nfunction _construct(t, e, r) {\n  return _construct2.construct(t, e, r);\n}\n_construct.assert = _construct2.assertThisInitialized;\nlet Foo = (__nox_super_0_82 => {\n  'use strict';\n  const Foo = function Foo() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    _construct.assert(_this).foo = 'bar';\n    var _this = _construct(Object.getPrototypeOf(Foo), [], new.target || Foo);\n    var _result = function () {}.apply(_this, arguments);\n    if (_result !== void 0) {\n      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')\n        return _result;\n      throw new TypeError('Derived constructors may only return object or undefined');\n    }\n    return _this;\n  };\n  if (__nox_super_0_82 !== null && typeof __nox_super_0_82 !== 'function')\n    throw new TypeError('Super expression must either be null or a function');\n  Foo.prototype = Object.create(__nox_super_0_82 && __nox_super_0_82.prototype, {\n    constructor: {\n      value: Foo,\n      writable: true,\n      configurable: true,\n    },\n  });\n  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo, __nox_super_0_82);\n  else Foo.__proto__ = __nox_super_0_82;\n  Object.defineProperty(Foo, 'prototype', { writable: false });\n  return Foo;\n})(Bar);",
-] as const;
-
 export const fixtureCases = [
   {
     title: 'assumption constantSuper — accessing super class (input)',
-    source:
-      'class Test extends Foo {\n  constructor() {\n    woops.super.test();\n    super();\n    super.test();\n\n    super(...arguments);\n    super("test", ...arguments);\n\n    super.test(...arguments);\n    super.test("test", ...arguments);\n  }\n}\n',
+    source: `class Test extends Foo {
+  constructor() {
+    woops.super.test();
+    super();
+    super.test();
+
+    super(...arguments);
+    super("test", ...arguments);
+
+    super.test(...arguments);
+    super.test("test", ...arguments);
+  }
+}
+`,
     filename: 'input.js',
+    output: `var _construct2 = {
+  construct: require('@babel/runtime/helpers/construct'),
+  assertThisInitialized: require('@babel/runtime/helpers/assertThisInitialized'),
+};
+function _construct(t, e, r) {
+  return _construct2.construct(t, e, r);
+}
+_construct.assert = _construct2.assertThisInitialized;
+var _get2 = { get: require('@babel/runtime/helpers/get') };
+function _get(e, t, r) {
+  return _get2.get(e, t, r);
+}
+let Test = (__nox_super_0_231 => {
+  'use strict';
+  const Test = function Test() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this,
+      _newtarget = new.target;
+    function _super() {
+      _this = _construct(Object.getPrototypeOf(Test), arguments, _newtarget || Test);
+      return _this;
+    }
+    var _result = function () {
+      woops.super.test();
+      _super();
+      _get(Object.getPrototypeOf(Test.prototype), 'test', _construct.assert(_this)).call(
+        _construct.assert(_this),
+      );
+      _super(...arguments);
+      _super('test', ...arguments);
+      _get(Object.getPrototypeOf(Test.prototype), 'test', _construct.assert(_this)).call(
+        _construct.assert(_this),
+        ...arguments,
+      );
+      _get(Object.getPrototypeOf(Test.prototype), 'test', _construct.assert(_this)).call(
+        _construct.assert(_this),
+        'test',
+        ...arguments,
+      );
+    }.apply(void 0, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    if (_this === void 0)
+      throw new ReferenceError("this hasn't been initialised - super() hasn't been called");
+    return _this;
+  };
+  if (__nox_super_0_231 !== null && typeof __nox_super_0_231 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Test.prototype = Object.create(__nox_super_0_231 && __nox_super_0_231.prototype, {
+    constructor: {
+      value: Test,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Test, __nox_super_0_231);
+  else Test.__proto__ = __nox_super_0_231;
+  Object.defineProperty(Test, 'prototype', { writable: false });
+  return Test;
+})(Foo);`,
     modes: [
       {
         title: 'default',
@@ -209,15 +94,58 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[0],
       },
     ],
   },
   {
     title: 'assumption constantSuper — accessing super properties (input)',
-    source:
-      'class Test extends Foo {\n  constructor() {\n    super();\n    super.test;\n    super.test.whatever;\n  }\n}\n',
+    source: `class Test extends Foo {
+  constructor() {
+    super();
+    super.test;
+    super.test.whatever;
+  }
+}
+`,
     filename: 'input.js',
+    output: `var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+var _get2 = { get: require('@babel/runtime/helpers/get') };
+function _get(e, t, r) {
+  return _get2.get(e, t, r);
+}
+let Test = (__nox_super_0_102 => {
+  'use strict';
+  const Test = function Test() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(Test), [], new.target || Test);
+    var _result = function () {
+      _get(Object.getPrototypeOf(Test.prototype), 'test', this);
+      _get(Object.getPrototypeOf(Test.prototype), 'test', this).whatever;
+    }.apply(_this, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    return _this;
+  };
+  if (__nox_super_0_102 !== null && typeof __nox_super_0_102 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Test.prototype = Object.create(__nox_super_0_102 && __nox_super_0_102.prototype, {
+    constructor: {
+      value: Test,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Test, __nox_super_0_102);
+  else Test.__proto__ = __nox_super_0_102;
+  Object.defineProperty(Test, 'prototype', { writable: false });
+  return Test;
+})(Foo);`,
     modes: [
       {
         title: 'default',
@@ -231,15 +159,70 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[1],
       },
     ],
   },
   {
     title: 'assumption constantSuper — accessing super property optional chain (input)',
-    source:
-      'class Test extends Foo {\n  constructor() {\n    super.foo?.bar;\n    super.foo?.();\n  }\n}\n',
+    source: `class Test extends Foo {
+  constructor() {
+    super.foo?.bar;
+    super.foo?.();
+  }
+}
+`,
     filename: 'input.js',
+    output: `var _construct2 = {
+  construct: require('@babel/runtime/helpers/construct'),
+  assertThisInitialized: require('@babel/runtime/helpers/assertThisInitialized'),
+};
+function _construct(t, e, r) {
+  return _construct2.construct(t, e, r);
+}
+_construct.assert = _construct2.assertThisInitialized;
+var _get2 = { get: require('@babel/runtime/helpers/get') };
+function _get(e, t, r) {
+  return _get2.get(e, t, r);
+}
+let Test = (__nox_super_0_87 => {
+  'use strict';
+  const Test = function Test() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this,
+      _newtarget = new.target;
+    function _super() {
+      _this = _construct(Object.getPrototypeOf(Test), arguments, _newtarget || Test);
+      return _this;
+    }
+    var _result = function () {
+      _get(Object.getPrototypeOf(Test.prototype), 'foo', _construct.assert(_this))?.bar;
+      _get(Object.getPrototypeOf(Test.prototype), 'foo', _construct.assert(_this))?.call(
+        _construct.assert(_this),
+      );
+    }.apply(void 0, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    if (_this === void 0)
+      throw new ReferenceError("this hasn't been initialised - super() hasn't been called");
+    return _this;
+  };
+  if (__nox_super_0_87 !== null && typeof __nox_super_0_87 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Test.prototype = Object.create(__nox_super_0_87 && __nox_super_0_87.prototype, {
+    constructor: {
+      value: Test,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Test, __nox_super_0_87);
+  else Test.__proto__ = __nox_super_0_87;
+  Object.defineProperty(Test, 'prototype', { writable: false });
+  return Test;
+})(Foo);`,
     modes: [
       {
         title: 'default',
@@ -253,15 +236,77 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[2],
       },
     ],
   },
   {
     title: 'assumption constantSuper — calling super properties (input)',
-    source:
-      'class Test extends Foo {\n  constructor() {\n    super();\n    super.test.whatever();\n    super.test();\n  }\n\n  static test() {\n    return super.wow();\n  }\n}\n',
+    source: `class Test extends Foo {
+  constructor() {
+    super();
+    super.test.whatever();
+    super.test();
+  }
+
+  static test() {
+    return super.wow();
+  }
+}
+`,
     filename: 'input.js',
+    output: `var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+var _get2 = { get: require('@babel/runtime/helpers/get') };
+function _get(e, t, r) {
+  return _get2.get(e, t, r);
+}
+let Test = (__nox_super_0_153 => {
+  'use strict';
+  const Test = function Test() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(Test), [], new.target || Test);
+    var _result = function () {
+      _get(Object.getPrototypeOf(Test.prototype), 'test', this).whatever();
+      _get(Object.getPrototypeOf(Test.prototype), 'test', this).call(this);
+    }.apply(_this, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    return _this;
+  };
+  if (__nox_super_0_153 !== null && typeof __nox_super_0_153 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Test.prototype = Object.create(__nox_super_0_153 && __nox_super_0_153.prototype, {
+    constructor: {
+      value: Test,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Test, __nox_super_0_153);
+  else Test.__proto__ = __nox_super_0_153;
+  Object.defineProperty(Test, 'test', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return _get(Object.getPrototypeOf(Test), 'wow', this).call(this);
+      },
+      'name',
+      {
+        value: 'test',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Test, 'prototype', { writable: false });
+  return Test;
+})(Foo);`,
     modes: [
       {
         title: 'default',
@@ -275,15 +320,64 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[3],
       },
     ],
   },
   {
     title: 'assumption constantSuper — default super (input)',
-    source:
-      'class Test {\n  constructor() {\n    return super.constructor;\n  }\n\n  static test() {\n    return super.constructor;\n  }\n}\n\n// Instances\nexpect(Object.getPrototypeOf(Test.prototype)).toBe(Object.prototype);\nexpect(new Test()).toBe(Object);\n\n// Static\nexpect(Object.getPrototypeOf(Test)).toBe(Function.prototype);\nexpect(Test.test()).toBe(Function);\n',
+    source: `class Test {
+  constructor() {
+    return super.constructor;
+  }
+
+  static test() {
+    return super.constructor;
+  }
+}
+
+// Instances
+expect(Object.getPrototypeOf(Test.prototype)).toBe(Object.prototype);
+expect(new Test()).toBe(Object);
+
+// Static
+expect(Object.getPrototypeOf(Test)).toBe(Function.prototype);
+expect(Test.test()).toBe(Function);
+`,
     filename: 'input.js',
+    output: `var _get2 = { get: require('@babel/runtime/helpers/get') };
+function _get(e, t, r) {
+  return _get2.get(e, t, r);
+}
+let Test = (() => {
+  'use strict';
+  const Test = function Test() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    return super.constructor;
+  };
+  Object.defineProperty(Test, 'test', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return _get(Object.getPrototypeOf(Test), 'constructor', this);
+      },
+      'name',
+      {
+        value: 'test',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Test, 'prototype', { writable: false });
+  return Test;
+})();
+// Instances
+expect(Object.getPrototypeOf(Test.prototype)).toBe(Object.prototype);
+expect(new Test()).toBe(Object);
+// Static
+expect(Object.getPrototypeOf(Test)).toBe(Function.prototype);
+expect(Test.test()).toBe(Function);`,
     modes: [
       {
         title: 'default',
@@ -297,14 +391,31 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[4],
       },
     ],
   },
   {
     title: 'assumption constantSuper — super function fallback (input)',
-    source: 'class Test {\n  constructor() {\n    super.hasOwnProperty("test");\n  }\n}\n',
+    source: `class Test {
+  constructor() {
+    super.hasOwnProperty("test");
+  }
+}
+`,
     filename: 'input.js',
+    output: `var _get2 = { get: require('@babel/runtime/helpers/get') };
+function _get(e, t, r) {
+  return _get2.get(e, t, r);
+}
+let Test = (() => {
+  'use strict';
+  const Test = function Test() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    super.hasOwnProperty('test');
+  };
+  Object.defineProperty(Test, 'prototype', { writable: false });
+  return Test;
+})();`,
     modes: [
       {
         title: 'default',
@@ -318,14 +429,22 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[5],
       },
     ],
   },
   {
     title: 'assumption noCallClass — class (input)',
-    source: 'class A {}\n',
+    source: `class A {}
+`,
     filename: 'input.js',
+    output: `let A = (() => {
+  'use strict';
+  const A = function A() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(A, 'prototype', { writable: false });
+  return A;
+})();`,
     modes: [
       {
         title: 'default',
@@ -339,15 +458,56 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[6],
       },
     ],
   },
   {
     title: 'assumption noCallClass — with constructor (input)',
-    source:
-      "class A {\n  constructor() {\n    console.log('a');\n  }\n}\n\nclass B {\n  b() {\n    console.log('b');\n  }\n}\n",
+    source: `class A {
+  constructor() {
+    console.log('a');
+  }
+}
+
+class B {
+  b() {
+    console.log('b');
+  }
+}
+`,
     filename: 'input.js',
+    output: `let A = (() => {
+  'use strict';
+  const A = function A() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    console.log('a');
+  };
+  Object.defineProperty(A, 'prototype', { writable: false });
+  return A;
+})();
+let B = (() => {
+  'use strict';
+  const B = function B() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(B.prototype, 'b', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        console.log('b');
+      },
+      'name',
+      {
+        value: 'b',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(B, 'prototype', { writable: false });
+  return B;
+})();`,
     modes: [
       {
         title: 'default',
@@ -361,15 +521,70 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[7],
       },
     ],
   },
   {
     title: 'assumption noCallClass — with superClass (input)',
-    source:
-      'class B {}\n\nclass A extends B {\n  constructor(track) {\n    if (track !== undefined) super(track);\n    else super();\n  }\n}\n',
+    source: `class B {}
+
+class A extends B {
+  constructor(track) {
+    if (track !== undefined) super(track);
+    else super();
+  }
+}
+`,
     filename: 'input.js',
+    output: `var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+let B = (() => {
+  'use strict';
+  const B = function B() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(B, 'prototype', { writable: false });
+  return B;
+})();
+let A = (__nox_super_12_121 => {
+  'use strict';
+  const A = function A(_argument) {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this,
+      _newtarget = new.target;
+    function _super() {
+      _this = _construct(Object.getPrototypeOf(A), arguments, _newtarget || A);
+      return _this;
+    }
+    var _result = function (track) {
+      if (track !== undefined) _super(track);
+      else _super();
+    }.apply(void 0, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    if (_this === void 0)
+      throw new ReferenceError("this hasn't been initialised - super() hasn't been called");
+    return _this;
+  };
+  if (__nox_super_12_121 !== null && typeof __nox_super_12_121 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  A.prototype = Object.create(__nox_super_12_121 && __nox_super_12_121.prototype, {
+    constructor: {
+      value: A,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(A, __nox_super_12_121);
+  else A.__proto__ = __nox_super_12_121;
+  Object.defineProperty(A, 'prototype', { writable: false });
+  return A;
+})(B);`,
     modes: [
       {
         title: 'default',
@@ -383,14 +598,40 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[8],
       },
     ],
   },
   {
     title: 'assumption setClassMethods — literal key (input)',
-    source: 'class Foo {\n  "bar"() {\n\n  }\n}\n',
+    source: `class Foo {
+  "bar"() {
+
+  }
+}
+`,
     filename: 'input.js',
+    output: `let Foo = (() => {
+  'use strict';
+  const Foo = function Foo() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Foo.prototype, 'bar', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      },
+      'name',
+      {
+        value: 'bar',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Foo, 'prototype', { writable: false });
+  return Foo;
+})();`,
     modes: [
       {
         title: 'default',
@@ -404,14 +645,40 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[9],
       },
     ],
   },
   {
     title: 'assumption setClassMethods — method name non bmp not supported (input)',
-    source: 'var o = class { 𠮷野家() {} };\n',
+    source: `var o = class { 𠮷野家() {} };
+`,
     filename: 'input.js',
+    output: `var o = (() => {
+  'use strict';
+  const _Class = function _Class() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(_Class, 'name', {
+    value: 'o',
+    configurable: true,
+  });
+  Object.defineProperty(_Class.prototype, '𠮷野家', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      },
+      'name',
+      {
+        value: '𠮷野家',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(_Class, 'prototype', { writable: false });
+  return _Class;
+})();`,
     modes: [
       {
         title: 'default',
@@ -425,14 +692,45 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[10],
       },
     ],
   },
   {
     title: 'assumption setClassMethods — method return type annotation (input)',
-    source: "// @flow\n// @flow\nclass C {\n  m(x: number): string {\n    return 'a';\n  }\n}\n",
+    source: `// @flow
+// @flow
+class C {
+  m(x: number): string {
+    return 'a';
+  }
+}
+`,
     filename: 'input.js',
+    output: `// @flow
+// @flow
+let C = (() => {
+  'use strict';
+  const C = function C() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(C.prototype, 'm', {
+    value: Object.defineProperty(
+      function (x) {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return 'a';
+      },
+      'name',
+      {
+        value: 'm',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(C, 'prototype', { writable: false });
+  return C;
+})();`,
     modes: [
       {
         title: 'default',
@@ -446,14 +744,68 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[11],
       },
     ],
   },
   {
     title: 'assumption setClassMethods — method reuse prototype (input)',
-    source: 'class Test {\n  a() {}\n  static b() {}\n  c() {}\n}\n',
+    source: `class Test {
+  a() {}
+  static b() {}
+  c() {}
+}
+`,
     filename: 'input.js',
+    output: `let Test = (() => {
+  'use strict';
+  const Test = function Test() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Test.prototype, 'a', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      },
+      'name',
+      {
+        value: 'a',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Test, 'b', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      },
+      'name',
+      {
+        value: 'b',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Test.prototype, 'c', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      },
+      'name',
+      {
+        value: 'c',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Test, 'prototype', { writable: false });
+  return Test;
+})();`,
     modes: [
       {
         title: 'default',
@@ -467,14 +819,42 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[12],
       },
     ],
   },
   {
     title: 'assumption setClassMethods — program with use strict directive (input)',
-    source: '"use strict";\n\nclass Foo {\n    method() {\n        \n    }\n}',
+    source: `"use strict";
+
+class Foo {
+    method() {
+\x20\x20\x20\x20\x20\x20\x20\x20
+    }
+}`,
     filename: 'input.js',
+    output: `'use strict';
+let Foo = (() => {
+  'use strict';
+  const Foo = function Foo() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Foo.prototype, 'method', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      },
+      'name',
+      {
+        value: 'method',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Foo, 'prototype', { writable: false });
+  return Foo;
+})();`,
     modes: [
       {
         title: 'default',
@@ -488,15 +868,44 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[13],
       },
     ],
   },
   {
     title: 'assumption superIsCallableConstructor — extend builtins es2015 (exec)',
-    source:
-      'class ListBuffer extends ArrayBuffer {}\n\nexpect(new ListBuffer).toBeInstanceOf(ListBuffer);\nexpect(new ListBuffer).toBeInstanceOf(ArrayBuffer);\n',
+    source: `class ListBuffer extends ArrayBuffer {}
+
+expect(new ListBuffer).toBeInstanceOf(ListBuffer);
+expect(new ListBuffer).toBeInstanceOf(ArrayBuffer);
+`,
     filename: 'exec.js',
+    output: `var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+let ListBuffer = (__nox_super_0_39 => {
+  'use strict';
+  const ListBuffer = function ListBuffer() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(ListBuffer), arguments, new.target || ListBuffer);
+    return _this;
+  };
+  if (__nox_super_0_39 !== null && typeof __nox_super_0_39 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  ListBuffer.prototype = Object.create(__nox_super_0_39 && __nox_super_0_39.prototype, {
+    constructor: {
+      value: ListBuffer,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(ListBuffer, __nox_super_0_39);
+  else ListBuffer.__proto__ = __nox_super_0_39;
+  Object.defineProperty(ListBuffer, 'prototype', { writable: false });
+  return ListBuffer;
+})(ArrayBuffer);
+expect(new ListBuffer()).toBeInstanceOf(ListBuffer);
+expect(new ListBuffer()).toBeInstanceOf(ArrayBuffer);`,
     modes: [
       {
         title: 'default',
@@ -510,14 +919,39 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[14],
       },
     ],
   },
   {
     title: 'assumption superIsCallableConstructor — extend builtins es2015 (input)',
-    source: 'class ListBuffer extends ArrayBuffer {}\n',
+    source: `class ListBuffer extends ArrayBuffer {}
+`,
     filename: 'input.js',
+    output: `var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+let ListBuffer = (__nox_super_0_39 => {
+  'use strict';
+  const ListBuffer = function ListBuffer() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(ListBuffer), arguments, new.target || ListBuffer);
+    return _this;
+  };
+  if (__nox_super_0_39 !== null && typeof __nox_super_0_39 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  ListBuffer.prototype = Object.create(__nox_super_0_39 && __nox_super_0_39.prototype, {
+    constructor: {
+      value: ListBuffer,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(ListBuffer, __nox_super_0_39);
+  else ListBuffer.__proto__ = __nox_super_0_39;
+  Object.defineProperty(ListBuffer, 'prototype', { writable: false });
+  return ListBuffer;
+})(ArrayBuffer);`,
     modes: [
       {
         title: 'default',
@@ -531,15 +965,48 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[15],
       },
     ],
   },
   {
     title: 'assumption superIsCallableConstructor — extend builtins es2017 (exec)',
-    source:
-      'class SharedListBuffer extends SharedArrayBuffer {}\n\nexpect(new SharedListBuffer).toBeInstanceOf(SharedListBuffer);\nexpect(new SharedListBuffer).toBeInstanceOf(SharedArrayBuffer);\n',
+    source: `class SharedListBuffer extends SharedArrayBuffer {}
+
+expect(new SharedListBuffer).toBeInstanceOf(SharedListBuffer);
+expect(new SharedListBuffer).toBeInstanceOf(SharedArrayBuffer);
+`,
     filename: 'exec.js',
+    output: `var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+let SharedListBuffer = (__nox_super_0_51 => {
+  'use strict';
+  const SharedListBuffer = function SharedListBuffer() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(
+      Object.getPrototypeOf(SharedListBuffer),
+      arguments,
+      new.target || SharedListBuffer,
+    );
+    return _this;
+  };
+  if (__nox_super_0_51 !== null && typeof __nox_super_0_51 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  SharedListBuffer.prototype = Object.create(__nox_super_0_51 && __nox_super_0_51.prototype, {
+    constructor: {
+      value: SharedListBuffer,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(SharedListBuffer, __nox_super_0_51);
+  else SharedListBuffer.__proto__ = __nox_super_0_51;
+  Object.defineProperty(SharedListBuffer, 'prototype', { writable: false });
+  return SharedListBuffer;
+})(SharedArrayBuffer);
+expect(new SharedListBuffer()).toBeInstanceOf(SharedListBuffer);
+expect(new SharedListBuffer()).toBeInstanceOf(SharedArrayBuffer);`,
     modes: [
       {
         title: 'default',
@@ -553,14 +1020,43 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[16],
       },
     ],
   },
   {
     title: 'assumption superIsCallableConstructor — extend builtins es2017 (input)',
-    source: 'class SharedListBuffer extends SharedArrayBuffer {}\n',
+    source: `class SharedListBuffer extends SharedArrayBuffer {}
+`,
     filename: 'input.js',
+    output: `var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+let SharedListBuffer = (__nox_super_0_51 => {
+  'use strict';
+  const SharedListBuffer = function SharedListBuffer() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(
+      Object.getPrototypeOf(SharedListBuffer),
+      arguments,
+      new.target || SharedListBuffer,
+    );
+    return _this;
+  };
+  if (__nox_super_0_51 !== null && typeof __nox_super_0_51 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  SharedListBuffer.prototype = Object.create(__nox_super_0_51 && __nox_super_0_51.prototype, {
+    constructor: {
+      value: SharedListBuffer,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(SharedListBuffer, __nox_super_0_51);
+  else SharedListBuffer.__proto__ = __nox_super_0_51;
+  Object.defineProperty(SharedListBuffer, 'prototype', { writable: false });
+  return SharedListBuffer;
+})(SharedArrayBuffer);`,
     modes: [
       {
         title: 'default',
@@ -574,15 +1070,48 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[17],
       },
     ],
   },
   {
     title: 'assumption superIsCallableConstructor — extend builtins es2020 (exec)',
-    source:
-      'class BigInt64List extends BigInt64Array {}\n\nexpect(new BigInt64List).toBeInstanceOf(BigInt64List);\nexpect(new BigInt64List).toBeInstanceOf(BigInt64Array);\n',
+    source: `class BigInt64List extends BigInt64Array {}
+
+expect(new BigInt64List).toBeInstanceOf(BigInt64List);
+expect(new BigInt64List).toBeInstanceOf(BigInt64Array);
+`,
     filename: 'exec.js',
+    output: `var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+let BigInt64List = (__nox_super_0_43 => {
+  'use strict';
+  const BigInt64List = function BigInt64List() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(
+      Object.getPrototypeOf(BigInt64List),
+      arguments,
+      new.target || BigInt64List,
+    );
+    return _this;
+  };
+  if (__nox_super_0_43 !== null && typeof __nox_super_0_43 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  BigInt64List.prototype = Object.create(__nox_super_0_43 && __nox_super_0_43.prototype, {
+    constructor: {
+      value: BigInt64List,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(BigInt64List, __nox_super_0_43);
+  else BigInt64List.__proto__ = __nox_super_0_43;
+  Object.defineProperty(BigInt64List, 'prototype', { writable: false });
+  return BigInt64List;
+})(BigInt64Array);
+expect(new BigInt64List()).toBeInstanceOf(BigInt64List);
+expect(new BigInt64List()).toBeInstanceOf(BigInt64Array);`,
     modes: [
       {
         title: 'default',
@@ -596,14 +1125,43 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[18],
       },
     ],
   },
   {
     title: 'assumption superIsCallableConstructor — extend builtins es2020 (input)',
-    source: 'class BigInt64List extends BigInt64Array {}\n',
+    source: `class BigInt64List extends BigInt64Array {}
+`,
     filename: 'input.js',
+    output: `var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+let BigInt64List = (__nox_super_0_43 => {
+  'use strict';
+  const BigInt64List = function BigInt64List() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(
+      Object.getPrototypeOf(BigInt64List),
+      arguments,
+      new.target || BigInt64List,
+    );
+    return _this;
+  };
+  if (__nox_super_0_43 !== null && typeof __nox_super_0_43 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  BigInt64List.prototype = Object.create(__nox_super_0_43 && __nox_super_0_43.prototype, {
+    constructor: {
+      value: BigInt64List,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(BigInt64List, __nox_super_0_43);
+  else BigInt64List.__proto__ = __nox_super_0_43;
+  Object.defineProperty(BigInt64List, 'prototype', { writable: false });
+  return BigInt64List;
+})(BigInt64Array);`,
     modes: [
       {
         title: 'default',
@@ -617,15 +1175,48 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[19],
       },
     ],
   },
   {
     title: 'assumption superIsCallableConstructor — extend builtins es2021 (exec)',
-    source:
-      'class MergedError extends AggregateError {}\n\nexpect(new MergedError([])).toBeInstanceOf(MergedError);\nexpect(new MergedError([])).toBeInstanceOf(AggregateError);\n',
+    source: `class MergedError extends AggregateError {}
+
+expect(new MergedError([])).toBeInstanceOf(MergedError);
+expect(new MergedError([])).toBeInstanceOf(AggregateError);
+`,
     filename: 'exec.js',
+    output: `var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+let MergedError = (__nox_super_0_43 => {
+  'use strict';
+  const MergedError = function MergedError() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(
+      Object.getPrototypeOf(MergedError),
+      arguments,
+      new.target || MergedError,
+    );
+    return _this;
+  };
+  if (__nox_super_0_43 !== null && typeof __nox_super_0_43 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  MergedError.prototype = Object.create(__nox_super_0_43 && __nox_super_0_43.prototype, {
+    constructor: {
+      value: MergedError,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(MergedError, __nox_super_0_43);
+  else MergedError.__proto__ = __nox_super_0_43;
+  Object.defineProperty(MergedError, 'prototype', { writable: false });
+  return MergedError;
+})(AggregateError);
+expect(new MergedError([])).toBeInstanceOf(MergedError);
+expect(new MergedError([])).toBeInstanceOf(AggregateError);`,
     modes: [
       {
         title: 'default',
@@ -639,14 +1230,43 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[20],
       },
     ],
   },
   {
     title: 'assumption superIsCallableConstructor — extend builtins es2021 (input)',
-    source: 'class MergedError extends AggregateError {}\n',
+    source: `class MergedError extends AggregateError {}
+`,
     filename: 'input.js',
+    output: `var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+let MergedError = (__nox_super_0_43 => {
+  'use strict';
+  const MergedError = function MergedError() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(
+      Object.getPrototypeOf(MergedError),
+      arguments,
+      new.target || MergedError,
+    );
+    return _this;
+  };
+  if (__nox_super_0_43 !== null && typeof __nox_super_0_43 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  MergedError.prototype = Object.create(__nox_super_0_43 && __nox_super_0_43.prototype, {
+    constructor: {
+      value: MergedError,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(MergedError, __nox_super_0_43);
+  else MergedError.__proto__ = __nox_super_0_43;
+  Object.defineProperty(MergedError, 'prototype', { writable: false });
+  return MergedError;
+})(AggregateError);`,
     modes: [
       {
         title: 'default',
@@ -660,15 +1280,44 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[21],
       },
     ],
   },
   {
     title: 'assumption superIsCallableConstructor — extend builtins (exec)',
-    source:
-      'class List extends Array {}\n\nexpect(new List).toBeInstanceOf(List);\nexpect(new List).toBeInstanceOf(Array);\n',
+    source: `class List extends Array {}
+
+expect(new List).toBeInstanceOf(List);
+expect(new List).toBeInstanceOf(Array);
+`,
     filename: 'exec.js',
+    output: `var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+let List = (__nox_super_0_27 => {
+  'use strict';
+  const List = function List() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(List), arguments, new.target || List);
+    return _this;
+  };
+  if (__nox_super_0_27 !== null && typeof __nox_super_0_27 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  List.prototype = Object.create(__nox_super_0_27 && __nox_super_0_27.prototype, {
+    constructor: {
+      value: List,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(List, __nox_super_0_27);
+  else List.__proto__ = __nox_super_0_27;
+  Object.defineProperty(List, 'prototype', { writable: false });
+  return List;
+})(Array);
+expect(new List()).toBeInstanceOf(List);
+expect(new List()).toBeInstanceOf(Array);`,
     modes: [
       {
         title: 'default',
@@ -682,7 +1331,6 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[22],
       },
     ],
   },
@@ -690,6 +1338,31 @@ export const fixtureCases = [
     title: 'assumption superIsCallableConstructor — extend builtins (input)',
     source: 'class List extends Array {}',
     filename: 'input.js',
+    output: `var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+let List = (__nox_super_0_27 => {
+  'use strict';
+  const List = function List() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(List), arguments, new.target || List);
+    return _this;
+  };
+  if (__nox_super_0_27 !== null && typeof __nox_super_0_27 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  List.prototype = Object.create(__nox_super_0_27 && __nox_super_0_27.prototype, {
+    constructor: {
+      value: List,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(List, __nox_super_0_27);
+  else List.__proto__ = __nox_super_0_27;
+  Object.defineProperty(List, 'prototype', { writable: false });
+  return List;
+})(Array);`,
     modes: [
       {
         title: 'default',
@@ -703,15 +1376,46 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[23],
       },
     ],
   },
   {
     title: 'assumption superIsCallableConstructor — invalid extend builtins Iterator (exec)',
-    source:
-      'class RangeIterator extends Iterator {}\n\nexpect(() => new RangeIterator).toThrow("Constructor Iterator requires \'new\'");\n',
+    source: `class RangeIterator extends Iterator {}
+
+expect(() => new RangeIterator).toThrow("Constructor Iterator requires 'new'");
+`,
     filename: 'exec.js',
+    output: `var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+let RangeIterator = (__nox_super_0_39 => {
+  'use strict';
+  const RangeIterator = function RangeIterator() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(
+      Object.getPrototypeOf(RangeIterator),
+      arguments,
+      new.target || RangeIterator,
+    );
+    return _this;
+  };
+  if (__nox_super_0_39 !== null && typeof __nox_super_0_39 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  RangeIterator.prototype = Object.create(__nox_super_0_39 && __nox_super_0_39.prototype, {
+    constructor: {
+      value: RangeIterator,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(RangeIterator, __nox_super_0_39);
+  else RangeIterator.__proto__ = __nox_super_0_39;
+  Object.defineProperty(RangeIterator, 'prototype', { writable: false });
+  return RangeIterator;
+})(Iterator);
+expect(() => new RangeIterator()).toThrow("Constructor Iterator requires 'new'");`,
     modes: [
       {
         title: 'default',
@@ -725,15 +1429,49 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[24],
       },
     ],
   },
   {
     title: 'assumption superIsCallableConstructor — invalid extend builtins Iterator (input)',
-    source:
-      '// Iterator can not be invoked with new, so this example does not\n// satisfy the superIsCallableConstructor assumption, it will throw\n// a runtime error\nclass RangeIterator extends Iterator {}\n',
+    source: `// Iterator can not be invoked with new, so this example does not
+// satisfy the superIsCallableConstructor assumption, it will throw
+// a runtime error
+class RangeIterator extends Iterator {}
+`,
     filename: 'input.js',
+    output: `var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+// Iterator can not be invoked with new, so this example does not
+// satisfy the superIsCallableConstructor assumption, it will throw
+// a runtime error
+let RangeIterator = (__nox_super_153_192 => {
+  'use strict';
+  const RangeIterator = function RangeIterator() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(
+      Object.getPrototypeOf(RangeIterator),
+      arguments,
+      new.target || RangeIterator,
+    );
+    return _this;
+  };
+  if (__nox_super_153_192 !== null && typeof __nox_super_153_192 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  RangeIterator.prototype = Object.create(__nox_super_153_192 && __nox_super_153_192.prototype, {
+    constructor: {
+      value: RangeIterator,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(RangeIterator, __nox_super_153_192);
+  else RangeIterator.__proto__ = __nox_super_153_192;
+  Object.defineProperty(RangeIterator, 'prototype', { writable: false });
+  return RangeIterator;
+})(Iterator);`,
     modes: [
       {
         title: 'default',
@@ -747,15 +1485,74 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[25],
       },
     ],
   },
   {
     title: 'assumption superIsCallableConstructor — super class id member expression (input)',
-    source:
-      'class BaseController extends Chaplin.Controller {\n\n}\n\nclass BaseController2 extends Chaplin.Controller.Another {\n\n}\n',
+    source: `class BaseController extends Chaplin.Controller {
+
+}
+
+class BaseController2 extends Chaplin.Controller.Another {
+
+}
+`,
     filename: 'input.js',
+    output: `var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+let BaseController = (__nox_super_0_52 => {
+  'use strict';
+  const BaseController = function BaseController() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(
+      Object.getPrototypeOf(BaseController),
+      arguments,
+      new.target || BaseController,
+    );
+    return _this;
+  };
+  if (__nox_super_0_52 !== null && typeof __nox_super_0_52 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  BaseController.prototype = Object.create(__nox_super_0_52 && __nox_super_0_52.prototype, {
+    constructor: {
+      value: BaseController,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(BaseController, __nox_super_0_52);
+  else BaseController.__proto__ = __nox_super_0_52;
+  Object.defineProperty(BaseController, 'prototype', { writable: false });
+  return BaseController;
+})(Chaplin.Controller);
+let BaseController2 = (__nox_super_54_115 => {
+  'use strict';
+  const BaseController2 = function BaseController2() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(
+      Object.getPrototypeOf(BaseController2),
+      arguments,
+      new.target || BaseController2,
+    );
+    return _this;
+  };
+  if (__nox_super_54_115 !== null && typeof __nox_super_54_115 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  BaseController2.prototype = Object.create(__nox_super_54_115 && __nox_super_54_115.prototype, {
+    constructor: {
+      value: BaseController2,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(BaseController2, __nox_super_54_115);
+  else BaseController2.__proto__ = __nox_super_54_115;
+  Object.defineProperty(BaseController2, 'prototype', { writable: false });
+  return BaseController2;
+})(Chaplin.Controller.Another);`,
     modes: [
       {
         title: 'default',
@@ -769,15 +1566,56 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[26],
       },
     ],
   },
   {
     title: 'assumption superIsCallableConstructor — super class this usage (input)',
-    source:
-      'class Test extends Foo {\n  constructor() {\n    super();\n\n    this;\n\n    this.prop = 1;\n  }\n}\n',
+    source: `class Test extends Foo {
+  constructor() {
+    super();
+
+    this;
+
+    this.prop = 1;
+  }
+}
+`,
     filename: 'input.js',
+    output: `var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+let Test = (__nox_super_0_92 => {
+  'use strict';
+  const Test = function Test() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(Test), [], new.target || Test);
+    var _result = function () {
+      this;
+      this.prop = 1;
+    }.apply(_this, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    return _this;
+  };
+  if (__nox_super_0_92 !== null && typeof __nox_super_0_92 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Test.prototype = Object.create(__nox_super_0_92 && __nox_super_0_92.prototype, {
+    constructor: {
+      value: Test,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Test, __nox_super_0_92);
+  else Test.__proto__ = __nox_super_0_92;
+  Object.defineProperty(Test, 'prototype', { writable: false });
+  return Test;
+})(Foo);`,
     modes: [
       {
         title: 'default',
@@ -791,14 +1629,39 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[27],
       },
     ],
   },
   {
     title: 'assumption superIsCallableConstructor — super class (input)',
-    source: 'class Test extends Foo { }\n',
+    source: `class Test extends Foo { }
+`,
     filename: 'input.js',
+    output: `var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+let Test = (__nox_super_0_26 => {
+  'use strict';
+  const Test = function Test() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(Test), arguments, new.target || Test);
+    return _this;
+  };
+  if (__nox_super_0_26 !== null && typeof __nox_super_0_26 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Test.prototype = Object.create(__nox_super_0_26 && __nox_super_0_26.prototype, {
+    constructor: {
+      value: Test,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Test, __nox_super_0_26);
+  else Test.__proto__ = __nox_super_0_26;
+  Object.defineProperty(Test, 'prototype', { writable: false });
+  return Test;
+})(Foo);`,
     modes: [
       {
         title: 'default',
@@ -812,15 +1675,50 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[28],
       },
     ],
   },
   {
     title: 'extend builtins — builtin objects throw when wrapped (exec)',
-    source:
-      '// JSON is wrapped because it starts with an uppercase letter, but it\n// should not be possible to extend it anyway.\n\nexpect(() => class BetterJSON extends JSON {}).toThrow();\n',
+    source: `// JSON is wrapped because it starts with an uppercase letter, but it
+// should not be possible to extend it anyway.
+
+expect(() => class BetterJSON extends JSON {}).toThrow();
+`,
     filename: 'exec.js',
+    output: `var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+// JSON is wrapped because it starts with an uppercase letter, but it
+// should not be possible to extend it anyway.
+expect(() =>
+  (__nox_super_131_163 => {
+    'use strict';
+    const BetterJSON = function BetterJSON() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+      var _this = _construct(
+        Object.getPrototypeOf(BetterJSON),
+        arguments,
+        new.target || BetterJSON,
+      );
+      return _this;
+    };
+    if (__nox_super_131_163 !== null && typeof __nox_super_131_163 !== 'function')
+      throw new TypeError('Super expression must either be null or a function');
+    BetterJSON.prototype = Object.create(__nox_super_131_163 && __nox_super_131_163.prototype, {
+      constructor: {
+        value: BetterJSON,
+        writable: true,
+        configurable: true,
+      },
+    });
+    if (Object.setPrototypeOf) Object.setPrototypeOf(BetterJSON, __nox_super_131_163);
+    else BetterJSON.__proto__ = __nox_super_131_163;
+    Object.defineProperty(BetterJSON, 'prototype', { writable: false });
+    return BetterJSON;
+  })(JSON),
+).toThrow();`,
     modes: [
       {
         title: 'default',
@@ -834,15 +1732,173 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[29],
       },
     ],
   },
   {
     title: 'extend builtins — imported_babel plugin transform builtin classes (exec)',
-    source:
-      "// Imported from\n// https://github.com/WebReflection/babel-plugin-transform-builtin-classes/blob/85efe1374e1c59a8323c7eddd4326f6c93d9f64f/test/test.js\n\nclass List extends Array {\n  constructor(value) {\n    super().push(value);\n  }\n  push(value) {\n    super.push(value);\n    return this;\n  }\n}\n\nexpect(new List(1)).toBeInstanceOf(List);\nexpect(new List(2)).toBeInstanceOf(Array);\n\nvar l = new List(3);\nexpect(l).toHaveLength(1);\nexpect(l[0]).toBe(3);\nexpect(l.push(4)).toBe(l);\nexpect(l).toHaveLength(2);\nexpect(l.join()).toBe('3,4');\n\nclass SecondLevel extends List {\n  method() {\n    return this;\n  }\n}\n\nexpect(new SecondLevel(1)).toBeInstanceOf(SecondLevel);\nexpect(new SecondLevel(2)).toBeInstanceOf(List);\nexpect(new SecondLevel(3)).toBeInstanceOf(Array);\n\nvar s = new SecondLevel(4);\nexpect(s).toHaveLength(1);\nexpect(s[0]).toBe(4);\nexpect(s.push(5)).toBe(s);\nexpect(s).toHaveLength(2);\nexpect(s.join()).toBe('4,5');\nexpect(s.method()).toBe(s);\n",
+    source: `// Imported from
+// https://github.com/WebReflection/babel-plugin-transform-builtin-classes/blob/85efe1374e1c59a8323c7eddd4326f6c93d9f64f/test/test.js
+
+class List extends Array {
+  constructor(value) {
+    super().push(value);
+  }
+  push(value) {
+    super.push(value);
+    return this;
+  }
+}
+
+expect(new List(1)).toBeInstanceOf(List);
+expect(new List(2)).toBeInstanceOf(Array);
+
+var l = new List(3);
+expect(l).toHaveLength(1);
+expect(l[0]).toBe(3);
+expect(l.push(4)).toBe(l);
+expect(l).toHaveLength(2);
+expect(l.join()).toBe('3,4');
+
+class SecondLevel extends List {
+  method() {
+    return this;
+  }
+}
+
+expect(new SecondLevel(1)).toBeInstanceOf(SecondLevel);
+expect(new SecondLevel(2)).toBeInstanceOf(List);
+expect(new SecondLevel(3)).toBeInstanceOf(Array);
+
+var s = new SecondLevel(4);
+expect(s).toHaveLength(1);
+expect(s[0]).toBe(4);
+expect(s.push(5)).toBe(s);
+expect(s).toHaveLength(2);
+expect(s.join()).toBe('4,5');
+expect(s.method()).toBe(s);
+`,
     filename: 'exec.js',
+    output: `var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+var _get2 = { get: require('@babel/runtime/helpers/get') };
+function _get(e, t, r) {
+  return _get2.get(e, t, r);
+}
+// Imported from
+// https://github.com/WebReflection/babel-plugin-transform-builtin-classes/blob/85efe1374e1c59a8323c7eddd4326f6c93d9f64f/test/test.js
+let List = (__nox_super_152_292 => {
+  'use strict';
+  const List = function List(_argument) {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this,
+      _newtarget = new.target;
+    function _super() {
+      _this = _construct(Object.getPrototypeOf(List), arguments, _newtarget || List);
+      return _this;
+    }
+    var _result = function (value) {
+      _super().push(value);
+    }.apply(void 0, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    if (_this === void 0)
+      throw new ReferenceError("this hasn't been initialised - super() hasn't been called");
+    return _this;
+  };
+  if (__nox_super_152_292 !== null && typeof __nox_super_152_292 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  List.prototype = Object.create(__nox_super_152_292 && __nox_super_152_292.prototype, {
+    constructor: {
+      value: List,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(List, __nox_super_152_292);
+  else List.__proto__ = __nox_super_152_292;
+  Object.defineProperty(List.prototype, 'push', {
+    value: Object.defineProperty(
+      function (value) {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        _get(Object.getPrototypeOf(List.prototype), 'push', this).call(this, value);
+        return this;
+      },
+      'name',
+      {
+        value: 'push',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(List, 'prototype', { writable: false });
+  return List;
+})(Array);
+expect(new List(1)).toBeInstanceOf(List);
+expect(new List(2)).toBeInstanceOf(Array);
+var l = new List(3);
+expect(l).toHaveLength(1);
+expect(l[0]).toBe(3);
+expect(l.push(4)).toBe(l);
+expect(l).toHaveLength(2);
+expect(l.join()).toBe('3,4');
+let SecondLevel = (__nox_super_535_603 => {
+  'use strict';
+  const SecondLevel = function SecondLevel() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(
+      Object.getPrototypeOf(SecondLevel),
+      arguments,
+      new.target || SecondLevel,
+    );
+    return _this;
+  };
+  if (__nox_super_535_603 !== null && typeof __nox_super_535_603 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  SecondLevel.prototype = Object.create(__nox_super_535_603 && __nox_super_535_603.prototype, {
+    constructor: {
+      value: SecondLevel,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(SecondLevel, __nox_super_535_603);
+  else SecondLevel.__proto__ = __nox_super_535_603;
+  Object.defineProperty(SecondLevel.prototype, 'method', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return this;
+      },
+      'name',
+      {
+        value: 'method',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(SecondLevel, 'prototype', { writable: false });
+  return SecondLevel;
+})(List);
+expect(new SecondLevel(1)).toBeInstanceOf(SecondLevel);
+expect(new SecondLevel(2)).toBeInstanceOf(List);
+expect(new SecondLevel(3)).toBeInstanceOf(Array);
+var s = new SecondLevel(4);
+expect(s).toHaveLength(1);
+expect(s[0]).toBe(4);
+expect(s.push(5)).toBe(s);
+expect(s).toHaveLength(2);
+expect(s.join()).toBe('4,5');
+expect(s.method()).toBe(s);`,
     modes: [
       {
         title: 'default',
@@ -856,15 +1912,52 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[30],
       },
     ],
   },
   {
     title: 'extend builtins — overwritten null (exec)',
-    source:
-      'var env = {\n  Array: null,\n};\n\n// We need to use "with" to avoid leaking the modified Array to other tests.\nwith (env) {\n  class List extends Array {}\n  expect(List.prototype.__proto__).toBeUndefined();\n}\n',
+    source: `var env = {
+  Array: null,
+};
+
+// We need to use "with" to avoid leaking the modified Array to other tests.
+with (env) {
+  class List extends Array {}
+  expect(List.prototype.__proto__).toBeUndefined();
+}
+`,
     filename: 'exec.js',
+    output: `var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+var env = { Array: null };
+// We need to use "with" to avoid leaking the modified Array to other tests.
+with (env) {
+  let List = (__nox_super_123_150 => {
+    'use strict';
+    const List = function List() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+      var _this = _construct(Object.getPrototypeOf(List), arguments, new.target || List);
+      return _this;
+    };
+    if (__nox_super_123_150 !== null && typeof __nox_super_123_150 !== 'function')
+      throw new TypeError('Super expression must either be null or a function');
+    List.prototype = Object.create(__nox_super_123_150 && __nox_super_123_150.prototype, {
+      constructor: {
+        value: List,
+        writable: true,
+        configurable: true,
+      },
+    });
+    if (Object.setPrototypeOf) Object.setPrototypeOf(List, __nox_super_123_150);
+    else List.__proto__ = __nox_super_123_150;
+    Object.defineProperty(List, 'prototype', { writable: false });
+    return List;
+  })(Array);
+  expect(List.prototype.__proto__).toBeUndefined();
+}`,
     modes: [
       {
         title: 'default',
@@ -878,14 +1971,48 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[31],
       },
     ],
   },
   {
     title: 'extend builtins — shadowed (input)',
-    source: 'class Array {}\n\nclass List extends Array {}',
+    source: `class Array {}
+
+class List extends Array {}`,
     filename: 'input.js',
+    output: `var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+let Array = (() => {
+  'use strict';
+  const Array = function Array() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Array, 'prototype', { writable: false });
+  return Array;
+})();
+let List = (__nox_super_16_43 => {
+  'use strict';
+  const List = function List() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(List), arguments, new.target || List);
+    return _this;
+  };
+  if (__nox_super_16_43 !== null && typeof __nox_super_16_43 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  List.prototype = Object.create(__nox_super_16_43 && __nox_super_16_43.prototype, {
+    constructor: {
+      value: List,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(List, __nox_super_16_43);
+  else List.__proto__ = __nox_super_16_43;
+  Object.defineProperty(List, 'prototype', { writable: false });
+  return List;
+})(Array);`,
     modes: [
       {
         title: 'default',
@@ -899,15 +2026,64 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[32],
       },
     ],
   },
   {
     title: 'extend builtins — super called (exec)',
-    source:
-      'var called = false;\n\nvar env = {\n  Array: function Array() {\n    called = true;\n  }\n};\n\n// We need to use "with" to avoid leaking the modified Array to other tests.\nwith (env) {\n  class List extends Array {};\n  new List();\n\n  expect(called).toBe(true);\n}\n',
+    source: `var called = false;
+
+var env = {
+  Array: function Array() {
+    called = true;
+  }
+};
+
+// We need to use "with" to avoid leaking the modified Array to other tests.
+with (env) {
+  class List extends Array {};
+  new List();
+
+  expect(called).toBe(true);
+}
+`,
     filename: 'exec.js',
+    output: `var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+var called = false;
+var env = {
+  Array: function Array() {
+    called = true;
+  },
+};
+// We need to use "with" to avoid leaking the modified Array to other tests.
+with (env) {
+  let List = (__nox_super_180_207 => {
+    'use strict';
+    const List = function List() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+      var _this = _construct(Object.getPrototypeOf(List), arguments, new.target || List);
+      return _this;
+    };
+    if (__nox_super_180_207 !== null && typeof __nox_super_180_207 !== 'function')
+      throw new TypeError('Super expression must either be null or a function');
+    List.prototype = Object.create(__nox_super_180_207 && __nox_super_180_207.prototype, {
+      constructor: {
+        value: List,
+        writable: true,
+        configurable: true,
+      },
+    });
+    if (Object.setPrototypeOf) Object.setPrototypeOf(List, __nox_super_180_207);
+    else List.__proto__ = __nox_super_180_207;
+    Object.defineProperty(List, 'prototype', { writable: false });
+    return List;
+  })(Array);
+  new List();
+  expect(called).toBe(true);
+}`,
     modes: [
       {
         title: 'default',
@@ -921,15 +2097,125 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[33],
       },
     ],
   },
   {
     title: 'extend builtins — wrap native super (exec)',
-    source:
-      "// basic sanity check to confirm the external wrapNativeSuper helper works\n\nclass Test1 extends Array {\n  name() {\n    return 'test1';\n  }\n}\n\nclass Test2 extends Array {\n  name() {\n    return 'test2';\n  }\n}\n\nvar t1 = new Test1();\nvar t2 = new Test2();\n\nexpect(Test1).not.toBe(Test2);\nexpect(t1).not.toBe(t2);\nexpect(t1.name()).toBe('test1');\nexpect(t2.name()).toBe('test2');\nexpect(t1).toBeInstanceOf(Test1);\nexpect(t2).toBeInstanceOf(Test2);\nexpect(t1).toBeInstanceOf(Array);\nexpect(t2).toBeInstanceOf(Array);\n",
+    source: `// basic sanity check to confirm the external wrapNativeSuper helper works
+
+class Test1 extends Array {
+  name() {
+    return 'test1';
+  }
+}
+
+class Test2 extends Array {
+  name() {
+    return 'test2';
+  }
+}
+
+var t1 = new Test1();
+var t2 = new Test2();
+
+expect(Test1).not.toBe(Test2);
+expect(t1).not.toBe(t2);
+expect(t1.name()).toBe('test1');
+expect(t2.name()).toBe('test2');
+expect(t1).toBeInstanceOf(Test1);
+expect(t2).toBeInstanceOf(Test2);
+expect(t1).toBeInstanceOf(Array);
+expect(t2).toBeInstanceOf(Array);
+`,
     filename: 'exec.js',
+    output: `var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+// basic sanity check to confirm the external wrapNativeSuper helper works
+let Test1 = (__nox_super_76_140 => {
+  'use strict';
+  const Test1 = function Test1() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(Test1), arguments, new.target || Test1);
+    return _this;
+  };
+  if (__nox_super_76_140 !== null && typeof __nox_super_76_140 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Test1.prototype = Object.create(__nox_super_76_140 && __nox_super_76_140.prototype, {
+    constructor: {
+      value: Test1,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Test1, __nox_super_76_140);
+  else Test1.__proto__ = __nox_super_76_140;
+  Object.defineProperty(Test1.prototype, 'name', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return 'test1';
+      },
+      'name',
+      {
+        value: 'name',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Test1, 'prototype', { writable: false });
+  return Test1;
+})(Array);
+let Test2 = (__nox_super_142_206 => {
+  'use strict';
+  const Test2 = function Test2() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(Test2), arguments, new.target || Test2);
+    return _this;
+  };
+  if (__nox_super_142_206 !== null && typeof __nox_super_142_206 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Test2.prototype = Object.create(__nox_super_142_206 && __nox_super_142_206.prototype, {
+    constructor: {
+      value: Test2,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Test2, __nox_super_142_206);
+  else Test2.__proto__ = __nox_super_142_206;
+  Object.defineProperty(Test2.prototype, 'name', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return 'test2';
+      },
+      'name',
+      {
+        value: 'name',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Test2, 'prototype', { writable: false });
+  return Test2;
+})(Array);
+var t1 = new Test1();
+var t2 = new Test2();
+expect(Test1).not.toBe(Test2);
+expect(t1).not.toBe(t2);
+expect(t1.name()).toBe('test1');
+expect(t2.name()).toBe('test2');
+expect(t1).toBeInstanceOf(Test1);
+expect(t2).toBeInstanceOf(Test2);
+expect(t1).toBeInstanceOf(Array);
+expect(t2).toBeInstanceOf(Array);`,
     modes: [
       {
         title: 'default',
@@ -943,15 +2229,127 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[34],
       },
     ],
   },
   {
     title: 'get set loose — call semantics data defined on parent (exec)',
-    source:
-      '"use strict";\nclass Base {\n  test(...args) {\n    expect(this).toBe(obj);\n    expect(args).toEqual([1, 2, 3]);\n    return 1;\n  }\n}\n\nclass Obj extends Base {\n  call() {\n    super.test(1, 2, 3);\n    super.test(1, ...[2, 3]);\n    super.test(...[1, 2, 3]);\n    return super.test(...arguments);\n  }\n\n  test() {\n    throw new Error("called");\n  }\n}\n\nconst obj = new Obj();\nexpect(obj.call(1, 2, 3)).toBe(1);\n',
+    source: `"use strict";
+class Base {
+  test(...args) {
+    expect(this).toBe(obj);
+    expect(args).toEqual([1, 2, 3]);
+    return 1;
+  }
+}
+
+class Obj extends Base {
+  call() {
+    super.test(1, 2, 3);
+    super.test(1, ...[2, 3]);
+    super.test(...[1, 2, 3]);
+    return super.test(...arguments);
+  }
+
+  test() {
+    throw new Error("called");
+  }
+}
+
+const obj = new Obj();
+expect(obj.call(1, 2, 3)).toBe(1);
+`,
     filename: 'exec.js',
+    output: `'use strict';
+var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+var _get2 = { get: require('@babel/runtime/helpers/get') };
+function _get(e, t, r) {
+  return _get2.get(e, t, r);
+}
+let Base = (() => {
+  'use strict';
+  const Base = function Base() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Base.prototype, 'test', {
+    value: Object.defineProperty(
+      function (...args) {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        expect(this).toBe(obj);
+        expect(args).toEqual([1, 2, 3]);
+        return 1;
+      },
+      'name',
+      {
+        value: 'test',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Base, 'prototype', { writable: false });
+  return Base;
+})();
+let Obj = (__nox_super_131_341 => {
+  'use strict';
+  const Obj = function Obj() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(Obj), arguments, new.target || Obj);
+    return _this;
+  };
+  if (__nox_super_131_341 !== null && typeof __nox_super_131_341 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Obj.prototype = Object.create(__nox_super_131_341 && __nox_super_131_341.prototype, {
+    constructor: {
+      value: Obj,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Obj, __nox_super_131_341);
+  else Obj.__proto__ = __nox_super_131_341;
+  Object.defineProperty(Obj.prototype, 'call', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        _get(Object.getPrototypeOf(Obj.prototype), 'test', this).call(this, 1, 2, 3);
+        _get(Object.getPrototypeOf(Obj.prototype), 'test', this).call(this, 1, ...[2, 3]);
+        _get(Object.getPrototypeOf(Obj.prototype), 'test', this).call(this, ...[1, 2, 3]);
+        return _get(Object.getPrototypeOf(Obj.prototype), 'test', this).call(this, ...arguments);
+      },
+      'name',
+      {
+        value: 'call',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Obj.prototype, 'test', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        throw new Error('called');
+      },
+      'name',
+      {
+        value: 'test',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Obj, 'prototype', { writable: false });
+  return Obj;
+})(Base);
+const obj = new Obj();
+expect(obj.call(1, 2, 3)).toBe(1);`,
     modes: [
       {
         title: 'default',
@@ -965,15 +2363,127 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[35],
       },
     ],
   },
   {
     title: 'get set loose — call semantics data defined on parent (input)',
-    source:
-      '"use strict";\nclass Base {\n  test(...args) {\n    expect(this).toBe(obj);\n    expect(args).toEqual([1, 2, 3]);\n    return 1;\n  }\n}\n\nclass Obj extends Base {\n  call() {\n    super.test(1, 2, 3);\n    super.test(1, ...[2, 3]);\n    super.test(...[1, 2, 3]);\n    return super.test(...arguments);\n  }\n\n  test() {\n    throw new Error("called");\n  }\n}\n\nconst obj = new Obj();\nexpect(obj.call(1, 2, 3)).toBe(1);\n',
+    source: `"use strict";
+class Base {
+  test(...args) {
+    expect(this).toBe(obj);
+    expect(args).toEqual([1, 2, 3]);
+    return 1;
+  }
+}
+
+class Obj extends Base {
+  call() {
+    super.test(1, 2, 3);
+    super.test(1, ...[2, 3]);
+    super.test(...[1, 2, 3]);
+    return super.test(...arguments);
+  }
+
+  test() {
+    throw new Error("called");
+  }
+}
+
+const obj = new Obj();
+expect(obj.call(1, 2, 3)).toBe(1);
+`,
     filename: 'input.js',
+    output: `'use strict';
+var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+var _get2 = { get: require('@babel/runtime/helpers/get') };
+function _get(e, t, r) {
+  return _get2.get(e, t, r);
+}
+let Base = (() => {
+  'use strict';
+  const Base = function Base() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Base.prototype, 'test', {
+    value: Object.defineProperty(
+      function (...args) {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        expect(this).toBe(obj);
+        expect(args).toEqual([1, 2, 3]);
+        return 1;
+      },
+      'name',
+      {
+        value: 'test',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Base, 'prototype', { writable: false });
+  return Base;
+})();
+let Obj = (__nox_super_131_341 => {
+  'use strict';
+  const Obj = function Obj() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(Obj), arguments, new.target || Obj);
+    return _this;
+  };
+  if (__nox_super_131_341 !== null && typeof __nox_super_131_341 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Obj.prototype = Object.create(__nox_super_131_341 && __nox_super_131_341.prototype, {
+    constructor: {
+      value: Obj,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Obj, __nox_super_131_341);
+  else Obj.__proto__ = __nox_super_131_341;
+  Object.defineProperty(Obj.prototype, 'call', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        _get(Object.getPrototypeOf(Obj.prototype), 'test', this).call(this, 1, 2, 3);
+        _get(Object.getPrototypeOf(Obj.prototype), 'test', this).call(this, 1, ...[2, 3]);
+        _get(Object.getPrototypeOf(Obj.prototype), 'test', this).call(this, ...[1, 2, 3]);
+        return _get(Object.getPrototypeOf(Obj.prototype), 'test', this).call(this, ...arguments);
+      },
+      'name',
+      {
+        value: 'call',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Obj.prototype, 'test', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        throw new Error('called');
+      },
+      'name',
+      {
+        value: 'test',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Obj, 'prototype', { writable: false });
+  return Obj;
+})(Base);
+const obj = new Obj();
+expect(obj.call(1, 2, 3)).toBe(1);`,
     modes: [
       {
         title: 'default',
@@ -987,15 +2497,132 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[35],
       },
     ],
   },
   {
     title: 'get set loose — call semantics getter defined on parent (exec)',
-    source:
-      '"use strict";\nclass Base {\n  get test() {\n    // This is incorrect according to the spec,\n    // but close enough for loose.\n    expect(this).toBe(Base.prototype);\n\n    return function(...args) {\n      expect(this).toBe(obj);\n      expect(args).toEqual([1, 2, 3]);\n      return 1;\n    };\n  }\n}\n\nclass Obj extends Base {\n  call() {\n    super.test(1, 2, 3);\n    super.test(1, ...[2, 3]);\n    super.test(...[1, 2, 3]);\n    return super.test(...arguments);\n  }\n}\nObject.defineProperty(Obj.prototype, \'test\', {\n  writable: true,\n  configurable: true,\n  value() {\n    throw new Error("called");\n  }\n});\n\nconst obj = new Obj();\nexpect(obj.call(1, 2, 3)).toBe(1);\n',
+    source: `"use strict";
+class Base {
+  get test() {
+    // This is incorrect according to the spec,
+    // but close enough for loose.
+    expect(this).toBe(Base.prototype);
+
+    return function(...args) {
+      expect(this).toBe(obj);
+      expect(args).toEqual([1, 2, 3]);
+      return 1;
+    };
+  }
+}
+
+class Obj extends Base {
+  call() {
+    super.test(1, 2, 3);
+    super.test(1, ...[2, 3]);
+    super.test(...[1, 2, 3]);
+    return super.test(...arguments);
+  }
+}
+Object.defineProperty(Obj.prototype, 'test', {
+  writable: true,
+  configurable: true,
+  value() {
+    throw new Error("called");
+  }
+});
+
+const obj = new Obj();
+expect(obj.call(1, 2, 3)).toBe(1);
+`,
     filename: 'exec.js',
+    output: `'use strict';
+var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+var _get2 = { get: require('@babel/runtime/helpers/get') };
+function _get(e, t, r) {
+  return _get2.get(e, t, r);
+}
+let Base = (() => {
+  'use strict';
+  const Base = function Base() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Base.prototype, 'test', {
+    get: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        // This is incorrect according to the spec,
+        // but close enough for loose.
+        expect(this).toBe(Base.prototype);
+        return function (...args) {
+          expect(this).toBe(obj);
+          expect(args).toEqual([1, 2, 3]);
+          return 1;
+        };
+      },
+      'name',
+      {
+        value: 'get test',
+        configurable: true,
+      },
+    ),
+    configurable: true,
+  });
+  Object.defineProperty(Base, 'prototype', { writable: false });
+  return Base;
+})();
+let Obj = (__nox_super_295_458 => {
+  'use strict';
+  const Obj = function Obj() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(Obj), arguments, new.target || Obj);
+    return _this;
+  };
+  if (__nox_super_295_458 !== null && typeof __nox_super_295_458 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Obj.prototype = Object.create(__nox_super_295_458 && __nox_super_295_458.prototype, {
+    constructor: {
+      value: Obj,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Obj, __nox_super_295_458);
+  else Obj.__proto__ = __nox_super_295_458;
+  Object.defineProperty(Obj.prototype, 'call', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        _get(Object.getPrototypeOf(Obj.prototype), 'test', this).call(this, 1, 2, 3);
+        _get(Object.getPrototypeOf(Obj.prototype), 'test', this).call(this, 1, ...[2, 3]);
+        _get(Object.getPrototypeOf(Obj.prototype), 'test', this).call(this, ...[1, 2, 3]);
+        return _get(Object.getPrototypeOf(Obj.prototype), 'test', this).call(this, ...arguments);
+      },
+      'name',
+      {
+        value: 'call',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Obj, 'prototype', { writable: false });
+  return Obj;
+})(Base);
+Object.defineProperty(Obj.prototype, 'test', {
+  writable: true,
+  configurable: true,
+  value() {
+    throw new Error('called');
+  },
+});
+const obj = new Obj();
+expect(obj.call(1, 2, 3)).toBe(1);`,
     modes: [
       {
         title: 'default',
@@ -1009,15 +2636,137 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[36],
       },
     ],
   },
   {
     title: 'get set loose — call semantics getter defined on parent (input)',
-    source:
-      '"use strict";\nclass Base {\n  get test() {\n    // This is incorrect according to the spec,\n    // but close enough for loose.\n    expect(this).toBe(Base.prototype);\n\n    return function(...args) {\n      expect(this).toBe(obj);\n      expect(args).toEqual([1, 2, 3]);\n      return 1;\n    };\n  }\n}\n\nclass Obj extends Base {\n  call() {\n    super.test(1, 2, 3);\n    super.test(1, ...[2, 3]);\n    super.test(...[1, 2, 3]);\n    return super.test(...arguments);\n  }\n\n  test() {\n    throw new Error("called");\n  }\n}\n\nconst obj = new Obj();\nexpect(obj.call(1, 2, 3)).toBe(1);\n',
+    source: `"use strict";
+class Base {
+  get test() {
+    // This is incorrect according to the spec,
+    // but close enough for loose.
+    expect(this).toBe(Base.prototype);
+
+    return function(...args) {
+      expect(this).toBe(obj);
+      expect(args).toEqual([1, 2, 3]);
+      return 1;
+    };
+  }
+}
+
+class Obj extends Base {
+  call() {
+    super.test(1, 2, 3);
+    super.test(1, ...[2, 3]);
+    super.test(...[1, 2, 3]);
+    return super.test(...arguments);
+  }
+
+  test() {
+    throw new Error("called");
+  }
+}
+
+const obj = new Obj();
+expect(obj.call(1, 2, 3)).toBe(1);
+`,
     filename: 'input.js',
+    output: `'use strict';
+var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+var _get2 = { get: require('@babel/runtime/helpers/get') };
+function _get(e, t, r) {
+  return _get2.get(e, t, r);
+}
+let Base = (() => {
+  'use strict';
+  const Base = function Base() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Base.prototype, 'test', {
+    get: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        // This is incorrect according to the spec,
+        // but close enough for loose.
+        expect(this).toBe(Base.prototype);
+        return function (...args) {
+          expect(this).toBe(obj);
+          expect(args).toEqual([1, 2, 3]);
+          return 1;
+        };
+      },
+      'name',
+      {
+        value: 'get test',
+        configurable: true,
+      },
+    ),
+    configurable: true,
+  });
+  Object.defineProperty(Base, 'prototype', { writable: false });
+  return Base;
+})();
+let Obj = (__nox_super_295_505 => {
+  'use strict';
+  const Obj = function Obj() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(Obj), arguments, new.target || Obj);
+    return _this;
+  };
+  if (__nox_super_295_505 !== null && typeof __nox_super_295_505 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Obj.prototype = Object.create(__nox_super_295_505 && __nox_super_295_505.prototype, {
+    constructor: {
+      value: Obj,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Obj, __nox_super_295_505);
+  else Obj.__proto__ = __nox_super_295_505;
+  Object.defineProperty(Obj.prototype, 'call', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        _get(Object.getPrototypeOf(Obj.prototype), 'test', this).call(this, 1, 2, 3);
+        _get(Object.getPrototypeOf(Obj.prototype), 'test', this).call(this, 1, ...[2, 3]);
+        _get(Object.getPrototypeOf(Obj.prototype), 'test', this).call(this, ...[1, 2, 3]);
+        return _get(Object.getPrototypeOf(Obj.prototype), 'test', this).call(this, ...arguments);
+      },
+      'name',
+      {
+        value: 'call',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Obj.prototype, 'test', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        throw new Error('called');
+      },
+      'name',
+      {
+        value: 'test',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Obj, 'prototype', { writable: false });
+  return Obj;
+})(Base);
+const obj = new Obj();
+expect(obj.call(1, 2, 3)).toBe(1);`,
     modes: [
       {
         title: 'default',
@@ -1031,15 +2780,108 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[37],
       },
     ],
   },
   {
     title: 'get set loose — call semantics not defined on parent (exec)',
-    source:
-      '"use strict";\nclass Base {\n}\n\nclass Obj extends Base {\n  call() {\n    return super.test();\n  }\n\n  test() {\n    throw new Error("gobbledygook");\n  }\n}\n\nconst obj = new Obj();\nexpect(() => {\n  obj.call();\n\n  // Assert that this throws, but that it\'s not\n  // Obj.p.test\'s error that is thrown\n}).toThrow(TypeError)\n',
+    source: `"use strict";
+class Base {
+}
+
+class Obj extends Base {
+  call() {
+    return super.test();
+  }
+
+  test() {
+    throw new Error("gobbledygook");
+  }
+}
+
+const obj = new Obj();
+expect(() => {
+  obj.call();
+
+  // Assert that this throws, but that it's not
+  // Obj.p.test's error that is thrown
+}).toThrow(TypeError)
+`,
     filename: 'exec.js',
+    output: `'use strict';
+var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+var _get2 = { get: require('@babel/runtime/helpers/get') };
+function _get(e, t, r) {
+  return _get2.get(e, t, r);
+}
+let Base = (() => {
+  'use strict';
+  const Base = function Base() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Base, 'prototype', { writable: false });
+  return Base;
+})();
+let Obj = (__nox_super_30_149 => {
+  'use strict';
+  const Obj = function Obj() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(Obj), arguments, new.target || Obj);
+    return _this;
+  };
+  if (__nox_super_30_149 !== null && typeof __nox_super_30_149 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Obj.prototype = Object.create(__nox_super_30_149 && __nox_super_30_149.prototype, {
+    constructor: {
+      value: Obj,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Obj, __nox_super_30_149);
+  else Obj.__proto__ = __nox_super_30_149;
+  Object.defineProperty(Obj.prototype, 'call', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return _get(Object.getPrototypeOf(Obj.prototype), 'test', this).call(this);
+      },
+      'name',
+      {
+        value: 'call',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Obj.prototype, 'test', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        throw new Error('gobbledygook');
+      },
+      'name',
+      {
+        value: 'test',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Obj, 'prototype', { writable: false });
+  return Obj;
+})(Base);
+const obj = new Obj();
+expect(() => {
+  obj.call();
+  // Assert that this throws, but that it's not
+  // Obj.p.test's error that is thrown
+}).toThrow(TypeError);`,
     modes: [
       {
         title: 'default',
@@ -1053,15 +2895,108 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[38],
       },
     ],
   },
   {
     title: 'get set loose — call semantics not defined on parent (input)',
-    source:
-      '"use strict";\nclass Base {\n}\n\nclass Obj extends Base {\n  call() {\n    return super.test();\n  }\n\n  test() {\n    throw new Error("gobbledygook");\n  }\n}\n\nconst obj = new Obj();\nexpect(() => {\n  obj.call();\n\n  // Assert that this throws, but that it\'s not\n  // Obj.p.test\'s error that is thrown\n}).toThrow(TypeError)\n',
+    source: `"use strict";
+class Base {
+}
+
+class Obj extends Base {
+  call() {
+    return super.test();
+  }
+
+  test() {
+    throw new Error("gobbledygook");
+  }
+}
+
+const obj = new Obj();
+expect(() => {
+  obj.call();
+
+  // Assert that this throws, but that it's not
+  // Obj.p.test's error that is thrown
+}).toThrow(TypeError)
+`,
     filename: 'input.js',
+    output: `'use strict';
+var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+var _get2 = { get: require('@babel/runtime/helpers/get') };
+function _get(e, t, r) {
+  return _get2.get(e, t, r);
+}
+let Base = (() => {
+  'use strict';
+  const Base = function Base() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Base, 'prototype', { writable: false });
+  return Base;
+})();
+let Obj = (__nox_super_30_149 => {
+  'use strict';
+  const Obj = function Obj() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(Obj), arguments, new.target || Obj);
+    return _this;
+  };
+  if (__nox_super_30_149 !== null && typeof __nox_super_30_149 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Obj.prototype = Object.create(__nox_super_30_149 && __nox_super_30_149.prototype, {
+    constructor: {
+      value: Obj,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Obj, __nox_super_30_149);
+  else Obj.__proto__ = __nox_super_30_149;
+  Object.defineProperty(Obj.prototype, 'call', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return _get(Object.getPrototypeOf(Obj.prototype), 'test', this).call(this);
+      },
+      'name',
+      {
+        value: 'call',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Obj.prototype, 'test', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        throw new Error('gobbledygook');
+      },
+      'name',
+      {
+        value: 'test',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Obj, 'prototype', { writable: false });
+  return Obj;
+})(Base);
+const obj = new Obj();
+expect(() => {
+  obj.call();
+  // Assert that this throws, but that it's not
+  // Obj.p.test's error that is thrown
+}).toThrow(TypeError);`,
     modes: [
       {
         title: 'default',
@@ -1075,15 +3010,120 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[38],
       },
     ],
   },
   {
     title: 'get set loose — call semantics setter defined on parent (exec)',
-    source:
-      '"use strict";\nclass Base {\n  set test(v) {\n    throw new Error("gobbledygook");\n  }\n}\n\nclass Obj extends Base {\n  call() {\n    return super.test();\n  }\n}\nObject.defineProperty(Obj.prototype, \'test\', {\n  writable: true,\n  configurable: true,\n  value() {\n    throw new Error("gobbledygook");\n  }\n});\n\nconst obj = new Obj();\nexpect(() => {\n  obj.call();\n\n  // Assert that this throws, but that it\'s not\n  // a gobbledygook error that is thrown\n}).toThrow(TypeError)\n',
+    source: `"use strict";
+class Base {
+  set test(v) {
+    throw new Error("gobbledygook");
+  }
+}
+
+class Obj extends Base {
+  call() {
+    return super.test();
+  }
+}
+Object.defineProperty(Obj.prototype, 'test', {
+  writable: true,
+  configurable: true,
+  value() {
+    throw new Error("gobbledygook");
+  }
+});
+
+const obj = new Obj();
+expect(() => {
+  obj.call();
+
+  // Assert that this throws, but that it's not
+  // a gobbledygook error that is thrown
+}).toThrow(TypeError)
+`,
     filename: 'exec.js',
+    output: `'use strict';
+var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+var _get2 = { get: require('@babel/runtime/helpers/get') };
+function _get(e, t, r) {
+  return _get2.get(e, t, r);
+}
+let Base = (() => {
+  'use strict';
+  const Base = function Base() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Base.prototype, 'test', {
+    set: Object.defineProperty(
+      function (v) {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        throw new Error('gobbledygook');
+      },
+      'name',
+      {
+        value: 'set test',
+        configurable: true,
+      },
+    ),
+    configurable: true,
+  });
+  Object.defineProperty(Base, 'prototype', { writable: false });
+  return Base;
+})();
+let Obj = (__nox_super_87_153 => {
+  'use strict';
+  const Obj = function Obj() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(Obj), arguments, new.target || Obj);
+    return _this;
+  };
+  if (__nox_super_87_153 !== null && typeof __nox_super_87_153 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Obj.prototype = Object.create(__nox_super_87_153 && __nox_super_87_153.prototype, {
+    constructor: {
+      value: Obj,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Obj, __nox_super_87_153);
+  else Obj.__proto__ = __nox_super_87_153;
+  Object.defineProperty(Obj.prototype, 'call', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return _get(Object.getPrototypeOf(Obj.prototype), 'test', this).call(this);
+      },
+      'name',
+      {
+        value: 'call',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Obj, 'prototype', { writable: false });
+  return Obj;
+})(Base);
+Object.defineProperty(Obj.prototype, 'test', {
+  writable: true,
+  configurable: true,
+  value() {
+    throw new Error('gobbledygook');
+  },
+});
+const obj = new Obj();
+expect(() => {
+  obj.call();
+  // Assert that this throws, but that it's not
+  // a gobbledygook error that is thrown
+}).toThrow(TypeError);`,
     modes: [
       {
         title: 'default',
@@ -1097,15 +3137,125 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[39],
       },
     ],
   },
   {
     title: 'get set loose — call semantics setter defined on parent (input)',
-    source:
-      '"use strict";\nclass Base {\n  set test(v) {\n    throw new Error("gobbledygook");\n  }\n}\n\nclass Obj extends Base {\n  call() {\n    return super.test();\n  }\n\n  test() {\n    throw new Error("gobbledygook");\n  }\n}\n\nconst obj = new Obj();\nexpect(() => {\n  obj.call();\n\n  // Assert that this throws, but that it\'s not\n  // a gobbledygook error that is thrown\n}).toThrow(TypeError)\n',
+    source: `"use strict";
+class Base {
+  set test(v) {
+    throw new Error("gobbledygook");
+  }
+}
+
+class Obj extends Base {
+  call() {
+    return super.test();
+  }
+
+  test() {
+    throw new Error("gobbledygook");
+  }
+}
+
+const obj = new Obj();
+expect(() => {
+  obj.call();
+
+  // Assert that this throws, but that it's not
+  // a gobbledygook error that is thrown
+}).toThrow(TypeError)
+`,
     filename: 'input.js',
+    output: `'use strict';
+var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+var _get2 = { get: require('@babel/runtime/helpers/get') };
+function _get(e, t, r) {
+  return _get2.get(e, t, r);
+}
+let Base = (() => {
+  'use strict';
+  const Base = function Base() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Base.prototype, 'test', {
+    set: Object.defineProperty(
+      function (v) {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        throw new Error('gobbledygook');
+      },
+      'name',
+      {
+        value: 'set test',
+        configurable: true,
+      },
+    ),
+    configurable: true,
+  });
+  Object.defineProperty(Base, 'prototype', { writable: false });
+  return Base;
+})();
+let Obj = (__nox_super_87_206 => {
+  'use strict';
+  const Obj = function Obj() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(Obj), arguments, new.target || Obj);
+    return _this;
+  };
+  if (__nox_super_87_206 !== null && typeof __nox_super_87_206 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Obj.prototype = Object.create(__nox_super_87_206 && __nox_super_87_206.prototype, {
+    constructor: {
+      value: Obj,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Obj, __nox_super_87_206);
+  else Obj.__proto__ = __nox_super_87_206;
+  Object.defineProperty(Obj.prototype, 'call', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return _get(Object.getPrototypeOf(Obj.prototype), 'test', this).call(this);
+      },
+      'name',
+      {
+        value: 'call',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Obj.prototype, 'test', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        throw new Error('gobbledygook');
+      },
+      'name',
+      {
+        value: 'test',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Obj, 'prototype', { writable: false });
+  return Obj;
+})(Base);
+const obj = new Obj();
+expect(() => {
+  obj.call();
+  // Assert that this throws, but that it's not
+  // a gobbledygook error that is thrown
+}).toThrow(TypeError);`,
     modes: [
       {
         title: 'default',
@@ -1119,15 +3269,102 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[40],
       },
     ],
   },
   {
     title: 'get set loose — get semantics data defined on parent (exec)',
-    source:
-      "\"use strict\";\nclass Base {\n}\nObject.defineProperty(Base.prototype, 'test', {\n  value: 1,\n  writable: true,\n  configurable: true,\n});\n\nclass Obj extends Base {\n  get() {\n    return super.test;\n  }\n}\nObject.defineProperty(Obj.prototype, 'test', {\n  value: 2,\n  writable: true,\n  configurable: true,\n});\n\nconst obj = new Obj();\nexpect(obj.test).toBe(2);\nexpect(obj.get()).toBe(1);\n",
+    source: `"use strict";
+class Base {
+}
+Object.defineProperty(Base.prototype, 'test', {
+  value: 1,
+  writable: true,
+  configurable: true,
+});
+
+class Obj extends Base {
+  get() {
+    return super.test;
+  }
+}
+Object.defineProperty(Obj.prototype, 'test', {
+  value: 2,
+  writable: true,
+  configurable: true,
+});
+
+const obj = new Obj();
+expect(obj.test).toBe(2);
+expect(obj.get()).toBe(1);
+`,
     filename: 'exec.js',
+    output: `'use strict';
+var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+var _get2 = { get: require('@babel/runtime/helpers/get') };
+function _get(e, t, r) {
+  return _get2.get(e, t, r);
+}
+let Base = (() => {
+  'use strict';
+  const Base = function Base() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Base, 'prototype', { writable: false });
+  return Base;
+})();
+Object.defineProperty(Base.prototype, 'test', {
+  value: 1,
+  writable: true,
+  configurable: true,
+});
+let Obj = (__nox_super_134_197 => {
+  'use strict';
+  const Obj = function Obj() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(Obj), arguments, new.target || Obj);
+    return _this;
+  };
+  if (__nox_super_134_197 !== null && typeof __nox_super_134_197 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Obj.prototype = Object.create(__nox_super_134_197 && __nox_super_134_197.prototype, {
+    constructor: {
+      value: Obj,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Obj, __nox_super_134_197);
+  else Obj.__proto__ = __nox_super_134_197;
+  Object.defineProperty(Obj.prototype, 'get', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return _get(Object.getPrototypeOf(Obj.prototype), 'test', this);
+      },
+      'name',
+      {
+        value: 'get',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Obj, 'prototype', { writable: false });
+  return Obj;
+})(Base);
+Object.defineProperty(Obj.prototype, 'test', {
+  value: 2,
+  writable: true,
+  configurable: true,
+});
+const obj = new Obj();
+expect(obj.test).toBe(2);
+expect(obj.get()).toBe(1);`,
     modes: [
       {
         title: 'default',
@@ -1141,15 +3378,86 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[41],
       },
     ],
   },
   {
     title: 'get set loose — get semantics data defined on parent (input)',
-    source:
-      '"use strict";\nclass Base {\n}\nBase.prototype.test = 1;\n\nclass Obj extends Base {\n  get() {\n    return super.test;\n  }\n}\nObj.prototype.test = 2;\n\nconst obj = new Obj();\nexpect(obj.test).toBe(2);\nexpect(obj.get()).toBe(1);\n',
+    source: `"use strict";
+class Base {
+}
+Base.prototype.test = 1;
+
+class Obj extends Base {
+  get() {
+    return super.test;
+  }
+}
+Obj.prototype.test = 2;
+
+const obj = new Obj();
+expect(obj.test).toBe(2);
+expect(obj.get()).toBe(1);
+`,
     filename: 'input.js',
+    output: `'use strict';
+var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+var _get2 = { get: require('@babel/runtime/helpers/get') };
+function _get(e, t, r) {
+  return _get2.get(e, t, r);
+}
+let Base = (() => {
+  'use strict';
+  const Base = function Base() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Base, 'prototype', { writable: false });
+  return Base;
+})();
+Base.prototype.test = 1;
+let Obj = (__nox_super_55_118 => {
+  'use strict';
+  const Obj = function Obj() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(Obj), arguments, new.target || Obj);
+    return _this;
+  };
+  if (__nox_super_55_118 !== null && typeof __nox_super_55_118 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Obj.prototype = Object.create(__nox_super_55_118 && __nox_super_55_118.prototype, {
+    constructor: {
+      value: Obj,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Obj, __nox_super_55_118);
+  else Obj.__proto__ = __nox_super_55_118;
+  Object.defineProperty(Obj.prototype, 'get', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return _get(Object.getPrototypeOf(Obj.prototype), 'test', this);
+      },
+      'name',
+      {
+        value: 'get',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Obj, 'prototype', { writable: false });
+  return Obj;
+})(Base);
+Obj.prototype.test = 2;
+const obj = new Obj();
+expect(obj.test).toBe(2);
+expect(obj.get()).toBe(1);`,
     modes: [
       {
         title: 'default',
@@ -1163,15 +3471,115 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[42],
       },
     ],
   },
   {
     title: 'get set loose — get semantics getter defined on parent (exec)',
-    source:
-      '"use strict";\nclass Base {\n  get test() {\n    // This is incorrect according to the spec,\n    // but close enough for loose.\n    expect(this).toBe(Base.prototype);\n    return 1;\n  }\n}\n\nclass Obj extends Base {\n  get() {\n    return super.test;\n  }\n}\nObject.defineProperty(Obj.prototype, \'test\', {\n  value: 2,\n  writable: true,\n  configurable: true,\n});\n\nconst obj = new Obj();\nexpect(obj.test).toBe(2);\nexpect(obj.get()).toBe(1);\n',
+    source: `"use strict";
+class Base {
+  get test() {
+    // This is incorrect according to the spec,
+    // but close enough for loose.
+    expect(this).toBe(Base.prototype);
+    return 1;
+  }
+}
+
+class Obj extends Base {
+  get() {
+    return super.test;
+  }
+}
+Object.defineProperty(Obj.prototype, 'test', {
+  value: 2,
+  writable: true,
+  configurable: true,
+});
+
+const obj = new Obj();
+expect(obj.test).toBe(2);
+expect(obj.get()).toBe(1);
+`,
     filename: 'exec.js',
+    output: `'use strict';
+var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+var _get2 = { get: require('@babel/runtime/helpers/get') };
+function _get(e, t, r) {
+  return _get2.get(e, t, r);
+}
+let Base = (() => {
+  'use strict';
+  const Base = function Base() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Base.prototype, 'test', {
+    get: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        // This is incorrect according to the spec,
+        // but close enough for loose.
+        expect(this).toBe(Base.prototype);
+        return 1;
+      },
+      'name',
+      {
+        value: 'get test',
+        configurable: true,
+      },
+    ),
+    configurable: true,
+  });
+  Object.defineProperty(Base, 'prototype', { writable: false });
+  return Base;
+})();
+let Obj = (__nox_super_185_248 => {
+  'use strict';
+  const Obj = function Obj() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(Obj), arguments, new.target || Obj);
+    return _this;
+  };
+  if (__nox_super_185_248 !== null && typeof __nox_super_185_248 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Obj.prototype = Object.create(__nox_super_185_248 && __nox_super_185_248.prototype, {
+    constructor: {
+      value: Obj,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Obj, __nox_super_185_248);
+  else Obj.__proto__ = __nox_super_185_248;
+  Object.defineProperty(Obj.prototype, 'get', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return _get(Object.getPrototypeOf(Obj.prototype), 'test', this);
+      },
+      'name',
+      {
+        value: 'get',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Obj, 'prototype', { writable: false });
+  return Obj;
+})(Base);
+Object.defineProperty(Obj.prototype, 'test', {
+  value: 2,
+  writable: true,
+  configurable: true,
+});
+const obj = new Obj();
+expect(obj.test).toBe(2);
+expect(obj.get()).toBe(1);`,
     modes: [
       {
         title: 'default',
@@ -1185,15 +3593,115 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[43],
       },
     ],
   },
   {
     title: 'get set loose — get semantics getter defined on parent (input)',
-    source:
-      '"use strict";\nclass Base {\n  get test() {\n    // This is incorrect according to the spec,\n    // but close enough for loose.\n    expect(this).toBe(Base.prototype);\n    return 1;\n  }\n}\n\nclass Obj extends Base {\n  get() {\n    return super.test;\n  }\n}\nObject.defineProperty(Obj.prototype, \'test\', {\n  value: 2,\n  writable: true,\n  configurable: true,\n});\n\nconst obj = new Obj();\nexpect(obj.test).toBe(2);\nexpect(obj.get()).toBe(1);\n',
+    source: `"use strict";
+class Base {
+  get test() {
+    // This is incorrect according to the spec,
+    // but close enough for loose.
+    expect(this).toBe(Base.prototype);
+    return 1;
+  }
+}
+
+class Obj extends Base {
+  get() {
+    return super.test;
+  }
+}
+Object.defineProperty(Obj.prototype, 'test', {
+  value: 2,
+  writable: true,
+  configurable: true,
+});
+
+const obj = new Obj();
+expect(obj.test).toBe(2);
+expect(obj.get()).toBe(1);
+`,
     filename: 'input.js',
+    output: `'use strict';
+var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+var _get2 = { get: require('@babel/runtime/helpers/get') };
+function _get(e, t, r) {
+  return _get2.get(e, t, r);
+}
+let Base = (() => {
+  'use strict';
+  const Base = function Base() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Base.prototype, 'test', {
+    get: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        // This is incorrect according to the spec,
+        // but close enough for loose.
+        expect(this).toBe(Base.prototype);
+        return 1;
+      },
+      'name',
+      {
+        value: 'get test',
+        configurable: true,
+      },
+    ),
+    configurable: true,
+  });
+  Object.defineProperty(Base, 'prototype', { writable: false });
+  return Base;
+})();
+let Obj = (__nox_super_185_248 => {
+  'use strict';
+  const Obj = function Obj() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(Obj), arguments, new.target || Obj);
+    return _this;
+  };
+  if (__nox_super_185_248 !== null && typeof __nox_super_185_248 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Obj.prototype = Object.create(__nox_super_185_248 && __nox_super_185_248.prototype, {
+    constructor: {
+      value: Obj,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Obj, __nox_super_185_248);
+  else Obj.__proto__ = __nox_super_185_248;
+  Object.defineProperty(Obj.prototype, 'get', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return _get(Object.getPrototypeOf(Obj.prototype), 'test', this);
+      },
+      'name',
+      {
+        value: 'get',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Obj, 'prototype', { writable: false });
+  return Obj;
+})(Base);
+Object.defineProperty(Obj.prototype, 'test', {
+  value: 2,
+  writable: true,
+  configurable: true,
+});
+const obj = new Obj();
+expect(obj.test).toBe(2);
+expect(obj.get()).toBe(1);`,
     modes: [
       {
         title: 'default',
@@ -1207,15 +3715,92 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[43],
       },
     ],
   },
   {
     title: 'get set loose — get semantics not defined on parent (exec)',
-    source:
-      '"use strict";\nclass Base {\n}\n\nclass Obj extends Base {\n  get() {\n    return super.test;\n  }\n}\nObject.defineProperty(Obj.prototype, \'test\', {\n  value: 2,\n  writable: true,\n  configurable: true,\n});\n\nconst obj = new Obj();\nexpect(obj.test).toBe(2);\nexpect(obj.get()).toBeUndefined();\n',
+    source: `"use strict";
+class Base {
+}
+
+class Obj extends Base {
+  get() {
+    return super.test;
+  }
+}
+Object.defineProperty(Obj.prototype, 'test', {
+  value: 2,
+  writable: true,
+  configurable: true,
+});
+
+const obj = new Obj();
+expect(obj.test).toBe(2);
+expect(obj.get()).toBeUndefined();
+`,
     filename: 'exec.js',
+    output: `'use strict';
+var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+var _get2 = { get: require('@babel/runtime/helpers/get') };
+function _get(e, t, r) {
+  return _get2.get(e, t, r);
+}
+let Base = (() => {
+  'use strict';
+  const Base = function Base() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Base, 'prototype', { writable: false });
+  return Base;
+})();
+let Obj = (__nox_super_30_93 => {
+  'use strict';
+  const Obj = function Obj() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(Obj), arguments, new.target || Obj);
+    return _this;
+  };
+  if (__nox_super_30_93 !== null && typeof __nox_super_30_93 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Obj.prototype = Object.create(__nox_super_30_93 && __nox_super_30_93.prototype, {
+    constructor: {
+      value: Obj,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Obj, __nox_super_30_93);
+  else Obj.__proto__ = __nox_super_30_93;
+  Object.defineProperty(Obj.prototype, 'get', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return _get(Object.getPrototypeOf(Obj.prototype), 'test', this);
+      },
+      'name',
+      {
+        value: 'get',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Obj, 'prototype', { writable: false });
+  return Obj;
+})(Base);
+Object.defineProperty(Obj.prototype, 'test', {
+  value: 2,
+  writable: true,
+  configurable: true,
+});
+const obj = new Obj();
+expect(obj.test).toBe(2);
+expect(obj.get()).toBeUndefined();`,
     modes: [
       {
         title: 'default',
@@ -1229,15 +3814,92 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[44],
       },
     ],
   },
   {
     title: 'get set loose — get semantics not defined on parent (input)',
-    source:
-      '"use strict";\nclass Base {\n}\n\nclass Obj extends Base {\n  get() {\n    return super.test;\n  }\n}\nObject.defineProperty(Obj.prototype, \'test\', {\n  value: 2,\n  writable: true,\n  configurable: true,\n});\n\nconst obj = new Obj();\nexpect(obj.test).toBe(2);\nexpect(obj.get()).toBeUndefined();\n',
+    source: `"use strict";
+class Base {
+}
+
+class Obj extends Base {
+  get() {
+    return super.test;
+  }
+}
+Object.defineProperty(Obj.prototype, 'test', {
+  value: 2,
+  writable: true,
+  configurable: true,
+});
+
+const obj = new Obj();
+expect(obj.test).toBe(2);
+expect(obj.get()).toBeUndefined();
+`,
     filename: 'input.js',
+    output: `'use strict';
+var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+var _get2 = { get: require('@babel/runtime/helpers/get') };
+function _get(e, t, r) {
+  return _get2.get(e, t, r);
+}
+let Base = (() => {
+  'use strict';
+  const Base = function Base() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Base, 'prototype', { writable: false });
+  return Base;
+})();
+let Obj = (__nox_super_30_93 => {
+  'use strict';
+  const Obj = function Obj() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(Obj), arguments, new.target || Obj);
+    return _this;
+  };
+  if (__nox_super_30_93 !== null && typeof __nox_super_30_93 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Obj.prototype = Object.create(__nox_super_30_93 && __nox_super_30_93.prototype, {
+    constructor: {
+      value: Obj,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Obj, __nox_super_30_93);
+  else Obj.__proto__ = __nox_super_30_93;
+  Object.defineProperty(Obj.prototype, 'get', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return _get(Object.getPrototypeOf(Obj.prototype), 'test', this);
+      },
+      'name',
+      {
+        value: 'get',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Obj, 'prototype', { writable: false });
+  return Obj;
+})(Base);
+Object.defineProperty(Obj.prototype, 'test', {
+  value: 2,
+  writable: true,
+  configurable: true,
+});
+const obj = new Obj();
+expect(obj.test).toBe(2);
+expect(obj.get()).toBeUndefined();`,
     modes: [
       {
         title: 'default',
@@ -1251,15 +3913,109 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[44],
       },
     ],
   },
   {
     title: 'get set loose — get semantics setter defined on parent (exec)',
-    source:
-      '"use strict";\nclass Base {\n  set test(v) {\n    throw new Error("called");\n  }\n}\n\nclass Obj extends Base {\n  get() {\n    return super.test;\n  }\n}\nObject.defineProperty(Obj.prototype, \'test\', {\n  value: 2,\n  writable: true,\n  configurable: true,\n});\n\nconst obj = new Obj();\nexpect(obj.test).toBe(2);\nexpect(obj.get()).toBeUndefined();\n',
+    source: `"use strict";
+class Base {
+  set test(v) {
+    throw new Error("called");
+  }
+}
+
+class Obj extends Base {
+  get() {
+    return super.test;
+  }
+}
+Object.defineProperty(Obj.prototype, 'test', {
+  value: 2,
+  writable: true,
+  configurable: true,
+});
+
+const obj = new Obj();
+expect(obj.test).toBe(2);
+expect(obj.get()).toBeUndefined();
+`,
     filename: 'exec.js',
+    output: `'use strict';
+var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+var _get2 = { get: require('@babel/runtime/helpers/get') };
+function _get(e, t, r) {
+  return _get2.get(e, t, r);
+}
+let Base = (() => {
+  'use strict';
+  const Base = function Base() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Base.prototype, 'test', {
+    set: Object.defineProperty(
+      function (v) {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        throw new Error('called');
+      },
+      'name',
+      {
+        value: 'set test',
+        configurable: true,
+      },
+    ),
+    configurable: true,
+  });
+  Object.defineProperty(Base, 'prototype', { writable: false });
+  return Base;
+})();
+let Obj = (__nox_super_81_144 => {
+  'use strict';
+  const Obj = function Obj() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(Obj), arguments, new.target || Obj);
+    return _this;
+  };
+  if (__nox_super_81_144 !== null && typeof __nox_super_81_144 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Obj.prototype = Object.create(__nox_super_81_144 && __nox_super_81_144.prototype, {
+    constructor: {
+      value: Obj,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Obj, __nox_super_81_144);
+  else Obj.__proto__ = __nox_super_81_144;
+  Object.defineProperty(Obj.prototype, 'get', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return _get(Object.getPrototypeOf(Obj.prototype), 'test', this);
+      },
+      'name',
+      {
+        value: 'get',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Obj, 'prototype', { writable: false });
+  return Obj;
+})(Base);
+Object.defineProperty(Obj.prototype, 'test', {
+  value: 2,
+  writable: true,
+  configurable: true,
+});
+const obj = new Obj();
+expect(obj.test).toBe(2);
+expect(obj.get()).toBeUndefined();`,
     modes: [
       {
         title: 'default',
@@ -1273,15 +4029,109 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[45],
       },
     ],
   },
   {
     title: 'get set loose — get semantics setter defined on parent (input)',
-    source:
-      '"use strict";\nclass Base {\n  set test(v) {\n    throw new Error("called");\n  }\n}\n\nclass Obj extends Base {\n  get() {\n    return super.test;\n  }\n}\nObject.defineProperty(Obj.prototype, \'test\', {\n  value: 2,\n  writable: true,\n  configurable: true,\n});\n\nconst obj = new Obj();\nexpect(obj.test).toBe(2);\nexpect(obj.get()).toBeUndefined();\n',
+    source: `"use strict";
+class Base {
+  set test(v) {
+    throw new Error("called");
+  }
+}
+
+class Obj extends Base {
+  get() {
+    return super.test;
+  }
+}
+Object.defineProperty(Obj.prototype, 'test', {
+  value: 2,
+  writable: true,
+  configurable: true,
+});
+
+const obj = new Obj();
+expect(obj.test).toBe(2);
+expect(obj.get()).toBeUndefined();
+`,
     filename: 'input.js',
+    output: `'use strict';
+var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+var _get2 = { get: require('@babel/runtime/helpers/get') };
+function _get(e, t, r) {
+  return _get2.get(e, t, r);
+}
+let Base = (() => {
+  'use strict';
+  const Base = function Base() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Base.prototype, 'test', {
+    set: Object.defineProperty(
+      function (v) {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        throw new Error('called');
+      },
+      'name',
+      {
+        value: 'set test',
+        configurable: true,
+      },
+    ),
+    configurable: true,
+  });
+  Object.defineProperty(Base, 'prototype', { writable: false });
+  return Base;
+})();
+let Obj = (__nox_super_81_144 => {
+  'use strict';
+  const Obj = function Obj() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(Obj), arguments, new.target || Obj);
+    return _this;
+  };
+  if (__nox_super_81_144 !== null && typeof __nox_super_81_144 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Obj.prototype = Object.create(__nox_super_81_144 && __nox_super_81_144.prototype, {
+    constructor: {
+      value: Obj,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Obj, __nox_super_81_144);
+  else Obj.__proto__ = __nox_super_81_144;
+  Object.defineProperty(Obj.prototype, 'get', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return _get(Object.getPrototypeOf(Obj.prototype), 'test', this);
+      },
+      'name',
+      {
+        value: 'get',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Obj, 'prototype', { writable: false });
+  return Obj;
+})(Base);
+Object.defineProperty(Obj.prototype, 'test', {
+  value: 2,
+  writable: true,
+  configurable: true,
+});
+const obj = new Obj();
+expect(obj.test).toBe(2);
+expect(obj.get()).toBeUndefined();`,
     modes: [
       {
         title: 'default',
@@ -1295,15 +4145,163 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[45],
       },
     ],
   },
   {
     title: 'get set loose — memoized assign (exec)',
-    source:
-      '"use strict";\nclass Base {}\nObject.defineProperty(Base.prototype, 0, {\n  value: 0,\n  writable: true,\n  configurable: true,\n});\nObject.defineProperty(Base.prototype, 1, {\n  value: 1,\n  writable: true,\n  configurable: true,\n});\n\nlet i = 0;\nconst proper = {\n  get prop() {\n    return i++;\n  },\n};\n\nclass Obj extends Base {\n  assign() {\n    super[proper.prop] += 1;\n  }\n\n  assign2() {\n    super[i] += 1;\n  }\n}\n\nconst obj = new Obj();\n\nobj.assign();\nexpect(i).toBe(1);\nexpect(obj[0]).toBe(1);\nexpect(obj[1]).toBe(1);\n\nobj.assign2();\nexpect(i).toBe(1);\nexpect(obj[0]).toBe(1);\nexpect(obj[1]).toBe(2);\n',
+    source: `"use strict";
+class Base {}
+Object.defineProperty(Base.prototype, 0, {
+  value: 0,
+  writable: true,
+  configurable: true,
+});
+Object.defineProperty(Base.prototype, 1, {
+  value: 1,
+  writable: true,
+  configurable: true,
+});
+
+let i = 0;
+const proper = {
+  get prop() {
+    return i++;
+  },
+};
+
+class Obj extends Base {
+  assign() {
+    super[proper.prop] += 1;
+  }
+
+  assign2() {
+    super[i] += 1;
+  }
+}
+
+const obj = new Obj();
+
+obj.assign();
+expect(i).toBe(1);
+expect(obj[0]).toBe(1);
+expect(obj[1]).toBe(1);
+
+obj.assign2();
+expect(i).toBe(1);
+expect(obj[0]).toBe(1);
+expect(obj[1]).toBe(2);
+`,
     filename: 'exec.js',
+    output: `'use strict';
+var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+var _superReference2 = {
+  get: require('@babel/runtime/helpers/get'),
+  set: require('@babel/runtime/helpers/set'),
+};
+function _get(e, t, r) {
+  return _superReference2.get(e, t, r);
+}
+function _superReference(e, t, r) {
+  return {
+    get value() {
+      return _superReference2.get(e, t, r);
+    },
+    set value(u) {
+      _superReference2.set(e, t, u, r, !0);
+    },
+  };
+}
+_superReference.set = function (e, t, r, u) {
+  return _superReference2.set(e, t, u, r, !0);
+};
+let Base = (() => {
+  'use strict';
+  const Base = function Base() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Base, 'prototype', { writable: false });
+  return Base;
+})();
+Object.defineProperty(Base.prototype, 0, {
+  value: 0,
+  writable: true,
+  configurable: true,
+});
+Object.defineProperty(Base.prototype, 1, {
+  value: 1,
+  writable: true,
+  configurable: true,
+});
+let i = 0;
+const proper = {
+  get prop() {
+    return i++;
+  },
+};
+let Obj = (__nox_super_295_405 => {
+  'use strict';
+  const Obj = function Obj() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(Obj), arguments, new.target || Obj);
+    return _this;
+  };
+  if (__nox_super_295_405 !== null && typeof __nox_super_295_405 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Obj.prototype = Object.create(__nox_super_295_405 && __nox_super_295_405.prototype, {
+    constructor: {
+      value: Obj,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Obj, __nox_super_295_405);
+  else Obj.__proto__ = __nox_super_295_405;
+  Object.defineProperty(Obj.prototype, 'assign', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        _superReference(Object.getPrototypeOf(Obj.prototype), proper.prop, this).value += 1;
+      },
+      'name',
+      {
+        value: 'assign',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Obj.prototype, 'assign2', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        _superReference(Object.getPrototypeOf(Obj.prototype), i, this).value += 1;
+      },
+      'name',
+      {
+        value: 'assign2',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Obj, 'prototype', { writable: false });
+  return Obj;
+})(Base);
+const obj = new Obj();
+obj.assign();
+expect(i).toBe(1);
+expect(obj[0]).toBe(1);
+expect(obj[1]).toBe(1);
+obj.assign2();
+expect(i).toBe(1);
+expect(obj[0]).toBe(1);
+expect(obj[1]).toBe(2);`,
     modes: [
       {
         title: 'default',
@@ -1317,15 +4315,163 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[46],
       },
     ],
   },
   {
     title: 'get set loose — memoized assign (input)',
-    source:
-      '"use strict";\nclass Base {}\nObject.defineProperty(Base.prototype, 0, {\n  value: 0,\n  writable: true,\n  configurable: true,\n});\nObject.defineProperty(Base.prototype, 1, {\n  value: 1,\n  writable: true,\n  configurable: true,\n});\n\nlet i = 0;\nconst proper = {\n  get prop() {\n    return i++;\n  },\n};\n\nclass Obj extends Base {\n  assign() {\n    super[proper.prop] += 1;\n  }\n\n  assign2() {\n    super[i] += 1;\n  }\n}\n\nconst obj = new Obj();\n\nobj.assign();\nexpect(i).toBe(1);\nexpect(obj[0]).toBe(1);\nexpect(obj[1]).toBe(1);\n\nobj.assign2();\nexpect(i).toBe(1);\nexpect(obj[0]).toBe(1);\nexpect(obj[1]).toBe(2);\n',
+    source: `"use strict";
+class Base {}
+Object.defineProperty(Base.prototype, 0, {
+  value: 0,
+  writable: true,
+  configurable: true,
+});
+Object.defineProperty(Base.prototype, 1, {
+  value: 1,
+  writable: true,
+  configurable: true,
+});
+
+let i = 0;
+const proper = {
+  get prop() {
+    return i++;
+  },
+};
+
+class Obj extends Base {
+  assign() {
+    super[proper.prop] += 1;
+  }
+
+  assign2() {
+    super[i] += 1;
+  }
+}
+
+const obj = new Obj();
+
+obj.assign();
+expect(i).toBe(1);
+expect(obj[0]).toBe(1);
+expect(obj[1]).toBe(1);
+
+obj.assign2();
+expect(i).toBe(1);
+expect(obj[0]).toBe(1);
+expect(obj[1]).toBe(2);
+`,
     filename: 'input.js',
+    output: `'use strict';
+var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+var _superReference2 = {
+  get: require('@babel/runtime/helpers/get'),
+  set: require('@babel/runtime/helpers/set'),
+};
+function _get(e, t, r) {
+  return _superReference2.get(e, t, r);
+}
+function _superReference(e, t, r) {
+  return {
+    get value() {
+      return _superReference2.get(e, t, r);
+    },
+    set value(u) {
+      _superReference2.set(e, t, u, r, !0);
+    },
+  };
+}
+_superReference.set = function (e, t, r, u) {
+  return _superReference2.set(e, t, u, r, !0);
+};
+let Base = (() => {
+  'use strict';
+  const Base = function Base() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Base, 'prototype', { writable: false });
+  return Base;
+})();
+Object.defineProperty(Base.prototype, 0, {
+  value: 0,
+  writable: true,
+  configurable: true,
+});
+Object.defineProperty(Base.prototype, 1, {
+  value: 1,
+  writable: true,
+  configurable: true,
+});
+let i = 0;
+const proper = {
+  get prop() {
+    return i++;
+  },
+};
+let Obj = (__nox_super_295_405 => {
+  'use strict';
+  const Obj = function Obj() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(Obj), arguments, new.target || Obj);
+    return _this;
+  };
+  if (__nox_super_295_405 !== null && typeof __nox_super_295_405 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Obj.prototype = Object.create(__nox_super_295_405 && __nox_super_295_405.prototype, {
+    constructor: {
+      value: Obj,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Obj, __nox_super_295_405);
+  else Obj.__proto__ = __nox_super_295_405;
+  Object.defineProperty(Obj.prototype, 'assign', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        _superReference(Object.getPrototypeOf(Obj.prototype), proper.prop, this).value += 1;
+      },
+      'name',
+      {
+        value: 'assign',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Obj.prototype, 'assign2', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        _superReference(Object.getPrototypeOf(Obj.prototype), i, this).value += 1;
+      },
+      'name',
+      {
+        value: 'assign2',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Obj, 'prototype', { writable: false });
+  return Obj;
+})(Base);
+const obj = new Obj();
+obj.assign();
+expect(i).toBe(1);
+expect(obj[0]).toBe(1);
+expect(obj[1]).toBe(1);
+obj.assign2();
+expect(i).toBe(1);
+expect(obj[0]).toBe(1);
+expect(obj[1]).toBe(2);`,
     modes: [
       {
         title: 'default',
@@ -1339,15 +4485,163 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[46],
       },
     ],
   },
   {
     title: 'get set loose — memoized update (exec)',
-    source:
-      '"use strict";\nclass Base {}\nObject.defineProperty(Base.prototype, 0, {\n  value: 0,\n  writable: true,\n  configurable: true,\n});\nObject.defineProperty(Base.prototype, 1, {\n  value: 1,\n  writable: true,\n  configurable: true,\n});\n\nlet i = 0;\nconst proper = {\n  get prop() {\n    return i++;\n  },\n};\n\nclass Obj extends Base {\n  update() {\n    super[proper.prop]++;\n  }\n\n  update2() {\n    super[i]++;\n  }\n}\n\nconst obj = new Obj();\n\nobj.update();\nexpect(i).toBe(1);\nexpect(obj[0]).toBe(1);\nexpect(obj[1]).toBe(1);\n\nobj.update2();\nexpect(i).toBe(1);\nexpect(obj[0]).toBe(1);\nexpect(obj[1]).toBe(2);\n',
+    source: `"use strict";
+class Base {}
+Object.defineProperty(Base.prototype, 0, {
+  value: 0,
+  writable: true,
+  configurable: true,
+});
+Object.defineProperty(Base.prototype, 1, {
+  value: 1,
+  writable: true,
+  configurable: true,
+});
+
+let i = 0;
+const proper = {
+  get prop() {
+    return i++;
+  },
+};
+
+class Obj extends Base {
+  update() {
+    super[proper.prop]++;
+  }
+
+  update2() {
+    super[i]++;
+  }
+}
+
+const obj = new Obj();
+
+obj.update();
+expect(i).toBe(1);
+expect(obj[0]).toBe(1);
+expect(obj[1]).toBe(1);
+
+obj.update2();
+expect(i).toBe(1);
+expect(obj[0]).toBe(1);
+expect(obj[1]).toBe(2);
+`,
     filename: 'exec.js',
+    output: `'use strict';
+var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+var _superReference2 = {
+  get: require('@babel/runtime/helpers/get'),
+  set: require('@babel/runtime/helpers/set'),
+};
+function _get(e, t, r) {
+  return _superReference2.get(e, t, r);
+}
+function _superReference(e, t, r) {
+  return {
+    get value() {
+      return _superReference2.get(e, t, r);
+    },
+    set value(u) {
+      _superReference2.set(e, t, u, r, !0);
+    },
+  };
+}
+_superReference.set = function (e, t, r, u) {
+  return _superReference2.set(e, t, u, r, !0);
+};
+let Base = (() => {
+  'use strict';
+  const Base = function Base() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Base, 'prototype', { writable: false });
+  return Base;
+})();
+Object.defineProperty(Base.prototype, 0, {
+  value: 0,
+  writable: true,
+  configurable: true,
+});
+Object.defineProperty(Base.prototype, 1, {
+  value: 1,
+  writable: true,
+  configurable: true,
+});
+let i = 0;
+const proper = {
+  get prop() {
+    return i++;
+  },
+};
+let Obj = (__nox_super_295_399 => {
+  'use strict';
+  const Obj = function Obj() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(Obj), arguments, new.target || Obj);
+    return _this;
+  };
+  if (__nox_super_295_399 !== null && typeof __nox_super_295_399 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Obj.prototype = Object.create(__nox_super_295_399 && __nox_super_295_399.prototype, {
+    constructor: {
+      value: Obj,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Obj, __nox_super_295_399);
+  else Obj.__proto__ = __nox_super_295_399;
+  Object.defineProperty(Obj.prototype, 'update', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        _superReference(Object.getPrototypeOf(Obj.prototype), proper.prop, this).value++;
+      },
+      'name',
+      {
+        value: 'update',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Obj.prototype, 'update2', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        _superReference(Object.getPrototypeOf(Obj.prototype), i, this).value++;
+      },
+      'name',
+      {
+        value: 'update2',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Obj, 'prototype', { writable: false });
+  return Obj;
+})(Base);
+const obj = new Obj();
+obj.update();
+expect(i).toBe(1);
+expect(obj[0]).toBe(1);
+expect(obj[1]).toBe(1);
+obj.update2();
+expect(i).toBe(1);
+expect(obj[0]).toBe(1);
+expect(obj[1]).toBe(2);`,
     modes: [
       {
         title: 'default',
@@ -1361,15 +4655,163 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[47],
       },
     ],
   },
   {
     title: 'get set loose — memoized update (input)',
-    source:
-      '"use strict";\nclass Base {}\nObject.defineProperty(Base.prototype, 0, {\n  value: 0,\n  writable: true,\n  configurable: true,\n});\nObject.defineProperty(Base.prototype, 1, {\n  value: 1,\n  writable: true,\n  configurable: true,\n});\n\nlet i = 0;\nconst proper = {\n  get prop() {\n    return i++;\n  },\n};\n\nclass Obj extends Base {\n  update() {\n    super[proper.prop]++;\n  }\n\n  update2() {\n    super[i]++;\n  }\n}\n\nconst obj = new Obj();\n\nobj.update();\nexpect(i).toBe(1);\nexpect(obj[0]).toBe(1);\nexpect(obj[1]).toBe(1);\n\nobj.update2();\nexpect(i).toBe(1);\nexpect(obj[0]).toBe(1);\nexpect(obj[1]).toBe(2);\n',
+    source: `"use strict";
+class Base {}
+Object.defineProperty(Base.prototype, 0, {
+  value: 0,
+  writable: true,
+  configurable: true,
+});
+Object.defineProperty(Base.prototype, 1, {
+  value: 1,
+  writable: true,
+  configurable: true,
+});
+
+let i = 0;
+const proper = {
+  get prop() {
+    return i++;
+  },
+};
+
+class Obj extends Base {
+  update() {
+    super[proper.prop]++;
+  }
+
+  update2() {
+    super[i]++;
+  }
+}
+
+const obj = new Obj();
+
+obj.update();
+expect(i).toBe(1);
+expect(obj[0]).toBe(1);
+expect(obj[1]).toBe(1);
+
+obj.update2();
+expect(i).toBe(1);
+expect(obj[0]).toBe(1);
+expect(obj[1]).toBe(2);
+`,
     filename: 'input.js',
+    output: `'use strict';
+var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+var _superReference2 = {
+  get: require('@babel/runtime/helpers/get'),
+  set: require('@babel/runtime/helpers/set'),
+};
+function _get(e, t, r) {
+  return _superReference2.get(e, t, r);
+}
+function _superReference(e, t, r) {
+  return {
+    get value() {
+      return _superReference2.get(e, t, r);
+    },
+    set value(u) {
+      _superReference2.set(e, t, u, r, !0);
+    },
+  };
+}
+_superReference.set = function (e, t, r, u) {
+  return _superReference2.set(e, t, u, r, !0);
+};
+let Base = (() => {
+  'use strict';
+  const Base = function Base() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Base, 'prototype', { writable: false });
+  return Base;
+})();
+Object.defineProperty(Base.prototype, 0, {
+  value: 0,
+  writable: true,
+  configurable: true,
+});
+Object.defineProperty(Base.prototype, 1, {
+  value: 1,
+  writable: true,
+  configurable: true,
+});
+let i = 0;
+const proper = {
+  get prop() {
+    return i++;
+  },
+};
+let Obj = (__nox_super_295_399 => {
+  'use strict';
+  const Obj = function Obj() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(Obj), arguments, new.target || Obj);
+    return _this;
+  };
+  if (__nox_super_295_399 !== null && typeof __nox_super_295_399 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Obj.prototype = Object.create(__nox_super_295_399 && __nox_super_295_399.prototype, {
+    constructor: {
+      value: Obj,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Obj, __nox_super_295_399);
+  else Obj.__proto__ = __nox_super_295_399;
+  Object.defineProperty(Obj.prototype, 'update', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        _superReference(Object.getPrototypeOf(Obj.prototype), proper.prop, this).value++;
+      },
+      'name',
+      {
+        value: 'update',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Obj.prototype, 'update2', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        _superReference(Object.getPrototypeOf(Obj.prototype), i, this).value++;
+      },
+      'name',
+      {
+        value: 'update2',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Obj, 'prototype', { writable: false });
+  return Obj;
+})(Base);
+const obj = new Obj();
+obj.update();
+expect(i).toBe(1);
+expect(obj[0]).toBe(1);
+expect(obj[1]).toBe(1);
+obj.update2();
+expect(i).toBe(1);
+expect(obj[0]).toBe(1);
+expect(obj[1]).toBe(2);`,
     modes: [
       {
         title: 'default',
@@ -1383,15 +4825,61 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[47],
       },
     ],
   },
   {
     title: 'get set loose — preserve comments (input)',
-    source:
-      'class C {\n  /* before get a */\n  get a() { return 42 }\n  /* after get a */\n\n  /* before set a */\n  set a(v) {}\n  /* after set a */\n}\n',
+    source: `class C {
+  /* before get a */
+  get a() { return 42 }
+  /* after get a */
+
+  /* before set a */
+  set a(v) {}
+  /* after set a */
+}
+`,
     filename: 'input.js',
+    output: `let C = (() => {
+  'use strict';
+  const C = function C() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(C.prototype, 'a', {
+    get: Object.defineProperty(
+      function () {
+        /* before get a */
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return 42;
+      },
+      'name',
+      {
+        value: 'get a',
+        configurable: true,
+      },
+    ),
+    configurable: true,
+  });
+  Object.defineProperty(C.prototype, 'a', {
+    set: Object.defineProperty(
+      function (v) {
+        /* after get a */
+        /* before set a */
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      },
+      'name',
+      {
+        value: 'set a',
+        configurable: true,
+      },
+    ),
+    configurable: true,
+  });
+  Object.defineProperty(C, 'prototype', { writable: false });
+  return C;
+  /* after set a */
+})();`,
     modes: [
       {
         title: 'default',
@@ -1405,15 +4893,108 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[48],
       },
     ],
   },
   {
     title: 'get set loose — set semantics data defined on parent (exec)',
-    source:
-      "\"use strict\";\nclass Base  {\n}\nObject.defineProperty(Base.prototype, 'test', {\n  value: 1,\n  writable: true,\n  configurable: true,\n});\n\nclass Obj extends Base {\n  set() {\n    return super.test = 3;\n  }\n}\nObject.defineProperty(Obj.prototype, 'test', {\n  value: 2,\n  writable: true,\n  configurable: true,\n});\n\nconst obj = new Obj();\nexpect(obj.set()).toBe(3);\nexpect(Base.prototype.test).toBe(1);\nexpect(Obj.prototype.test).toBe(2);\nexpect(obj.test).toBe(3);\n",
+    source: `"use strict";
+class Base  {
+}
+Object.defineProperty(Base.prototype, 'test', {
+  value: 1,
+  writable: true,
+  configurable: true,
+});
+
+class Obj extends Base {
+  set() {
+    return super.test = 3;
+  }
+}
+Object.defineProperty(Obj.prototype, 'test', {
+  value: 2,
+  writable: true,
+  configurable: true,
+});
+
+const obj = new Obj();
+expect(obj.set()).toBe(3);
+expect(Base.prototype.test).toBe(1);
+expect(Obj.prototype.test).toBe(2);
+expect(obj.test).toBe(3);
+`,
     filename: 'exec.js',
+    output: `'use strict';
+var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+var _superReference2 = { set: require('@babel/runtime/helpers/set') },
+  _superReference = {
+    set: function (e, r, t, s) {
+      return _superReference2.set(e, r, s, t, !0);
+    },
+  };
+let Base = (() => {
+  'use strict';
+  const Base = function Base() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Base, 'prototype', { writable: false });
+  return Base;
+})();
+Object.defineProperty(Base.prototype, 'test', {
+  value: 1,
+  writable: true,
+  configurable: true,
+});
+let Obj = (__nox_super_135_202 => {
+  'use strict';
+  const Obj = function Obj() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(Obj), arguments, new.target || Obj);
+    return _this;
+  };
+  if (__nox_super_135_202 !== null && typeof __nox_super_135_202 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Obj.prototype = Object.create(__nox_super_135_202 && __nox_super_135_202.prototype, {
+    constructor: {
+      value: Obj,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Obj, __nox_super_135_202);
+  else Obj.__proto__ = __nox_super_135_202;
+  Object.defineProperty(Obj.prototype, 'set', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return _superReference.set(Object.getPrototypeOf(Obj.prototype), 'test', this, 3);
+      },
+      'name',
+      {
+        value: 'set',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Obj, 'prototype', { writable: false });
+  return Obj;
+})(Base);
+Object.defineProperty(Obj.prototype, 'test', {
+  value: 2,
+  writable: true,
+  configurable: true,
+});
+const obj = new Obj();
+expect(obj.set()).toBe(3);
+expect(Base.prototype.test).toBe(1);
+expect(Obj.prototype.test).toBe(2);
+expect(obj.test).toBe(3);`,
     modes: [
       {
         title: 'default',
@@ -1427,15 +5008,108 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[49],
       },
     ],
   },
   {
     title: 'get set loose — set semantics data defined on parent (input)',
-    source:
-      "\"use strict\";\nclass Base  {\n}\nObject.defineProperty(Base.prototype, 'test', {\n  value: 1,\n  writable: true,\n  configurable: true,\n});\n\nclass Obj extends Base {\n  set() {\n    return super.test = 3;\n  }\n}\nObject.defineProperty(Obj.prototype, 'test', {\n  value: 2,\n  writable: true,\n  configurable: true,\n});\n\nconst obj = new Obj();\nexpect(obj.set()).toBe(3);\nexpect(Base.prototype.test).toBe(1);\nexpect(Obj.prototype.test).toBe(2);\nexpect(obj.test).toBe(3);\n",
+    source: `"use strict";
+class Base  {
+}
+Object.defineProperty(Base.prototype, 'test', {
+  value: 1,
+  writable: true,
+  configurable: true,
+});
+
+class Obj extends Base {
+  set() {
+    return super.test = 3;
+  }
+}
+Object.defineProperty(Obj.prototype, 'test', {
+  value: 2,
+  writable: true,
+  configurable: true,
+});
+
+const obj = new Obj();
+expect(obj.set()).toBe(3);
+expect(Base.prototype.test).toBe(1);
+expect(Obj.prototype.test).toBe(2);
+expect(obj.test).toBe(3);
+`,
     filename: 'input.js',
+    output: `'use strict';
+var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+var _superReference2 = { set: require('@babel/runtime/helpers/set') },
+  _superReference = {
+    set: function (e, r, t, s) {
+      return _superReference2.set(e, r, s, t, !0);
+    },
+  };
+let Base = (() => {
+  'use strict';
+  const Base = function Base() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Base, 'prototype', { writable: false });
+  return Base;
+})();
+Object.defineProperty(Base.prototype, 'test', {
+  value: 1,
+  writable: true,
+  configurable: true,
+});
+let Obj = (__nox_super_135_202 => {
+  'use strict';
+  const Obj = function Obj() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(Obj), arguments, new.target || Obj);
+    return _this;
+  };
+  if (__nox_super_135_202 !== null && typeof __nox_super_135_202 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Obj.prototype = Object.create(__nox_super_135_202 && __nox_super_135_202.prototype, {
+    constructor: {
+      value: Obj,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Obj, __nox_super_135_202);
+  else Obj.__proto__ = __nox_super_135_202;
+  Object.defineProperty(Obj.prototype, 'set', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return _superReference.set(Object.getPrototypeOf(Obj.prototype), 'test', this, 3);
+      },
+      'name',
+      {
+        value: 'set',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Obj, 'prototype', { writable: false });
+  return Obj;
+})(Base);
+Object.defineProperty(Obj.prototype, 'test', {
+  value: 2,
+  writable: true,
+  configurable: true,
+});
+const obj = new Obj();
+expect(obj.set()).toBe(3);
+expect(Base.prototype.test).toBe(1);
+expect(Obj.prototype.test).toBe(2);
+expect(obj.test).toBe(3);`,
     modes: [
       {
         title: 'default',
@@ -1449,15 +5123,131 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[49],
       },
     ],
   },
   {
     title: 'get set loose — set semantics getter defined on parent (exec)',
-    source:
-      '"use strict";\nlet called = false;\nclass Base {\n  get test() {\n    called = true;\n    return 1;\n  }\n};\n\nclass Obj extends Base {\n  set() {\n    return super.test = 3;\n  }\n}\nObject.defineProperty(Obj.prototype, \'test\', {\n  value: 2,\n  writable: true,\n  configurable: true,\n});\n\nconst obj = new Obj();\n\n// This is incorrect according to the spec,\n// but close enough for loose.\n// expect(() => {\n  expect(obj.set()).toBe(3);\n// }).toThrow(TypeError);\n\nexpect(called).toBe(false);\nexpect(Base.prototype.test).toBe(1);\nexpect(Obj.prototype.test).toBe(2);\nexpect(obj.test).toBe(3);\n',
+    source: `"use strict";
+let called = false;
+class Base {
+  get test() {
+    called = true;
+    return 1;
+  }
+};
+
+class Obj extends Base {
+  set() {
+    return super.test = 3;
+  }
+}
+Object.defineProperty(Obj.prototype, 'test', {
+  value: 2,
+  writable: true,
+  configurable: true,
+});
+
+const obj = new Obj();
+
+// This is incorrect according to the spec,
+// but close enough for loose.
+// expect(() => {
+  expect(obj.set()).toBe(3);
+// }).toThrow(TypeError);
+
+expect(called).toBe(false);
+expect(Base.prototype.test).toBe(1);
+expect(Obj.prototype.test).toBe(2);
+expect(obj.test).toBe(3);
+`,
     filename: 'exec.js',
+    output: `'use strict';
+var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+var _superReference2 = { set: require('@babel/runtime/helpers/set') },
+  _superReference = {
+    set: function (e, r, t, s) {
+      return _superReference2.set(e, r, s, t, !0);
+    },
+  };
+let called = false;
+let Base = (() => {
+  'use strict';
+  const Base = function Base() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Base.prototype, 'test', {
+    get: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        called = true;
+        return 1;
+      },
+      'name',
+      {
+        value: 'get test',
+        configurable: true,
+      },
+    ),
+    configurable: true,
+  });
+  Object.defineProperty(Base, 'prototype', { writable: false });
+  return Base;
+})();
+let Obj = (__nox_super_103_170 => {
+  'use strict';
+  const Obj = function Obj() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(Obj), arguments, new.target || Obj);
+    return _this;
+  };
+  if (__nox_super_103_170 !== null && typeof __nox_super_103_170 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Obj.prototype = Object.create(__nox_super_103_170 && __nox_super_103_170.prototype, {
+    constructor: {
+      value: Obj,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Obj, __nox_super_103_170);
+  else Obj.__proto__ = __nox_super_103_170;
+  Object.defineProperty(Obj.prototype, 'set', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return _superReference.set(Object.getPrototypeOf(Obj.prototype), 'test', this, 3);
+      },
+      'name',
+      {
+        value: 'set',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Obj, 'prototype', { writable: false });
+  return Obj;
+})(Base);
+Object.defineProperty(Obj.prototype, 'test', {
+  value: 2,
+  writable: true,
+  configurable: true,
+});
+const obj = new Obj();
+// This is incorrect according to the spec,
+// but close enough for loose.
+// expect(() => {
+expect(obj.set()).toBe(3);
+// }).toThrow(TypeError);
+expect(called).toBe(false);
+expect(Base.prototype.test).toBe(1);
+expect(Obj.prototype.test).toBe(2);
+expect(obj.test).toBe(3);`,
     modes: [
       {
         title: 'default',
@@ -1471,15 +5261,131 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[50],
       },
     ],
   },
   {
     title: 'get set loose — set semantics getter defined on parent (input)',
-    source:
-      '"use strict";\nlet called = false;\nclass Base {\n  get test() {\n    called = true;\n    return 1;\n  }\n};\n\nclass Obj extends Base {\n  set() {\n    return super.test = 3;\n  }\n}\nObject.defineProperty(Obj.prototype, \'test\', {\n  value: 2,\n  writable: true,\n  configurable: true,\n});\n\nconst obj = new Obj();\n\n// This is incorrect according to the spec,\n// but close enough for loose.\n// expect(() => {\n  expect(obj.set()).toBe(3);\n// }).toThrow(TypeError);\n\nexpect(called).toBe(false);\nexpect(Base.prototype.test).toBe(1);\nexpect(Obj.prototype.test).toBe(2);\nexpect(obj.test).toBe(3);\n',
+    source: `"use strict";
+let called = false;
+class Base {
+  get test() {
+    called = true;
+    return 1;
+  }
+};
+
+class Obj extends Base {
+  set() {
+    return super.test = 3;
+  }
+}
+Object.defineProperty(Obj.prototype, 'test', {
+  value: 2,
+  writable: true,
+  configurable: true,
+});
+
+const obj = new Obj();
+
+// This is incorrect according to the spec,
+// but close enough for loose.
+// expect(() => {
+  expect(obj.set()).toBe(3);
+// }).toThrow(TypeError);
+
+expect(called).toBe(false);
+expect(Base.prototype.test).toBe(1);
+expect(Obj.prototype.test).toBe(2);
+expect(obj.test).toBe(3);
+`,
     filename: 'input.js',
+    output: `'use strict';
+var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+var _superReference2 = { set: require('@babel/runtime/helpers/set') },
+  _superReference = {
+    set: function (e, r, t, s) {
+      return _superReference2.set(e, r, s, t, !0);
+    },
+  };
+let called = false;
+let Base = (() => {
+  'use strict';
+  const Base = function Base() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Base.prototype, 'test', {
+    get: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        called = true;
+        return 1;
+      },
+      'name',
+      {
+        value: 'get test',
+        configurable: true,
+      },
+    ),
+    configurable: true,
+  });
+  Object.defineProperty(Base, 'prototype', { writable: false });
+  return Base;
+})();
+let Obj = (__nox_super_103_170 => {
+  'use strict';
+  const Obj = function Obj() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(Obj), arguments, new.target || Obj);
+    return _this;
+  };
+  if (__nox_super_103_170 !== null && typeof __nox_super_103_170 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Obj.prototype = Object.create(__nox_super_103_170 && __nox_super_103_170.prototype, {
+    constructor: {
+      value: Obj,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Obj, __nox_super_103_170);
+  else Obj.__proto__ = __nox_super_103_170;
+  Object.defineProperty(Obj.prototype, 'set', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return _superReference.set(Object.getPrototypeOf(Obj.prototype), 'test', this, 3);
+      },
+      'name',
+      {
+        value: 'set',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Obj, 'prototype', { writable: false });
+  return Obj;
+})(Base);
+Object.defineProperty(Obj.prototype, 'test', {
+  value: 2,
+  writable: true,
+  configurable: true,
+});
+const obj = new Obj();
+// This is incorrect according to the spec,
+// but close enough for loose.
+// expect(() => {
+expect(obj.set()).toBe(3);
+// }).toThrow(TypeError);
+expect(called).toBe(false);
+expect(Base.prototype.test).toBe(1);
+expect(Obj.prototype.test).toBe(2);
+expect(obj.test).toBe(3);`,
     modes: [
       {
         title: 'default',
@@ -1493,15 +5399,98 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[50],
       },
     ],
   },
   {
     title: 'get set loose — set semantics not defined on parent data on obj (exec)',
-    source:
-      '"use strict";\nclass Base {\n}\n\nclass Obj extends Base {\n  set() {\n    return super.test = 3;\n  }\n}\nObject.defineProperty(Obj.prototype, \'test\', {\n  value: 2,\n  writable: true,\n  configurable: true,\n});\n\nconst obj = new Obj();\nexpect(obj.set()).toBe(3);\nexpect(Base.prototype.test).toBeUndefined();\nexpect(Obj.prototype.test).toBe(2);\nexpect(obj.test).toBe(3);\n',
+    source: `"use strict";
+class Base {
+}
+
+class Obj extends Base {
+  set() {
+    return super.test = 3;
+  }
+}
+Object.defineProperty(Obj.prototype, 'test', {
+  value: 2,
+  writable: true,
+  configurable: true,
+});
+
+const obj = new Obj();
+expect(obj.set()).toBe(3);
+expect(Base.prototype.test).toBeUndefined();
+expect(Obj.prototype.test).toBe(2);
+expect(obj.test).toBe(3);
+`,
     filename: 'exec.js',
+    output: `'use strict';
+var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+var _superReference2 = { set: require('@babel/runtime/helpers/set') },
+  _superReference = {
+    set: function (e, r, t, s) {
+      return _superReference2.set(e, r, s, t, !0);
+    },
+  };
+let Base = (() => {
+  'use strict';
+  const Base = function Base() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Base, 'prototype', { writable: false });
+  return Base;
+})();
+let Obj = (__nox_super_30_97 => {
+  'use strict';
+  const Obj = function Obj() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(Obj), arguments, new.target || Obj);
+    return _this;
+  };
+  if (__nox_super_30_97 !== null && typeof __nox_super_30_97 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Obj.prototype = Object.create(__nox_super_30_97 && __nox_super_30_97.prototype, {
+    constructor: {
+      value: Obj,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Obj, __nox_super_30_97);
+  else Obj.__proto__ = __nox_super_30_97;
+  Object.defineProperty(Obj.prototype, 'set', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return _superReference.set(Object.getPrototypeOf(Obj.prototype), 'test', this, 3);
+      },
+      'name',
+      {
+        value: 'set',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Obj, 'prototype', { writable: false });
+  return Obj;
+})(Base);
+Object.defineProperty(Obj.prototype, 'test', {
+  value: 2,
+  writable: true,
+  configurable: true,
+});
+const obj = new Obj();
+expect(obj.set()).toBe(3);
+expect(Base.prototype.test).toBeUndefined();
+expect(Obj.prototype.test).toBe(2);
+expect(obj.test).toBe(3);`,
     modes: [
       {
         title: 'default',
@@ -1515,15 +5504,98 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[51],
       },
     ],
   },
   {
     title: 'get set loose — set semantics not defined on parent data on obj (input)',
-    source:
-      '"use strict";\nclass Base {\n}\n\nclass Obj extends Base {\n  set() {\n    return super.test = 3;\n  }\n}\nObject.defineProperty(Obj.prototype, \'test\', {\n  value: 2,\n  writable: true,\n  configurable: true,\n});\n\nconst obj = new Obj();\nexpect(obj.set()).toBe(3);\nexpect(Base.prototype.test).toBeUndefined();\nexpect(Obj.prototype.test).toBe(2);\nexpect(obj.test).toBe(3);\n',
+    source: `"use strict";
+class Base {
+}
+
+class Obj extends Base {
+  set() {
+    return super.test = 3;
+  }
+}
+Object.defineProperty(Obj.prototype, 'test', {
+  value: 2,
+  writable: true,
+  configurable: true,
+});
+
+const obj = new Obj();
+expect(obj.set()).toBe(3);
+expect(Base.prototype.test).toBeUndefined();
+expect(Obj.prototype.test).toBe(2);
+expect(obj.test).toBe(3);
+`,
     filename: 'input.js',
+    output: `'use strict';
+var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+var _superReference2 = { set: require('@babel/runtime/helpers/set') },
+  _superReference = {
+    set: function (e, r, t, s) {
+      return _superReference2.set(e, r, s, t, !0);
+    },
+  };
+let Base = (() => {
+  'use strict';
+  const Base = function Base() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Base, 'prototype', { writable: false });
+  return Base;
+})();
+let Obj = (__nox_super_30_97 => {
+  'use strict';
+  const Obj = function Obj() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(Obj), arguments, new.target || Obj);
+    return _this;
+  };
+  if (__nox_super_30_97 !== null && typeof __nox_super_30_97 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Obj.prototype = Object.create(__nox_super_30_97 && __nox_super_30_97.prototype, {
+    constructor: {
+      value: Obj,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Obj, __nox_super_30_97);
+  else Obj.__proto__ = __nox_super_30_97;
+  Object.defineProperty(Obj.prototype, 'set', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return _superReference.set(Object.getPrototypeOf(Obj.prototype), 'test', this, 3);
+      },
+      'name',
+      {
+        value: 'set',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Obj, 'prototype', { writable: false });
+  return Obj;
+})(Base);
+Object.defineProperty(Obj.prototype, 'test', {
+  value: 2,
+  writable: true,
+  configurable: true,
+});
+const obj = new Obj();
+expect(obj.set()).toBe(3);
+expect(Base.prototype.test).toBeUndefined();
+expect(Obj.prototype.test).toBe(2);
+expect(obj.test).toBe(3);`,
     modes: [
       {
         title: 'default',
@@ -1537,15 +5609,121 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[51],
       },
     ],
   },
   {
     title: 'get set loose — set semantics not defined on parent getter on obj (exec)',
-    source:
-      '"use strict";\nclass Base {\n}\n\nlet called = false;\nclass Obj extends Base {\n  get test() {\n    called = true;\n  }\n\n  set() {\n    return super.test = 3;\n  }\n}\n\nconst obj = new Obj();\n// This is incorrect according to the spec,\n// but close enough for loose.\n// expect(obj.set()).toBe(3);\nexpect(() => {\n  obj.set();\n}).toThrow(TypeError);\n\nexpect(called).toBe(false);\nexpect(Base.prototype.test).toBeUndefined();\nexpect(Obj.prototype.test).toBeUndefined();\nexpect(obj.test).toBe(undefined);\n',
+    source: `"use strict";
+class Base {
+}
+
+let called = false;
+class Obj extends Base {
+  get test() {
+    called = true;
+  }
+
+  set() {
+    return super.test = 3;
+  }
+}
+
+const obj = new Obj();
+// This is incorrect according to the spec,
+// but close enough for loose.
+// expect(obj.set()).toBe(3);
+expect(() => {
+  obj.set();
+}).toThrow(TypeError);
+
+expect(called).toBe(false);
+expect(Base.prototype.test).toBeUndefined();
+expect(Obj.prototype.test).toBeUndefined();
+expect(obj.test).toBe(undefined);
+`,
     filename: 'exec.js',
+    output: `'use strict';
+var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+var _superReference2 = { set: require('@babel/runtime/helpers/set') },
+  _superReference = {
+    set: function (e, r, t, s) {
+      return _superReference2.set(e, r, s, t, !0);
+    },
+  };
+let Base = (() => {
+  'use strict';
+  const Base = function Base() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Base, 'prototype', { writable: false });
+  return Base;
+})();
+let called = false;
+let Obj = (__nox_super_50_156 => {
+  'use strict';
+  const Obj = function Obj() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(Obj), arguments, new.target || Obj);
+    return _this;
+  };
+  if (__nox_super_50_156 !== null && typeof __nox_super_50_156 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Obj.prototype = Object.create(__nox_super_50_156 && __nox_super_50_156.prototype, {
+    constructor: {
+      value: Obj,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Obj, __nox_super_50_156);
+  else Obj.__proto__ = __nox_super_50_156;
+  Object.defineProperty(Obj.prototype, 'test', {
+    get: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        called = true;
+      },
+      'name',
+      {
+        value: 'get test',
+        configurable: true,
+      },
+    ),
+    configurable: true,
+  });
+  Object.defineProperty(Obj.prototype, 'set', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return _superReference.set(Object.getPrototypeOf(Obj.prototype), 'test', this, 3);
+      },
+      'name',
+      {
+        value: 'set',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Obj, 'prototype', { writable: false });
+  return Obj;
+})(Base);
+const obj = new Obj();
+// This is incorrect according to the spec,
+// but close enough for loose.
+// expect(obj.set()).toBe(3);
+expect(() => {
+  obj.set();
+}).toThrow(TypeError);
+expect(called).toBe(false);
+expect(Base.prototype.test).toBeUndefined();
+expect(Obj.prototype.test).toBeUndefined();
+expect(obj.test).toBe(undefined);`,
     modes: [
       {
         title: 'default',
@@ -1559,15 +5737,121 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[52],
       },
     ],
   },
   {
     title: 'get set loose — set semantics not defined on parent getter on obj (input)',
-    source:
-      '"use strict";\nclass Base {\n}\n\nlet called = false;\nclass Obj extends Base {\n  get test() {\n    called = true;\n  }\n\n  set() {\n    return super.test = 3;\n  }\n}\n\nconst obj = new Obj();\n// This is incorrect according to the spec,\n// but close enough for loose.\n// expect(obj.set()).toBe(3);\nexpect(() => {\n  obj.set();\n}).toThrow(TypeError);\n\nexpect(called).toBe(false);\nexpect(Base.prototype.test).toBeUndefined();\nexpect(Obj.prototype.test).toBeUndefined();\nexpect(obj.test).toBe(undefined);\n',
+    source: `"use strict";
+class Base {
+}
+
+let called = false;
+class Obj extends Base {
+  get test() {
+    called = true;
+  }
+
+  set() {
+    return super.test = 3;
+  }
+}
+
+const obj = new Obj();
+// This is incorrect according to the spec,
+// but close enough for loose.
+// expect(obj.set()).toBe(3);
+expect(() => {
+  obj.set();
+}).toThrow(TypeError);
+
+expect(called).toBe(false);
+expect(Base.prototype.test).toBeUndefined();
+expect(Obj.prototype.test).toBeUndefined();
+expect(obj.test).toBe(undefined);
+`,
     filename: 'input.js',
+    output: `'use strict';
+var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+var _superReference2 = { set: require('@babel/runtime/helpers/set') },
+  _superReference = {
+    set: function (e, r, t, s) {
+      return _superReference2.set(e, r, s, t, !0);
+    },
+  };
+let Base = (() => {
+  'use strict';
+  const Base = function Base() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Base, 'prototype', { writable: false });
+  return Base;
+})();
+let called = false;
+let Obj = (__nox_super_50_156 => {
+  'use strict';
+  const Obj = function Obj() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(Obj), arguments, new.target || Obj);
+    return _this;
+  };
+  if (__nox_super_50_156 !== null && typeof __nox_super_50_156 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Obj.prototype = Object.create(__nox_super_50_156 && __nox_super_50_156.prototype, {
+    constructor: {
+      value: Obj,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Obj, __nox_super_50_156);
+  else Obj.__proto__ = __nox_super_50_156;
+  Object.defineProperty(Obj.prototype, 'test', {
+    get: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        called = true;
+      },
+      'name',
+      {
+        value: 'get test',
+        configurable: true,
+      },
+    ),
+    configurable: true,
+  });
+  Object.defineProperty(Obj.prototype, 'set', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return _superReference.set(Object.getPrototypeOf(Obj.prototype), 'test', this, 3);
+      },
+      'name',
+      {
+        value: 'set',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Obj, 'prototype', { writable: false });
+  return Obj;
+})(Base);
+const obj = new Obj();
+// This is incorrect according to the spec,
+// but close enough for loose.
+// expect(obj.set()).toBe(3);
+expect(() => {
+  obj.set();
+}).toThrow(TypeError);
+expect(called).toBe(false);
+expect(Base.prototype.test).toBeUndefined();
+expect(Obj.prototype.test).toBeUndefined();
+expect(obj.test).toBe(undefined);`,
     modes: [
       {
         title: 'default',
@@ -1581,15 +5865,88 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[52],
       },
     ],
   },
   {
     title: 'get set loose — set semantics not defined on parent not on obj (exec)',
-    source:
-      '"use strict";\nclass Base {\n}\n\nclass Obj extends Base {\n  set() {\n    return super.test = 3;\n  }\n}\n\nconst obj = new Obj();\nexpect(obj.set()).toBe(3);\nexpect(Base.prototype.test).toBeUndefined();\nexpect(Obj.prototype.test).toBeUndefined();\nexpect(obj.test).toBe(3);\n',
+    source: `"use strict";
+class Base {
+}
+
+class Obj extends Base {
+  set() {
+    return super.test = 3;
+  }
+}
+
+const obj = new Obj();
+expect(obj.set()).toBe(3);
+expect(Base.prototype.test).toBeUndefined();
+expect(Obj.prototype.test).toBeUndefined();
+expect(obj.test).toBe(3);
+`,
     filename: 'exec.js',
+    output: `'use strict';
+var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+var _superReference2 = { set: require('@babel/runtime/helpers/set') },
+  _superReference = {
+    set: function (e, r, t, s) {
+      return _superReference2.set(e, r, s, t, !0);
+    },
+  };
+let Base = (() => {
+  'use strict';
+  const Base = function Base() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Base, 'prototype', { writable: false });
+  return Base;
+})();
+let Obj = (__nox_super_30_97 => {
+  'use strict';
+  const Obj = function Obj() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(Obj), arguments, new.target || Obj);
+    return _this;
+  };
+  if (__nox_super_30_97 !== null && typeof __nox_super_30_97 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Obj.prototype = Object.create(__nox_super_30_97 && __nox_super_30_97.prototype, {
+    constructor: {
+      value: Obj,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Obj, __nox_super_30_97);
+  else Obj.__proto__ = __nox_super_30_97;
+  Object.defineProperty(Obj.prototype, 'set', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return _superReference.set(Object.getPrototypeOf(Obj.prototype), 'test', this, 3);
+      },
+      'name',
+      {
+        value: 'set',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Obj, 'prototype', { writable: false });
+  return Obj;
+})(Base);
+const obj = new Obj();
+expect(obj.set()).toBe(3);
+expect(Base.prototype.test).toBeUndefined();
+expect(Obj.prototype.test).toBeUndefined();
+expect(obj.test).toBe(3);`,
     modes: [
       {
         title: 'default',
@@ -1603,15 +5960,88 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[53],
       },
     ],
   },
   {
     title: 'get set loose — set semantics not defined on parent not on obj (input)',
-    source:
-      '"use strict";\nclass Base {\n}\n\nclass Obj extends Base {\n  set() {\n    return super.test = 3;\n  }\n}\n\nconst obj = new Obj();\nexpect(obj.set()).toBe(3);\nexpect(Base.prototype.test).toBeUndefined();\nexpect(Obj.prototype.test).toBeUndefined();\nexpect(obj.test).toBe(3);\n',
+    source: `"use strict";
+class Base {
+}
+
+class Obj extends Base {
+  set() {
+    return super.test = 3;
+  }
+}
+
+const obj = new Obj();
+expect(obj.set()).toBe(3);
+expect(Base.prototype.test).toBeUndefined();
+expect(Obj.prototype.test).toBeUndefined();
+expect(obj.test).toBe(3);
+`,
     filename: 'input.js',
+    output: `'use strict';
+var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+var _superReference2 = { set: require('@babel/runtime/helpers/set') },
+  _superReference = {
+    set: function (e, r, t, s) {
+      return _superReference2.set(e, r, s, t, !0);
+    },
+  };
+let Base = (() => {
+  'use strict';
+  const Base = function Base() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Base, 'prototype', { writable: false });
+  return Base;
+})();
+let Obj = (__nox_super_30_97 => {
+  'use strict';
+  const Obj = function Obj() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(Obj), arguments, new.target || Obj);
+    return _this;
+  };
+  if (__nox_super_30_97 !== null && typeof __nox_super_30_97 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Obj.prototype = Object.create(__nox_super_30_97 && __nox_super_30_97.prototype, {
+    constructor: {
+      value: Obj,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Obj, __nox_super_30_97);
+  else Obj.__proto__ = __nox_super_30_97;
+  Object.defineProperty(Obj.prototype, 'set', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return _superReference.set(Object.getPrototypeOf(Obj.prototype), 'test', this, 3);
+      },
+      'name',
+      {
+        value: 'set',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Obj, 'prototype', { writable: false });
+  return Obj;
+})(Base);
+const obj = new Obj();
+expect(obj.set()).toBe(3);
+expect(Base.prototype.test).toBeUndefined();
+expect(Obj.prototype.test).toBeUndefined();
+expect(obj.test).toBe(3);`,
     modes: [
       {
         title: 'default',
@@ -1625,15 +6055,116 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[53],
       },
     ],
   },
   {
     title: 'get set loose — set semantics not defined on parent setter on obj (exec)',
-    source:
-      '"use strict";\nclass Base {\n}\n\nlet value = 2;\nclass Obj extends Base {\n  set test(v) {\n    value = v;\n  }\n\n  set() {\n    return super.test = 3;\n  }\n}\n\nconst obj = new Obj();\nexpect(obj.set()).toBe(3);\nexpect(Base.prototype.test).toBeUndefined();\nexpect(Obj.prototype.test).toBeUndefined();\n\n// This is incorrect according to the spec,\n// but close enough for loose.\nexpect(value).toBe(3);\n\nexpect(obj.test).toBe(undefined);\n',
+    source: `"use strict";
+class Base {
+}
+
+let value = 2;
+class Obj extends Base {
+  set test(v) {
+    value = v;
+  }
+
+  set() {
+    return super.test = 3;
+  }
+}
+
+const obj = new Obj();
+expect(obj.set()).toBe(3);
+expect(Base.prototype.test).toBeUndefined();
+expect(Obj.prototype.test).toBeUndefined();
+
+// This is incorrect according to the spec,
+// but close enough for loose.
+expect(value).toBe(3);
+
+expect(obj.test).toBe(undefined);
+`,
     filename: 'exec.js',
+    output: `'use strict';
+var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+var _superReference2 = { set: require('@babel/runtime/helpers/set') },
+  _superReference = {
+    set: function (e, r, t, s) {
+      return _superReference2.set(e, r, s, t, !0);
+    },
+  };
+let Base = (() => {
+  'use strict';
+  const Base = function Base() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Base, 'prototype', { writable: false });
+  return Base;
+})();
+let value = 2;
+let Obj = (__nox_super_45_148 => {
+  'use strict';
+  const Obj = function Obj() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(Obj), arguments, new.target || Obj);
+    return _this;
+  };
+  if (__nox_super_45_148 !== null && typeof __nox_super_45_148 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Obj.prototype = Object.create(__nox_super_45_148 && __nox_super_45_148.prototype, {
+    constructor: {
+      value: Obj,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Obj, __nox_super_45_148);
+  else Obj.__proto__ = __nox_super_45_148;
+  Object.defineProperty(Obj.prototype, 'test', {
+    set: Object.defineProperty(
+      function (v) {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        value = v;
+      },
+      'name',
+      {
+        value: 'set test',
+        configurable: true,
+      },
+    ),
+    configurable: true,
+  });
+  Object.defineProperty(Obj.prototype, 'set', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return _superReference.set(Object.getPrototypeOf(Obj.prototype), 'test', this, 3);
+      },
+      'name',
+      {
+        value: 'set',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Obj, 'prototype', { writable: false });
+  return Obj;
+})(Base);
+const obj = new Obj();
+expect(obj.set()).toBe(3);
+expect(Base.prototype.test).toBeUndefined();
+expect(Obj.prototype.test).toBeUndefined();
+// This is incorrect according to the spec,
+// but close enough for loose.
+expect(value).toBe(3);
+expect(obj.test).toBe(undefined);`,
     modes: [
       {
         title: 'default',
@@ -1647,15 +6178,116 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[54],
       },
     ],
   },
   {
     title: 'get set loose — set semantics not defined on parent setter on obj (input)',
-    source:
-      '"use strict";\nclass Base {\n}\n\nlet value = 2;\nclass Obj extends Base {\n  set test(v) {\n    value = v;\n  }\n\n  set() {\n    return super.test = 3;\n  }\n}\n\nconst obj = new Obj();\nexpect(obj.set()).toBe(3);\nexpect(Base.prototype.test).toBeUndefined();\nexpect(Obj.prototype.test).toBeUndefined();\n\n// This is incorrect according to the spec,\n// but close enough for loose.\nexpect(value).toBe(3);\n\nexpect(obj.test).toBe(undefined);\n',
+    source: `"use strict";
+class Base {
+}
+
+let value = 2;
+class Obj extends Base {
+  set test(v) {
+    value = v;
+  }
+
+  set() {
+    return super.test = 3;
+  }
+}
+
+const obj = new Obj();
+expect(obj.set()).toBe(3);
+expect(Base.prototype.test).toBeUndefined();
+expect(Obj.prototype.test).toBeUndefined();
+
+// This is incorrect according to the spec,
+// but close enough for loose.
+expect(value).toBe(3);
+
+expect(obj.test).toBe(undefined);
+`,
     filename: 'input.js',
+    output: `'use strict';
+var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+var _superReference2 = { set: require('@babel/runtime/helpers/set') },
+  _superReference = {
+    set: function (e, r, t, s) {
+      return _superReference2.set(e, r, s, t, !0);
+    },
+  };
+let Base = (() => {
+  'use strict';
+  const Base = function Base() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Base, 'prototype', { writable: false });
+  return Base;
+})();
+let value = 2;
+let Obj = (__nox_super_45_148 => {
+  'use strict';
+  const Obj = function Obj() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(Obj), arguments, new.target || Obj);
+    return _this;
+  };
+  if (__nox_super_45_148 !== null && typeof __nox_super_45_148 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Obj.prototype = Object.create(__nox_super_45_148 && __nox_super_45_148.prototype, {
+    constructor: {
+      value: Obj,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Obj, __nox_super_45_148);
+  else Obj.__proto__ = __nox_super_45_148;
+  Object.defineProperty(Obj.prototype, 'test', {
+    set: Object.defineProperty(
+      function (v) {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        value = v;
+      },
+      'name',
+      {
+        value: 'set test',
+        configurable: true,
+      },
+    ),
+    configurable: true,
+  });
+  Object.defineProperty(Obj.prototype, 'set', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return _superReference.set(Object.getPrototypeOf(Obj.prototype), 'test', this, 3);
+      },
+      'name',
+      {
+        value: 'set',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Obj, 'prototype', { writable: false });
+  return Obj;
+})(Base);
+const obj = new Obj();
+expect(obj.set()).toBe(3);
+expect(Base.prototype.test).toBeUndefined();
+expect(Obj.prototype.test).toBeUndefined();
+// This is incorrect according to the spec,
+// but close enough for loose.
+expect(value).toBe(3);
+expect(obj.test).toBe(undefined);`,
     modes: [
       {
         title: 'default',
@@ -1669,15 +6301,123 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[54],
       },
     ],
   },
   {
     title: 'get set loose — set semantics setter defined on parent (exec)',
-    source:
-      '"use strict";\nlet value = 1;\nclass Base {\n  set test(v) {\n    value = v;\n  }\n}\n\nclass Obj extends Base {\n  set() {\n    return super.test = 3;\n  }\n}\nObject.defineProperty(Obj.prototype, \'test\', {\n  value: 2,\n  writable: true,\n  configurable: true,\n});\n\nconst obj = new Obj();\nexpect(obj.set()).toBe(3);\n// todo\nexpect(value).toBe(1);\nexpect(Base.prototype.test).toBeUndefined();\nexpect(Obj.prototype.test).toBe(2);\n// todo\nexpect(obj.test).toBe(3);\n',
+    source: `"use strict";
+let value = 1;
+class Base {
+  set test(v) {
+    value = v;
+  }
+}
+
+class Obj extends Base {
+  set() {
+    return super.test = 3;
+  }
+}
+Object.defineProperty(Obj.prototype, 'test', {
+  value: 2,
+  writable: true,
+  configurable: true,
+});
+
+const obj = new Obj();
+expect(obj.set()).toBe(3);
+// todo
+expect(value).toBe(1);
+expect(Base.prototype.test).toBeUndefined();
+expect(Obj.prototype.test).toBe(2);
+// todo
+expect(obj.test).toBe(3);
+`,
     filename: 'exec.js',
+    output: `'use strict';
+var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+var _superReference2 = { set: require('@babel/runtime/helpers/set') },
+  _superReference = {
+    set: function (e, r, t, s) {
+      return _superReference2.set(e, r, s, t, !0);
+    },
+  };
+let value = 1;
+let Base = (() => {
+  'use strict';
+  const Base = function Base() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Base.prototype, 'test', {
+    set: Object.defineProperty(
+      function (v) {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        value = v;
+      },
+      'name',
+      {
+        value: 'set test',
+        configurable: true,
+      },
+    ),
+    configurable: true,
+  });
+  Object.defineProperty(Base, 'prototype', { writable: false });
+  return Base;
+})();
+let Obj = (__nox_super_80_147 => {
+  'use strict';
+  const Obj = function Obj() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(Obj), arguments, new.target || Obj);
+    return _this;
+  };
+  if (__nox_super_80_147 !== null && typeof __nox_super_80_147 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Obj.prototype = Object.create(__nox_super_80_147 && __nox_super_80_147.prototype, {
+    constructor: {
+      value: Obj,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Obj, __nox_super_80_147);
+  else Obj.__proto__ = __nox_super_80_147;
+  Object.defineProperty(Obj.prototype, 'set', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return _superReference.set(Object.getPrototypeOf(Obj.prototype), 'test', this, 3);
+      },
+      'name',
+      {
+        value: 'set',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Obj, 'prototype', { writable: false });
+  return Obj;
+})(Base);
+Object.defineProperty(Obj.prototype, 'test', {
+  value: 2,
+  writable: true,
+  configurable: true,
+});
+const obj = new Obj();
+expect(obj.set()).toBe(3);
+// todo
+expect(value).toBe(1);
+expect(Base.prototype.test).toBeUndefined();
+expect(Obj.prototype.test).toBe(2);
+// todo
+expect(obj.test).toBe(3);`,
     modes: [
       {
         title: 'default',
@@ -1691,15 +6431,134 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[55],
       },
     ],
   },
   {
     title: 'get set loose — set semantics setter defined on parent (input)',
-    source:
-      '"use strict";\nlet value = 1;\nclass Base {\n  set test(v) {\n    value = v;\n  }\n}\n\nclass Obj extends Base {\n  set() {\n    return super.test = 3;\n  }\n}\nObject.defineProperty(Obj.prototype, \'test\', {\n  value: 2,\n  writable: true,\n  configurable: true,\n});\n\nconst obj = new Obj();\nexpect(obj.set()).toBe(3);\n\n// This is incorrect according to the spec,\n// but close enough for loose.\n// expect(value).toBe(3);\nexpect(value).toBe(1);\n\nexpect(Base.prototype.test).toBeUndefined();\nexpect(Obj.prototype.test).toBe(2);\n\n// This is incorrect according to the spec,\n// but close enough for loose.\n// expect(obj.test).toBe(2);\nexpect(obj.test).toBe(3);\n',
+    source: `"use strict";
+let value = 1;
+class Base {
+  set test(v) {
+    value = v;
+  }
+}
+
+class Obj extends Base {
+  set() {
+    return super.test = 3;
+  }
+}
+Object.defineProperty(Obj.prototype, 'test', {
+  value: 2,
+  writable: true,
+  configurable: true,
+});
+
+const obj = new Obj();
+expect(obj.set()).toBe(3);
+
+// This is incorrect according to the spec,
+// but close enough for loose.
+// expect(value).toBe(3);
+expect(value).toBe(1);
+
+expect(Base.prototype.test).toBeUndefined();
+expect(Obj.prototype.test).toBe(2);
+
+// This is incorrect according to the spec,
+// but close enough for loose.
+// expect(obj.test).toBe(2);
+expect(obj.test).toBe(3);
+`,
     filename: 'input.js',
+    output: `'use strict';
+var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+var _superReference2 = { set: require('@babel/runtime/helpers/set') },
+  _superReference = {
+    set: function (e, r, t, s) {
+      return _superReference2.set(e, r, s, t, !0);
+    },
+  };
+let value = 1;
+let Base = (() => {
+  'use strict';
+  const Base = function Base() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Base.prototype, 'test', {
+    set: Object.defineProperty(
+      function (v) {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        value = v;
+      },
+      'name',
+      {
+        value: 'set test',
+        configurable: true,
+      },
+    ),
+    configurable: true,
+  });
+  Object.defineProperty(Base, 'prototype', { writable: false });
+  return Base;
+})();
+let Obj = (__nox_super_80_147 => {
+  'use strict';
+  const Obj = function Obj() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(Obj), arguments, new.target || Obj);
+    return _this;
+  };
+  if (__nox_super_80_147 !== null && typeof __nox_super_80_147 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Obj.prototype = Object.create(__nox_super_80_147 && __nox_super_80_147.prototype, {
+    constructor: {
+      value: Obj,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Obj, __nox_super_80_147);
+  else Obj.__proto__ = __nox_super_80_147;
+  Object.defineProperty(Obj.prototype, 'set', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return _superReference.set(Object.getPrototypeOf(Obj.prototype), 'test', this, 3);
+      },
+      'name',
+      {
+        value: 'set',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Obj, 'prototype', { writable: false });
+  return Obj;
+})(Base);
+Object.defineProperty(Obj.prototype, 'test', {
+  value: 2,
+  writable: true,
+  configurable: true,
+});
+const obj = new Obj();
+expect(obj.set()).toBe(3);
+// This is incorrect according to the spec,
+// but close enough for loose.
+// expect(value).toBe(3);
+expect(value).toBe(1);
+expect(Base.prototype.test).toBeUndefined();
+expect(Obj.prototype.test).toBe(2);
+// This is incorrect according to the spec,
+// but close enough for loose.
+// expect(obj.test).toBe(2);
+expect(obj.test).toBe(3);`,
     modes: [
       {
         title: 'default',
@@ -1713,15 +6572,132 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[56],
       },
     ],
   },
   {
     title: 'get set — call semantics getter defined on parent (exec)',
-    source:
-      '"use strict";\nclass Base {\n  get test() {\n    expect(this).toBe(obj);\n    return function(...args) {\n      expect(this).toBe(obj);\n      expect(args).toEqual([1, 2, 3]);\n      return 1;\n    };\n  }\n}\n\nclass Obj extends Base {\n  call() {\n    super.test(1, 2, 3);\n    super.test(1, ...[2, 3]);\n    super.test(...[1, 2, 3]);\n    return super.test(...arguments);\n  }\n\n  test() {\n    throw new Error("called");\n  }\n}\n\nconst obj = new Obj();\nexpect(obj.call(1, 2, 3)).toBe(1);\n',
+    source: `"use strict";
+class Base {
+  get test() {
+    expect(this).toBe(obj);
+    return function(...args) {
+      expect(this).toBe(obj);
+      expect(args).toEqual([1, 2, 3]);
+      return 1;
+    };
+  }
+}
+
+class Obj extends Base {
+  call() {
+    super.test(1, 2, 3);
+    super.test(1, ...[2, 3]);
+    super.test(...[1, 2, 3]);
+    return super.test(...arguments);
+  }
+
+  test() {
+    throw new Error("called");
+  }
+}
+
+const obj = new Obj();
+expect(obj.call(1, 2, 3)).toBe(1);
+`,
     filename: 'exec.js',
+    output: `'use strict';
+var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+var _get2 = { get: require('@babel/runtime/helpers/get') };
+function _get(e, t, r) {
+  return _get2.get(e, t, r);
+}
+let Base = (() => {
+  'use strict';
+  const Base = function Base() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Base.prototype, 'test', {
+    get: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        expect(this).toBe(obj);
+        return function (...args) {
+          expect(this).toBe(obj);
+          expect(args).toEqual([1, 2, 3]);
+          return 1;
+        };
+      },
+      'name',
+      {
+        value: 'get test',
+        configurable: true,
+      },
+    ),
+    configurable: true,
+  });
+  Object.defineProperty(Base, 'prototype', { writable: false });
+  return Base;
+})();
+let Obj = (__nox_super_200_410 => {
+  'use strict';
+  const Obj = function Obj() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(Obj), arguments, new.target || Obj);
+    return _this;
+  };
+  if (__nox_super_200_410 !== null && typeof __nox_super_200_410 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Obj.prototype = Object.create(__nox_super_200_410 && __nox_super_200_410.prototype, {
+    constructor: {
+      value: Obj,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Obj, __nox_super_200_410);
+  else Obj.__proto__ = __nox_super_200_410;
+  Object.defineProperty(Obj.prototype, 'call', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        _get(Object.getPrototypeOf(Obj.prototype), 'test', this).call(this, 1, 2, 3);
+        _get(Object.getPrototypeOf(Obj.prototype), 'test', this).call(this, 1, ...[2, 3]);
+        _get(Object.getPrototypeOf(Obj.prototype), 'test', this).call(this, ...[1, 2, 3]);
+        return _get(Object.getPrototypeOf(Obj.prototype), 'test', this).call(this, ...arguments);
+      },
+      'name',
+      {
+        value: 'call',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Obj.prototype, 'test', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        throw new Error('called');
+      },
+      'name',
+      {
+        value: 'test',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Obj, 'prototype', { writable: false });
+  return Obj;
+})(Base);
+const obj = new Obj();
+expect(obj.call(1, 2, 3)).toBe(1);`,
     modes: [
       {
         title: 'default',
@@ -1735,15 +6711,132 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[57],
       },
     ],
   },
   {
     title: 'get set — call semantics getter defined on parent (input)',
-    source:
-      '"use strict";\nclass Base {\n  get test() {\n    expect(this).toBe(obj);\n    return function(...args) {\n      expect(this).toBe(obj);\n      expect(args).toEqual([1, 2, 3]);\n      return 1;\n    };\n  }\n}\n\nclass Obj extends Base {\n  call() {\n    super.test(1, 2, 3);\n    super.test(1, ...[2, 3]);\n    super.test(...[1, 2, 3]);\n    return super.test(...arguments);\n  }\n\n  test() {\n    throw new Error("called");\n  }\n}\n\nconst obj = new Obj();\nexpect(obj.call(1, 2, 3)).toBe(1);\n',
+    source: `"use strict";
+class Base {
+  get test() {
+    expect(this).toBe(obj);
+    return function(...args) {
+      expect(this).toBe(obj);
+      expect(args).toEqual([1, 2, 3]);
+      return 1;
+    };
+  }
+}
+
+class Obj extends Base {
+  call() {
+    super.test(1, 2, 3);
+    super.test(1, ...[2, 3]);
+    super.test(...[1, 2, 3]);
+    return super.test(...arguments);
+  }
+
+  test() {
+    throw new Error("called");
+  }
+}
+
+const obj = new Obj();
+expect(obj.call(1, 2, 3)).toBe(1);
+`,
     filename: 'input.js',
+    output: `'use strict';
+var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+var _get2 = { get: require('@babel/runtime/helpers/get') };
+function _get(e, t, r) {
+  return _get2.get(e, t, r);
+}
+let Base = (() => {
+  'use strict';
+  const Base = function Base() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Base.prototype, 'test', {
+    get: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        expect(this).toBe(obj);
+        return function (...args) {
+          expect(this).toBe(obj);
+          expect(args).toEqual([1, 2, 3]);
+          return 1;
+        };
+      },
+      'name',
+      {
+        value: 'get test',
+        configurable: true,
+      },
+    ),
+    configurable: true,
+  });
+  Object.defineProperty(Base, 'prototype', { writable: false });
+  return Base;
+})();
+let Obj = (__nox_super_200_410 => {
+  'use strict';
+  const Obj = function Obj() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(Obj), arguments, new.target || Obj);
+    return _this;
+  };
+  if (__nox_super_200_410 !== null && typeof __nox_super_200_410 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Obj.prototype = Object.create(__nox_super_200_410 && __nox_super_200_410.prototype, {
+    constructor: {
+      value: Obj,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Obj, __nox_super_200_410);
+  else Obj.__proto__ = __nox_super_200_410;
+  Object.defineProperty(Obj.prototype, 'call', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        _get(Object.getPrototypeOf(Obj.prototype), 'test', this).call(this, 1, 2, 3);
+        _get(Object.getPrototypeOf(Obj.prototype), 'test', this).call(this, 1, ...[2, 3]);
+        _get(Object.getPrototypeOf(Obj.prototype), 'test', this).call(this, ...[1, 2, 3]);
+        return _get(Object.getPrototypeOf(Obj.prototype), 'test', this).call(this, ...arguments);
+      },
+      'name',
+      {
+        value: 'call',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Obj.prototype, 'test', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        throw new Error('called');
+      },
+      'name',
+      {
+        value: 'test',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Obj, 'prototype', { writable: false });
+  return Obj;
+})(Base);
+const obj = new Obj();
+expect(obj.call(1, 2, 3)).toBe(1);`,
     modes: [
       {
         title: 'default',
@@ -1757,15 +6850,125 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[57],
       },
     ],
   },
   {
     title: 'get set — call semantics setter defined on parent (exec)',
-    source:
-      '"use strict";\nclass Base {\n  set test(v) {\n    throw new Error("gobbledygook");\n  }\n}\n\nclass Obj extends Base {\n  call() {\n    return super.test();\n  }\n\n  test() {\n    throw new Error("gobbledygook");\n  }\n}\n\nconst obj = new Obj();\nexpect(() => {\n  obj.call();\n\n  // Assert that this throws, but that it\'s not\n  // a gobbledygook error that is thrown\n}).toThrow(TypeError)\n',
+    source: `"use strict";
+class Base {
+  set test(v) {
+    throw new Error("gobbledygook");
+  }
+}
+
+class Obj extends Base {
+  call() {
+    return super.test();
+  }
+
+  test() {
+    throw new Error("gobbledygook");
+  }
+}
+
+const obj = new Obj();
+expect(() => {
+  obj.call();
+
+  // Assert that this throws, but that it's not
+  // a gobbledygook error that is thrown
+}).toThrow(TypeError)
+`,
     filename: 'exec.js',
+    output: `'use strict';
+var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+var _get2 = { get: require('@babel/runtime/helpers/get') };
+function _get(e, t, r) {
+  return _get2.get(e, t, r);
+}
+let Base = (() => {
+  'use strict';
+  const Base = function Base() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Base.prototype, 'test', {
+    set: Object.defineProperty(
+      function (v) {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        throw new Error('gobbledygook');
+      },
+      'name',
+      {
+        value: 'set test',
+        configurable: true,
+      },
+    ),
+    configurable: true,
+  });
+  Object.defineProperty(Base, 'prototype', { writable: false });
+  return Base;
+})();
+let Obj = (__nox_super_87_206 => {
+  'use strict';
+  const Obj = function Obj() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(Obj), arguments, new.target || Obj);
+    return _this;
+  };
+  if (__nox_super_87_206 !== null && typeof __nox_super_87_206 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Obj.prototype = Object.create(__nox_super_87_206 && __nox_super_87_206.prototype, {
+    constructor: {
+      value: Obj,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Obj, __nox_super_87_206);
+  else Obj.__proto__ = __nox_super_87_206;
+  Object.defineProperty(Obj.prototype, 'call', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return _get(Object.getPrototypeOf(Obj.prototype), 'test', this).call(this);
+      },
+      'name',
+      {
+        value: 'call',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Obj.prototype, 'test', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        throw new Error('gobbledygook');
+      },
+      'name',
+      {
+        value: 'test',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Obj, 'prototype', { writable: false });
+  return Obj;
+})(Base);
+const obj = new Obj();
+expect(() => {
+  obj.call();
+  // Assert that this throws, but that it's not
+  // a gobbledygook error that is thrown
+}).toThrow(TypeError);`,
     modes: [
       {
         title: 'default',
@@ -1779,15 +6982,104 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[40],
       },
     ],
   },
   {
     title: 'get set — change computed key (exec)',
-    source:
-      'let x = 1;\n\nclass A {\n  get [x]() {}\n  [(x = 3, 2)]() {}\n  set [x](_) {}\n}\n\nexpect(Object.getOwnPropertyDescriptors(A.prototype)).toMatchObject({\n  1: {\n    get: expect.any(Function),\n    set: undefined,\n  },\n  2: {\n    value: expect.any(Function),\n  },\n  3: {\n    get: undefined,\n    set: expect.any(Function),\n  }\n});\n',
+    source: `let x = 1;
+
+class A {
+  get [x]() {}
+  [(x = 3, 2)]() {}
+  set [x](_) {}
+}
+
+expect(Object.getOwnPropertyDescriptors(A.prototype)).toMatchObject({
+  1: {
+    get: expect.any(Function),
+    set: undefined,
+  },
+  2: {
+    value: expect.any(Function),
+  },
+  3: {
+    get: undefined,
+    set: expect.any(Function),
+  }
+});
+`,
     filename: 'exec.js',
+    output: `var _classKey2 = { toPropertyKey: require('@babel/runtime/helpers/toPropertyKey') },
+  _classKey = _classKey2.toPropertyKey;
+let x = 1;
+let A = ((_key, _key16, _key17) => {
+  'use strict';
+  _key = _classKey(_key);
+  _key16 = _classKey(_key16);
+  _key17 = _classKey(_key17);
+  const A = function A() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(A.prototype, _key, {
+    get: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      },
+      'name',
+      {
+        value:
+          'get ' +
+          (typeof _key === 'symbol' ? { [_key]: function () {} }[_key].name : String(_key)),
+        configurable: true,
+      },
+    ),
+    configurable: true,
+  });
+  Object.defineProperty(A.prototype, _key16, {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      },
+      'name',
+      {
+        value:
+          typeof _key16 === 'symbol' ? { [_key16]: function () {} }[_key16].name : String(_key16),
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(A.prototype, _key17, {
+    set: Object.defineProperty(
+      function (_) {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      },
+      'name',
+      {
+        value:
+          'set ' +
+          (typeof _key17 === 'symbol' ? { [_key17]: function () {} }[_key17].name : String(_key17)),
+        configurable: true,
+      },
+    ),
+    configurable: true,
+  });
+  Object.defineProperty(A, 'prototype', { writable: false });
+  return A;
+})(x, ((x = 3), 2), x);
+expect(Object.getOwnPropertyDescriptors(A.prototype)).toMatchObject({
+  1: {
+    get: expect.any(Function),
+    set: undefined,
+  },
+  2: { value: expect.any(Function) },
+  3: {
+    get: undefined,
+    set: expect.any(Function),
+  },
+});`,
     modes: [
       {
         title: 'default',
@@ -1801,14 +7093,76 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[58],
       },
     ],
   },
   {
     title: 'get set — change computed key (input)',
-    source: 'class A {\n  get [x]() {}\n  [(x = 2, 3)]() {}\n  set [x](_) {}\n}\n',
+    source: `class A {
+  get [x]() {}
+  [(x = 2, 3)]() {}
+  set [x](_) {}
+}
+`,
     filename: 'input.js',
+    output: `var _classKey2 = { toPropertyKey: require('@babel/runtime/helpers/toPropertyKey') },
+  _classKey = _classKey2.toPropertyKey;
+let A = ((_key, _key15, _key16) => {
+  'use strict';
+  _key = _classKey(_key);
+  _key15 = _classKey(_key15);
+  _key16 = _classKey(_key16);
+  const A = function A() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(A.prototype, _key, {
+    get: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      },
+      'name',
+      {
+        value:
+          'get ' +
+          (typeof _key === 'symbol' ? { [_key]: function () {} }[_key].name : String(_key)),
+        configurable: true,
+      },
+    ),
+    configurable: true,
+  });
+  Object.defineProperty(A.prototype, _key15, {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      },
+      'name',
+      {
+        value:
+          typeof _key15 === 'symbol' ? { [_key15]: function () {} }[_key15].name : String(_key15),
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(A.prototype, _key16, {
+    set: Object.defineProperty(
+      function (_) {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      },
+      'name',
+      {
+        value:
+          'set ' +
+          (typeof _key16 === 'symbol' ? { [_key16]: function () {} }[_key16].name : String(_key16)),
+        configurable: true,
+      },
+    ),
+    configurable: true,
+  });
+  Object.defineProperty(A, 'prototype', { writable: false });
+  return A;
+})(x, ((x = 2), 3), x);`,
     modes: [
       {
         title: 'default',
@@ -1822,15 +7176,111 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[59],
       },
     ],
   },
   {
     title: 'get set — get semantics getter defined on parent (exec)',
-    source:
-      '"use strict";\nclass Base {\n  get test() {\n    expect(this).toBe(obj);\n    return 1;\n  }\n}\n\nclass Obj extends Base {\n  get() {\n    return super.test;\n  }\n}\nObject.defineProperty(Obj.prototype, \'test\', {\n  value: 2,\n  writable: true,\n  configurable: true,\n});\n\nconst obj = new Obj();\nexpect(obj.test).toBe(2);\nexpect(obj.get()).toBe(1);\n',
+    source: `"use strict";
+class Base {
+  get test() {
+    expect(this).toBe(obj);
+    return 1;
+  }
+}
+
+class Obj extends Base {
+  get() {
+    return super.test;
+  }
+}
+Object.defineProperty(Obj.prototype, 'test', {
+  value: 2,
+  writable: true,
+  configurable: true,
+});
+
+const obj = new Obj();
+expect(obj.test).toBe(2);
+expect(obj.get()).toBe(1);
+`,
     filename: 'exec.js',
+    output: `'use strict';
+var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+var _get2 = { get: require('@babel/runtime/helpers/get') };
+function _get(e, t, r) {
+  return _get2.get(e, t, r);
+}
+let Base = (() => {
+  'use strict';
+  const Base = function Base() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Base.prototype, 'test', {
+    get: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        expect(this).toBe(obj);
+        return 1;
+      },
+      'name',
+      {
+        value: 'get test',
+        configurable: true,
+      },
+    ),
+    configurable: true,
+  });
+  Object.defineProperty(Base, 'prototype', { writable: false });
+  return Base;
+})();
+let Obj = (__nox_super_91_154 => {
+  'use strict';
+  const Obj = function Obj() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(Obj), arguments, new.target || Obj);
+    return _this;
+  };
+  if (__nox_super_91_154 !== null && typeof __nox_super_91_154 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Obj.prototype = Object.create(__nox_super_91_154 && __nox_super_91_154.prototype, {
+    constructor: {
+      value: Obj,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Obj, __nox_super_91_154);
+  else Obj.__proto__ = __nox_super_91_154;
+  Object.defineProperty(Obj.prototype, 'get', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return _get(Object.getPrototypeOf(Obj.prototype), 'test', this);
+      },
+      'name',
+      {
+        value: 'get',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Obj, 'prototype', { writable: false });
+  return Obj;
+})(Base);
+Object.defineProperty(Obj.prototype, 'test', {
+  value: 2,
+  writable: true,
+  configurable: true,
+});
+const obj = new Obj();
+expect(obj.test).toBe(2);
+expect(obj.get()).toBe(1);`,
     modes: [
       {
         title: 'default',
@@ -1844,15 +7294,111 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[60],
       },
     ],
   },
   {
     title: 'get set — get semantics getter defined on parent (input)',
-    source:
-      '"use strict";\nclass Base {\n  get test() {\n    expect(this).toBe(obj);\n    return 1;\n  }\n}\n\nclass Obj extends Base {\n  get() {\n    return super.test;\n  }\n}\nObject.defineProperty(Obj.prototype, \'test\', {\n  value: 2,\n  writable: true,\n  configurable: true,\n});\n\nconst obj = new Obj();\nexpect(obj.test).toBe(2);\nexpect(obj.get()).toBe(1);\n',
+    source: `"use strict";
+class Base {
+  get test() {
+    expect(this).toBe(obj);
+    return 1;
+  }
+}
+
+class Obj extends Base {
+  get() {
+    return super.test;
+  }
+}
+Object.defineProperty(Obj.prototype, 'test', {
+  value: 2,
+  writable: true,
+  configurable: true,
+});
+
+const obj = new Obj();
+expect(obj.test).toBe(2);
+expect(obj.get()).toBe(1);
+`,
     filename: 'input.js',
+    output: `'use strict';
+var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+var _get2 = { get: require('@babel/runtime/helpers/get') };
+function _get(e, t, r) {
+  return _get2.get(e, t, r);
+}
+let Base = (() => {
+  'use strict';
+  const Base = function Base() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Base.prototype, 'test', {
+    get: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        expect(this).toBe(obj);
+        return 1;
+      },
+      'name',
+      {
+        value: 'get test',
+        configurable: true,
+      },
+    ),
+    configurable: true,
+  });
+  Object.defineProperty(Base, 'prototype', { writable: false });
+  return Base;
+})();
+let Obj = (__nox_super_91_154 => {
+  'use strict';
+  const Obj = function Obj() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(Obj), arguments, new.target || Obj);
+    return _this;
+  };
+  if (__nox_super_91_154 !== null && typeof __nox_super_91_154 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Obj.prototype = Object.create(__nox_super_91_154 && __nox_super_91_154.prototype, {
+    constructor: {
+      value: Obj,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Obj, __nox_super_91_154);
+  else Obj.__proto__ = __nox_super_91_154;
+  Object.defineProperty(Obj.prototype, 'get', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return _get(Object.getPrototypeOf(Obj.prototype), 'test', this);
+      },
+      'name',
+      {
+        value: 'get',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Obj, 'prototype', { writable: false });
+  return Obj;
+})(Base);
+Object.defineProperty(Obj.prototype, 'test', {
+  value: 2,
+  writable: true,
+  configurable: true,
+});
+const obj = new Obj();
+expect(obj.test).toBe(2);
+expect(obj.get()).toBe(1);`,
     modes: [
       {
         title: 'default',
@@ -1866,15 +7412,79 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[60],
       },
     ],
   },
   {
     title: 'get set — method conflict (exec)',
-    source:
-      'class A {\n  get x() {}\n  x() {}\n  set x(_) {}\n}\n\nexpect(Object.getOwnPropertyDescriptors(A.prototype)).toMatchObject({\n  x: {\n    get: undefined,\n    set: expect.any(Function),\n  }\n});\n',
+    source: `class A {
+  get x() {}
+  x() {}
+  set x(_) {}
+}
+
+expect(Object.getOwnPropertyDescriptors(A.prototype)).toMatchObject({
+  x: {
+    get: undefined,
+    set: expect.any(Function),
+  }
+});
+`,
     filename: 'exec.js',
+    output: `let A = (() => {
+  'use strict';
+  const A = function A() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(A.prototype, 'x', {
+    get: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      },
+      'name',
+      {
+        value: 'get x',
+        configurable: true,
+      },
+    ),
+    configurable: true,
+  });
+  Object.defineProperty(A.prototype, 'x', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      },
+      'name',
+      {
+        value: 'x',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(A.prototype, 'x', {
+    set: Object.defineProperty(
+      function (_) {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      },
+      'name',
+      {
+        value: 'set x',
+        configurable: true,
+      },
+    ),
+    configurable: true,
+  });
+  Object.defineProperty(A, 'prototype', { writable: false });
+  return A;
+})();
+expect(Object.getOwnPropertyDescriptors(A.prototype)).toMatchObject({
+  x: {
+    get: undefined,
+    set: expect.any(Function),
+  },
+});`,
     modes: [
       {
         title: 'default',
@@ -1888,14 +7498,66 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[61],
       },
     ],
   },
   {
     title: 'get set — method conflict (input)',
-    source: 'class A {\n  get x() {}\n  x() {}\n  set x(_) {}\n}\n',
+    source: `class A {
+  get x() {}
+  x() {}
+  set x(_) {}
+}
+`,
     filename: 'input.js',
+    output: `let A = (() => {
+  'use strict';
+  const A = function A() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(A.prototype, 'x', {
+    get: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      },
+      'name',
+      {
+        value: 'get x',
+        configurable: true,
+      },
+    ),
+    configurable: true,
+  });
+  Object.defineProperty(A.prototype, 'x', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      },
+      'name',
+      {
+        value: 'x',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(A.prototype, 'x', {
+    set: Object.defineProperty(
+      function (_) {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      },
+      'name',
+      {
+        value: 'set x',
+        configurable: true,
+      },
+    ),
+    configurable: true,
+  });
+  Object.defineProperty(A, 'prototype', { writable: false });
+  return A;
+})();`,
     modes: [
       {
         title: 'default',
@@ -1909,15 +7571,142 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[62],
       },
     ],
   },
   {
     title: 'get set — numeric keys (input)',
-    source:
-      'class A {\n  get 1() {}\n  set [1](_) {}\n\n  get 2() {}\n  set "2"(_) {}\n\n  get 3n() {}\n  set 3(_) {}\n\n  get [4n]() {}\n  set "4"(_) {}\n\n  // Different keys\n  get 5n() {}\n  set "5n"(_) {}\n}\n',
+    source: `class A {
+  get 1() {}
+  set [1](_) {}
+
+  get 2() {}
+  set "2"(_) {}
+
+  get 3n() {}
+  set 3(_) {}
+
+  get [4n]() {}
+  set "4"(_) {}
+
+  // Different keys
+  get 5n() {}
+  set "5n"(_) {}
+}
+`,
     filename: 'input.js',
+    output: `var _classKey2 = { toPropertyKey: require('@babel/runtime/helpers/toPropertyKey') },
+  _classKey = _classKey2.toPropertyKey;
+let A = ((_key, _key15) => {
+  'use strict';
+  _key = _classKey(_key);
+  _key15 = _classKey(_key15);
+  const A = function A() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(A.prototype, 1, {
+    get: function () {
+      if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+    },
+    configurable: true,
+  });
+  Object.defineProperty(A.prototype, _key, {
+    set: Object.defineProperty(
+      function (_) {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      },
+      'name',
+      {
+        value:
+          'set ' +
+          (typeof _key === 'symbol' ? { [_key]: function () {} }[_key].name : String(_key)),
+        configurable: true,
+      },
+    ),
+    configurable: true,
+  });
+  Object.defineProperty(A.prototype, 2, {
+    get: function () {
+      if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+    },
+    configurable: true,
+  });
+  Object.defineProperty(A.prototype, '2', {
+    set: Object.defineProperty(
+      function (_) {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      },
+      'name',
+      {
+        value: 'set 2',
+        configurable: true,
+      },
+    ),
+    configurable: true,
+  });
+  Object.defineProperty(A.prototype, 3n, {
+    get: function () {
+      if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+    },
+    configurable: true,
+  });
+  Object.defineProperty(A.prototype, 3, {
+    set: function (_) {
+      if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+    },
+    configurable: true,
+  });
+  Object.defineProperty(A.prototype, _key15, {
+    get: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      },
+      'name',
+      {
+        value:
+          'get ' +
+          (typeof _key15 === 'symbol' ? { [_key15]: function () {} }[_key15].name : String(_key15)),
+        configurable: true,
+      },
+    ),
+    configurable: true,
+  });
+  Object.defineProperty(A.prototype, '4', {
+    set: Object.defineProperty(
+      function (_) {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      },
+      'name',
+      {
+        value: 'set 4',
+        configurable: true,
+      },
+    ),
+    configurable: true,
+  });
+  Object.defineProperty(A.prototype, 5n, {
+    get: function () {
+      // Different keys
+      if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+    },
+    configurable: true,
+  });
+  Object.defineProperty(A.prototype, '5n', {
+    set: Object.defineProperty(
+      function (_) {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      },
+      'name',
+      {
+        value: 'set 5n',
+        configurable: true,
+      },
+    ),
+    configurable: true,
+  });
+  Object.defineProperty(A, 'prototype', { writable: false });
+  return A;
+})(1, 4n);`,
     modes: [
       {
         title: 'default',
@@ -1931,15 +7720,125 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[63],
       },
     ],
   },
   {
     title: 'get set — set semantics getter defined on parent (exec)',
-    source:
-      '"use strict";\nlet called = false;\nclass Base {\n  get test() {\n    called = true;\n    return 1;\n  }\n};\n\nclass Obj extends Base {\n  set() {\n    return super.test = 3;\n  }\n}\nObject.defineProperty(Obj.prototype, \'test\', {\n  value: 2,\n  writable: true,\n  configurable: true,\n});\n\nconst obj = new Obj();\nexpect(() => {\n  obj.set();\n}).toThrow(TypeError);\nexpect(called).toBe(false);\nexpect(Base.prototype.test).toBe(1);\nexpect(Obj.prototype.test).toBe(2);\nexpect(obj.test).toBe(2);\n',
+    source: `"use strict";
+let called = false;
+class Base {
+  get test() {
+    called = true;
+    return 1;
+  }
+};
+
+class Obj extends Base {
+  set() {
+    return super.test = 3;
+  }
+}
+Object.defineProperty(Obj.prototype, 'test', {
+  value: 2,
+  writable: true,
+  configurable: true,
+});
+
+const obj = new Obj();
+expect(() => {
+  obj.set();
+}).toThrow(TypeError);
+expect(called).toBe(false);
+expect(Base.prototype.test).toBe(1);
+expect(Obj.prototype.test).toBe(2);
+expect(obj.test).toBe(2);
+`,
     filename: 'exec.js',
+    output: `'use strict';
+var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+var _superReference2 = { set: require('@babel/runtime/helpers/set') },
+  _superReference = {
+    set: function (e, r, t, s) {
+      return _superReference2.set(e, r, s, t, !0);
+    },
+  };
+let called = false;
+let Base = (() => {
+  'use strict';
+  const Base = function Base() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Base.prototype, 'test', {
+    get: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        called = true;
+        return 1;
+      },
+      'name',
+      {
+        value: 'get test',
+        configurable: true,
+      },
+    ),
+    configurable: true,
+  });
+  Object.defineProperty(Base, 'prototype', { writable: false });
+  return Base;
+})();
+let Obj = (__nox_super_103_170 => {
+  'use strict';
+  const Obj = function Obj() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(Obj), arguments, new.target || Obj);
+    return _this;
+  };
+  if (__nox_super_103_170 !== null && typeof __nox_super_103_170 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Obj.prototype = Object.create(__nox_super_103_170 && __nox_super_103_170.prototype, {
+    constructor: {
+      value: Obj,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Obj, __nox_super_103_170);
+  else Obj.__proto__ = __nox_super_103_170;
+  Object.defineProperty(Obj.prototype, 'set', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return _superReference.set(Object.getPrototypeOf(Obj.prototype), 'test', this, 3);
+      },
+      'name',
+      {
+        value: 'set',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Obj, 'prototype', { writable: false });
+  return Obj;
+})(Base);
+Object.defineProperty(Obj.prototype, 'test', {
+  value: 2,
+  writable: true,
+  configurable: true,
+});
+const obj = new Obj();
+expect(() => {
+  obj.set();
+}).toThrow(TypeError);
+expect(called).toBe(false);
+expect(Base.prototype.test).toBe(1);
+expect(Obj.prototype.test).toBe(2);
+expect(obj.test).toBe(2);`,
     modes: [
       {
         title: 'default',
@@ -1953,15 +7852,123 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[64],
       },
     ],
   },
   {
     title: 'get set — set semantics getter defined on parent (input)',
-    source:
-      '"use strict";\nclass Base {\n  get test() {\n    return 1;\n  }\n};\n\nclass Obj extends Base {\n  set() {\n    return super.test = 3;\n  }\n}\nObject.defineProperty(Obj.prototype, \'test\', {\n  value: 2,\n  writable: true,\n  configurable: true,\n});\n\nconst obj = new Obj();\nexpect(() => {\n  // this requires helpers to be in file (not external), so they\n  // are in "strict" mode code.\n  obj.set();\n}).toThrow(TypeError);\nexpect(Base.prototype.test).toBe(1);\nexpect(Obj.prototype.test).toBe(2);\nexpect(obj.test).toBe(2);\n',
+    source: `"use strict";
+class Base {
+  get test() {
+    return 1;
+  }
+};
+
+class Obj extends Base {
+  set() {
+    return super.test = 3;
+  }
+}
+Object.defineProperty(Obj.prototype, 'test', {
+  value: 2,
+  writable: true,
+  configurable: true,
+});
+
+const obj = new Obj();
+expect(() => {
+  // this requires helpers to be in file (not external), so they
+  // are in "strict" mode code.
+  obj.set();
+}).toThrow(TypeError);
+expect(Base.prototype.test).toBe(1);
+expect(Obj.prototype.test).toBe(2);
+expect(obj.test).toBe(2);
+`,
     filename: 'input.js',
+    output: `'use strict';
+var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+var _superReference2 = { set: require('@babel/runtime/helpers/set') },
+  _superReference = {
+    set: function (e, r, t, s) {
+      return _superReference2.set(e, r, s, t, !0);
+    },
+  };
+let Base = (() => {
+  'use strict';
+  const Base = function Base() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Base.prototype, 'test', {
+    get: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return 1;
+      },
+      'name',
+      {
+        value: 'get test',
+        configurable: true,
+      },
+    ),
+    configurable: true,
+  });
+  Object.defineProperty(Base, 'prototype', { writable: false });
+  return Base;
+})();
+let Obj = (__nox_super_64_131 => {
+  'use strict';
+  const Obj = function Obj() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(Obj), arguments, new.target || Obj);
+    return _this;
+  };
+  if (__nox_super_64_131 !== null && typeof __nox_super_64_131 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Obj.prototype = Object.create(__nox_super_64_131 && __nox_super_64_131.prototype, {
+    constructor: {
+      value: Obj,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Obj, __nox_super_64_131);
+  else Obj.__proto__ = __nox_super_64_131;
+  Object.defineProperty(Obj.prototype, 'set', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return _superReference.set(Object.getPrototypeOf(Obj.prototype), 'test', this, 3);
+      },
+      'name',
+      {
+        value: 'set',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Obj, 'prototype', { writable: false });
+  return Obj;
+})(Base);
+Object.defineProperty(Obj.prototype, 'test', {
+  value: 2,
+  writable: true,
+  configurable: true,
+});
+const obj = new Obj();
+expect(() => {
+  // this requires helpers to be in file (not external), so they
+  // are in "strict" mode code.
+  obj.set();
+}).toThrow(TypeError);
+expect(Base.prototype.test).toBe(1);
+expect(Obj.prototype.test).toBe(2);
+expect(obj.test).toBe(2);`,
     modes: [
       {
         title: 'default',
@@ -1975,15 +7982,110 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[65],
       },
     ],
   },
   {
     title: 'get set — set semantics not defined on parent getter on obj (exec)',
-    source:
-      '"use strict";\nclass Base {\n}\n\nlet called = false;\nclass Obj extends Base {\n  get test() {\n    called = true;\n  }\n\n  set() {\n    return super.test = 3;\n  }\n}\n\nconst obj = new Obj();\nexpect(obj.set()).toBe(3);\nexpect(called).toBe(false);\nexpect(Base.prototype.test).toBeUndefined();\nexpect(Obj.prototype.test).toBeUndefined();\nexpect(obj.test).toBe(3);\n',
+    source: `"use strict";
+class Base {
+}
+
+let called = false;
+class Obj extends Base {
+  get test() {
+    called = true;
+  }
+
+  set() {
+    return super.test = 3;
+  }
+}
+
+const obj = new Obj();
+expect(obj.set()).toBe(3);
+expect(called).toBe(false);
+expect(Base.prototype.test).toBeUndefined();
+expect(Obj.prototype.test).toBeUndefined();
+expect(obj.test).toBe(3);
+`,
     filename: 'exec.js',
+    output: `'use strict';
+var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+var _superReference2 = { set: require('@babel/runtime/helpers/set') },
+  _superReference = {
+    set: function (e, r, t, s) {
+      return _superReference2.set(e, r, s, t, !0);
+    },
+  };
+let Base = (() => {
+  'use strict';
+  const Base = function Base() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Base, 'prototype', { writable: false });
+  return Base;
+})();
+let called = false;
+let Obj = (__nox_super_50_156 => {
+  'use strict';
+  const Obj = function Obj() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(Obj), arguments, new.target || Obj);
+    return _this;
+  };
+  if (__nox_super_50_156 !== null && typeof __nox_super_50_156 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Obj.prototype = Object.create(__nox_super_50_156 && __nox_super_50_156.prototype, {
+    constructor: {
+      value: Obj,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Obj, __nox_super_50_156);
+  else Obj.__proto__ = __nox_super_50_156;
+  Object.defineProperty(Obj.prototype, 'test', {
+    get: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        called = true;
+      },
+      'name',
+      {
+        value: 'get test',
+        configurable: true,
+      },
+    ),
+    configurable: true,
+  });
+  Object.defineProperty(Obj.prototype, 'set', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return _superReference.set(Object.getPrototypeOf(Obj.prototype), 'test', this, 3);
+      },
+      'name',
+      {
+        value: 'set',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Obj, 'prototype', { writable: false });
+  return Obj;
+})(Base);
+const obj = new Obj();
+expect(obj.set()).toBe(3);
+expect(called).toBe(false);
+expect(Base.prototype.test).toBeUndefined();
+expect(Obj.prototype.test).toBeUndefined();
+expect(obj.test).toBe(3);`,
     modes: [
       {
         title: 'default',
@@ -1997,15 +8099,103 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[66],
       },
     ],
   },
   {
     title: 'get set — set semantics not defined on parent getter on obj (input)',
-    source:
-      '"use strict";\nclass Base {\n}\n\nclass Obj extends Base {\n  get test() { }\n\n  set() {\n    return super.test = 3;\n  }\n}\n\nconst obj = new Obj();\nexpect(obj.set()).toBe(3);\nexpect(Base.prototype.test).toBeUndefined();\nexpect(Obj.prototype.test).toBeUndefined();\nexpect(obj.test).toBe(3);\n',
+    source: `"use strict";
+class Base {
+}
+
+class Obj extends Base {
+  get test() { }
+
+  set() {
+    return super.test = 3;
+  }
+}
+
+const obj = new Obj();
+expect(obj.set()).toBe(3);
+expect(Base.prototype.test).toBeUndefined();
+expect(Obj.prototype.test).toBeUndefined();
+expect(obj.test).toBe(3);
+`,
     filename: 'input.js',
+    output: `'use strict';
+var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+var _superReference2 = { set: require('@babel/runtime/helpers/set') },
+  _superReference = {
+    set: function (e, r, t, s) {
+      return _superReference2.set(e, r, s, t, !0);
+    },
+  };
+let Base = (() => {
+  'use strict';
+  const Base = function Base() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Base, 'prototype', { writable: false });
+  return Base;
+})();
+let Obj = (__nox_super_30_115 => {
+  'use strict';
+  const Obj = function Obj() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(Obj), arguments, new.target || Obj);
+    return _this;
+  };
+  if (__nox_super_30_115 !== null && typeof __nox_super_30_115 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Obj.prototype = Object.create(__nox_super_30_115 && __nox_super_30_115.prototype, {
+    constructor: {
+      value: Obj,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Obj, __nox_super_30_115);
+  else Obj.__proto__ = __nox_super_30_115;
+  Object.defineProperty(Obj.prototype, 'test', {
+    get: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      },
+      'name',
+      {
+        value: 'get test',
+        configurable: true,
+      },
+    ),
+    configurable: true,
+  });
+  Object.defineProperty(Obj.prototype, 'set', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return _superReference.set(Object.getPrototypeOf(Obj.prototype), 'test', this, 3);
+      },
+      'name',
+      {
+        value: 'set',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Obj, 'prototype', { writable: false });
+  return Obj;
+})(Base);
+const obj = new Obj();
+expect(obj.set()).toBe(3);
+expect(Base.prototype.test).toBeUndefined();
+expect(Obj.prototype.test).toBeUndefined();
+expect(obj.test).toBe(3);`,
     modes: [
       {
         title: 'default',
@@ -2019,15 +8209,110 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[67],
       },
     ],
   },
   {
     title: 'get set — set semantics not defined on parent setter on obj (exec)',
-    source:
-      '"use strict";\nclass Base {\n}\n\nlet value = 2;\nclass Obj extends Base {\n  set test(v) {\n    value = v;\n  }\n\n  set() {\n    return super.test = 3;\n  }\n}\n\nconst obj = new Obj();\nexpect(obj.set()).toBe(3);\nexpect(Base.prototype.test).toBeUndefined();\nexpect(Obj.prototype.test).toBeUndefined();\nexpect(value).toBe(2);\nexpect(obj.test).toBe(3);\n',
+    source: `"use strict";
+class Base {
+}
+
+let value = 2;
+class Obj extends Base {
+  set test(v) {
+    value = v;
+  }
+
+  set() {
+    return super.test = 3;
+  }
+}
+
+const obj = new Obj();
+expect(obj.set()).toBe(3);
+expect(Base.prototype.test).toBeUndefined();
+expect(Obj.prototype.test).toBeUndefined();
+expect(value).toBe(2);
+expect(obj.test).toBe(3);
+`,
     filename: 'exec.js',
+    output: `'use strict';
+var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+var _superReference2 = { set: require('@babel/runtime/helpers/set') },
+  _superReference = {
+    set: function (e, r, t, s) {
+      return _superReference2.set(e, r, s, t, !0);
+    },
+  };
+let Base = (() => {
+  'use strict';
+  const Base = function Base() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Base, 'prototype', { writable: false });
+  return Base;
+})();
+let value = 2;
+let Obj = (__nox_super_45_148 => {
+  'use strict';
+  const Obj = function Obj() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(Obj), arguments, new.target || Obj);
+    return _this;
+  };
+  if (__nox_super_45_148 !== null && typeof __nox_super_45_148 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Obj.prototype = Object.create(__nox_super_45_148 && __nox_super_45_148.prototype, {
+    constructor: {
+      value: Obj,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Obj, __nox_super_45_148);
+  else Obj.__proto__ = __nox_super_45_148;
+  Object.defineProperty(Obj.prototype, 'test', {
+    set: Object.defineProperty(
+      function (v) {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        value = v;
+      },
+      'name',
+      {
+        value: 'set test',
+        configurable: true,
+      },
+    ),
+    configurable: true,
+  });
+  Object.defineProperty(Obj.prototype, 'set', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return _superReference.set(Object.getPrototypeOf(Obj.prototype), 'test', this, 3);
+      },
+      'name',
+      {
+        value: 'set',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Obj, 'prototype', { writable: false });
+  return Obj;
+})(Base);
+const obj = new Obj();
+expect(obj.set()).toBe(3);
+expect(Base.prototype.test).toBeUndefined();
+expect(Obj.prototype.test).toBeUndefined();
+expect(value).toBe(2);
+expect(obj.test).toBe(3);`,
     modes: [
       {
         title: 'default',
@@ -2041,15 +8326,112 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[68],
       },
     ],
   },
   {
     title: 'get set — set semantics not defined on parent setter on obj (input)',
-    source:
-      '"use strict";\nclass Base {\n}\n\nlet value = 2;\nclass Obj extends Base {\n  set test(v) {\n    expect(this).toBe(obj);\n    value = v;\n  }\n\n  set() {\n    return super.test = 3;\n  }\n}\n\nconst obj = new Obj();\nexpect(obj.set()).toBe(3);\nexpect(Base.prototype.test).toBeUndefined();\nexpect(Obj.prototype.test).toBeUndefined();\nexpect(value).toBe(2);\nexpect(obj.test).toBe(3);\n',
+    source: `"use strict";
+class Base {
+}
+
+let value = 2;
+class Obj extends Base {
+  set test(v) {
+    expect(this).toBe(obj);
+    value = v;
+  }
+
+  set() {
+    return super.test = 3;
+  }
+}
+
+const obj = new Obj();
+expect(obj.set()).toBe(3);
+expect(Base.prototype.test).toBeUndefined();
+expect(Obj.prototype.test).toBeUndefined();
+expect(value).toBe(2);
+expect(obj.test).toBe(3);
+`,
     filename: 'input.js',
+    output: `'use strict';
+var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+var _superReference2 = { set: require('@babel/runtime/helpers/set') },
+  _superReference = {
+    set: function (e, r, t, s) {
+      return _superReference2.set(e, r, s, t, !0);
+    },
+  };
+let Base = (() => {
+  'use strict';
+  const Base = function Base() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Base, 'prototype', { writable: false });
+  return Base;
+})();
+let value = 2;
+let Obj = (__nox_super_45_176 => {
+  'use strict';
+  const Obj = function Obj() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(Obj), arguments, new.target || Obj);
+    return _this;
+  };
+  if (__nox_super_45_176 !== null && typeof __nox_super_45_176 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Obj.prototype = Object.create(__nox_super_45_176 && __nox_super_45_176.prototype, {
+    constructor: {
+      value: Obj,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Obj, __nox_super_45_176);
+  else Obj.__proto__ = __nox_super_45_176;
+  Object.defineProperty(Obj.prototype, 'test', {
+    set: Object.defineProperty(
+      function (v) {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        expect(this).toBe(obj);
+        value = v;
+      },
+      'name',
+      {
+        value: 'set test',
+        configurable: true,
+      },
+    ),
+    configurable: true,
+  });
+  Object.defineProperty(Obj.prototype, 'set', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return _superReference.set(Object.getPrototypeOf(Obj.prototype), 'test', this, 3);
+      },
+      'name',
+      {
+        value: 'set',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Obj, 'prototype', { writable: false });
+  return Obj;
+})(Base);
+const obj = new Obj();
+expect(obj.set()).toBe(3);
+expect(Base.prototype.test).toBeUndefined();
+expect(Obj.prototype.test).toBeUndefined();
+expect(value).toBe(2);
+expect(obj.test).toBe(3);`,
     modes: [
       {
         title: 'default',
@@ -2063,15 +8445,119 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[69],
       },
     ],
   },
   {
     title: 'get set — set semantics setter defined on parent (exec)',
-    source:
-      '"use strict";\nlet value = 1;\nclass Base {\n  set test(v) {\n    value = v;\n  }\n}\n\nclass Obj extends Base {\n  set() {\n    return super.test = 3;\n  }\n}\nObject.defineProperty(Obj.prototype, \'test\', {\n  value: 2,\n  writable: true,\n  configurable: true,\n});\n\nconst obj = new Obj();\nexpect(obj.set()).toBe(3);\nexpect(value).toBe(3);\nexpect(Base.prototype.test).toBeUndefined();\nexpect(Obj.prototype.test).toBe(2);\nexpect(obj.test).toBe(2);\n',
+    source: `"use strict";
+let value = 1;
+class Base {
+  set test(v) {
+    value = v;
+  }
+}
+
+class Obj extends Base {
+  set() {
+    return super.test = 3;
+  }
+}
+Object.defineProperty(Obj.prototype, 'test', {
+  value: 2,
+  writable: true,
+  configurable: true,
+});
+
+const obj = new Obj();
+expect(obj.set()).toBe(3);
+expect(value).toBe(3);
+expect(Base.prototype.test).toBeUndefined();
+expect(Obj.prototype.test).toBe(2);
+expect(obj.test).toBe(2);
+`,
     filename: 'exec.js',
+    output: `'use strict';
+var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+var _superReference2 = { set: require('@babel/runtime/helpers/set') },
+  _superReference = {
+    set: function (e, r, t, s) {
+      return _superReference2.set(e, r, s, t, !0);
+    },
+  };
+let value = 1;
+let Base = (() => {
+  'use strict';
+  const Base = function Base() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Base.prototype, 'test', {
+    set: Object.defineProperty(
+      function (v) {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        value = v;
+      },
+      'name',
+      {
+        value: 'set test',
+        configurable: true,
+      },
+    ),
+    configurable: true,
+  });
+  Object.defineProperty(Base, 'prototype', { writable: false });
+  return Base;
+})();
+let Obj = (__nox_super_80_147 => {
+  'use strict';
+  const Obj = function Obj() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(Obj), arguments, new.target || Obj);
+    return _this;
+  };
+  if (__nox_super_80_147 !== null && typeof __nox_super_80_147 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Obj.prototype = Object.create(__nox_super_80_147 && __nox_super_80_147.prototype, {
+    constructor: {
+      value: Obj,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Obj, __nox_super_80_147);
+  else Obj.__proto__ = __nox_super_80_147;
+  Object.defineProperty(Obj.prototype, 'set', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return _superReference.set(Object.getPrototypeOf(Obj.prototype), 'test', this, 3);
+      },
+      'name',
+      {
+        value: 'set',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Obj, 'prototype', { writable: false });
+  return Obj;
+})(Base);
+Object.defineProperty(Obj.prototype, 'test', {
+  value: 2,
+  writable: true,
+  configurable: true,
+});
+const obj = new Obj();
+expect(obj.set()).toBe(3);
+expect(value).toBe(3);
+expect(Base.prototype.test).toBeUndefined();
+expect(Obj.prototype.test).toBe(2);
+expect(obj.test).toBe(2);`,
     modes: [
       {
         title: 'default',
@@ -2085,15 +8571,119 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[70],
       },
     ],
   },
   {
     title: 'get set — set semantics setter defined on parent (input)',
-    source:
-      '"use strict";\nlet value = 1;\nclass Base {\n  set test(v) {\n    value = v;\n  }\n}\n\nclass Obj extends Base {\n  set() {\n    return super.test = 3;\n  }\n}\nObject.defineProperty(Obj.prototype, \'test\', {\n  value: 2,\n  writable: true,\n  configurable: true,\n});\n\nconst obj = new Obj();\nexpect(obj.set()).toBe(3);\nexpect(value).toBe(3);\nexpect(Base.prototype.test).toBeUndefined();\nexpect(Obj.prototype.test).toBe(2);\nexpect(obj.test).toBe(2);\n',
+    source: `"use strict";
+let value = 1;
+class Base {
+  set test(v) {
+    value = v;
+  }
+}
+
+class Obj extends Base {
+  set() {
+    return super.test = 3;
+  }
+}
+Object.defineProperty(Obj.prototype, 'test', {
+  value: 2,
+  writable: true,
+  configurable: true,
+});
+
+const obj = new Obj();
+expect(obj.set()).toBe(3);
+expect(value).toBe(3);
+expect(Base.prototype.test).toBeUndefined();
+expect(Obj.prototype.test).toBe(2);
+expect(obj.test).toBe(2);
+`,
     filename: 'input.js',
+    output: `'use strict';
+var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+var _superReference2 = { set: require('@babel/runtime/helpers/set') },
+  _superReference = {
+    set: function (e, r, t, s) {
+      return _superReference2.set(e, r, s, t, !0);
+    },
+  };
+let value = 1;
+let Base = (() => {
+  'use strict';
+  const Base = function Base() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Base.prototype, 'test', {
+    set: Object.defineProperty(
+      function (v) {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        value = v;
+      },
+      'name',
+      {
+        value: 'set test',
+        configurable: true,
+      },
+    ),
+    configurable: true,
+  });
+  Object.defineProperty(Base, 'prototype', { writable: false });
+  return Base;
+})();
+let Obj = (__nox_super_80_147 => {
+  'use strict';
+  const Obj = function Obj() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(Obj), arguments, new.target || Obj);
+    return _this;
+  };
+  if (__nox_super_80_147 !== null && typeof __nox_super_80_147 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Obj.prototype = Object.create(__nox_super_80_147 && __nox_super_80_147.prototype, {
+    constructor: {
+      value: Obj,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Obj, __nox_super_80_147);
+  else Obj.__proto__ = __nox_super_80_147;
+  Object.defineProperty(Obj.prototype, 'set', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return _superReference.set(Object.getPrototypeOf(Obj.prototype), 'test', this, 3);
+      },
+      'name',
+      {
+        value: 'set',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Obj, 'prototype', { writable: false });
+  return Obj;
+})(Base);
+Object.defineProperty(Obj.prototype, 'test', {
+  value: 2,
+  writable: true,
+  configurable: true,
+});
+const obj = new Obj();
+expect(obj.set()).toBe(3);
+expect(value).toBe(3);
+expect(Base.prototype.test).toBeUndefined();
+expect(Obj.prototype.test).toBe(2);
+expect(obj.test).toBe(2);`,
     modes: [
       {
         title: 'default',
@@ -2107,14 +8697,43 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[70],
       },
     ],
   },
   {
     title: 'loose — blockstatement with use strict directive (input)',
-    source: 'function t() {\n    "use strict";\n    class Foo {\n      method() {}\n    }\n  }',
+    source: `function t() {
+    "use strict";
+    class Foo {
+      method() {}
+    }
+  }`,
     filename: 'input.js',
+    output: `function t() {
+  'use strict';
+  let Foo = (() => {
+    'use strict';
+    const Foo = function Foo() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+    };
+    Object.defineProperty(Foo.prototype, 'method', {
+      value: Object.defineProperty(
+        function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        },
+        'name',
+        {
+          value: 'method',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(Foo, 'prototype', { writable: false });
+    return Foo;
+  })();
+}`,
     modes: [
       {
         title: 'default',
@@ -2128,15 +8747,54 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[71],
       },
     ],
   },
   {
     title: 'loose — constructor order (input)',
-    source:
-      'class x {\n  f() {\n    1\n    2\n    3\n  }\n\n  constructor() {\n    4\n    5\n    6\n  }\n}\n',
+    source: `class x {
+  f() {
+    1
+    2
+    3
+  }
+
+  constructor() {
+    4
+    5
+    6
+  }
+}
+`,
     filename: 'input.js',
+    output: `let x = (() => {
+  'use strict';
+  const x = function x() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    4;
+    5;
+    6;
+  };
+  Object.defineProperty(x.prototype, 'f', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        1;
+        2;
+        3;
+      },
+      'name',
+      {
+        value: 'f',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(x, 'prototype', { writable: false });
+  return x;
+})();`,
     modes: [
       {
         title: 'default',
@@ -2150,15 +8808,64 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[72],
       },
     ],
   },
   {
     title: 'loose — default super (exec)',
-    source:
-      'class Test {\n  constructor() {\n    return super.constructor;\n  }\n\n  static test() {\n    return super.constructor;\n  }\n}\n\n// Instances\nexpect(Object.getPrototypeOf(Test.prototype)).toBe(Object.prototype);\nexpect(new Test()).toBe(Object);\n\n// Static\nexpect(Object.getPrototypeOf(Test)).toBe(Function.prototype);\nexpect(Test.test()).toBe(Function);\n',
+    source: `class Test {
+  constructor() {
+    return super.constructor;
+  }
+
+  static test() {
+    return super.constructor;
+  }
+}
+
+// Instances
+expect(Object.getPrototypeOf(Test.prototype)).toBe(Object.prototype);
+expect(new Test()).toBe(Object);
+
+// Static
+expect(Object.getPrototypeOf(Test)).toBe(Function.prototype);
+expect(Test.test()).toBe(Function);
+`,
     filename: 'exec.js',
+    output: `var _get2 = { get: require('@babel/runtime/helpers/get') };
+function _get(e, t, r) {
+  return _get2.get(e, t, r);
+}
+let Test = (() => {
+  'use strict';
+  const Test = function Test() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    return super.constructor;
+  };
+  Object.defineProperty(Test, 'test', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return _get(Object.getPrototypeOf(Test), 'constructor', this);
+      },
+      'name',
+      {
+        value: 'test',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Test, 'prototype', { writable: false });
+  return Test;
+})();
+// Instances
+expect(Object.getPrototypeOf(Test.prototype)).toBe(Object.prototype);
+expect(new Test()).toBe(Object);
+// Static
+expect(Object.getPrototypeOf(Test)).toBe(Function.prototype);
+expect(Test.test()).toBe(Function);`,
     modes: [
       {
         title: 'default',
@@ -2172,15 +8879,69 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[4],
       },
     ],
   },
   {
     title: 'loose — derived constructor must call super (exec)',
-    source:
-      'class Bar {}\n\nclass Foo extends Bar {\n  constructor() {\n\n  }\n}\n\nexpect(() => new Foo()).toThrow(ReferenceError, "this hasn\'t been initialised");\n',
+    source: `class Bar {}
+
+class Foo extends Bar {
+  constructor() {
+
+  }
+}
+
+expect(() => new Foo()).toThrow(ReferenceError, "this hasn't been initialised");
+`,
     filename: 'exec.js',
+    output: `var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+let Bar = (() => {
+  'use strict';
+  const Bar = function Bar() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Bar, 'prototype', { writable: false });
+  return Bar;
+})();
+let Foo = (__nox_super_14_62 => {
+  'use strict';
+  const Foo = function Foo() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this,
+      _newtarget = new.target;
+    function _super() {
+      _this = _construct(Object.getPrototypeOf(Foo), arguments, _newtarget || Foo);
+      return _this;
+    }
+    var _result = function () {}.apply(void 0, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    if (_this === void 0)
+      throw new ReferenceError("this hasn't been initialised - super() hasn't been called");
+    return _this;
+  };
+  if (__nox_super_14_62 !== null && typeof __nox_super_14_62 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Foo.prototype = Object.create(__nox_super_14_62 && __nox_super_14_62.prototype, {
+    constructor: {
+      value: Foo,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo, __nox_super_14_62);
+  else Foo.__proto__ = __nox_super_14_62;
+  Object.defineProperty(Foo, 'prototype', { writable: false });
+  return Foo;
+})(Bar);
+expect(() => new Foo()).toThrow(ReferenceError, "this hasn't been initialised");`,
     modes: [
       {
         title: 'default',
@@ -2194,14 +8955,56 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[73],
       },
     ],
   },
   {
     title: 'loose — derived constructor must call super (input)',
-    source: 'class Foo extends Bar {\n  constructor() {\n\n  }\n}\n',
+    source: `class Foo extends Bar {
+  constructor() {
+
+  }
+}
+`,
     filename: 'input.js',
+    output: `var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+let Foo = (__nox_super_0_48 => {
+  'use strict';
+  const Foo = function Foo() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this,
+      _newtarget = new.target;
+    function _super() {
+      _this = _construct(Object.getPrototypeOf(Foo), arguments, _newtarget || Foo);
+      return _this;
+    }
+    var _result = function () {}.apply(void 0, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    if (_this === void 0)
+      throw new ReferenceError("this hasn't been initialised - super() hasn't been called");
+    return _this;
+  };
+  if (__nox_super_0_48 !== null && typeof __nox_super_0_48 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Foo.prototype = Object.create(__nox_super_0_48 && __nox_super_0_48.prototype, {
+    constructor: {
+      value: Foo,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo, __nox_super_0_48);
+  else Foo.__proto__ = __nox_super_0_48;
+  Object.defineProperty(Foo, 'prototype', { writable: false });
+  return Foo;
+})(Bar);`,
     modes: [
       {
         title: 'default',
@@ -2215,14 +9018,58 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[74],
       },
     ],
   },
   {
     title: 'loose — derived constructor no super return falsey (input)',
-    source: 'class Child extends Base {\n    constructor(){\n      return false;\n    }\n}\n',
+    source: `class Child extends Base {
+    constructor(){
+      return false;
+    }
+}
+`,
     filename: 'input.js',
+    output: `var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+let Child = (__nox_super_0_73 => {
+  'use strict';
+  const Child = function Child() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this,
+      _newtarget = new.target;
+    function _super() {
+      _this = _construct(Object.getPrototypeOf(Child), arguments, _newtarget || Child);
+      return _this;
+    }
+    var _result = function () {
+      return false;
+    }.apply(void 0, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    if (_this === void 0)
+      throw new ReferenceError("this hasn't been initialised - super() hasn't been called");
+    return _this;
+  };
+  if (__nox_super_0_73 !== null && typeof __nox_super_0_73 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Child.prototype = Object.create(__nox_super_0_73 && __nox_super_0_73.prototype, {
+    constructor: {
+      value: Child,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Child, __nox_super_0_73);
+  else Child.__proto__ = __nox_super_0_73;
+  Object.defineProperty(Child, 'prototype', { writable: false });
+  return Child;
+})(Base);`,
     modes: [
       {
         title: 'default',
@@ -2236,14 +9083,58 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[75],
       },
     ],
   },
   {
     title: 'loose — derived constructor no super return object (input)',
-    source: 'class Child extends Base {\n    constructor(){\n      return {};\n    }\n}\n',
+    source: `class Child extends Base {
+    constructor(){
+      return {};
+    }
+}
+`,
     filename: 'input.js',
+    output: `var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+let Child = (__nox_super_0_70 => {
+  'use strict';
+  const Child = function Child() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this,
+      _newtarget = new.target;
+    function _super() {
+      _this = _construct(Object.getPrototypeOf(Child), arguments, _newtarget || Child);
+      return _this;
+    }
+    var _result = function () {
+      return {};
+    }.apply(void 0, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    if (_this === void 0)
+      throw new ReferenceError("this hasn't been initialised - super() hasn't been called");
+    return _this;
+  };
+  if (__nox_super_0_70 !== null && typeof __nox_super_0_70 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Child.prototype = Object.create(__nox_super_0_70 && __nox_super_0_70.prototype, {
+    constructor: {
+      value: Child,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Child, __nox_super_0_70);
+  else Child.__proto__ = __nox_super_0_70;
+  Object.defineProperty(Child, 'prototype', { writable: false });
+  return Child;
+})(Base);`,
     modes: [
       {
         title: 'default',
@@ -2257,14 +9148,42 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[76],
       },
     ],
   },
   {
     title: 'loose — preserve comments (input)',
-    source: 'class C {\n  /* before a */\n  a() {}\n  /* after a */\n}\n',
+    source: `class C {
+  /* before a */
+  a() {}
+  /* after a */
+}
+`,
     filename: 'input.js',
+    output: `let C = (() => {
+  'use strict';
+  const C = function C() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(C.prototype, 'a', {
+    value: Object.defineProperty(
+      function () {
+        /* before a */
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      },
+      'name',
+      {
+        value: 'a',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(C, 'prototype', { writable: false });
+  return C;
+  /* after a */
+})();`,
     modes: [
       {
         title: 'default',
@@ -2278,15 +9197,177 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[77],
       },
     ],
   },
   {
     title: 'loose — returning from derived constructor (exec)',
-    source:
-      '"use strict";\nclass Foo {\n  constructor() {\n    return { x: 1 };\n  }\n}\n\nexpect(new Foo().x).toBe(1);\n\nclass Bar extends Foo {\n  constructor() {\n    super();\n    return;\n  }\n}\n\nexpect(new Bar().x).toBe(1);\n\nclass Bar2 extends Foo {\n  constructor() {\n    super();\n    expect(this.x).toBe(1);\n    return { x: 2 };\n  }\n}\n\nexpect(new Bar2().x).toBe(2);\n\n\nlet singleton;\nclass Sub extends Foo {\n  constructor() {\n    if (singleton) {\n      return singleton;\n    }\n    singleton = super();\n  }\n}\n\nlet instance = new Sub;\nexpect(instance).toBe(singleton);\n\ninstance = new Sub;\nexpect(instance).toBe(singleton);\n',
+    source: `"use strict";
+class Foo {
+  constructor() {
+    return { x: 1 };
+  }
+}
+
+expect(new Foo().x).toBe(1);
+
+class Bar extends Foo {
+  constructor() {
+    super();
+    return;
+  }
+}
+
+expect(new Bar().x).toBe(1);
+
+class Bar2 extends Foo {
+  constructor() {
+    super();
+    expect(this.x).toBe(1);
+    return { x: 2 };
+  }
+}
+
+expect(new Bar2().x).toBe(2);
+
+
+let singleton;
+class Sub extends Foo {
+  constructor() {
+    if (singleton) {
+      return singleton;
+    }
+    singleton = super();
+  }
+}
+
+let instance = new Sub;
+expect(instance).toBe(singleton);
+
+instance = new Sub;
+expect(instance).toBe(singleton);
+`,
     filename: 'exec.js',
+    output: `'use strict';
+var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+let Foo = (() => {
+  'use strict';
+  const Foo = function Foo() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    return { x: 1 };
+  };
+  Object.defineProperty(Foo, 'prototype', { writable: false });
+  return Foo;
+})();
+expect(new Foo().x).toBe(1);
+let Bar = (__nox_super_102_174 => {
+  'use strict';
+  const Bar = function Bar() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(Bar), [], new.target || Bar);
+    var _result = function () {
+      return;
+    }.apply(_this, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    return _this;
+  };
+  if (__nox_super_102_174 !== null && typeof __nox_super_102_174 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Bar.prototype = Object.create(__nox_super_102_174 && __nox_super_102_174.prototype, {
+    constructor: {
+      value: Bar,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Bar, __nox_super_102_174);
+  else Bar.__proto__ = __nox_super_102_174;
+  Object.defineProperty(Bar, 'prototype', { writable: false });
+  return Bar;
+})(Foo);
+expect(new Bar().x).toBe(1);
+let Bar2 = (__nox_super_206_316 => {
+  'use strict';
+  const Bar2 = function Bar2() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(Bar2), [], new.target || Bar2);
+    var _result = function () {
+      expect(this.x).toBe(1);
+      return { x: 2 };
+    }.apply(_this, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    return _this;
+  };
+  if (__nox_super_206_316 !== null && typeof __nox_super_206_316 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Bar2.prototype = Object.create(__nox_super_206_316 && __nox_super_206_316.prototype, {
+    constructor: {
+      value: Bar2,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Bar2, __nox_super_206_316);
+  else Bar2.__proto__ = __nox_super_206_316;
+  Object.defineProperty(Bar2, 'prototype', { writable: false });
+  return Bar2;
+})(Foo);
+expect(new Bar2().x).toBe(2);
+let singleton;
+let Sub = (__nox_super_365_488 => {
+  'use strict';
+  const Sub = function Sub() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this,
+      _newtarget = new.target;
+    function _super() {
+      _this = _construct(Object.getPrototypeOf(Sub), arguments, _newtarget || Sub);
+      return _this;
+    }
+    var _result = function () {
+      if (singleton) {
+        return singleton;
+      }
+      singleton = _super();
+    }.apply(void 0, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    if (_this === void 0)
+      throw new ReferenceError("this hasn't been initialised - super() hasn't been called");
+    return _this;
+  };
+  if (__nox_super_365_488 !== null && typeof __nox_super_365_488 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Sub.prototype = Object.create(__nox_super_365_488 && __nox_super_365_488.prototype, {
+    constructor: {
+      value: Sub,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Sub, __nox_super_365_488);
+  else Sub.__proto__ = __nox_super_365_488;
+  Object.defineProperty(Sub, 'prototype', { writable: false });
+  return Sub;
+})(Foo);
+let instance = new Sub();
+expect(instance).toBe(singleton);
+instance = new Sub();
+expect(instance).toBe(singleton);`,
     modes: [
       {
         title: 'default',
@@ -2300,14 +9381,60 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[78],
       },
     ],
   },
   {
     title: 'loose — super destructuring array pattern 1 (input)',
-    source: 'class Foo {\n  foo(props) {\n    ;([x, ...super.client] = props);\n  }\n}',
+    source: `class Foo {
+  foo(props) {
+    ;([x, ...super.client] = props);
+  }
+}`,
     filename: 'input.js',
+    output: `var _superReference2 = {
+  get: require('@babel/runtime/helpers/get'),
+  set: require('@babel/runtime/helpers/set'),
+};
+function _get(e, t, r) {
+  return _superReference2.get(e, t, r);
+}
+function _superReference(e, t, r) {
+  return {
+    get value() {
+      return _superReference2.get(e, t, r);
+    },
+    set value(u) {
+      _superReference2.set(e, t, u, r, !0);
+    },
+  };
+}
+_superReference.set = function (e, t, r, u) {
+  return _superReference2.set(e, t, u, r, !0);
+};
+let Foo = (() => {
+  'use strict';
+  const Foo = function Foo() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Foo.prototype, 'foo', {
+    value: Object.defineProperty(
+      function (props) {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        [x, ..._superReference(Object.getPrototypeOf(Foo.prototype), 'client', this).value] = props;
+      },
+      'name',
+      {
+        value: 'foo',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Foo, 'prototype', { writable: false });
+  return Foo;
+})();`,
     modes: [
       {
         title: 'default',
@@ -2321,14 +9448,61 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[79],
       },
     ],
   },
   {
     title: 'loose — super destructuring array pattern (input)',
-    source: 'class Foo {\n  foo(props) {\n    ;([super.client] = props);\n  }\n}\n',
+    source: `class Foo {
+  foo(props) {
+    ;([super.client] = props);
+  }
+}
+`,
     filename: 'input.js',
+    output: `var _superReference2 = {
+  get: require('@babel/runtime/helpers/get'),
+  set: require('@babel/runtime/helpers/set'),
+};
+function _get(e, t, r) {
+  return _superReference2.get(e, t, r);
+}
+function _superReference(e, t, r) {
+  return {
+    get value() {
+      return _superReference2.get(e, t, r);
+    },
+    set value(u) {
+      _superReference2.set(e, t, u, r, !0);
+    },
+  };
+}
+_superReference.set = function (e, t, r, u) {
+  return _superReference2.set(e, t, u, r, !0);
+};
+let Foo = (() => {
+  'use strict';
+  const Foo = function Foo() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Foo.prototype, 'foo', {
+    value: Object.defineProperty(
+      function (props) {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        [_superReference(Object.getPrototypeOf(Foo.prototype), 'client', this).value] = props;
+      },
+      'name',
+      {
+        value: 'foo',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Foo, 'prototype', { writable: false });
+  return Foo;
+})();`,
     modes: [
       {
         title: 'default',
@@ -2342,14 +9516,61 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[80],
       },
     ],
   },
   {
     title: 'loose — super destructuring object pattern 1 (input)',
-    source: 'class Foo {\n  foo(props) {\n    ;({ x, ...super.client } = props)\n  }\n}',
+    source: `class Foo {
+  foo(props) {
+    ;({ x, ...super.client } = props)
+  }
+}`,
     filename: 'input.js',
+    output: `var _superReference2 = {
+  get: require('@babel/runtime/helpers/get'),
+  set: require('@babel/runtime/helpers/set'),
+};
+function _get(e, t, r) {
+  return _superReference2.get(e, t, r);
+}
+function _superReference(e, t, r) {
+  return {
+    get value() {
+      return _superReference2.get(e, t, r);
+    },
+    set value(u) {
+      _superReference2.set(e, t, u, r, !0);
+    },
+  };
+}
+_superReference.set = function (e, t, r, u) {
+  return _superReference2.set(e, t, u, r, !0);
+};
+let Foo = (() => {
+  'use strict';
+  const Foo = function Foo() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Foo.prototype, 'foo', {
+    value: Object.defineProperty(
+      function (props) {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        ({ x, ..._superReference(Object.getPrototypeOf(Foo.prototype), 'client', this).value } =
+          props);
+      },
+      'name',
+      {
+        value: 'foo',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Foo, 'prototype', { writable: false });
+  return Foo;
+})();`,
     modes: [
       {
         title: 'default',
@@ -2363,14 +9584,61 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[81],
       },
     ],
   },
   {
     title: 'loose — super destructuring object pattern (input)',
-    source: 'class Foo {\n  foo(props) {\n    ;({ client: super.client } = props)\n  }\n}',
+    source: `class Foo {
+  foo(props) {
+    ;({ client: super.client } = props)
+  }
+}`,
     filename: 'input.js',
+    output: `var _superReference2 = {
+  get: require('@babel/runtime/helpers/get'),
+  set: require('@babel/runtime/helpers/set'),
+};
+function _get(e, t, r) {
+  return _superReference2.get(e, t, r);
+}
+function _superReference(e, t, r) {
+  return {
+    get value() {
+      return _superReference2.get(e, t, r);
+    },
+    set value(u) {
+      _superReference2.set(e, t, u, r, !0);
+    },
+  };
+}
+_superReference.set = function (e, t, r, u) {
+  return _superReference2.set(e, t, u, r, !0);
+};
+let Foo = (() => {
+  'use strict';
+  const Foo = function Foo() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Foo.prototype, 'foo', {
+    value: Object.defineProperty(
+      function (props) {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        ({ client: _superReference(Object.getPrototypeOf(Foo.prototype), 'client', this).value } =
+          props);
+      },
+      'name',
+      {
+        value: 'foo',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Foo, 'prototype', { writable: false });
+  return Foo;
+})();`,
     modes: [
       {
         title: 'default',
@@ -2384,15 +9652,48 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[82],
       },
     ],
   },
   {
     title: 'misc — function name ts annotation (input)',
-    source:
-      'class Database {\n  transaction(\n    // If the type annotation here contains the *name of the method*\n    // then it changes how the method is compiled. Rename `transaction`\n    // below and see how the output changes.\n    callback: (transaction: Transaction) => unknown,\n  ) {\n    return this.table.transaction(\n      (x) => callback(new DaoTransaction(x)),\n    );\n  }\n}\n',
+    source: `class Database {
+  transaction(
+    // If the type annotation here contains the *name of the method*
+    // then it changes how the method is compiled. Rename \`transaction\`
+    // below and see how the output changes.
+    callback: (transaction: Transaction) => unknown,
+  ) {
+    return this.table.transaction(
+      (x) => callback(new DaoTransaction(x)),
+    );
+  }
+}
+`,
     filename: 'input.ts',
+    output: `let Database = (() => {
+  'use strict';
+  const Database = function Database() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Database.prototype, 'transaction', {
+    value: Object.defineProperty(
+      function (callback) {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return this.table.transaction(x => callback(new DaoTransaction(x)));
+      },
+      'name',
+      {
+        value: 'transaction',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Database, 'prototype', { writable: false });
+  return Database;
+})();`,
     modes: [
       {
         title: 'default',
@@ -2407,14 +9708,58 @@ export const fixtureCases = [
           },
           typescript: 'strip',
         },
-        output: expectedOutputs[83],
       },
     ],
   },
   {
     title: 'misc — missing class properties transform private (input)',
-    source: "class Test {\n  #key = '';\n\n  method() {\n      return this.#key;\n  }\n}\n",
+    source: `class Test {
+  #key = '';
+
+  method() {
+      return this.#key;
+  }
+}
+`,
     filename: 'input.js',
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+let Test = (() => {
+  'use strict';
+  var _key = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Test_key');
+  function _initialize() {
+    Object.defineProperty(this, _key, {
+      writable: true,
+      value: '',
+    });
+  }
+  const Test = function Test() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    _initialize.call(this);
+  };
+  Object.defineProperty(Test.prototype, 'method', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return _classPrivateFieldLooseBase(this, _key)[_key];
+      },
+      'name',
+      {
+        value: 'method',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Test, 'prototype', { writable: false });
+  return Test;
+})();`,
     modes: [
       {
         title: 'default',
@@ -2433,14 +9778,52 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[84],
       },
     ],
   },
   {
     title: 'misc — missing class properties transform public (input)',
-    source: "class Test {\n  key = '';\n\n  method() {\n      return this.key;\n  }\n}\n",
+    source: `class Test {
+  key = '';
+
+  method() {
+      return this.key;
+  }
+}
+`,
     filename: 'input.js',
+    output: `let Test = (() => {
+  'use strict';
+  function _initialize() {
+    Object.defineProperty(this, 'key', {
+      value: '',
+      enumerable: true,
+      configurable: true,
+      writable: true,
+    });
+  }
+  const Test = function Test() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    _initialize.call(this);
+  };
+  Object.defineProperty(Test.prototype, 'method', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return this.key;
+      },
+      'name',
+      {
+        value: 'method',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Test, 'prototype', { writable: false });
+  return Test;
+})();`,
     modes: [
       {
         title: 'default',
@@ -2454,15 +9837,64 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[85],
       },
     ],
   },
   {
     title: 'misc — this before super 2 (input)',
-    source:
-      'class Foo extends Bar {\n  constructor() {\n    if (dynamic()) super();\n    this;\n  }\n}\n',
+    source: `class Foo extends Bar {
+  constructor() {
+    if (dynamic()) super();
+    this;
+  }
+}
+`,
     filename: 'input.js',
+    output: `var _construct2 = {
+  construct: require('@babel/runtime/helpers/construct'),
+  assertThisInitialized: require('@babel/runtime/helpers/assertThisInitialized'),
+};
+function _construct(t, e, r) {
+  return _construct2.construct(t, e, r);
+}
+_construct.assert = _construct2.assertThisInitialized;
+let Foo = (__nox_super_0_85 => {
+  'use strict';
+  const Foo = function Foo() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this,
+      _newtarget = new.target;
+    function _super() {
+      _this = _construct(Object.getPrototypeOf(Foo), arguments, _newtarget || Foo);
+      return _this;
+    }
+    var _result = function () {
+      if (dynamic()) _super();
+      _construct.assert(_this);
+    }.apply(void 0, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    if (_this === void 0)
+      throw new ReferenceError("this hasn't been initialised - super() hasn't been called");
+    return _this;
+  };
+  if (__nox_super_0_85 !== null && typeof __nox_super_0_85 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Foo.prototype = Object.create(__nox_super_0_85 && __nox_super_0_85.prototype, {
+    constructor: {
+      value: Foo,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo, __nox_super_0_85);
+  else Foo.__proto__ = __nox_super_0_85;
+  Object.defineProperty(Foo, 'prototype', { writable: false });
+  return Foo;
+})(Bar);`,
     modes: [
       {
         title: 'default',
@@ -2476,14 +9908,49 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[86],
       },
     ],
   },
   {
     title: 'misc — this before super 3 (input)',
-    source: 'class Foo extends Bar {\n  constructor() {\n    super(this);\n  }\n}\n',
+    source: `class Foo extends Bar {
+  constructor() {
+    super(this);
+  }
+}
+`,
     filename: 'input.js',
+    output: `var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+let Foo = (__nox_super_0_64 => {
+  'use strict';
+  const Foo = function Foo() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(Foo), [this], new.target || Foo);
+    var _result = function () {}.apply(_this, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    return _this;
+  };
+  if (__nox_super_0_64 !== null && typeof __nox_super_0_64 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Foo.prototype = Object.create(__nox_super_0_64 && __nox_super_0_64.prototype, {
+    constructor: {
+      value: Foo,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo, __nox_super_0_64);
+  else Foo.__proto__ = __nox_super_0_64;
+  Object.defineProperty(Foo, 'prototype', { writable: false });
+  return Foo;
+})(Bar);`,
     modes: [
       {
         title: 'default',
@@ -2497,14 +9964,55 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[87],
       },
     ],
   },
   {
     title: 'misc — this before super (input)',
-    source: 'class Foo extends Bar {\n  constructor() {\n    this;\n    super();\n  }\n}\n',
+    source: `class Foo extends Bar {
+  constructor() {
+    this;
+    super();
+  }
+}
+`,
     filename: 'input.js',
+    output: `var _construct2 = {
+  construct: require('@babel/runtime/helpers/construct'),
+  assertThisInitialized: require('@babel/runtime/helpers/assertThisInitialized'),
+};
+function _construct(t, e, r) {
+  return _construct2.construct(t, e, r);
+}
+_construct.assert = _construct2.assertThisInitialized;
+let Foo = (__nox_super_0_70 => {
+  'use strict';
+  const Foo = function Foo() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    _construct.assert(_this);
+    var _this = _construct(Object.getPrototypeOf(Foo), [], new.target || Foo);
+    var _result = function () {}.apply(_this, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    return _this;
+  };
+  if (__nox_super_0_70 !== null && typeof __nox_super_0_70 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Foo.prototype = Object.create(__nox_super_0_70 && __nox_super_0_70.prototype, {
+    constructor: {
+      value: Foo,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo, __nox_super_0_70);
+  else Foo.__proto__ = __nox_super_0_70;
+  Object.defineProperty(Foo, 'prototype', { writable: false });
+  return Foo;
+})(Bar);`,
     modes: [
       {
         title: 'default',
@@ -2518,14 +10026,58 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[88],
       },
     ],
   },
   {
     title: 'regression — 14652 (input)',
-    source: 'class C extends P {\n  constructor() {\n    super(super(super()))\n  }\n}\n',
+    source: `class C extends P {
+  constructor() {
+    super(super(super()))
+  }
+}
+`,
     filename: 'input.js',
+    output: `var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+let C = (__nox_super_0_69 => {
+  'use strict';
+  const C = function C() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this,
+      _newtarget = new.target;
+    function _super() {
+      _this = _construct(Object.getPrototypeOf(C), arguments, _newtarget || C);
+      return _this;
+    }
+    var _result = function () {
+      _super(_super(_super()));
+    }.apply(void 0, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    if (_this === void 0)
+      throw new ReferenceError("this hasn't been initialised - super() hasn't been called");
+    return _this;
+  };
+  if (__nox_super_0_69 !== null && typeof __nox_super_0_69 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  C.prototype = Object.create(__nox_super_0_69 && __nox_super_0_69.prototype, {
+    constructor: {
+      value: C,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(C, __nox_super_0_69);
+  else C.__proto__ = __nox_super_0_69;
+  Object.defineProperty(C, 'prototype', { writable: false });
+  return C;
+})(P);`,
     modes: [
       {
         title: 'default',
@@ -2539,15 +10091,120 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[89],
       },
     ],
   },
   {
     title: 'regression — 2663 (input)',
-    source:
-      "import net from 'net';\nimport { EventEmitter } from 'events';\nimport BinarySerializer from './helpers/binary-serializer';\n// import ...\n\nexport default class Connection extends EventEmitter {\n    constructor(endpoint, joinKey, joinData, roomId) {\n        super();\n\n        this.isConnected = false;\n        this.roomId = roomId;\n\n        // ...\n    }\n\n    send(message) {\n        this.sock.write(BinarySerializer.serializeMessage(message));\n    }\n\n    disconnect() {\n        this.sock.close();\n    }\n}\n",
+    source: `import net from 'net';
+import { EventEmitter } from 'events';
+import BinarySerializer from './helpers/binary-serializer';
+// import ...
+
+export default class Connection extends EventEmitter {
+    constructor(endpoint, joinKey, joinData, roomId) {
+        super();
+
+        this.isConnected = false;
+        this.roomId = roomId;
+
+        // ...
+    }
+
+    send(message) {
+        this.sock.write(BinarySerializer.serializeMessage(message));
+    }
+
+    disconnect() {
+        this.sock.close();
+    }
+}
+`,
     filename: 'input.mjs',
+    output: `import _babelHelper from '@babel/runtime/helpers/construct';
+import _babelHelper2 from '@babel/runtime/helpers/assertThisInitialized';
+var _construct2 = {
+  construct: _babelHelper,
+  assertThisInitialized: _babelHelper2,
+};
+function _construct(t, e, r) {
+  return _construct2.construct(t, e, r);
+}
+_construct.assert = _construct2.assertThisInitialized;
+import net from 'net';
+import { EventEmitter } from 'events';
+import BinarySerializer from './helpers/binary-serializer';
+// import ...
+let Connection = (__nox_super_152_501 => {
+  'use strict';
+  const Connection = function Connection(_argument, _argument22, _argument23, _argument24) {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this,
+      _newtarget = new.target;
+    function _super() {
+      _this = _construct(Object.getPrototypeOf(Connection), arguments, _newtarget || Connection);
+      return _this;
+    }
+    var _result = function (endpoint, joinKey, joinData, roomId) {
+      _super();
+      _construct.assert(_this).isConnected = false;
+      _construct.assert(_this).roomId = roomId;
+    }.apply(void 0, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    if (_this === void 0)
+      throw new ReferenceError("this hasn't been initialised - super() hasn't been called");
+    return _this;
+    // ...
+  };
+  if (__nox_super_152_501 !== null && typeof __nox_super_152_501 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Connection.prototype = Object.create(__nox_super_152_501 && __nox_super_152_501.prototype, {
+    constructor: {
+      value: Connection,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Connection, __nox_super_152_501);
+  else Connection.__proto__ = __nox_super_152_501;
+  Object.defineProperty(Connection.prototype, 'send', {
+    value: Object.defineProperty(
+      function (message) {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        this.sock.write(BinarySerializer.serializeMessage(message));
+      },
+      'name',
+      {
+        value: 'send',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Connection.prototype, 'disconnect', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        this.sock.close();
+      },
+      'name',
+      {
+        value: 'disconnect',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Connection, 'prototype', { writable: false });
+  return Connection;
+})(EventEmitter);
+export default Connection;`,
     modes: [
       {
         title: 'default',
@@ -2561,15 +10218,70 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[90],
       },
     ],
   },
   {
     title: 'regression — 2694 (input)',
-    source:
-      "import BaseFoo from './BaseFoo';\n\nexport default class SubFoo extends BaseFoo {\n  static talk() {\n    super.talk();\n    console.log('SubFoo.talk');\n  }\n}\n",
+    source: `import BaseFoo from './BaseFoo';
+
+export default class SubFoo extends BaseFoo {
+  static talk() {
+    super.talk();
+    console.log('SubFoo.talk');
+  }
+}
+`,
     filename: 'input.mjs',
+    output: `import _babelHelper from '@babel/runtime/helpers/construct';
+import _babelHelper2 from '@babel/runtime/helpers/get';
+var _construct2 = { construct: _babelHelper };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+var _get2 = { get: _babelHelper2 };
+function _get(e, t, r) {
+  return _get2.get(e, t, r);
+}
+import BaseFoo from './BaseFoo';
+let SubFoo = (__nox_super_49_153 => {
+  'use strict';
+  const SubFoo = function SubFoo() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(SubFoo), arguments, new.target || SubFoo);
+    return _this;
+  };
+  if (__nox_super_49_153 !== null && typeof __nox_super_49_153 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  SubFoo.prototype = Object.create(__nox_super_49_153 && __nox_super_49_153.prototype, {
+    constructor: {
+      value: SubFoo,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(SubFoo, __nox_super_49_153);
+  else SubFoo.__proto__ = __nox_super_49_153;
+  Object.defineProperty(SubFoo, 'talk', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        _get(Object.getPrototypeOf(SubFoo), 'talk', this).call(this);
+        console.log('SubFoo.talk');
+      },
+      'name',
+      {
+        value: 'talk',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(SubFoo, 'prototype', { writable: false });
+  return SubFoo;
+})(BaseFoo);
+export default SubFoo;`,
     modes: [
       {
         title: 'default',
@@ -2583,15 +10295,85 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[91],
       },
     ],
   },
   {
     title: 'regression — 2775 (input)',
-    source:
-      "import React, {Component} from 'react';\n\nexport default class RandomComponent extends Component {\n  constructor(){\n    super();\n  }\n\n  render() {\n    return (\n      <div className='sui-RandomComponent'>\n        <h2>Hi there!</h2>\n      </div>\n    );\n  }\n}\n",
+    source: `import React, {Component} from 'react';
+
+export default class RandomComponent extends Component {
+  constructor(){
+    super();
+  }
+
+  render() {
+    return (
+      <div className='sui-RandomComponent'>
+        <h2>Hi there!</h2>
+      </div>
+    );
+  }
+}
+`,
     filename: 'input.jsx',
+    output: `import _babelHelper from '@babel/runtime/helpers/construct';
+var _construct2 = { construct: _babelHelper };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+import React, { Component } from 'react';
+let RandomComponent = (__nox_super_56_255 => {
+  'use strict';
+  const RandomComponent = function RandomComponent() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(
+      Object.getPrototypeOf(RandomComponent),
+      [],
+      new.target || RandomComponent,
+    );
+    var _result = function () {}.apply(_this, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    return _this;
+  };
+  if (__nox_super_56_255 !== null && typeof __nox_super_56_255 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  RandomComponent.prototype = Object.create(__nox_super_56_255 && __nox_super_56_255.prototype, {
+    constructor: {
+      value: RandomComponent,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(RandomComponent, __nox_super_56_255);
+  else RandomComponent.__proto__ = __nox_super_56_255;
+  Object.defineProperty(RandomComponent.prototype, 'render', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return (
+          <div className="sui-RandomComponent">
+            <h2>Hi there!</h2>
+          </div>
+        );
+      },
+      'name',
+      {
+        value: 'render',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(RandomComponent, 'prototype', { writable: false });
+  return RandomComponent;
+})(Component);
+export default RandomComponent;`,
     modes: [
       {
         title: 'default',
@@ -2606,14 +10388,23 @@ export const fixtureCases = [
           },
           jsx: 'preserve',
         },
-        output: expectedOutputs[92],
       },
     ],
   },
   {
     title: 'regression — 2941 (input)',
-    source: 'export default class {}\n',
+    source: `export default class {}
+`,
     filename: 'input.mjs',
+    output: `let _Class = (() => {
+  'use strict';
+  const _Class = function _Class() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(_Class, 'prototype', { writable: false });
+  return _Class;
+})();
+export default _Class;`,
     modes: [
       {
         title: 'default',
@@ -2627,15 +10418,101 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[93],
       },
     ],
   },
   {
     title: 'regression — 3028 (input)',
-    source:
-      'class b {\n}\n\nclass a1 extends b {\n  constructor() {\n    super();\n    this.x = () => this;\n  }\n}\n\nexport default class a2 extends b {\n  constructor() {\n    super();\n    this.x = () => this;\n  }\n}\n',
+    source: `class b {
+}
+
+class a1 extends b {
+  constructor() {
+    super();
+    this.x = () => this;
+  }
+}
+
+export default class a2 extends b {
+  constructor() {
+    super();
+    this.x = () => this;
+  }
+}
+`,
     filename: 'input.mjs',
+    output: `import _babelHelper from '@babel/runtime/helpers/construct';
+var _construct2 = { construct: _babelHelper };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+let b = (() => {
+  'use strict';
+  const b = function b() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(b, 'prototype', { writable: false });
+  return b;
+})();
+let a1 = (__nox_super_13_95 => {
+  'use strict';
+  const a1 = function a1() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(a1), [], new.target || a1);
+    var _result = function () {
+      this.x = () => this;
+    }.apply(_this, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    return _this;
+  };
+  if (__nox_super_13_95 !== null && typeof __nox_super_13_95 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  a1.prototype = Object.create(__nox_super_13_95 && __nox_super_13_95.prototype, {
+    constructor: {
+      value: a1,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(a1, __nox_super_13_95);
+  else a1.__proto__ = __nox_super_13_95;
+  Object.defineProperty(a1, 'prototype', { writable: false });
+  return a1;
+})(b);
+let a2 = (__nox_super_112_194 => {
+  'use strict';
+  const a2 = function a2() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(a2), [], new.target || a2);
+    var _result = function () {
+      this.x = () => this;
+    }.apply(_this, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    return _this;
+  };
+  if (__nox_super_112_194 !== null && typeof __nox_super_112_194 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  a2.prototype = Object.create(__nox_super_112_194 && __nox_super_112_194.prototype, {
+    constructor: {
+      value: a2,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(a2, __nox_super_112_194);
+  else a2.__proto__ = __nox_super_112_194;
+  Object.defineProperty(a2, 'prototype', { writable: false });
+  return a2;
+})(b);
+export default a2;`,
     modes: [
       {
         title: 'default',
@@ -2649,15 +10526,123 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[94],
       },
     ],
   },
   {
     title: 'regression — 5769 (exec)',
-    source:
-      'class Point {\n  getX() {\n    expect(this.x).toBe(3); // C\n  }\n}\n\nclass ColorPoint extends Point {\n  constructor() {\n    super();\n    this.x = 2;\n    super.x = 3;\n    expect(this.x).toBe(3);   // A\n    expect(super.x).toBeUndefined();  // B\n  }\n\n  m() {\n    this.getX()\n  }\n}\n\nconst cp = new ColorPoint();\ncp.m();\n',
+    source: `class Point {
+  getX() {
+    expect(this.x).toBe(3); // C
+  }
+}
+
+class ColorPoint extends Point {
+  constructor() {
+    super();
+    this.x = 2;
+    super.x = 3;
+    expect(this.x).toBe(3);   // A
+    expect(super.x).toBeUndefined();  // B
+  }
+
+  m() {
+    this.getX()
+  }
+}
+
+const cp = new ColorPoint();
+cp.m();
+`,
     filename: 'exec.js',
+    output: `var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+var _superReference2 = {
+  get: require('@babel/runtime/helpers/get'),
+  set: require('@babel/runtime/helpers/set'),
+};
+function _get(e, r, t) {
+  return _superReference2.get(e, r, t);
+}
+var _superReference = {
+  set: function (e, r, t, u) {
+    return _superReference2.set(e, r, u, t, !0);
+  },
+};
+let Point = (() => {
+  'use strict';
+  const Point = function Point() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Point.prototype, 'getX', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        expect(this.x).toBe(3);
+      },
+      'name',
+      {
+        value: 'getX',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Point, 'prototype', { writable: false });
+  return Point;
+})();
+let ColorPoint = (__nox_super_65_274 => {
+  'use strict';
+  const ColorPoint = function ColorPoint() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(ColorPoint), [], new.target || ColorPoint);
+    var _result = function () {
+      this.x = 2;
+      _superReference.set(Object.getPrototypeOf(ColorPoint.prototype), 'x', this, 3);
+      expect(this.x).toBe(3);
+      expect(_get(Object.getPrototypeOf(ColorPoint.prototype), 'x', this)).toBeUndefined();
+    }.apply(_this, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    return _this;
+  };
+  if (__nox_super_65_274 !== null && typeof __nox_super_65_274 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  ColorPoint.prototype = Object.create(__nox_super_65_274 && __nox_super_65_274.prototype, {
+    constructor: {
+      value: ColorPoint,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(ColorPoint, __nox_super_65_274);
+  else ColorPoint.__proto__ = __nox_super_65_274;
+  Object.defineProperty(ColorPoint.prototype, 'm', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        this.getX();
+      },
+      'name',
+      {
+        value: 'm',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(ColorPoint, 'prototype', { writable: false });
+  return ColorPoint;
+})(Point);
+const cp = new ColorPoint();
+cp.m();`,
     modes: [
       {
         title: 'default',
@@ -2671,15 +10656,123 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[95],
       },
     ],
   },
   {
     title: 'regression — 5769 (input)',
-    source:
-      'class Point {\n  getX() {\n    expect(this.x).toBe(3); // C\n  }\n}\n\nclass ColorPoint extends Point {\n  constructor() {\n    super();\n    this.x = 2;\n    super.x = 3;\n    expect(this.x).toBe(3);   // A\n    expect(super.x).toBeUndefined();  // B\n  }\n\n  m() {\n    this.getX();\n  }\n}\n\nconst cp = new ColorPoint();\ncp.m();\n',
+    source: `class Point {
+  getX() {
+    expect(this.x).toBe(3); // C
+  }
+}
+
+class ColorPoint extends Point {
+  constructor() {
+    super();
+    this.x = 2;
+    super.x = 3;
+    expect(this.x).toBe(3);   // A
+    expect(super.x).toBeUndefined();  // B
+  }
+
+  m() {
+    this.getX();
+  }
+}
+
+const cp = new ColorPoint();
+cp.m();
+`,
     filename: 'input.js',
+    output: `var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+var _superReference2 = {
+  get: require('@babel/runtime/helpers/get'),
+  set: require('@babel/runtime/helpers/set'),
+};
+function _get(e, r, t) {
+  return _superReference2.get(e, r, t);
+}
+var _superReference = {
+  set: function (e, r, t, u) {
+    return _superReference2.set(e, r, u, t, !0);
+  },
+};
+let Point = (() => {
+  'use strict';
+  const Point = function Point() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Point.prototype, 'getX', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        expect(this.x).toBe(3);
+      },
+      'name',
+      {
+        value: 'getX',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Point, 'prototype', { writable: false });
+  return Point;
+})();
+let ColorPoint = (__nox_super_65_275 => {
+  'use strict';
+  const ColorPoint = function ColorPoint() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(ColorPoint), [], new.target || ColorPoint);
+    var _result = function () {
+      this.x = 2;
+      _superReference.set(Object.getPrototypeOf(ColorPoint.prototype), 'x', this, 3);
+      expect(this.x).toBe(3);
+      expect(_get(Object.getPrototypeOf(ColorPoint.prototype), 'x', this)).toBeUndefined();
+    }.apply(_this, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    return _this;
+  };
+  if (__nox_super_65_275 !== null && typeof __nox_super_65_275 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  ColorPoint.prototype = Object.create(__nox_super_65_275 && __nox_super_65_275.prototype, {
+    constructor: {
+      value: ColorPoint,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(ColorPoint, __nox_super_65_275);
+  else ColorPoint.__proto__ = __nox_super_65_275;
+  Object.defineProperty(ColorPoint.prototype, 'm', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        this.getX();
+      },
+      'name',
+      {
+        value: 'm',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(ColorPoint, 'prototype', { writable: false });
+  return ColorPoint;
+})(Point);
+const cp = new ColorPoint();
+cp.m();`,
     modes: [
       {
         title: 'default',
@@ -2693,15 +10786,75 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[96],
       },
     ],
   },
   {
     title: 'regression — 5817 (exec)',
-    source:
-      '// https://github.com/babel/babel/issues/5817\n\nclass Parent {}\n\nclass Table extends Parent {\n  constructor() {\n    super();\n    this.returnParam = (param) => {\n      return param;\n    }\n  }\n}\n\nconst table = new Table();\n\nexpect(table.returnParam(false)).toBe(false);\n',
+    source: `// https://github.com/babel/babel/issues/5817
+
+class Parent {}
+
+class Table extends Parent {
+  constructor() {
+    super();
+    this.returnParam = (param) => {
+      return param;
+    }
+  }
+}
+
+const table = new Table();
+
+expect(table.returnParam(false)).toBe(false);
+`,
     filename: 'exec.js',
+    output: `var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+// https://github.com/babel/babel/issues/5817
+let Parent = (() => {
+  'use strict';
+  const Parent = function Parent() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Parent, 'prototype', { writable: false });
+  return Parent;
+})();
+let Table = (__nox_super_64_191 => {
+  'use strict';
+  const Table = function Table() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(Table), [], new.target || Table);
+    var _result = function () {
+      this.returnParam = param => {
+        return param;
+      };
+    }.apply(_this, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    return _this;
+  };
+  if (__nox_super_64_191 !== null && typeof __nox_super_64_191 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Table.prototype = Object.create(__nox_super_64_191 && __nox_super_64_191.prototype, {
+    constructor: {
+      value: Table,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Table, __nox_super_64_191);
+  else Table.__proto__ = __nox_super_64_191;
+  Object.defineProperty(Table, 'prototype', { writable: false });
+  return Table;
+})(Parent);
+const table = new Table();
+expect(table.returnParam(false)).toBe(false);`,
     modes: [
       {
         title: 'default',
@@ -2715,15 +10868,57 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[97],
       },
     ],
   },
   {
     title: 'regression — 5817 (input)',
-    source:
-      'class A extends B {\n  constructor() {\n    super();\n\n    this.arrow1 = (x) => { return x; };\n    this.arrow2 = (x) => x;\n  }\n}\n',
+    source: `class A extends B {
+  constructor() {
+    super();
+
+    this.arrow1 = (x) => { return x; };
+    this.arrow2 = (x) => x;
+  }
+}
+`,
     filename: 'input.js',
+    output: `var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+let A = (__nox_super_0_125 => {
+  'use strict';
+  const A = function A() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(A), [], new.target || A);
+    var _result = function () {
+      this.arrow1 = x => {
+        return x;
+      };
+      this.arrow2 = x => x;
+    }.apply(_this, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    return _this;
+  };
+  if (__nox_super_0_125 !== null && typeof __nox_super_0_125 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  A.prototype = Object.create(__nox_super_0_125 && __nox_super_0_125.prototype, {
+    constructor: {
+      value: A,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(A, __nox_super_0_125);
+  else A.__proto__ = __nox_super_0_125;
+  Object.defineProperty(A, 'prototype', { writable: false });
+  return A;
+})(B);`,
     modes: [
       {
         title: 'default',
@@ -2737,15 +10932,67 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[98],
       },
     ],
   },
   {
     title: 'regression — 8499 (exec)',
-    source:
-      "// Pretend that `Reflect.construct` isn't supported.\nglobal.Reflect = undefined;\n\nglobal.HTMLElement = function() {\n  // Here, `this.HTMLElement` is this function, not the original HTMLElement\n  // constructor. `this.constructor` should be this function too, but isn't.\n  constructor = this.constructor;\n};\n\nvar constructor;\n\nclass CustomElement extends HTMLElement {}\nnew CustomElement();\n\nexpect(constructor).toBe(CustomElement);\n",
+    source: `// Pretend that \`Reflect.construct\` isn't supported.
+global.Reflect = undefined;
+
+global.HTMLElement = function() {
+  // Here, \`this.HTMLElement\` is this function, not the original HTMLElement
+  // constructor. \`this.constructor\` should be this function too, but isn't.
+  constructor = this.constructor;
+};
+
+var constructor;
+
+class CustomElement extends HTMLElement {}
+new CustomElement();
+
+expect(constructor).toBe(CustomElement);
+`,
     filename: 'exec.js',
+    output: `var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+// Pretend that \`Reflect.construct\` isn't supported.
+global.Reflect = undefined;
+global.HTMLElement = function () {
+  // Here, \`this.HTMLElement\` is this function, not the original HTMLElement
+  // constructor. \`this.constructor\` should be this function too, but isn't.
+  constructor = this.constructor;
+};
+var constructor;
+let CustomElement = (__nox_super_326_368 => {
+  'use strict';
+  const CustomElement = function CustomElement() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(
+      Object.getPrototypeOf(CustomElement),
+      arguments,
+      new.target || CustomElement,
+    );
+    return _this;
+  };
+  if (__nox_super_326_368 !== null && typeof __nox_super_326_368 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  CustomElement.prototype = Object.create(__nox_super_326_368 && __nox_super_326_368.prototype, {
+    constructor: {
+      value: CustomElement,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(CustomElement, __nox_super_326_368);
+  else CustomElement.__proto__ = __nox_super_326_368;
+  Object.defineProperty(CustomElement, 'prototype', { writable: false });
+  return CustomElement;
+})(HTMLElement);
+new CustomElement();
+expect(constructor).toBe(CustomElement);`,
     modes: [
       {
         title: 'default',
@@ -2759,15 +11006,86 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[99],
       },
     ],
   },
   {
     title: 'regression — 8499 (input)',
-    source:
-      "const oldReflect = this.Reflect;\nconst oldHTMLElement = this.HTMLElement;\n\ntry {\n  // Pretend that `Reflect.construct` isn't supported.\n  this.Reflect = undefined;\n\n  this.HTMLElement = function() {\n    // Here, `this.HTMLElement` is this function, not the original HTMLElement\n    // constructor. `this.constructor` should be this function too, but isn't.\n    constructor = this.constructor;\n  };\n\n  var constructor;\n\n  class CustomElement extends HTMLElement {};\n  new CustomElement();\n\n  expect(constructor).toBe(CustomElement);\n} finally {\n  // Restore original env\n  this.Reflect = oldReflect;\n  this.HTMLElement = oldHTMLElement;\n}\n\n\n",
+    source: `const oldReflect = this.Reflect;
+const oldHTMLElement = this.HTMLElement;
+
+try {
+  // Pretend that \`Reflect.construct\` isn't supported.
+  this.Reflect = undefined;
+
+  this.HTMLElement = function() {
+    // Here, \`this.HTMLElement\` is this function, not the original HTMLElement
+    // constructor. \`this.constructor\` should be this function too, but isn't.
+    constructor = this.constructor;
+  };
+
+  var constructor;
+
+  class CustomElement extends HTMLElement {};
+  new CustomElement();
+
+  expect(constructor).toBe(CustomElement);
+} finally {
+  // Restore original env
+  this.Reflect = oldReflect;
+  this.HTMLElement = oldHTMLElement;
+}
+
+
+`,
     filename: 'input.js',
+    output: `var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+const oldReflect = this.Reflect;
+const oldHTMLElement = this.HTMLElement;
+try {
+  // Pretend that \`Reflect.construct\` isn't supported.
+  this.Reflect = undefined;
+  this.HTMLElement = function () {
+    // Here, \`this.HTMLElement\` is this function, not the original HTMLElement
+    // constructor. \`this.constructor\` should be this function too, but isn't.
+    constructor = this.constructor;
+  };
+  var constructor;
+  let CustomElement = (__nox_super_421_463 => {
+    'use strict';
+    const CustomElement = function CustomElement() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+      var _this = _construct(
+        Object.getPrototypeOf(CustomElement),
+        arguments,
+        new.target || CustomElement,
+      );
+      return _this;
+    };
+    if (__nox_super_421_463 !== null && typeof __nox_super_421_463 !== 'function')
+      throw new TypeError('Super expression must either be null or a function');
+    CustomElement.prototype = Object.create(__nox_super_421_463 && __nox_super_421_463.prototype, {
+      constructor: {
+        value: CustomElement,
+        writable: true,
+        configurable: true,
+      },
+    });
+    if (Object.setPrototypeOf) Object.setPrototypeOf(CustomElement, __nox_super_421_463);
+    else CustomElement.__proto__ = __nox_super_421_463;
+    Object.defineProperty(CustomElement, 'prototype', { writable: false });
+    return CustomElement;
+  })(HTMLElement);
+  new CustomElement();
+  expect(constructor).toBe(CustomElement);
+} finally {
+  // Restore original env
+  this.Reflect = oldReflect;
+  this.HTMLElement = oldHTMLElement;
+}`,
     modes: [
       {
         title: 'default',
@@ -2781,14 +11099,47 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[100],
       },
     ],
   },
   {
     title: 'regression — T2494 (input)',
-    source: 'var x = {\n  Foo: class extends Foo {}\n};\n',
+    source: `var x = {
+  Foo: class extends Foo {}
+};
+`,
     filename: 'input.js',
+    output: `var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+var x = {
+  Foo: (__nox_super_17_37 => {
+    'use strict';
+    const _Class = function _Class() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+      var _this = _construct(Object.getPrototypeOf(_Class), arguments, new.target || _Class);
+      return _this;
+    };
+    Object.defineProperty(_Class, 'name', {
+      value: 'Foo',
+      configurable: true,
+    });
+    if (__nox_super_17_37 !== null && typeof __nox_super_17_37 !== 'function')
+      throw new TypeError('Super expression must either be null or a function');
+    _Class.prototype = Object.create(__nox_super_17_37 && __nox_super_17_37.prototype, {
+      constructor: {
+        value: _Class,
+        writable: true,
+        configurable: true,
+      },
+    });
+    if (Object.setPrototypeOf) Object.setPrototypeOf(_Class, __nox_super_17_37);
+    else _Class.__proto__ = __nox_super_17_37;
+    Object.defineProperty(_Class, 'prototype', { writable: false });
+    return _Class;
+  })(Foo),
+};`,
     modes: [
       {
         title: 'default',
@@ -2802,14 +11153,61 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[101],
       },
     ],
   },
   {
     title: 'regression — T2997 (input)',
-    source: 'class A {}\n\nclass B extends A {\n  constructor() {\n    return super();\n  }\n}\n',
+    source: `class A {}
+
+class B extends A {
+  constructor() {
+    return super();
+  }
+}
+`,
     filename: 'input.js',
+    output: `var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+let A = (() => {
+  'use strict';
+  const A = function A() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(A, 'prototype', { writable: false });
+  return A;
+})();
+let B = (__nox_super_12_75 => {
+  'use strict';
+  const B = function B() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(B), [], new.target || B);
+    var _result = function () {
+      return this;
+    }.apply(_this, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    return _this;
+  };
+  if (__nox_super_12_75 !== null && typeof __nox_super_12_75 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  B.prototype = Object.create(__nox_super_12_75 && __nox_super_12_75.prototype, {
+    constructor: {
+      value: B,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(B, __nox_super_12_75);
+  else B.__proto__ = __nox_super_12_75;
+  Object.defineProperty(B, 'prototype', { writable: false });
+  return B;
+})(A);`,
     modes: [
       {
         title: 'default',
@@ -2823,14 +11221,41 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[102],
       },
     ],
   },
   {
     title: 'regression — T6712 (input)',
-    source: 'class A {\n  foo() {\n    const foo = 2;\n  }\n}\n',
+    source: `class A {
+  foo() {
+    const foo = 2;
+  }
+}
+`,
     filename: 'input.js',
+    output: `let A = (() => {
+  'use strict';
+  const A = function A() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(A.prototype, 'foo', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        const foo = 2;
+      },
+      'name',
+      {
+        value: 'foo',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(A, 'prototype', { writable: false });
+  return A;
+})();`,
     modes: [
       {
         title: 'default',
@@ -2844,15 +11269,43 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[103],
       },
     ],
   },
   {
     title: 'regression — T6750 (input)',
-    source:
-      'export default function() {\n  return class Select {\n    query(query) {\n    }\n  }\n}\n',
+    source: `export default function() {
+  return class Select {
+    query(query) {
+    }
+  }
+}
+`,
     filename: 'input.mjs',
+    output: `export default function () {
+  return (() => {
+    'use strict';
+    const Select = function Select() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+    };
+    Object.defineProperty(Select.prototype, 'query', {
+      value: Object.defineProperty(
+        function (query) {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        },
+        'name',
+        {
+          value: 'query',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(Select, 'prototype', { writable: false });
+    return Select;
+  })();
+}`,
     modes: [
       {
         title: 'default',
@@ -2866,15 +11319,58 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[104],
       },
     ],
   },
   {
     title: 'regression — T6755 (input)',
-    source:
-      'class Example {\n  async test1(){\n    await Promise.resolve(2);\n  }\n\n  *test2(){\n    yield 3;\n  }\n}\n',
+    source: `class Example {
+  async test1(){
+    await Promise.resolve(2);
+  }
+
+  *test2(){
+    yield 3;
+  }
+}
+`,
     filename: 'input.js',
+    output: `let Example = (() => {
+  'use strict';
+  const Example = function Example() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Example.prototype, 'test1', {
+    value: Object.defineProperty(
+      async function () {
+        await Promise.resolve(2);
+      },
+      'name',
+      {
+        value: 'test1',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Example.prototype, 'test2', {
+    value: Object.defineProperty(
+      function* () {
+        yield 3;
+      },
+      'name',
+      {
+        value: 'test2',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Example, 'prototype', { writable: false });
+  return Example;
+})();`,
     modes: [
       {
         title: 'default',
@@ -2888,15 +11384,45 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[105],
       },
     ],
   },
   {
     title: 'regression — T7010 (input)',
-    source:
-      'class Foo {\n  constructor(val){\n    this._val = val;\n  }\n  foo2(){\n    return foo2(this._val);\n  }\n}\n',
+    source: `class Foo {
+  constructor(val){
+    this._val = val;
+  }
+  foo2(){
+    return foo2(this._val);
+  }
+}
+`,
     filename: 'input.js',
+    output: `let Foo = (() => {
+  'use strict';
+  const Foo = function Foo(val) {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    this._val = val;
+  };
+  Object.defineProperty(Foo.prototype, 'foo2', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return foo2(this._val);
+      },
+      'name',
+      {
+        value: 'foo2',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Foo, 'prototype', { writable: false });
+  return Foo;
+})();`,
     modes: [
       {
         title: 'default',
@@ -2910,15 +11436,66 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[106],
       },
     ],
   },
   {
     title: 'regression — regression 1155 (input)',
-    source:
-      'class Foo extends Bar {\n  constructor (options) {\n    let parentOptions = {};\n    parentOptions.init = function () {\n      this;\n    };\n    super(parentOptions);\n  }\n}\n',
+    source: `class Foo extends Bar {
+  constructor (options) {
+    let parentOptions = {};
+    parentOptions.init = function () {
+      this;
+    };
+    super(parentOptions);
+  }
+}
+`,
     filename: 'input.js',
+    output: `var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+let Foo = (__nox_super_0_167 => {
+  'use strict';
+  const Foo = function Foo(_argument) {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this,
+      _newtarget = new.target;
+    function _super() {
+      _this = _construct(Object.getPrototypeOf(Foo), arguments, _newtarget || Foo);
+      return _this;
+    }
+    var _result = function (options) {
+      let parentOptions = {};
+      parentOptions.init = function () {
+        this;
+      };
+      _super(parentOptions);
+    }.apply(void 0, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    if (_this === void 0)
+      throw new ReferenceError("this hasn't been initialised - super() hasn't been called");
+    return _this;
+  };
+  if (__nox_super_0_167 !== null && typeof __nox_super_0_167 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Foo.prototype = Object.create(__nox_super_0_167 && __nox_super_0_167.prototype, {
+    constructor: {
+      value: Foo,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo, __nox_super_0_167);
+  else Foo.__proto__ = __nox_super_0_167;
+  Object.defineProperty(Foo, 'prototype', { writable: false });
+  return Foo;
+})(Bar);`,
     modes: [
       {
         title: 'default',
@@ -2932,15 +11509,135 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[107],
       },
     ],
   },
   {
     title: 'spec — accessing super class (input)',
-    source:
-      'class Test extends Foo {\n  constructor() {\n    woops.super.test();\n    super();\n    super.test();\n\n    super(...arguments);\n    super("test", ...arguments);\n\n    super.test(...arguments);\n    super.test("test", ...arguments);\n  }\n\n  test() {\n    super.test();\n    super.test(...arguments);\n    super.test("test", ...arguments);\n  }\n\n  static foo() {\n    super.foo();\n    super.foo(...arguments);\n    super.foo("test", ...arguments);\n  }\n}\n',
+    source: `class Test extends Foo {
+  constructor() {
+    woops.super.test();
+    super();
+    super.test();
+
+    super(...arguments);
+    super("test", ...arguments);
+
+    super.test(...arguments);
+    super.test("test", ...arguments);
+  }
+
+  test() {
+    super.test();
+    super.test(...arguments);
+    super.test("test", ...arguments);
+  }
+
+  static foo() {
+    super.foo();
+    super.foo(...arguments);
+    super.foo("test", ...arguments);
+  }
+}
+`,
     filename: 'input.js',
+    output: `var _construct2 = {
+  construct: require('@babel/runtime/helpers/construct'),
+  assertThisInitialized: require('@babel/runtime/helpers/assertThisInitialized'),
+};
+function _construct(t, e, r) {
+  return _construct2.construct(t, e, r);
+}
+_construct.assert = _construct2.assertThisInitialized;
+var _get2 = { get: require('@babel/runtime/helpers/get') };
+function _get(e, t, r) {
+  return _get2.get(e, t, r);
+}
+let Test = (__nox_super_0_438 => {
+  'use strict';
+  const Test = function Test() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this,
+      _newtarget = new.target;
+    function _super() {
+      _this = _construct(Object.getPrototypeOf(Test), arguments, _newtarget || Test);
+      return _this;
+    }
+    var _result = function () {
+      woops.super.test();
+      _super();
+      _get(Object.getPrototypeOf(Test.prototype), 'test', _construct.assert(_this)).call(
+        _construct.assert(_this),
+      );
+      _super(...arguments);
+      _super('test', ...arguments);
+      _get(Object.getPrototypeOf(Test.prototype), 'test', _construct.assert(_this)).call(
+        _construct.assert(_this),
+        ...arguments,
+      );
+      _get(Object.getPrototypeOf(Test.prototype), 'test', _construct.assert(_this)).call(
+        _construct.assert(_this),
+        'test',
+        ...arguments,
+      );
+    }.apply(void 0, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    if (_this === void 0)
+      throw new ReferenceError("this hasn't been initialised - super() hasn't been called");
+    return _this;
+  };
+  if (__nox_super_0_438 !== null && typeof __nox_super_0_438 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Test.prototype = Object.create(__nox_super_0_438 && __nox_super_0_438.prototype, {
+    constructor: {
+      value: Test,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Test, __nox_super_0_438);
+  else Test.__proto__ = __nox_super_0_438;
+  Object.defineProperty(Test.prototype, 'test', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        _get(Object.getPrototypeOf(Test.prototype), 'test', this).call(this);
+        _get(Object.getPrototypeOf(Test.prototype), 'test', this).call(this, ...arguments);
+        _get(Object.getPrototypeOf(Test.prototype), 'test', this).call(this, 'test', ...arguments);
+      },
+      'name',
+      {
+        value: 'test',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Test, 'foo', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        _get(Object.getPrototypeOf(Test), 'foo', this).call(this);
+        _get(Object.getPrototypeOf(Test), 'foo', this).call(this, ...arguments);
+        _get(Object.getPrototypeOf(Test), 'foo', this).call(this, 'test', ...arguments);
+      },
+      'name',
+      {
+        value: 'foo',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Test, 'prototype', { writable: false });
+  return Test;
+})(Foo);`,
     modes: [
       {
         title: 'default',
@@ -2954,14 +11651,45 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[108],
       },
     ],
   },
   {
     title: 'spec — computed key class tdz (exec)',
-    source: 'expect(() => {\n  class A {\n    [A.name]() {}\n  }\n}).toThrow(ReferenceError);\n',
+    source: `expect(() => {
+  class A {
+    [A.name]() {}
+  }
+}).toThrow(ReferenceError);
+`,
     filename: 'exec.js',
+    output: `var _classKey2 = { toPropertyKey: require('@babel/runtime/helpers/toPropertyKey') },
+  _classKey = _classKey2.toPropertyKey;
+expect(() => {
+  let A = (_key => {
+    'use strict';
+    _key = _classKey(_key);
+    const A = function A() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+    };
+    Object.defineProperty(A.prototype, _key, {
+      value: Object.defineProperty(
+        function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        },
+        'name',
+        {
+          value: typeof _key === 'symbol' ? { [_key]: function () {} }[_key].name : String(_key),
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(A, 'prototype', { writable: false });
+    return A;
+  })(A.name);
+}).toThrow(ReferenceError);`,
     modes: [
       {
         title: 'default',
@@ -2975,15 +11703,99 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[109],
       },
     ],
   },
   {
     title: 'spec — computed keys call order (exec)',
-    source:
-      'var log = [];\n\nclass A {\n  [log.push(1)]() {}\n  static [log.push(2)]() {}\n  [log.push(3)]() {}\n  static [log.push(4)]() {}\n}\n\nexpect(log).toEqual([1, 2, 3, 4]);\n\n',
+    source: `var log = [];
+
+class A {
+  [log.push(1)]() {}
+  static [log.push(2)]() {}
+  [log.push(3)]() {}
+  static [log.push(4)]() {}
+}
+
+expect(log).toEqual([1, 2, 3, 4]);
+
+`,
     filename: 'exec.js',
+    output: `var _classKey2 = { toPropertyKey: require('@babel/runtime/helpers/toPropertyKey') },
+  _classKey = _classKey2.toPropertyKey;
+var log = [];
+let A = ((_key, _key15, _key16, _key17) => {
+  'use strict';
+  _key = _classKey(_key);
+  _key15 = _classKey(_key15);
+  _key16 = _classKey(_key16);
+  _key17 = _classKey(_key17);
+  const A = function A() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(A.prototype, _key, {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      },
+      'name',
+      {
+        value: typeof _key === 'symbol' ? { [_key]: function () {} }[_key].name : String(_key),
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(A, _key15, {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      },
+      'name',
+      {
+        value:
+          typeof _key15 === 'symbol' ? { [_key15]: function () {} }[_key15].name : String(_key15),
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(A.prototype, _key16, {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      },
+      'name',
+      {
+        value:
+          typeof _key16 === 'symbol' ? { [_key16]: function () {} }[_key16].name : String(_key16),
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(A, _key17, {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      },
+      'name',
+      {
+        value:
+          typeof _key17 === 'symbol' ? { [_key17]: function () {} }[_key17].name : String(_key17),
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(A, 'prototype', { writable: false });
+  return A;
+})(log.push(1), log.push(2), log.push(3), log.push(4));
+expect(log).toEqual([1, 2, 3, 4]);`,
     modes: [
       {
         title: 'default',
@@ -2997,15 +11809,90 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[110],
       },
     ],
   },
   {
     title: 'spec — computed keys yield await (input)',
-    source:
-      'async function* fn() {\n  class A {\n    [yield 1]() {}\n  }\n\n  class B extends A {\n    [await 1]() {}\n  }\n}\n',
+    source: `async function* fn() {
+  class A {
+    [yield 1]() {}
+  }
+
+  class B extends A {
+    [await 1]() {}
+  }
+}
+`,
     filename: 'input.js',
+    output: `var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+var _classKey2 = { toPropertyKey: require('@babel/runtime/helpers/toPropertyKey') },
+  _classKey = _classKey2.toPropertyKey;
+async function* fn() {
+  let A = (_key => {
+    'use strict';
+    _key = _classKey(_key);
+    const A = function A() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+    };
+    Object.defineProperty(A.prototype, _key, {
+      value: Object.defineProperty(
+        function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        },
+        'name',
+        {
+          value: typeof _key === 'symbol' ? { [_key]: function () {} }[_key].name : String(_key),
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(A, 'prototype', { writable: false });
+    return A;
+  })(yield 1);
+  let B = ((__nox_super_61_103, _key18) => {
+    'use strict';
+    _key18 = _classKey(_key18);
+    const B = function B() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+      var _this = _construct(Object.getPrototypeOf(B), arguments, new.target || B);
+      return _this;
+    };
+    if (__nox_super_61_103 !== null && typeof __nox_super_61_103 !== 'function')
+      throw new TypeError('Super expression must either be null or a function');
+    B.prototype = Object.create(__nox_super_61_103 && __nox_super_61_103.prototype, {
+      constructor: {
+        value: B,
+        writable: true,
+        configurable: true,
+      },
+    });
+    if (Object.setPrototypeOf) Object.setPrototypeOf(B, __nox_super_61_103);
+    else B.__proto__ = __nox_super_61_103;
+    Object.defineProperty(B.prototype, _key18, {
+      value: Object.defineProperty(
+        function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        },
+        'name',
+        {
+          value:
+            typeof _key18 === 'symbol' ? { [_key18]: function () {} }[_key18].name : String(_key18),
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(B, 'prototype', { writable: false });
+    return B;
+  })(A, await 1);
+}`,
     modes: [
       {
         title: 'default',
@@ -3019,15 +11906,105 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[111],
       },
     ],
   },
   {
     title: 'spec — computed methods (exec)',
-    source:
-      'const sym = Symbol();\n\nclass Foo {\n  [sym] () {\n    return 1;\n  }\n}\n\nclass Bar extends Foo {\n  [sym] () {\n    return super[sym]() + 2;\n  }\n}\n\nlet i = new Bar();\n\nexpect(i[sym]()).toBe(3);\n',
+    source: `const sym = Symbol();
+
+class Foo {
+  [sym] () {
+    return 1;
+  }
+}
+
+class Bar extends Foo {
+  [sym] () {
+    return super[sym]() + 2;
+  }
+}
+
+let i = new Bar();
+
+expect(i[sym]()).toBe(3);
+`,
     filename: 'exec.js',
+    output: `var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+var _get2 = { get: require('@babel/runtime/helpers/get') };
+function _get(e, t, r) {
+  return _get2.get(e, t, r);
+}
+var _classKey2 = { toPropertyKey: require('@babel/runtime/helpers/toPropertyKey') },
+  _classKey = _classKey2.toPropertyKey;
+const sym = Symbol();
+let Foo = (_key => {
+  'use strict';
+  _key = _classKey(_key);
+  const Foo = function Foo() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Foo.prototype, _key, {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return 1;
+      },
+      'name',
+      {
+        value: typeof _key === 'symbol' ? { [_key]: function () {} }[_key].name : String(_key),
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Foo, 'prototype', { writable: false });
+  return Foo;
+})(sym);
+let Bar = ((__nox_super_69_140, _key19) => {
+  'use strict';
+  _key19 = _classKey(_key19);
+  const Bar = function Bar() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(Bar), arguments, new.target || Bar);
+    return _this;
+  };
+  if (__nox_super_69_140 !== null && typeof __nox_super_69_140 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Bar.prototype = Object.create(__nox_super_69_140 && __nox_super_69_140.prototype, {
+    constructor: {
+      value: Bar,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Bar, __nox_super_69_140);
+  else Bar.__proto__ = __nox_super_69_140;
+  Object.defineProperty(Bar.prototype, _key19, {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return _get(Object.getPrototypeOf(Bar.prototype), sym, this).call(this) + 2;
+      },
+      'name',
+      {
+        value:
+          typeof _key19 === 'symbol' ? { [_key19]: function () {} }[_key19].name : String(_key19),
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Bar, 'prototype', { writable: false });
+  return Bar;
+})(Foo, sym);
+let i = new Bar();
+expect(i[sym]()).toBe(3);`,
     modes: [
       {
         title: 'default',
@@ -3041,15 +12018,89 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[112],
       },
     ],
   },
   {
     title: 'spec — computed methods (input)',
-    source:
-      'class Foo {\n  foo() {}\n  "foo"() { "second" }\n  [bar]() {}\n  [bar + "foo"]() {}\n}\n',
+    source: `class Foo {
+  foo() {}
+  "foo"() { "second" }
+  [bar]() {}
+  [bar + "foo"]() {}
+}
+`,
     filename: 'input.js',
+    output: `var _classKey2 = { toPropertyKey: require('@babel/runtime/helpers/toPropertyKey') },
+  _classKey = _classKey2.toPropertyKey;
+let Foo = ((_key, _key14) => {
+  'use strict';
+  _key = _classKey(_key);
+  _key14 = _classKey(_key14);
+  const Foo = function Foo() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Foo.prototype, 'foo', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      },
+      'name',
+      {
+        value: 'foo',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Foo.prototype, 'foo', {
+    value: Object.defineProperty(
+      function () {
+        'second';
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      },
+      'name',
+      {
+        value: 'foo',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Foo.prototype, _key, {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      },
+      'name',
+      {
+        value: typeof _key === 'symbol' ? { [_key]: function () {} }[_key].name : String(_key),
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Foo.prototype, _key14, {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      },
+      'name',
+      {
+        value:
+          typeof _key14 === 'symbol' ? { [_key14]: function () {} }[_key14].name : String(_key14),
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Foo, 'prototype', { writable: false });
+  return Foo;
+})(bar, bar + 'foo');`,
     modes: [
       {
         title: 'default',
@@ -3063,15 +12114,202 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[113],
       },
     ],
   },
   {
     title: 'spec — computed toPrimitive (exec)',
-    source:
-      'const foo = { [Symbol.toPrimitive]: () => "foo" };\n\nexpect((new class { [foo](){ return 0; } }).foo()).toBe(0);\nexpect((new class { get [foo](){ return 0; } }).foo).toBe(0);\nexpect((new class { set [foo](v){ return v; } }).foo = 0).toBe(0);\n\nconst arrayLike = { [Symbol.toPrimitive] : () => [] };\n\nexpect(() => new class { [arrayLike](){ return 0; } }).toThrow("@@toPrimitive must return a primitive value.");\nexpect(() => new class { get [arrayLike](){ return 0; } }).toThrow("@@toPrimitive must return a primitive value.");\nexpect(() => new class { set [arrayLike](v){ return v; } }).toThrow("@@toPrimitive must return a primitive value.");\n',
+    source: `const foo = { [Symbol.toPrimitive]: () => "foo" };
+
+expect((new class { [foo](){ return 0; } }).foo()).toBe(0);
+expect((new class { get [foo](){ return 0; } }).foo).toBe(0);
+expect((new class { set [foo](v){ return v; } }).foo = 0).toBe(0);
+
+const arrayLike = { [Symbol.toPrimitive] : () => [] };
+
+expect(() => new class { [arrayLike](){ return 0; } }).toThrow("@@toPrimitive must return a primitive value.");
+expect(() => new class { get [arrayLike](){ return 0; } }).toThrow("@@toPrimitive must return a primitive value.");
+expect(() => new class { set [arrayLike](v){ return v; } }).toThrow("@@toPrimitive must return a primitive value.");
+`,
     filename: 'exec.js',
+    output: `var _classKey2 = { toPropertyKey: require('@babel/runtime/helpers/toPropertyKey') },
+  _classKey = _classKey2.toPropertyKey;
+const foo = { [Symbol.toPrimitive]: () => 'foo' };
+expect(
+  new ((_key => {
+    'use strict';
+    _key = _classKey(_key);
+    const _Class = function _Class() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+    };
+    Object.defineProperty(_Class.prototype, _key, {
+      value: Object.defineProperty(
+        function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          return 0;
+        },
+        'name',
+        {
+          value: typeof _key === 'symbol' ? { [_key]: function () {} }[_key].name : String(_key),
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(_Class, 'prototype', { writable: false });
+    return _Class;
+  })(foo))().foo(),
+).toBe(0);
+expect(
+  new ((_key20 => {
+    'use strict';
+    _key20 = _classKey(_key20);
+    const _Class19 = function _Class19() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+    };
+    Object.defineProperty(_Class19.prototype, _key20, {
+      get: Object.defineProperty(
+        function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          return 0;
+        },
+        'name',
+        {
+          value:
+            'get ' +
+            (typeof _key20 === 'symbol'
+              ? { [_key20]: function () {} }[_key20].name
+              : String(_key20)),
+          configurable: true,
+        },
+      ),
+      configurable: true,
+    });
+    Object.defineProperty(_Class19, 'prototype', { writable: false });
+    return _Class19;
+  })(foo))().foo,
+).toBe(0);
+expect(
+  (new ((_key24 => {
+    'use strict';
+    _key24 = _classKey(_key24);
+    const _Class23 = function _Class23() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+    };
+    Object.defineProperty(_Class23.prototype, _key24, {
+      set: Object.defineProperty(
+        function (v) {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          return v;
+        },
+        'name',
+        {
+          value:
+            'set ' +
+            (typeof _key24 === 'symbol'
+              ? { [_key24]: function () {} }[_key24].name
+              : String(_key24)),
+          configurable: true,
+        },
+      ),
+      configurable: true,
+    });
+    Object.defineProperty(_Class23, 'prototype', { writable: false });
+    return _Class23;
+  })(foo))().foo = 0),
+).toBe(0);
+const arrayLike = { [Symbol.toPrimitive]: () => [] };
+expect(
+  () =>
+    new ((_key28 => {
+      'use strict';
+      _key28 = _classKey(_key28);
+      const _Class27 = function _Class27() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+      };
+      Object.defineProperty(_Class27.prototype, _key28, {
+        value: Object.defineProperty(
+          function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            return 0;
+          },
+          'name',
+          {
+            value:
+              typeof _key28 === 'symbol'
+                ? { [_key28]: function () {} }[_key28].name
+                : String(_key28),
+            configurable: true,
+          },
+        ),
+        writable: true,
+        configurable: true,
+      });
+      Object.defineProperty(_Class27, 'prototype', { writable: false });
+      return _Class27;
+    })(arrayLike))(),
+).toThrow('@@toPrimitive must return a primitive value.');
+expect(
+  () =>
+    new ((_key32 => {
+      'use strict';
+      _key32 = _classKey(_key32);
+      const _Class31 = function _Class31() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+      };
+      Object.defineProperty(_Class31.prototype, _key32, {
+        get: Object.defineProperty(
+          function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            return 0;
+          },
+          'name',
+          {
+            value:
+              'get ' +
+              (typeof _key32 === 'symbol'
+                ? { [_key32]: function () {} }[_key32].name
+                : String(_key32)),
+            configurable: true,
+          },
+        ),
+        configurable: true,
+      });
+      Object.defineProperty(_Class31, 'prototype', { writable: false });
+      return _Class31;
+    })(arrayLike))(),
+).toThrow('@@toPrimitive must return a primitive value.');
+expect(
+  () =>
+    new ((_key36 => {
+      'use strict';
+      _key36 = _classKey(_key36);
+      const _Class35 = function _Class35() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+      };
+      Object.defineProperty(_Class35.prototype, _key36, {
+        set: Object.defineProperty(
+          function (v) {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            return v;
+          },
+          'name',
+          {
+            value:
+              'set ' +
+              (typeof _key36 === 'symbol'
+                ? { [_key36]: function () {} }[_key36].name
+                : String(_key36)),
+            configurable: true,
+          },
+        ),
+        configurable: true,
+      });
+      Object.defineProperty(_Class35, 'prototype', { writable: false });
+      return _Class35;
+    })(arrayLike))(),
+).toThrow('@@toPrimitive must return a primitive value.');`,
     modes: [
       {
         title: 'default',
@@ -3085,15 +12323,202 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[114],
       },
     ],
   },
   {
     title: 'spec — computed toPrimitive (input)',
-    source:
-      'const foo = { [Symbol.toPrimitive]: () => "foo" };\n\nexpect((new class { [foo](){ return 0; } }).foo()).toBe(0);\nexpect((new class { get [foo](){ return 0; } }).foo).toBe(0);\nexpect((new class { set [foo](v){ return v; } }).foo = 0).toBe(0);\n\nconst arrayLike = { [Symbol.toPrimitive] : () => [] };\n\nexpect(() => new class { [arrayLike](){ return 0; } }).toThrow("@@toPrimitive must return a primitive value.");\nexpect(() => new class { get [arrayLike](){ return 0; } }).toThrow("@@toPrimitive must return a primitive value.");\nexpect(() => new class { set [arrayLike](v){ return v; } }).toThrow("@@toPrimitive must return a primitive value.");\n',
+    source: `const foo = { [Symbol.toPrimitive]: () => "foo" };
+
+expect((new class { [foo](){ return 0; } }).foo()).toBe(0);
+expect((new class { get [foo](){ return 0; } }).foo).toBe(0);
+expect((new class { set [foo](v){ return v; } }).foo = 0).toBe(0);
+
+const arrayLike = { [Symbol.toPrimitive] : () => [] };
+
+expect(() => new class { [arrayLike](){ return 0; } }).toThrow("@@toPrimitive must return a primitive value.");
+expect(() => new class { get [arrayLike](){ return 0; } }).toThrow("@@toPrimitive must return a primitive value.");
+expect(() => new class { set [arrayLike](v){ return v; } }).toThrow("@@toPrimitive must return a primitive value.");
+`,
     filename: 'input.js',
+    output: `var _classKey2 = { toPropertyKey: require('@babel/runtime/helpers/toPropertyKey') },
+  _classKey = _classKey2.toPropertyKey;
+const foo = { [Symbol.toPrimitive]: () => 'foo' };
+expect(
+  new ((_key => {
+    'use strict';
+    _key = _classKey(_key);
+    const _Class = function _Class() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+    };
+    Object.defineProperty(_Class.prototype, _key, {
+      value: Object.defineProperty(
+        function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          return 0;
+        },
+        'name',
+        {
+          value: typeof _key === 'symbol' ? { [_key]: function () {} }[_key].name : String(_key),
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(_Class, 'prototype', { writable: false });
+    return _Class;
+  })(foo))().foo(),
+).toBe(0);
+expect(
+  new ((_key20 => {
+    'use strict';
+    _key20 = _classKey(_key20);
+    const _Class19 = function _Class19() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+    };
+    Object.defineProperty(_Class19.prototype, _key20, {
+      get: Object.defineProperty(
+        function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          return 0;
+        },
+        'name',
+        {
+          value:
+            'get ' +
+            (typeof _key20 === 'symbol'
+              ? { [_key20]: function () {} }[_key20].name
+              : String(_key20)),
+          configurable: true,
+        },
+      ),
+      configurable: true,
+    });
+    Object.defineProperty(_Class19, 'prototype', { writable: false });
+    return _Class19;
+  })(foo))().foo,
+).toBe(0);
+expect(
+  (new ((_key24 => {
+    'use strict';
+    _key24 = _classKey(_key24);
+    const _Class23 = function _Class23() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+    };
+    Object.defineProperty(_Class23.prototype, _key24, {
+      set: Object.defineProperty(
+        function (v) {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          return v;
+        },
+        'name',
+        {
+          value:
+            'set ' +
+            (typeof _key24 === 'symbol'
+              ? { [_key24]: function () {} }[_key24].name
+              : String(_key24)),
+          configurable: true,
+        },
+      ),
+      configurable: true,
+    });
+    Object.defineProperty(_Class23, 'prototype', { writable: false });
+    return _Class23;
+  })(foo))().foo = 0),
+).toBe(0);
+const arrayLike = { [Symbol.toPrimitive]: () => [] };
+expect(
+  () =>
+    new ((_key28 => {
+      'use strict';
+      _key28 = _classKey(_key28);
+      const _Class27 = function _Class27() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+      };
+      Object.defineProperty(_Class27.prototype, _key28, {
+        value: Object.defineProperty(
+          function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            return 0;
+          },
+          'name',
+          {
+            value:
+              typeof _key28 === 'symbol'
+                ? { [_key28]: function () {} }[_key28].name
+                : String(_key28),
+            configurable: true,
+          },
+        ),
+        writable: true,
+        configurable: true,
+      });
+      Object.defineProperty(_Class27, 'prototype', { writable: false });
+      return _Class27;
+    })(arrayLike))(),
+).toThrow('@@toPrimitive must return a primitive value.');
+expect(
+  () =>
+    new ((_key32 => {
+      'use strict';
+      _key32 = _classKey(_key32);
+      const _Class31 = function _Class31() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+      };
+      Object.defineProperty(_Class31.prototype, _key32, {
+        get: Object.defineProperty(
+          function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            return 0;
+          },
+          'name',
+          {
+            value:
+              'get ' +
+              (typeof _key32 === 'symbol'
+                ? { [_key32]: function () {} }[_key32].name
+                : String(_key32)),
+            configurable: true,
+          },
+        ),
+        configurable: true,
+      });
+      Object.defineProperty(_Class31, 'prototype', { writable: false });
+      return _Class31;
+    })(arrayLike))(),
+).toThrow('@@toPrimitive must return a primitive value.');
+expect(
+  () =>
+    new ((_key36 => {
+      'use strict';
+      _key36 = _classKey(_key36);
+      const _Class35 = function _Class35() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+      };
+      Object.defineProperty(_Class35.prototype, _key36, {
+        set: Object.defineProperty(
+          function (v) {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            return v;
+          },
+          'name',
+          {
+            value:
+              'set ' +
+              (typeof _key36 === 'symbol'
+                ? { [_key36]: function () {} }[_key36].name
+                : String(_key36)),
+            configurable: true,
+          },
+        ),
+        configurable: true,
+      });
+      Object.defineProperty(_Class35, 'prototype', { writable: false });
+      return _Class35;
+    })(arrayLike))(),
+).toThrow('@@toPrimitive must return a primitive value.');`,
     modes: [
       {
         title: 'default',
@@ -3107,15 +12532,30 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[114],
       },
     ],
   },
   {
     title: 'spec — constructor binding collision (input)',
-    source:
-      'class Example {\n  constructor() {\n    var Example;\n  }\n}\n\nvar t = new Example();\n',
+    source: `class Example {
+  constructor() {
+    var Example;
+  }
+}
+
+var t = new Example();
+`,
     filename: 'input.js',
+    output: `let Example = (() => {
+  'use strict';
+  const Example = function Example() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var Example;
+  };
+  Object.defineProperty(Example, 'prototype', { writable: false });
+  return Example;
+})();
+var t = new Example();`,
     modes: [
       {
         title: 'default',
@@ -3129,14 +12569,25 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[115],
       },
     ],
   },
   {
     title: 'spec — constructor only (input)',
-    source: 'class Foo {\n    constructor() {\n\n    }\n}',
+    source: `class Foo {
+    constructor() {
+
+    }
+}`,
     filename: 'input.js',
+    output: `let Foo = (() => {
+  'use strict';
+  const Foo = function Foo() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Foo, 'prototype', { writable: false });
+  return Foo;
+})();`,
     modes: [
       {
         title: 'default',
@@ -3150,15 +12601,88 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[116],
       },
     ],
   },
   {
     title: 'spec — constructor (input)',
-    source:
-      'class Test {\n  constructor() {\n    this.state = "test";\n  }\n}\n\nclass Foo extends Bar {\n  constructor() {\n    super();\n    this.state = "test";\n  }\n}\n\nclass ConstructorScoping {\n  constructor(){\n    let bar;\n    {\n      let bar;\n    }\n  }\n}\n',
+    source: `class Test {
+  constructor() {
+    this.state = "test";
+  }
+}
+
+class Foo extends Bar {
+  constructor() {
+    super();
+    this.state = "test";
+  }
+}
+
+class ConstructorScoping {
+  constructor(){
+    let bar;
+    {
+      let bar;
+    }
+  }
+}
+`,
     filename: 'input.js',
+    output: `var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+let Test = (() => {
+  'use strict';
+  const Test = function Test() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    this.state = 'test';
+  };
+  Object.defineProperty(Test, 'prototype', { writable: false });
+  return Test;
+})();
+let Foo = (__nox_super_63_148 => {
+  'use strict';
+  const Foo = function Foo() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(Foo), [], new.target || Foo);
+    var _result = function () {
+      this.state = 'test';
+    }.apply(_this, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    return _this;
+  };
+  if (__nox_super_63_148 !== null && typeof __nox_super_63_148 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Foo.prototype = Object.create(__nox_super_63_148 && __nox_super_63_148.prototype, {
+    constructor: {
+      value: Foo,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo, __nox_super_63_148);
+  else Foo.__proto__ = __nox_super_63_148;
+  Object.defineProperty(Foo, 'prototype', { writable: false });
+  return Foo;
+})(Bar);
+let ConstructorScoping = (() => {
+  'use strict';
+  const ConstructorScoping = function ConstructorScoping() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    let bar;
+    {
+      let bar;
+    }
+  };
+  Object.defineProperty(ConstructorScoping, 'prototype', { writable: false });
+  return ConstructorScoping;
+})();`,
     modes: [
       {
         title: 'default',
@@ -3172,15 +12696,59 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[117],
       },
     ],
   },
   {
     title: 'spec — delay arrow function for bare super derived (input)',
-    source:
-      'class Foo extends Bar {\n  constructor() {\n    super(() => {\n      this.test;\n    });\n  }\n}\n',
+    source: `class Foo extends Bar {
+  constructor() {
+    super(() => {
+      this.test;
+    });
+  }
+}
+`,
     filename: 'input.js',
+    output: `var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+let Foo = (__nox_super_0_90 => {
+  'use strict';
+  const Foo = function Foo() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(
+      Object.getPrototypeOf(Foo),
+      [
+        () => {
+          this.test;
+        },
+      ],
+      new.target || Foo,
+    );
+    var _result = function () {}.apply(_this, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    return _this;
+  };
+  if (__nox_super_0_90 !== null && typeof __nox_super_0_90 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Foo.prototype = Object.create(__nox_super_0_90 && __nox_super_0_90.prototype, {
+    constructor: {
+      value: Foo,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo, __nox_super_0_90);
+  else Foo.__proto__ = __nox_super_0_90;
+  Object.defineProperty(Foo, 'prototype', { writable: false });
+  return Foo;
+})(Bar);`,
     modes: [
       {
         title: 'default',
@@ -3194,15 +12762,111 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[118],
       },
     ],
   },
   {
     title: 'spec — delete super property to property key (exec)',
-    source:
-      '// [Symbol.toPrimitive] must be called if exist\nvar counter = 0;\nexpect(() => {\n  (new class {\n    f() {\n      delete super[{\n        [Symbol.toPrimitive]: function() { ++counter; return 0; },\n      }];\n    }\n  }).f();\n}).toThrow(ReferenceError);\nexpect(counter).toBe(1);\n\n// [Symbol.toPrimitive] must return a primitive value\nexpect(() => {\n  (new class {\n    f() {\n      delete super[{\n        [Symbol.toPrimitive]: function() { return {}; },\n      }];\n    }\n  }).f();\n}).toThrow(TypeError);\n',
+    source: `// [Symbol.toPrimitive] must be called if exist
+var counter = 0;
+expect(() => {
+  (new class {
+    f() {
+      delete super[{
+        [Symbol.toPrimitive]: function() { ++counter; return 0; },
+      }];
+    }
+  }).f();
+}).toThrow(ReferenceError);
+expect(counter).toBe(1);
+
+// [Symbol.toPrimitive] must return a primitive value
+expect(() => {
+  (new class {
+    f() {
+      delete super[{
+        [Symbol.toPrimitive]: function() { return {}; },
+      }];
+    }
+  }).f();
+}).toThrow(TypeError);
+`,
     filename: 'exec.js',
+    output: `var _get2 = { get: require('@babel/runtime/helpers/get') };
+function _get(e, t, r) {
+  return _get2.get(e, t, r);
+}
+// [Symbol.toPrimitive] must be called if exist
+var counter = 0;
+expect(() => {
+  new ((() => {
+    'use strict';
+    const _Class = function _Class() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+    };
+    Object.defineProperty(_Class.prototype, 'f', {
+      value: Object.defineProperty(
+        function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          delete _get(
+            Object.getPrototypeOf(_Class.prototype),
+            {
+              [Symbol.toPrimitive]: function () {
+                ++counter;
+                return 0;
+              },
+            },
+            this,
+          );
+        },
+        'name',
+        {
+          value: 'f',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(_Class, 'prototype', { writable: false });
+    return _Class;
+  })())().f();
+}).toThrow(ReferenceError);
+expect(counter).toBe(1);
+// [Symbol.toPrimitive] must return a primitive value
+expect(() => {
+  new ((() => {
+    'use strict';
+    const _Class16 = function _Class16() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+    };
+    Object.defineProperty(_Class16.prototype, 'f', {
+      value: Object.defineProperty(
+        function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          delete _get(
+            Object.getPrototypeOf(_Class16.prototype),
+            {
+              [Symbol.toPrimitive]: function () {
+                return {};
+              },
+            },
+            this,
+          );
+        },
+        'name',
+        {
+          value: 'f',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(_Class16, 'prototype', { writable: false });
+    return _Class16;
+  })())().f();
+}).toThrow(TypeError);`,
     modes: [
       {
         title: 'default',
@@ -3216,15 +12880,101 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[119],
       },
     ],
   },
   {
     title: 'spec — delete super property to property key (input)',
-    source:
-      '// [Symbol.toPrimitive] must be called if exist\nvar counter = 0;\n(new class {\n  f() {\n    delete super[{\n      [Symbol.toPrimitive]: function() { ++counter; return 0; },\n    }];\n  }\n}).f();\n\n// [Symbol.toPrimitive] must return a primitive value\n(new class {\n  f() {\n    delete super[{\n      [Symbol.toPrimitive]: function() { return {}; },\n    }];\n  }\n}).f();\n',
+    source: `// [Symbol.toPrimitive] must be called if exist
+var counter = 0;
+(new class {
+  f() {
+    delete super[{
+      [Symbol.toPrimitive]: function() { ++counter; return 0; },
+    }];
+  }
+}).f();
+
+// [Symbol.toPrimitive] must return a primitive value
+(new class {
+  f() {
+    delete super[{
+      [Symbol.toPrimitive]: function() { return {}; },
+    }];
+  }
+}).f();
+`,
     filename: 'input.js',
+    output: `var _get2 = { get: require('@babel/runtime/helpers/get') };
+function _get(e, t, r) {
+  return _get2.get(e, t, r);
+}
+// [Symbol.toPrimitive] must be called if exist
+var counter = 0;
+new ((() => {
+  'use strict';
+  const _Class = function _Class() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(_Class.prototype, 'f', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        delete _get(
+          Object.getPrototypeOf(_Class.prototype),
+          {
+            [Symbol.toPrimitive]: function () {
+              ++counter;
+              return 0;
+            },
+          },
+          this,
+        );
+      },
+      'name',
+      {
+        value: 'f',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(_Class, 'prototype', { writable: false });
+  return _Class;
+})())().f();
+// [Symbol.toPrimitive] must return a primitive value
+new ((() => {
+  'use strict';
+  const _Class16 = function _Class16() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(_Class16.prototype, 'f', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        delete _get(
+          Object.getPrototypeOf(_Class16.prototype),
+          {
+            [Symbol.toPrimitive]: function () {
+              return {};
+            },
+          },
+          this,
+        );
+      },
+      'name',
+      {
+        value: 'f',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(_Class16, 'prototype', { writable: false });
+  return _Class16;
+})())().f();`,
     modes: [
       {
         title: 'default',
@@ -3238,15 +12988,148 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[120],
       },
     ],
   },
   {
     title: 'spec — delete super property (exec)',
-    source:
-      'expect(() => {\n  (new class {\n    f() { delete super.x; }\n  }).f();\n}).toThrow(ReferenceError);\n\nexpect(() => {\n  (new class {\n    f() { delete super[0]; }\n  }).f();\n}).toThrow(ReferenceError);\n\n// [expr] should be evaluated\nvar counter = 0;\nexpect(() => {\n  (new class {\n    f() { delete super[++counter]; }\n  }).f();\n}).toThrow(ReferenceError);\nexpect(counter).toBe(1);\n\n// TypeError before ReferenceError\nexpect(() => {\n  (new class {\n    f() { delete super[0()]; }\n  }).f();\n}).toThrow(TypeError);\n',
+    source: `expect(() => {
+  (new class {
+    f() { delete super.x; }
+  }).f();
+}).toThrow(ReferenceError);
+
+expect(() => {
+  (new class {
+    f() { delete super[0]; }
+  }).f();
+}).toThrow(ReferenceError);
+
+// [expr] should be evaluated
+var counter = 0;
+expect(() => {
+  (new class {
+    f() { delete super[++counter]; }
+  }).f();
+}).toThrow(ReferenceError);
+expect(counter).toBe(1);
+
+// TypeError before ReferenceError
+expect(() => {
+  (new class {
+    f() { delete super[0()]; }
+  }).f();
+}).toThrow(TypeError);
+`,
     filename: 'exec.js',
+    output: `var _get2 = { get: require('@babel/runtime/helpers/get') };
+function _get(e, t, r) {
+  return _get2.get(e, t, r);
+}
+expect(() => {
+  new ((() => {
+    'use strict';
+    const _Class = function _Class() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+    };
+    Object.defineProperty(_Class.prototype, 'f', {
+      value: Object.defineProperty(
+        function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          delete _get(Object.getPrototypeOf(_Class.prototype), 'x', this);
+        },
+        'name',
+        {
+          value: 'f',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(_Class, 'prototype', { writable: false });
+    return _Class;
+  })())().f();
+}).toThrow(ReferenceError);
+expect(() => {
+  new ((() => {
+    'use strict';
+    const _Class16 = function _Class16() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+    };
+    Object.defineProperty(_Class16.prototype, 'f', {
+      value: Object.defineProperty(
+        function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          delete _get(Object.getPrototypeOf(_Class16.prototype), 0, this);
+        },
+        'name',
+        {
+          value: 'f',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(_Class16, 'prototype', { writable: false });
+    return _Class16;
+  })())().f();
+}).toThrow(ReferenceError);
+// [expr] should be evaluated
+var counter = 0;
+expect(() => {
+  new ((() => {
+    'use strict';
+    const _Class19 = function _Class19() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+    };
+    Object.defineProperty(_Class19.prototype, 'f', {
+      value: Object.defineProperty(
+        function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          delete _get(Object.getPrototypeOf(_Class19.prototype), ++counter, this);
+        },
+        'name',
+        {
+          value: 'f',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(_Class19, 'prototype', { writable: false });
+    return _Class19;
+  })())().f();
+}).toThrow(ReferenceError);
+expect(counter).toBe(1);
+// TypeError before ReferenceError
+expect(() => {
+  new ((() => {
+    'use strict';
+    const _Class22 = function _Class22() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+    };
+    Object.defineProperty(_Class22.prototype, 'f', {
+      value: Object.defineProperty(
+        function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          delete _get(Object.getPrototypeOf(_Class22.prototype), 0(), this);
+        },
+        'name',
+        {
+          value: 'f',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(_Class22, 'prototype', { writable: false });
+    return _Class22;
+  })())().f();
+}).toThrow(TypeError);`,
     modes: [
       {
         title: 'default',
@@ -3260,15 +13143,130 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[121],
       },
     ],
   },
   {
     title: 'spec — delete super property (input)',
-    source:
-      '(new class {\n  f() { delete super.x; }\n}).f();\n\n(new class {\n  f() { delete super[0]; }\n}).f();\n\n// [expr] should be evaluated\nvar counter = 0;\n(new class {\n  f() { delete super[++counter]; }\n}).f();\n\n// TypeError before ReferenceError\n(new class {\n  f() { delete super[0()]; }\n}).f();\n',
+    source: `(new class {
+  f() { delete super.x; }
+}).f();
+
+(new class {
+  f() { delete super[0]; }
+}).f();
+
+// [expr] should be evaluated
+var counter = 0;
+(new class {
+  f() { delete super[++counter]; }
+}).f();
+
+// TypeError before ReferenceError
+(new class {
+  f() { delete super[0()]; }
+}).f();
+`,
     filename: 'input.js',
+    output: `var _get2 = { get: require('@babel/runtime/helpers/get') };
+function _get(e, t, r) {
+  return _get2.get(e, t, r);
+}
+new ((() => {
+  'use strict';
+  const _Class = function _Class() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(_Class.prototype, 'f', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        delete _get(Object.getPrototypeOf(_Class.prototype), 'x', this);
+      },
+      'name',
+      {
+        value: 'f',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(_Class, 'prototype', { writable: false });
+  return _Class;
+})())().f();
+new ((() => {
+  'use strict';
+  const _Class16 = function _Class16() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(_Class16.prototype, 'f', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        delete _get(Object.getPrototypeOf(_Class16.prototype), 0, this);
+      },
+      'name',
+      {
+        value: 'f',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(_Class16, 'prototype', { writable: false });
+  return _Class16;
+})())().f();
+// [expr] should be evaluated
+var counter = 0;
+new ((() => {
+  'use strict';
+  const _Class19 = function _Class19() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(_Class19.prototype, 'f', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        delete _get(Object.getPrototypeOf(_Class19.prototype), ++counter, this);
+      },
+      'name',
+      {
+        value: 'f',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(_Class19, 'prototype', { writable: false });
+  return _Class19;
+})())().f();
+// TypeError before ReferenceError
+new ((() => {
+  'use strict';
+  const _Class22 = function _Class22() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(_Class22.prototype, 'f', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        delete _get(Object.getPrototypeOf(_Class22.prototype), 0(), this);
+      },
+      'name',
+      {
+        value: 'f',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(_Class22, 'prototype', { writable: false });
+  return _Class22;
+})())().f();`,
     modes: [
       {
         title: 'default',
@@ -3282,15 +13280,71 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[122],
       },
     ],
   },
   {
     title: 'spec — derived constructor must call super 2 (exec)',
-    source:
-      'class Bar {}\n\nclass Foo extends Bar {\n  constructor() {\n    if (eval("false")) super();\n  }\n}\n\nexpect(() => new Foo()).toThrow("this hasn\'t been initialised");\n',
+    source: `class Bar {}
+
+class Foo extends Bar {
+  constructor() {
+    if (eval("false")) super();
+  }
+}
+
+expect(() => new Foo()).toThrow("this hasn't been initialised");
+`,
     filename: 'exec.js',
+    output: `var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+let Bar = (() => {
+  'use strict';
+  const Bar = function Bar() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Bar, 'prototype', { writable: false });
+  return Bar;
+})();
+let Foo = (__nox_super_14_93 => {
+  'use strict';
+  const Foo = function Foo() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this,
+      _newtarget = new.target;
+    function _super() {
+      _this = _construct(Object.getPrototypeOf(Foo), arguments, _newtarget || Foo);
+      return _this;
+    }
+    var _result = function () {
+      if (eval('false')) _super();
+    }.apply(void 0, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    if (_this === void 0)
+      throw new ReferenceError("this hasn't been initialised - super() hasn't been called");
+    return _this;
+  };
+  if (__nox_super_14_93 !== null && typeof __nox_super_14_93 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Foo.prototype = Object.create(__nox_super_14_93 && __nox_super_14_93.prototype, {
+    constructor: {
+      value: Foo,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo, __nox_super_14_93);
+  else Foo.__proto__ = __nox_super_14_93;
+  Object.defineProperty(Foo, 'prototype', { writable: false });
+  return Foo;
+})(Bar);
+expect(() => new Foo()).toThrow("this hasn't been initialised");`,
     modes: [
       {
         title: 'default',
@@ -3304,14 +13358,58 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[123],
       },
     ],
   },
   {
     title: 'spec — derived constructor must call super 2 (input)',
-    source: 'class Foo extends Bar {\n  constructor() {\n    if (eval("false")) super();\n  }\n}\n',
+    source: `class Foo extends Bar {
+  constructor() {
+    if (eval("false")) super();
+  }
+}
+`,
     filename: 'input.js',
+    output: `var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+let Foo = (__nox_super_0_79 => {
+  'use strict';
+  const Foo = function Foo() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this,
+      _newtarget = new.target;
+    function _super() {
+      _this = _construct(Object.getPrototypeOf(Foo), arguments, _newtarget || Foo);
+      return _this;
+    }
+    var _result = function () {
+      if (eval('false')) _super();
+    }.apply(void 0, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    if (_this === void 0)
+      throw new ReferenceError("this hasn't been initialised - super() hasn't been called");
+    return _this;
+  };
+  if (__nox_super_0_79 !== null && typeof __nox_super_0_79 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Foo.prototype = Object.create(__nox_super_0_79 && __nox_super_0_79.prototype, {
+    constructor: {
+      value: Foo,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo, __nox_super_0_79);
+  else Foo.__proto__ = __nox_super_0_79;
+  Object.defineProperty(Foo, 'prototype', { writable: false });
+  return Foo;
+})(Bar);`,
     modes: [
       {
         title: 'default',
@@ -3325,15 +13423,73 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[124],
       },
     ],
   },
   {
     title: 'spec — derived constructor must call super 3 (exec)',
-    source:
-      'class Bar {}\n\nclass Foo extends Bar {\n  constructor() {\n    const fn = () => super();\n    fn();\n  }\n}\n\nnew Foo();\n',
+    source: `class Bar {}
+
+class Foo extends Bar {
+  constructor() {
+    const fn = () => super();
+    fn();
+  }
+}
+
+new Foo();
+`,
     filename: 'exec.js',
+    output: `var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+let Bar = (() => {
+  'use strict';
+  const Bar = function Bar() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Bar, 'prototype', { writable: false });
+  return Bar;
+})();
+let Foo = (__nox_super_14_101 => {
+  'use strict';
+  const Foo = function Foo() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this,
+      _newtarget = new.target;
+    function _super() {
+      _this = _construct(Object.getPrototypeOf(Foo), arguments, _newtarget || Foo);
+      return _this;
+    }
+    var _result = function () {
+      const fn = () => _super();
+      fn();
+    }.apply(void 0, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    if (_this === void 0)
+      throw new ReferenceError("this hasn't been initialised - super() hasn't been called");
+    return _this;
+  };
+  if (__nox_super_14_101 !== null && typeof __nox_super_14_101 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Foo.prototype = Object.create(__nox_super_14_101 && __nox_super_14_101.prototype, {
+    constructor: {
+      value: Foo,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo, __nox_super_14_101);
+  else Foo.__proto__ = __nox_super_14_101;
+  Object.defineProperty(Foo, 'prototype', { writable: false });
+  return Foo;
+})(Bar);
+new Foo();`,
     modes: [
       {
         title: 'default',
@@ -3347,15 +13503,60 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[125],
       },
     ],
   },
   {
     title: 'spec — derived constructor must call super 3 (input)',
-    source:
-      'class Foo extends Bar {\n  constructor() {\n    const fn = () => super();\n    fn();\n  }\n}\n',
+    source: `class Foo extends Bar {
+  constructor() {
+    const fn = () => super();
+    fn();
+  }
+}
+`,
     filename: 'input.js',
+    output: `var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+let Foo = (__nox_super_0_87 => {
+  'use strict';
+  const Foo = function Foo() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this,
+      _newtarget = new.target;
+    function _super() {
+      _this = _construct(Object.getPrototypeOf(Foo), arguments, _newtarget || Foo);
+      return _this;
+    }
+    var _result = function () {
+      const fn = () => _super();
+      fn();
+    }.apply(void 0, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    if (_this === void 0)
+      throw new ReferenceError("this hasn't been initialised - super() hasn't been called");
+    return _this;
+  };
+  if (__nox_super_0_87 !== null && typeof __nox_super_0_87 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Foo.prototype = Object.create(__nox_super_0_87 && __nox_super_0_87.prototype, {
+    constructor: {
+      value: Foo,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo, __nox_super_0_87);
+  else Foo.__proto__ = __nox_super_0_87;
+  Object.defineProperty(Foo, 'prototype', { writable: false });
+  return Foo;
+})(Bar);`,
     modes: [
       {
         title: 'default',
@@ -3369,15 +13570,71 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[126],
       },
     ],
   },
   {
     title: 'spec — derived constructor must call super 4 (exec)',
-    source:
-      'class Bar {}\n\nclass Foo extends Bar {\n  constructor() {\n    const fn = () => super();\n  }\n}\n\nexpect(() => new Foo()).toThrow("this hasn\'t been initialised");\n',
+    source: `class Bar {}
+
+class Foo extends Bar {
+  constructor() {
+    const fn = () => super();
+  }
+}
+
+expect(() => new Foo()).toThrow("this hasn't been initialised");
+`,
     filename: 'exec.js',
+    output: `var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+let Bar = (() => {
+  'use strict';
+  const Bar = function Bar() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Bar, 'prototype', { writable: false });
+  return Bar;
+})();
+let Foo = (__nox_super_14_91 => {
+  'use strict';
+  const Foo = function Foo() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this,
+      _newtarget = new.target;
+    function _super() {
+      _this = _construct(Object.getPrototypeOf(Foo), arguments, _newtarget || Foo);
+      return _this;
+    }
+    var _result = function () {
+      const fn = () => _super();
+    }.apply(void 0, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    if (_this === void 0)
+      throw new ReferenceError("this hasn't been initialised - super() hasn't been called");
+    return _this;
+  };
+  if (__nox_super_14_91 !== null && typeof __nox_super_14_91 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Foo.prototype = Object.create(__nox_super_14_91 && __nox_super_14_91.prototype, {
+    constructor: {
+      value: Foo,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo, __nox_super_14_91);
+  else Foo.__proto__ = __nox_super_14_91;
+  Object.defineProperty(Foo, 'prototype', { writable: false });
+  return Foo;
+})(Bar);
+expect(() => new Foo()).toThrow("this hasn't been initialised");`,
     modes: [
       {
         title: 'default',
@@ -3391,14 +13648,58 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[127],
       },
     ],
   },
   {
     title: 'spec — derived constructor must call super 4 (input)',
-    source: 'class Foo extends Bar {\n  constructor() {\n    const fn = () => super();\n  }\n}\n',
+    source: `class Foo extends Bar {
+  constructor() {
+    const fn = () => super();
+  }
+}
+`,
     filename: 'input.js',
+    output: `var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+let Foo = (__nox_super_0_77 => {
+  'use strict';
+  const Foo = function Foo() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this,
+      _newtarget = new.target;
+    function _super() {
+      _this = _construct(Object.getPrototypeOf(Foo), arguments, _newtarget || Foo);
+      return _this;
+    }
+    var _result = function () {
+      const fn = () => _super();
+    }.apply(void 0, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    if (_this === void 0)
+      throw new ReferenceError("this hasn't been initialised - super() hasn't been called");
+    return _this;
+  };
+  if (__nox_super_0_77 !== null && typeof __nox_super_0_77 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Foo.prototype = Object.create(__nox_super_0_77 && __nox_super_0_77.prototype, {
+    constructor: {
+      value: Foo,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo, __nox_super_0_77);
+  else Foo.__proto__ = __nox_super_0_77;
+  Object.defineProperty(Foo, 'prototype', { writable: false });
+  return Foo;
+})(Bar);`,
     modes: [
       {
         title: 'default',
@@ -3412,15 +13713,69 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[128],
       },
     ],
   },
   {
     title: 'spec — derived constructor must call super (exec)',
-    source:
-      'class Bar {}\n\nclass Foo extends Bar {\n  constructor() {\n\n  }\n}\n\nexpect(() => new Foo()).toThrow("this hasn\'t been initialised");\n',
+    source: `class Bar {}
+
+class Foo extends Bar {
+  constructor() {
+
+  }
+}
+
+expect(() => new Foo()).toThrow("this hasn't been initialised");
+`,
     filename: 'exec.js',
+    output: `var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+let Bar = (() => {
+  'use strict';
+  const Bar = function Bar() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Bar, 'prototype', { writable: false });
+  return Bar;
+})();
+let Foo = (__nox_super_14_62 => {
+  'use strict';
+  const Foo = function Foo() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this,
+      _newtarget = new.target;
+    function _super() {
+      _this = _construct(Object.getPrototypeOf(Foo), arguments, _newtarget || Foo);
+      return _this;
+    }
+    var _result = function () {}.apply(void 0, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    if (_this === void 0)
+      throw new ReferenceError("this hasn't been initialised - super() hasn't been called");
+    return _this;
+  };
+  if (__nox_super_14_62 !== null && typeof __nox_super_14_62 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Foo.prototype = Object.create(__nox_super_14_62 && __nox_super_14_62.prototype, {
+    constructor: {
+      value: Foo,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo, __nox_super_14_62);
+  else Foo.__proto__ = __nox_super_14_62;
+  Object.defineProperty(Foo, 'prototype', { writable: false });
+  return Foo;
+})(Bar);
+expect(() => new Foo()).toThrow("this hasn't been initialised");`,
     modes: [
       {
         title: 'default',
@@ -3434,15 +13789,103 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[129],
       },
     ],
   },
   {
     title: 'spec — derived constructor no primitive return (exec)',
-    source:
-      'class Bar {}\n\nclass Foo extends Bar {\n  constructor() {\n    super();\n    return 3;\n  }\n}\n\nclass Foo2 extends Bar {\n  constructor() {\n    super();\n    return null;\n  }\n}\n\nexpect(() => new Foo()).toThrow("Derived constructors may only return object or undefined");\nexpect(() => new Foo2()).toThrow("Derived constructors may only return object or undefined");\n',
+    source: `class Bar {}
+
+class Foo extends Bar {
+  constructor() {
+    super();
+    return 3;
+  }
+}
+
+class Foo2 extends Bar {
+  constructor() {
+    super();
+    return null;
+  }
+}
+
+expect(() => new Foo()).toThrow("Derived constructors may only return object or undefined");
+expect(() => new Foo2()).toThrow("Derived constructors may only return object or undefined");
+`,
     filename: 'exec.js',
+    output: `var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+let Bar = (() => {
+  'use strict';
+  const Bar = function Bar() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Bar, 'prototype', { writable: false });
+  return Bar;
+})();
+let Foo = (__nox_super_14_88 => {
+  'use strict';
+  const Foo = function Foo() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(Foo), [], new.target || Foo);
+    var _result = function () {
+      return 3;
+    }.apply(_this, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    return _this;
+  };
+  if (__nox_super_14_88 !== null && typeof __nox_super_14_88 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Foo.prototype = Object.create(__nox_super_14_88 && __nox_super_14_88.prototype, {
+    constructor: {
+      value: Foo,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo, __nox_super_14_88);
+  else Foo.__proto__ = __nox_super_14_88;
+  Object.defineProperty(Foo, 'prototype', { writable: false });
+  return Foo;
+})(Bar);
+let Foo2 = (__nox_super_90_168 => {
+  'use strict';
+  const Foo2 = function Foo2() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(Foo2), [], new.target || Foo2);
+    var _result = function () {
+      return null;
+    }.apply(_this, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    return _this;
+  };
+  if (__nox_super_90_168 !== null && typeof __nox_super_90_168 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Foo2.prototype = Object.create(__nox_super_90_168 && __nox_super_90_168.prototype, {
+    constructor: {
+      value: Foo2,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo2, __nox_super_90_168);
+  else Foo2.__proto__ = __nox_super_90_168;
+  Object.defineProperty(Foo2, 'prototype', { writable: false });
+  return Foo2;
+})(Bar);
+expect(() => new Foo()).toThrow('Derived constructors may only return object or undefined');
+expect(() => new Foo2()).toThrow('Derived constructors may only return object or undefined');`,
     modes: [
       {
         title: 'default',
@@ -3456,14 +13899,52 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[130],
       },
     ],
   },
   {
     title: 'spec — derived constructor no primitive return (input)',
-    source: 'class Foo extends Bar {\n  constructor() {\n    super();\n    return 3;\n  }\n}\n',
+    source: `class Foo extends Bar {
+  constructor() {
+    super();
+    return 3;
+  }
+}
+`,
     filename: 'input.js',
+    output: `var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+let Foo = (__nox_super_0_74 => {
+  'use strict';
+  const Foo = function Foo() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(Foo), [], new.target || Foo);
+    var _result = function () {
+      return 3;
+    }.apply(_this, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    return _this;
+  };
+  if (__nox_super_0_74 !== null && typeof __nox_super_0_74 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Foo.prototype = Object.create(__nox_super_0_74 && __nox_super_0_74.prototype, {
+    constructor: {
+      value: Foo,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo, __nox_super_0_74);
+  else Foo.__proto__ = __nox_super_0_74;
+  Object.defineProperty(Foo, 'prototype', { writable: false });
+  return Foo;
+})(Bar);`,
     modes: [
       {
         title: 'default',
@@ -3477,14 +13958,23 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[131],
       },
     ],
   },
   {
     title: 'spec — export default (input)',
-    source: 'export default class Foo {}\n',
+    source: `export default class Foo {}
+`,
     filename: 'input.mjs',
+    output: `let Foo = (() => {
+  'use strict';
+  const Foo = function Foo() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Foo, 'prototype', { writable: false });
+  return Foo;
+})();
+export default Foo;`,
     modes: [
       {
         title: 'default',
@@ -3498,14 +13988,41 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[132],
       },
     ],
   },
   {
     title: 'spec — export super class (input)',
-    source: 'export default class extends A {}\n',
+    source: `export default class extends A {}
+`,
     filename: 'input.mjs',
+    output: `import _babelHelper from '@babel/runtime/helpers/construct';
+var _construct2 = { construct: _babelHelper };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+let _Class = (__nox_super_15_33 => {
+  'use strict';
+  const _Class = function _Class() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(_Class), arguments, new.target || _Class);
+    return _this;
+  };
+  if (__nox_super_15_33 !== null && typeof __nox_super_15_33 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  _Class.prototype = Object.create(__nox_super_15_33 && __nox_super_15_33.prototype, {
+    constructor: {
+      value: _Class,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(_Class, __nox_super_15_33);
+  else _Class.__proto__ = __nox_super_15_33;
+  Object.defineProperty(_Class, 'prototype', { writable: false });
+  return _Class;
+})(A);
+export default _Class;`,
     modes: [
       {
         title: 'default',
@@ -3519,15 +14036,132 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[133],
       },
     ],
   },
   {
     title: 'spec — extend untranspiled class (exec)',
-    source:
-      '"use strict";\n\nvar log = [];\nvar SuperClass = require("module-which-exports-native-class");\n\nclass SubClass extends SuperClass {\n  constructor() {\n    log.push(4);\n    super();\n  }\n  method() {\n    log.push(5);\n    super.method();\n  }\n  static method() {\n    log.push(6);\n    super.method();\n  }\n}\n\nnew SubClass().method();\nSubClass.method();\n\nexpect(log).toEqual([4, 1, 5, 2, 6, 3]);\n\n// Magic function to avoid transpiling class\nfunction require() {\n  return eval(`(\n    class SuperClass {\n      constructor() { log.push(1); }\n      method() { log.push(2); }\n      static method() { log.push(3); }\n    }\n  )`);\n}\n',
+    source: `"use strict";
+
+var log = [];
+var SuperClass = require("module-which-exports-native-class");
+
+class SubClass extends SuperClass {
+  constructor() {
+    log.push(4);
+    super();
+  }
+  method() {
+    log.push(5);
+    super.method();
+  }
+  static method() {
+    log.push(6);
+    super.method();
+  }
+}
+
+new SubClass().method();
+SubClass.method();
+
+expect(log).toEqual([4, 1, 5, 2, 6, 3]);
+
+// Magic function to avoid transpiling class
+function require() {
+  return eval(\`(
+    class SuperClass {
+      constructor() { log.push(1); }
+      method() { log.push(2); }
+      static method() { log.push(3); }
+    }
+  )\`);
+}
+`,
     filename: 'exec.js',
+    output: `'use strict';
+var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+var _get2 = { get: require('@babel/runtime/helpers/get') };
+function _get(e, t, r) {
+  return _get2.get(e, t, r);
+}
+var log = [];
+var SuperClass = require('module-which-exports-native-class');
+let SubClass = (__nox_super_93_297 => {
+  'use strict';
+  const SubClass = function SubClass() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    log.push(4);
+    var _this = _construct(Object.getPrototypeOf(SubClass), [], new.target || SubClass);
+    var _result = function () {}.apply(_this, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    return _this;
+  };
+  if (__nox_super_93_297 !== null && typeof __nox_super_93_297 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  SubClass.prototype = Object.create(__nox_super_93_297 && __nox_super_93_297.prototype, {
+    constructor: {
+      value: SubClass,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(SubClass, __nox_super_93_297);
+  else SubClass.__proto__ = __nox_super_93_297;
+  Object.defineProperty(SubClass.prototype, 'method', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        log.push(5);
+        _get(Object.getPrototypeOf(SubClass.prototype), 'method', this).call(this);
+      },
+      'name',
+      {
+        value: 'method',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(SubClass, 'method', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        log.push(6);
+        _get(Object.getPrototypeOf(SubClass), 'method', this).call(this);
+      },
+      'name',
+      {
+        value: 'method',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(SubClass, 'prototype', { writable: false });
+  return SubClass;
+})(SuperClass);
+new SubClass().method();
+SubClass.method();
+expect(log).toEqual([4, 1, 5, 2, 6, 3]);
+// Magic function to avoid transpiling class
+function require() {
+  return eval(\`(
+    class SuperClass {
+      constructor() { log.push(1); }
+      method() { log.push(2); }
+      static method() { log.push(3); }
+    }
+  )\`);
+}`,
     modes: [
       {
         title: 'default',
@@ -3541,14 +14175,24 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[134],
       },
     ],
   },
   {
     title: 'spec — inferred expression name (input)',
-    source: 'var o = { foo: class foo {} };\n',
+    source: `var o = { foo: class foo {} };
+`,
     filename: 'input.js',
+    output: `var o = {
+  foo: (() => {
+    'use strict';
+    const foo = function foo() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+    };
+    Object.defineProperty(foo, 'prototype', { writable: false });
+    return foo;
+  })(),
+};`,
     modes: [
       {
         title: 'default',
@@ -3562,15 +14206,57 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[135],
       },
     ],
   },
   {
     title: 'spec — instance getter and setter (input)',
-    source:
-      'class Test {\n  get test() {\n    return 5 + 5;\n  }\n  set test(val) {\n    this._test = val;\n  }\n}\n',
+    source: `class Test {
+  get test() {
+    return 5 + 5;
+  }
+  set test(val) {
+    this._test = val;
+  }
+}
+`,
     filename: 'input.js',
+    output: `let Test = (() => {
+  'use strict';
+  const Test = function Test() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Test.prototype, 'test', {
+    get: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return 5 + 5;
+      },
+      'name',
+      {
+        value: 'get test',
+        configurable: true,
+      },
+    ),
+    configurable: true,
+  });
+  Object.defineProperty(Test.prototype, 'test', {
+    set: Object.defineProperty(
+      function (val) {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        this._test = val;
+      },
+      'name',
+      {
+        value: 'set test',
+        configurable: true,
+      },
+    ),
+    configurable: true,
+  });
+  Object.defineProperty(Test, 'prototype', { writable: false });
+  return Test;
+})();`,
     modes: [
       {
         title: 'default',
@@ -3584,14 +14270,40 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[136],
       },
     ],
   },
   {
     title: 'spec — instance getter (input)',
-    source: 'class Test {\n  get test() {\n  return 5 + 5;\n  }\n}\n',
+    source: `class Test {
+  get test() {
+  return 5 + 5;
+  }
+}
+`,
     filename: 'input.js',
+    output: `let Test = (() => {
+  'use strict';
+  const Test = function Test() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Test.prototype, 'test', {
+    get: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return 5 + 5;
+      },
+      'name',
+      {
+        value: 'get test',
+        configurable: true,
+      },
+    ),
+    configurable: true,
+  });
+  Object.defineProperty(Test, 'prototype', { writable: false });
+  return Test;
+})();`,
     modes: [
       {
         title: 'default',
@@ -3605,14 +14317,41 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[137],
       },
     ],
   },
   {
     title: 'spec — instance method (input)',
-    source: 'class Test {\n  test() {\n  return 5 + 5;\n  }\n}\n',
+    source: `class Test {
+  test() {
+  return 5 + 5;
+  }
+}
+`,
     filename: 'input.js',
+    output: `let Test = (() => {
+  'use strict';
+  const Test = function Test() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Test.prototype, 'test', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return 5 + 5;
+      },
+      'name',
+      {
+        value: 'test',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Test, 'prototype', { writable: false });
+  return Test;
+})();`,
     modes: [
       {
         title: 'default',
@@ -3626,14 +14365,40 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[138],
       },
     ],
   },
   {
     title: 'spec — instance setter (input)',
-    source: 'class Test {\n  set test(val) {\n  this._test = val;\n  }\n}\n',
+    source: `class Test {
+  set test(val) {
+  this._test = val;
+  }
+}
+`,
     filename: 'input.js',
+    output: `let Test = (() => {
+  'use strict';
+  const Test = function Test() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Test.prototype, 'test', {
+    set: Object.defineProperty(
+      function (val) {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        this._test = val;
+      },
+      'name',
+      {
+        value: 'set test',
+        configurable: true,
+      },
+    ),
+    configurable: true,
+  });
+  Object.defineProperty(Test, 'prototype', { writable: false });
+  return Test;
+})();`,
     modes: [
       {
         title: 'default',
@@ -3647,15 +14412,90 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[139],
       },
     ],
   },
   {
     title: 'spec — name collisions with class ref in computed key (input)',
-    source:
-      'class Foo extends Bar {\n  constructor() {\n    super();\n    class X {\n      [(() => {\n        let Foo;\n        super.method();\n      })()]() {}\n    }\n  }\n}',
+    source: `class Foo extends Bar {
+  constructor() {
+    super();
+    class X {
+      [(() => {
+        let Foo;
+        super.method();
+      })()]() {}
+    }
+  }
+}`,
     filename: 'input.js',
+    output: `var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+var _get2 = { get: require('@babel/runtime/helpers/get') };
+function _get(e, t, r) {
+  return _get2.get(e, t, r);
+}
+var _classKey2 = { toPropertyKey: require('@babel/runtime/helpers/toPropertyKey') },
+  _classKey = _classKey2.toPropertyKey;
+let Foo = (__nox_super_0_154 => {
+  'use strict';
+  const Foo = function Foo() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(Foo), [], new.target || Foo);
+    var _result = function () {
+      let X = (_key => {
+        'use strict';
+        _key = _classKey(_key);
+        const X = function X() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(X.prototype, _key, {
+          value: Object.defineProperty(
+            function () {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            },
+            'name',
+            {
+              value:
+                typeof _key === 'symbol' ? { [_key]: function () {} }[_key].name : String(_key),
+              configurable: true,
+            },
+          ),
+          writable: true,
+          configurable: true,
+        });
+        Object.defineProperty(X, 'prototype', { writable: false });
+        return X;
+      })(
+        (() => {
+          let Foo;
+          _get(Object.getPrototypeOf(Foo.prototype), 'method', this).call(this);
+        })(),
+      );
+    }.apply(_this, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    return _this;
+  };
+  if (__nox_super_0_154 !== null && typeof __nox_super_0_154 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Foo.prototype = Object.create(__nox_super_0_154 && __nox_super_0_154.prototype, {
+    constructor: {
+      value: Foo,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo, __nox_super_0_154);
+  else Foo.__proto__ = __nox_super_0_154;
+  Object.defineProperty(Foo, 'prototype', { writable: false });
+  return Foo;
+})(Bar);`,
     modes: [
       {
         title: 'default',
@@ -3669,15 +14509,104 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[140],
       },
     ],
   },
   {
     title: 'spec — name collisions with class ref in constructor (input)',
-    source:
-      'class Base {\n  method() {}\n}\n\nclass Foo extends Base {\n  constructor() {\n    super();\n\n    if (true) {\n      let Foo;\n      super.method();\n    }\n  }\n\n  method() { }\n}',
+    source: `class Base {
+  method() {}
+}
+
+class Foo extends Base {
+  constructor() {
+    super();
+
+    if (true) {
+      let Foo;
+      super.method();
+    }
+  }
+
+  method() { }
+}`,
     filename: 'input.js',
+    output: `var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+var _get2 = { get: require('@babel/runtime/helpers/get') };
+function _get(e, t, r) {
+  return _get2.get(e, t, r);
+}
+let Base = (() => {
+  'use strict';
+  const Base = function Base() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Base.prototype, 'method', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      },
+      'name',
+      {
+        value: 'method',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Base, 'prototype', { writable: false });
+  return Base;
+})();
+let Foo = (__nox_super_30_167 => {
+  'use strict';
+  const Foo = function Foo() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(Foo), [], new.target || Foo);
+    var _result = function () {
+      if (true) {
+        let Foo;
+        _get(Object.getPrototypeOf(Foo.prototype), 'method', this).call(this);
+      }
+    }.apply(_this, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    return _this;
+  };
+  if (__nox_super_30_167 !== null && typeof __nox_super_30_167 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Foo.prototype = Object.create(__nox_super_30_167 && __nox_super_30_167.prototype, {
+    constructor: {
+      value: Foo,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo, __nox_super_30_167);
+  else Foo.__proto__ = __nox_super_30_167;
+  Object.defineProperty(Foo.prototype, 'method', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      },
+      'name',
+      {
+        value: 'method',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Foo, 'prototype', { writable: false });
+  return Foo;
+})(Base);`,
     modes: [
       {
         title: 'default',
@@ -3691,15 +14620,139 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[141],
       },
     ],
   },
   {
     title: 'spec — name collisions with class ref in method (input)',
-    source:
-      'class Foo {\n  method(Foo) {\n    return super.method(Foo);\n  }\n}\n\nclass Bar {\n  method() {\n    return () => {\n      let Bar;\n      return super.method(Bar);\n    };\n  }\n}\n\nclass Baz {\n  method() {\n    class Baz {\n      f() {\n        let Baz = 1;\n        return Baz;\n      }\n    }\n\n    return super.method(Baz)\n  }\n}',
+    source: `class Foo {
+  method(Foo) {
+    return super.method(Foo);
+  }
+}
+
+class Bar {
+  method() {
+    return () => {
+      let Bar;
+      return super.method(Bar);
+    };
+  }
+}
+
+class Baz {
+  method() {
+    class Baz {
+      f() {
+        let Baz = 1;
+        return Baz;
+      }
+    }
+
+    return super.method(Baz)
+  }
+}`,
     filename: 'input.js',
+    output: `var _get2 = { get: require('@babel/runtime/helpers/get') };
+function _get(e, t, r) {
+  return _get2.get(e, t, r);
+}
+let Foo = (() => {
+  'use strict';
+  const Foo = function Foo() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Foo.prototype, 'method', {
+    value: Object.defineProperty(
+      function (Foo) {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return _get(Object.getPrototypeOf(Foo.prototype), 'method', this).call(this, Foo);
+      },
+      'name',
+      {
+        value: 'method',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Foo, 'prototype', { writable: false });
+  return Foo;
+})();
+let Bar = (() => {
+  'use strict';
+  const Bar = function Bar() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Bar.prototype, 'method', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return () => {
+          let Bar;
+          return _get(Object.getPrototypeOf(Bar.prototype), 'method', this).call(this, Bar);
+        };
+      },
+      'name',
+      {
+        value: 'method',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Bar, 'prototype', { writable: false });
+  return Bar;
+})();
+let Baz = (() => {
+  'use strict';
+  const Baz = function Baz() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Baz.prototype, 'method', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        let Baz = (() => {
+          'use strict';
+          const Baz = function Baz() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
+          };
+          Object.defineProperty(Baz.prototype, 'f', {
+            value: Object.defineProperty(
+              function () {
+                if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+                let Baz = 1;
+                return Baz;
+              },
+              'name',
+              {
+                value: 'f',
+                configurable: true,
+              },
+            ),
+            writable: true,
+            configurable: true,
+          });
+          Object.defineProperty(Baz, 'prototype', { writable: false });
+          return Baz;
+        })();
+        return _get(Object.getPrototypeOf(Baz.prototype), 'method', this).call(this, Baz);
+      },
+      'name',
+      {
+        value: 'method',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Baz, 'prototype', { writable: false });
+  return Baz;
+})();`,
     modes: [
       {
         title: 'default',
@@ -3713,14 +14766,44 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[142],
       },
     ],
   },
   {
     title: 'spec — name method collision (input)',
-    source: 'import { a } from "./a";\n\nclass Foo {\n  _a() {\n    a();\n  }\n}\n',
+    source: `import { a } from "./a";
+
+class Foo {
+  _a() {
+    a();
+  }
+}
+`,
     filename: 'input.mjs',
+    output: `import { a } from './a';
+let Foo = (() => {
+  'use strict';
+  const Foo = function Foo() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Foo.prototype, '_a', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        a();
+      },
+      'name',
+      {
+        value: '_a',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Foo, 'prototype', { writable: false });
+  return Foo;
+})();`,
     modes: [
       {
         title: 'default',
@@ -3734,15 +14817,119 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[143],
       },
     ],
   },
   {
     title: 'spec — nested class super call in key (exec)',
-    source:
-      "\"use strict\";\nclass Hello {\n  constructor() {\n    return {\n      toString() {\n        return 'hello';\n      },\n    };\n  }\n}\n\nclass Outer extends Hello {\n  constructor() {\n    class Inner {\n      [super()]() {\n        return 'hello';\n      }\n    }\n\n    return new Inner();\n  }\n}\n\nexpect(new Outer().hello()).toBe('hello');\n",
+    source: `"use strict";
+class Hello {
+  constructor() {
+    return {
+      toString() {
+        return 'hello';
+      },
+    };
+  }
+}
+
+class Outer extends Hello {
+  constructor() {
+    class Inner {
+      [super()]() {
+        return 'hello';
+      }
+    }
+
+    return new Inner();
+  }
+}
+
+expect(new Outer().hello()).toBe('hello');
+`,
     filename: 'exec.js',
+    output: `'use strict';
+var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+var _classKey2 = { toPropertyKey: require('@babel/runtime/helpers/toPropertyKey') },
+  _classKey = _classKey2.toPropertyKey;
+let Hello = (() => {
+  'use strict';
+  const Hello = function Hello() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    return {
+      toString() {
+        return 'hello';
+      },
+    };
+  };
+  Object.defineProperty(Hello, 'prototype', { writable: false });
+  return Hello;
+})();
+let Outer = (__nox_super_125_277 => {
+  'use strict';
+  const Outer = function Outer() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this,
+      _newtarget = new.target;
+    function _super() {
+      _this = _construct(Object.getPrototypeOf(Outer), arguments, _newtarget || Outer);
+      return _this;
+    }
+    var _result = function () {
+      let Inner = (_key => {
+        'use strict';
+        _key = _classKey(_key);
+        const Inner = function Inner() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(Inner.prototype, _key, {
+          value: Object.defineProperty(
+            function () {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              return 'hello';
+            },
+            'name',
+            {
+              value:
+                typeof _key === 'symbol' ? { [_key]: function () {} }[_key].name : String(_key),
+              configurable: true,
+            },
+          ),
+          writable: true,
+          configurable: true,
+        });
+        Object.defineProperty(Inner, 'prototype', { writable: false });
+        return Inner;
+      })(_super());
+      return new Inner();
+    }.apply(void 0, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    if (_this === void 0)
+      throw new ReferenceError("this hasn't been initialised - super() hasn't been called");
+    return _this;
+  };
+  if (__nox_super_125_277 !== null && typeof __nox_super_125_277 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Outer.prototype = Object.create(__nox_super_125_277 && __nox_super_125_277.prototype, {
+    constructor: {
+      value: Outer,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Outer, __nox_super_125_277);
+  else Outer.__proto__ = __nox_super_125_277;
+  Object.defineProperty(Outer, 'prototype', { writable: false });
+  return Outer;
+})(Hello);
+expect(new Outer().hello()).toBe('hello');`,
     modes: [
       {
         title: 'default',
@@ -3756,15 +14943,119 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[144],
       },
     ],
   },
   {
     title: 'spec — nested class super call in key (input)',
-    source:
-      "\"use strict\";\nclass Hello {\n  constructor() {\n    return {\n      toString() {\n        return 'hello';\n      },\n    };\n  }\n}\n\nclass Outer extends Hello {\n  constructor() {\n    class Inner {\n      [super()]() {\n        return 'hello';\n      }\n    }\n\n    return new Inner();\n  }\n}\n\nexpect(new Outer().hello()).toBe('hello');\n",
+    source: `"use strict";
+class Hello {
+  constructor() {
+    return {
+      toString() {
+        return 'hello';
+      },
+    };
+  }
+}
+
+class Outer extends Hello {
+  constructor() {
+    class Inner {
+      [super()]() {
+        return 'hello';
+      }
+    }
+
+    return new Inner();
+  }
+}
+
+expect(new Outer().hello()).toBe('hello');
+`,
     filename: 'input.js',
+    output: `'use strict';
+var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+var _classKey2 = { toPropertyKey: require('@babel/runtime/helpers/toPropertyKey') },
+  _classKey = _classKey2.toPropertyKey;
+let Hello = (() => {
+  'use strict';
+  const Hello = function Hello() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    return {
+      toString() {
+        return 'hello';
+      },
+    };
+  };
+  Object.defineProperty(Hello, 'prototype', { writable: false });
+  return Hello;
+})();
+let Outer = (__nox_super_125_277 => {
+  'use strict';
+  const Outer = function Outer() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this,
+      _newtarget = new.target;
+    function _super() {
+      _this = _construct(Object.getPrototypeOf(Outer), arguments, _newtarget || Outer);
+      return _this;
+    }
+    var _result = function () {
+      let Inner = (_key => {
+        'use strict';
+        _key = _classKey(_key);
+        const Inner = function Inner() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(Inner.prototype, _key, {
+          value: Object.defineProperty(
+            function () {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              return 'hello';
+            },
+            'name',
+            {
+              value:
+                typeof _key === 'symbol' ? { [_key]: function () {} }[_key].name : String(_key),
+              configurable: true,
+            },
+          ),
+          writable: true,
+          configurable: true,
+        });
+        Object.defineProperty(Inner, 'prototype', { writable: false });
+        return Inner;
+      })(_super());
+      return new Inner();
+    }.apply(void 0, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    if (_this === void 0)
+      throw new ReferenceError("this hasn't been initialised - super() hasn't been called");
+    return _this;
+  };
+  if (__nox_super_125_277 !== null && typeof __nox_super_125_277 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Outer.prototype = Object.create(__nox_super_125_277 && __nox_super_125_277.prototype, {
+    constructor: {
+      value: Outer,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Outer, __nox_super_125_277);
+  else Outer.__proto__ = __nox_super_125_277;
+  Object.defineProperty(Outer, 'prototype', { writable: false });
+  return Outer;
+})(Hello);
+expect(new Outer().hello()).toBe('hello');`,
     modes: [
       {
         title: 'default',
@@ -3778,15 +15069,123 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[144],
       },
     ],
   },
   {
     title: 'spec — nested class super property in key (exec)',
-    source:
-      "\"use strict\";\nclass Hello {\n  toString() {\n    return 'hello';\n  }\n}\n\nclass Outer extends Hello {\n  constructor() {\n    super();\n    class Inner {\n      [super.toString()]() {\n        return 'hello';\n      }\n    }\n\n    return new Inner();\n  }\n}\n\nexpect(new Outer().hello()).toBe('hello');\n",
+    source: `"use strict";
+class Hello {
+  toString() {
+    return 'hello';
+  }
+}
+
+class Outer extends Hello {
+  constructor() {
+    super();
+    class Inner {
+      [super.toString()]() {
+        return 'hello';
+      }
+    }
+
+    return new Inner();
+  }
+}
+
+expect(new Outer().hello()).toBe('hello');
+`,
     filename: 'exec.js',
+    output: `'use strict';
+var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+var _get2 = { get: require('@babel/runtime/helpers/get') };
+function _get(e, t, r) {
+  return _get2.get(e, t, r);
+}
+var _classKey2 = { toPropertyKey: require('@babel/runtime/helpers/toPropertyKey') },
+  _classKey = _classKey2.toPropertyKey;
+let Hello = (() => {
+  'use strict';
+  const Hello = function Hello() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Hello.prototype, 'toString', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return 'hello';
+      },
+      'name',
+      {
+        value: 'toString',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Hello, 'prototype', { writable: false });
+  return Hello;
+})();
+let Outer = (__nox_super_70_244 => {
+  'use strict';
+  const Outer = function Outer() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(Outer), [], new.target || Outer);
+    var _result = function () {
+      let Inner = (_key => {
+        'use strict';
+        _key = _classKey(_key);
+        const Inner = function Inner() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(Inner.prototype, _key, {
+          value: Object.defineProperty(
+            function () {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              return 'hello';
+            },
+            'name',
+            {
+              value:
+                typeof _key === 'symbol' ? { [_key]: function () {} }[_key].name : String(_key),
+              configurable: true,
+            },
+          ),
+          writable: true,
+          configurable: true,
+        });
+        Object.defineProperty(Inner, 'prototype', { writable: false });
+        return Inner;
+      })(_get(Object.getPrototypeOf(Outer.prototype), 'toString', this).call(this));
+      return new Inner();
+    }.apply(_this, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    return _this;
+  };
+  if (__nox_super_70_244 !== null && typeof __nox_super_70_244 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Outer.prototype = Object.create(__nox_super_70_244 && __nox_super_70_244.prototype, {
+    constructor: {
+      value: Outer,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Outer, __nox_super_70_244);
+  else Outer.__proto__ = __nox_super_70_244;
+  Object.defineProperty(Outer, 'prototype', { writable: false });
+  return Outer;
+})(Hello);
+expect(new Outer().hello()).toBe('hello');`,
     modes: [
       {
         title: 'default',
@@ -3800,15 +15199,123 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[145],
       },
     ],
   },
   {
     title: 'spec — nested class super property in key (input)',
-    source:
-      "\"use strict\";\nclass Hello {\n  toString() {\n    return 'hello';\n  }\n}\n\nclass Outer extends Hello {\n  constructor() {\n    super();\n    class Inner {\n      [super.toString()]() {\n        return 'hello';\n      }\n    }\n\n    return new Inner();\n  }\n}\n\nexpect(new Outer().hello()).toBe('hello');\n",
+    source: `"use strict";
+class Hello {
+  toString() {
+    return 'hello';
+  }
+}
+
+class Outer extends Hello {
+  constructor() {
+    super();
+    class Inner {
+      [super.toString()]() {
+        return 'hello';
+      }
+    }
+
+    return new Inner();
+  }
+}
+
+expect(new Outer().hello()).toBe('hello');
+`,
     filename: 'input.js',
+    output: `'use strict';
+var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+var _get2 = { get: require('@babel/runtime/helpers/get') };
+function _get(e, t, r) {
+  return _get2.get(e, t, r);
+}
+var _classKey2 = { toPropertyKey: require('@babel/runtime/helpers/toPropertyKey') },
+  _classKey = _classKey2.toPropertyKey;
+let Hello = (() => {
+  'use strict';
+  const Hello = function Hello() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Hello.prototype, 'toString', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return 'hello';
+      },
+      'name',
+      {
+        value: 'toString',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Hello, 'prototype', { writable: false });
+  return Hello;
+})();
+let Outer = (__nox_super_70_244 => {
+  'use strict';
+  const Outer = function Outer() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(Outer), [], new.target || Outer);
+    var _result = function () {
+      let Inner = (_key => {
+        'use strict';
+        _key = _classKey(_key);
+        const Inner = function Inner() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(Inner.prototype, _key, {
+          value: Object.defineProperty(
+            function () {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              return 'hello';
+            },
+            'name',
+            {
+              value:
+                typeof _key === 'symbol' ? { [_key]: function () {} }[_key].name : String(_key),
+              configurable: true,
+            },
+          ),
+          writable: true,
+          configurable: true,
+        });
+        Object.defineProperty(Inner, 'prototype', { writable: false });
+        return Inner;
+      })(_get(Object.getPrototypeOf(Outer.prototype), 'toString', this).call(this));
+      return new Inner();
+    }.apply(_this, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    return _this;
+  };
+  if (__nox_super_70_244 !== null && typeof __nox_super_70_244 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Outer.prototype = Object.create(__nox_super_70_244 && __nox_super_70_244.prototype, {
+    constructor: {
+      value: Outer,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Outer, __nox_super_70_244);
+  else Outer.__proto__ = __nox_super_70_244;
+  Object.defineProperty(Outer, 'prototype', { writable: false });
+  return Outer;
+})(Hello);
+expect(new Outer().hello()).toBe('hello');`,
     modes: [
       {
         title: 'default',
@@ -3822,15 +15329,97 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[145],
       },
     ],
   },
   {
     title: 'spec — nested object super call in key (exec)',
-    source:
-      "\"use strict\";\nclass Hello {\n  constructor() {\n    return {\n      toString() {\n        return 'hello';\n      },\n    };\n  }\n}\n\nclass Outer extends Hello {\n  constructor() {\n    const Inner = {\n      [super()]() {\n        return 'hello';\n      },\n    };\n\n    return Inner;\n  }\n}\n\nexpect(new Outer().hello()).toBe('hello');\n",
+    source: `"use strict";
+class Hello {
+  constructor() {
+    return {
+      toString() {
+        return 'hello';
+      },
+    };
+  }
+}
+
+class Outer extends Hello {
+  constructor() {
+    const Inner = {
+      [super()]() {
+        return 'hello';
+      },
+    };
+
+    return Inner;
+  }
+}
+
+expect(new Outer().hello()).toBe('hello');
+`,
     filename: 'exec.js',
+    output: `'use strict';
+var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+let Hello = (() => {
+  'use strict';
+  const Hello = function Hello() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    return {
+      toString() {
+        return 'hello';
+      },
+    };
+  };
+  Object.defineProperty(Hello, 'prototype', { writable: false });
+  return Hello;
+})();
+let Outer = (__nox_super_125_275 => {
+  'use strict';
+  const Outer = function Outer() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this,
+      _newtarget = new.target;
+    function _super() {
+      _this = _construct(Object.getPrototypeOf(Outer), arguments, _newtarget || Outer);
+      return _this;
+    }
+    var _result = function () {
+      const Inner = {
+        [_super()]() {
+          return 'hello';
+        },
+      };
+      return Inner;
+    }.apply(void 0, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    if (_this === void 0)
+      throw new ReferenceError("this hasn't been initialised - super() hasn't been called");
+    return _this;
+  };
+  if (__nox_super_125_275 !== null && typeof __nox_super_125_275 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Outer.prototype = Object.create(__nox_super_125_275 && __nox_super_125_275.prototype, {
+    constructor: {
+      value: Outer,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Outer, __nox_super_125_275);
+  else Outer.__proto__ = __nox_super_125_275;
+  Object.defineProperty(Outer, 'prototype', { writable: false });
+  return Outer;
+})(Hello);
+expect(new Outer().hello()).toBe('hello');`,
     modes: [
       {
         title: 'default',
@@ -3844,15 +15433,97 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[146],
       },
     ],
   },
   {
     title: 'spec — nested object super call in key (input)',
-    source:
-      "\"use strict\";\nclass Hello {\n  constructor() {\n    return {\n      toString() {\n        return 'hello';\n      },\n    };\n  }\n}\n\nclass Outer extends Hello {\n  constructor() {\n    const Inner = {\n      [super()]() {\n        return 'hello';\n      },\n    };\n\n    return Inner;\n  }\n}\n\nexpect(new Outer().hello()).toBe('hello');\n",
+    source: `"use strict";
+class Hello {
+  constructor() {
+    return {
+      toString() {
+        return 'hello';
+      },
+    };
+  }
+}
+
+class Outer extends Hello {
+  constructor() {
+    const Inner = {
+      [super()]() {
+        return 'hello';
+      },
+    };
+
+    return Inner;
+  }
+}
+
+expect(new Outer().hello()).toBe('hello');
+`,
     filename: 'input.js',
+    output: `'use strict';
+var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+let Hello = (() => {
+  'use strict';
+  const Hello = function Hello() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    return {
+      toString() {
+        return 'hello';
+      },
+    };
+  };
+  Object.defineProperty(Hello, 'prototype', { writable: false });
+  return Hello;
+})();
+let Outer = (__nox_super_125_275 => {
+  'use strict';
+  const Outer = function Outer() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this,
+      _newtarget = new.target;
+    function _super() {
+      _this = _construct(Object.getPrototypeOf(Outer), arguments, _newtarget || Outer);
+      return _this;
+    }
+    var _result = function () {
+      const Inner = {
+        [_super()]() {
+          return 'hello';
+        },
+      };
+      return Inner;
+    }.apply(void 0, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    if (_this === void 0)
+      throw new ReferenceError("this hasn't been initialised - super() hasn't been called");
+    return _this;
+  };
+  if (__nox_super_125_275 !== null && typeof __nox_super_125_275 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Outer.prototype = Object.create(__nox_super_125_275 && __nox_super_125_275.prototype, {
+    constructor: {
+      value: Outer,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Outer, __nox_super_125_275);
+  else Outer.__proto__ = __nox_super_125_275;
+  Object.defineProperty(Outer, 'prototype', { writable: false });
+  return Outer;
+})(Hello);
+expect(new Outer().hello()).toBe('hello');`,
     modes: [
       {
         title: 'default',
@@ -3866,15 +15537,101 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[146],
       },
     ],
   },
   {
     title: 'spec — nested object super property in key (exec)',
-    source:
-      "\"use strict\";\nclass Hello {\n  toString() {\n    return 'hello';\n  }\n}\n\nclass Outer extends Hello {\n  constructor() {\n    super();\n    const Inner = {\n      [super.toString()]() {\n        return 'hello';\n      },\n    };\n\n    return Inner;\n  }\n}\n\nexpect(new Outer().hello()).toBe('hello');\n",
+    source: `"use strict";
+class Hello {
+  toString() {
+    return 'hello';
+  }
+}
+
+class Outer extends Hello {
+  constructor() {
+    super();
+    const Inner = {
+      [super.toString()]() {
+        return 'hello';
+      },
+    };
+
+    return Inner;
+  }
+}
+
+expect(new Outer().hello()).toBe('hello');
+`,
     filename: 'exec.js',
+    output: `'use strict';
+var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+var _get2 = { get: require('@babel/runtime/helpers/get') };
+function _get(e, t, r) {
+  return _get2.get(e, t, r);
+}
+let Hello = (() => {
+  'use strict';
+  const Hello = function Hello() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Hello.prototype, 'toString', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return 'hello';
+      },
+      'name',
+      {
+        value: 'toString',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Hello, 'prototype', { writable: false });
+  return Hello;
+})();
+let Outer = (__nox_super_70_242 => {
+  'use strict';
+  const Outer = function Outer() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(Outer), [], new.target || Outer);
+    var _result = function () {
+      const Inner = {
+        [_get(Object.getPrototypeOf(Outer.prototype), 'toString', this).call(this)]() {
+          return 'hello';
+        },
+      };
+      return Inner;
+    }.apply(_this, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    return _this;
+  };
+  if (__nox_super_70_242 !== null && typeof __nox_super_70_242 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Outer.prototype = Object.create(__nox_super_70_242 && __nox_super_70_242.prototype, {
+    constructor: {
+      value: Outer,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Outer, __nox_super_70_242);
+  else Outer.__proto__ = __nox_super_70_242;
+  Object.defineProperty(Outer, 'prototype', { writable: false });
+  return Outer;
+})(Hello);
+expect(new Outer().hello()).toBe('hello');`,
     modes: [
       {
         title: 'default',
@@ -3888,15 +15645,101 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[147],
       },
     ],
   },
   {
     title: 'spec — nested object super property in key (input)',
-    source:
-      "\"use strict\";\nclass Hello {\n  toString() {\n    return 'hello';\n  }\n}\n\nclass Outer extends Hello {\n  constructor() {\n    super();\n    const Inner = {\n      [super.toString()]() {\n        return 'hello';\n      },\n    };\n\n    return Inner;\n  }\n}\n\nexpect(new Outer().hello()).toBe('hello');\n",
+    source: `"use strict";
+class Hello {
+  toString() {
+    return 'hello';
+  }
+}
+
+class Outer extends Hello {
+  constructor() {
+    super();
+    const Inner = {
+      [super.toString()]() {
+        return 'hello';
+      },
+    };
+
+    return Inner;
+  }
+}
+
+expect(new Outer().hello()).toBe('hello');
+`,
     filename: 'input.js',
+    output: `'use strict';
+var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+var _get2 = { get: require('@babel/runtime/helpers/get') };
+function _get(e, t, r) {
+  return _get2.get(e, t, r);
+}
+let Hello = (() => {
+  'use strict';
+  const Hello = function Hello() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Hello.prototype, 'toString', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return 'hello';
+      },
+      'name',
+      {
+        value: 'toString',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Hello, 'prototype', { writable: false });
+  return Hello;
+})();
+let Outer = (__nox_super_70_242 => {
+  'use strict';
+  const Outer = function Outer() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(Outer), [], new.target || Outer);
+    var _result = function () {
+      const Inner = {
+        [_get(Object.getPrototypeOf(Outer.prototype), 'toString', this).call(this)]() {
+          return 'hello';
+        },
+      };
+      return Inner;
+    }.apply(_this, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    return _this;
+  };
+  if (__nox_super_70_242 !== null && typeof __nox_super_70_242 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Outer.prototype = Object.create(__nox_super_70_242 && __nox_super_70_242.prototype, {
+    constructor: {
+      value: Outer,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Outer, __nox_super_70_242);
+  else Outer.__proto__ = __nox_super_70_242;
+  Object.defineProperty(Outer, 'prototype', { writable: false });
+  return Outer;
+})(Hello);
+expect(new Outer().hello()).toBe('hello');`,
     modes: [
       {
         title: 'default',
@@ -3910,14 +15753,22 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[147],
       },
     ],
   },
   {
     title: 'spec — plain class (input)',
-    source: 'class Test { }\n',
+    source: `class Test { }
+`,
     filename: 'input.js',
+    output: `let Test = (() => {
+  'use strict';
+  const Test = function Test() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Test, 'prototype', { writable: false });
+  return Test;
+})();`,
     modes: [
       {
         title: 'default',
@@ -3931,15 +15782,67 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[148],
       },
     ],
   },
   {
     title: 'spec — preserves directives (input)',
-    source:
-      'class MyCtrl {\n  constructor(a) {\n    "any directive prologue";\n    foo;\n  }\n}\n\nclass MyCtrl2 {\n  constructor(a) {\n    "a";\n    "b";\n    foo;\n  }\n}\n\nclass MyCtrl3 {\n  constructor(a) {\n    "a";\n    foo;\n    "b";\n  }\n}\n',
+    source: `class MyCtrl {
+  constructor(a) {
+    "any directive prologue";
+    foo;
+  }
+}
+
+class MyCtrl2 {
+  constructor(a) {
+    "a";
+    "b";
+    foo;
+  }
+}
+
+class MyCtrl3 {
+  constructor(a) {
+    "a";
+    foo;
+    "b";
+  }
+}
+`,
     filename: 'input.js',
+    output: `let MyCtrl = (() => {
+  'use strict';
+  const MyCtrl = function MyCtrl(a) {
+    'any directive prologue';
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    foo;
+  };
+  Object.defineProperty(MyCtrl, 'prototype', { writable: false });
+  return MyCtrl;
+})();
+let MyCtrl2 = (() => {
+  'use strict';
+  const MyCtrl2 = function MyCtrl2(a) {
+    'a';
+    'b';
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    foo;
+  };
+  Object.defineProperty(MyCtrl2, 'prototype', { writable: false });
+  return MyCtrl2;
+})();
+let MyCtrl3 = (() => {
+  'use strict';
+  const MyCtrl3 = function MyCtrl3(a) {
+    'a';
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    foo;
+    ('b');
+  };
+  Object.defineProperty(MyCtrl3, 'prototype', { writable: false });
+  return MyCtrl3;
+})();`,
     modes: [
       {
         title: 'default',
@@ -3953,14 +15856,61 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[149],
       },
     ],
   },
   {
     title: 'spec — relaxed method coercion (input)',
-    source: '// #1649\n\nclass Foo {\n  [Symbol()]() {}\n  [Symbol()]() {}\n}\n',
+    source: `// #1649
+
+class Foo {
+  [Symbol()]() {}
+  [Symbol()]() {}
+}
+`,
     filename: 'input.js',
+    output: `var _classKey2 = { toPropertyKey: require('@babel/runtime/helpers/toPropertyKey') },
+  _classKey = _classKey2.toPropertyKey;
+// #1649
+let Foo = ((_key, _key14) => {
+  'use strict';
+  _key = _classKey(_key);
+  _key14 = _classKey(_key14);
+  const Foo = function Foo() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Foo.prototype, _key, {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      },
+      'name',
+      {
+        value: typeof _key === 'symbol' ? { [_key]: function () {} }[_key].name : String(_key),
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Foo.prototype, _key14, {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      },
+      'name',
+      {
+        value:
+          typeof _key14 === 'symbol' ? { [_key14]: function () {} }[_key14].name : String(_key14),
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Foo, 'prototype', { writable: false });
+  return Foo;
+})(Symbol(), Symbol());`,
     modes: [
       {
         title: 'default',
@@ -3979,15 +15929,234 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[150],
       },
     ],
   },
   {
     title: 'spec — returning from derived constructor (exec)',
-    source:
-      '"use strict";\nclass Foo {\n  constructor() {\n    return { x: 1 };\n  }\n}\n\nexpect(new Foo().x).toBe(1);\n\nclass Bar extends Foo {\n  constructor() {\n    super();\n    return;\n  }\n}\n\nexpect(new Bar().x).toBe(1);\n\nclass Bar2 extends Foo {\n  constructor() {\n    super();\n    expect(this.x).toBe(1);\n    return { x: 2 };\n  }\n}\n\nexpect(new Bar2().x).toBe(2);\n\n\nlet singleton;\nclass Sub extends Foo {\n  constructor() {\n    if (singleton) {\n      return singleton;\n    }\n    singleton = super();\n  }\n}\n\nlet instance = new Sub;\nexpect(instance).toBe(singleton);\n\ninstance = new Sub;\nexpect(instance).toBe(singleton);\n\nclass Undefined extends Foo {\n  constructor() {\n    if (false) {\n      super();\n    }\n    return;\n    super();\n  }\n}\n\nexpect(() => {\n  new Undefined();\n}).toThrow("this");\n',
+    source: `"use strict";
+class Foo {
+  constructor() {
+    return { x: 1 };
+  }
+}
+
+expect(new Foo().x).toBe(1);
+
+class Bar extends Foo {
+  constructor() {
+    super();
+    return;
+  }
+}
+
+expect(new Bar().x).toBe(1);
+
+class Bar2 extends Foo {
+  constructor() {
+    super();
+    expect(this.x).toBe(1);
+    return { x: 2 };
+  }
+}
+
+expect(new Bar2().x).toBe(2);
+
+
+let singleton;
+class Sub extends Foo {
+  constructor() {
+    if (singleton) {
+      return singleton;
+    }
+    singleton = super();
+  }
+}
+
+let instance = new Sub;
+expect(instance).toBe(singleton);
+
+instance = new Sub;
+expect(instance).toBe(singleton);
+
+class Undefined extends Foo {
+  constructor() {
+    if (false) {
+      super();
+    }
+    return;
+    super();
+  }
+}
+
+expect(() => {
+  new Undefined();
+}).toThrow("this");
+`,
     filename: 'exec.js',
+    output: `'use strict';
+var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+let Foo = (() => {
+  'use strict';
+  const Foo = function Foo() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    return { x: 1 };
+  };
+  Object.defineProperty(Foo, 'prototype', { writable: false });
+  return Foo;
+})();
+expect(new Foo().x).toBe(1);
+let Bar = (__nox_super_102_174 => {
+  'use strict';
+  const Bar = function Bar() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(Bar), [], new.target || Bar);
+    var _result = function () {
+      return;
+    }.apply(_this, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    return _this;
+  };
+  if (__nox_super_102_174 !== null && typeof __nox_super_102_174 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Bar.prototype = Object.create(__nox_super_102_174 && __nox_super_102_174.prototype, {
+    constructor: {
+      value: Bar,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Bar, __nox_super_102_174);
+  else Bar.__proto__ = __nox_super_102_174;
+  Object.defineProperty(Bar, 'prototype', { writable: false });
+  return Bar;
+})(Foo);
+expect(new Bar().x).toBe(1);
+let Bar2 = (__nox_super_206_316 => {
+  'use strict';
+  const Bar2 = function Bar2() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(Bar2), [], new.target || Bar2);
+    var _result = function () {
+      expect(this.x).toBe(1);
+      return { x: 2 };
+    }.apply(_this, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    return _this;
+  };
+  if (__nox_super_206_316 !== null && typeof __nox_super_206_316 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Bar2.prototype = Object.create(__nox_super_206_316 && __nox_super_206_316.prototype, {
+    constructor: {
+      value: Bar2,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Bar2, __nox_super_206_316);
+  else Bar2.__proto__ = __nox_super_206_316;
+  Object.defineProperty(Bar2, 'prototype', { writable: false });
+  return Bar2;
+})(Foo);
+expect(new Bar2().x).toBe(2);
+let singleton;
+let Sub = (__nox_super_365_488 => {
+  'use strict';
+  const Sub = function Sub() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this,
+      _newtarget = new.target;
+    function _super() {
+      _this = _construct(Object.getPrototypeOf(Sub), arguments, _newtarget || Sub);
+      return _this;
+    }
+    var _result = function () {
+      if (singleton) {
+        return singleton;
+      }
+      singleton = _super();
+    }.apply(void 0, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    if (_this === void 0)
+      throw new ReferenceError("this hasn't been initialised - super() hasn't been called");
+    return _this;
+  };
+  if (__nox_super_365_488 !== null && typeof __nox_super_365_488 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Sub.prototype = Object.create(__nox_super_365_488 && __nox_super_365_488.prototype, {
+    constructor: {
+      value: Sub,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Sub, __nox_super_365_488);
+  else Sub.__proto__ = __nox_super_365_488;
+  Object.defineProperty(Sub, 'prototype', { writable: false });
+  return Sub;
+})(Foo);
+let instance = new Sub();
+expect(instance).toBe(singleton);
+instance = new Sub();
+expect(instance).toBe(singleton);
+let Undefined = (__nox_super_604_720 => {
+  'use strict';
+  const Undefined = function Undefined() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this,
+      _newtarget = new.target;
+    function _super() {
+      _this = _construct(Object.getPrototypeOf(Undefined), arguments, _newtarget || Undefined);
+      return _this;
+    }
+    var _result = function () {
+      if (false) {
+        _super();
+      }
+      return;
+      _super();
+    }.apply(void 0, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    if (_this === void 0)
+      throw new ReferenceError("this hasn't been initialised - super() hasn't been called");
+    return _this;
+  };
+  if (__nox_super_604_720 !== null && typeof __nox_super_604_720 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Undefined.prototype = Object.create(__nox_super_604_720 && __nox_super_604_720.prototype, {
+    constructor: {
+      value: Undefined,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Undefined, __nox_super_604_720);
+  else Undefined.__proto__ = __nox_super_604_720;
+  Object.defineProperty(Undefined, 'prototype', { writable: false });
+  return Undefined;
+})(Foo);
+expect(() => {
+  new Undefined();
+}).toThrow('this');`,
     modes: [
       {
         title: 'default',
@@ -4001,15 +16170,79 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[151],
       },
     ],
   },
   {
     title: 'spec — statement (input)',
-    source:
-      'var BaseView = class BaseView {\n  constructor() {\n    this.autoRender = true;\n  }\n}\n\nvar BaseView = class {\n  constructor() {\n    this.autoRender = true;\n  }\n}\n\nvar BaseView = class {\n  foo() {\n    this.autoRender = true;\n  }\n}\n',
+    source: `var BaseView = class BaseView {
+  constructor() {
+    this.autoRender = true;
+  }
+}
+
+var BaseView = class {
+  constructor() {
+    this.autoRender = true;
+  }
+}
+
+var BaseView = class {
+  foo() {
+    this.autoRender = true;
+  }
+}
+`,
     filename: 'input.js',
+    output: `var BaseView = (() => {
+  'use strict';
+  const BaseView = function BaseView() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    this.autoRender = true;
+  };
+  Object.defineProperty(BaseView, 'prototype', { writable: false });
+  return BaseView;
+})();
+var BaseView = (() => {
+  'use strict';
+  const _Class = function _Class() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    this.autoRender = true;
+  };
+  Object.defineProperty(_Class, 'name', {
+    value: 'BaseView',
+    configurable: true,
+  });
+  Object.defineProperty(_Class, 'prototype', { writable: false });
+  return _Class;
+})();
+var BaseView = (() => {
+  'use strict';
+  const _Class18 = function _Class18() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(_Class18, 'name', {
+    value: 'BaseView',
+    configurable: true,
+  });
+  Object.defineProperty(_Class18.prototype, 'foo', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        this.autoRender = true;
+      },
+      'name',
+      {
+        value: 'foo',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(_Class18, 'prototype', { writable: false });
+  return _Class18;
+})();`,
     modes: [
       {
         title: 'default',
@@ -4023,15 +16256,74 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[152],
       },
     ],
   },
   {
     title: 'spec — static (input)',
-    source:
-      'class A {\n  static a() {\n\n  }\n\n  static get b(){\n\n  }\n\n  static set b(b){\n\n  }\n}\n',
+    source: `class A {
+  static a() {
+
+  }
+
+  static get b(){
+
+  }
+
+  static set b(b){
+
+  }
+}
+`,
     filename: 'input.js',
+    output: `let A = (() => {
+  'use strict';
+  const A = function A() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(A, 'a', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      },
+      'name',
+      {
+        value: 'a',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(A, 'b', {
+    get: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      },
+      'name',
+      {
+        value: 'get b',
+        configurable: true,
+      },
+    ),
+    configurable: true,
+  });
+  Object.defineProperty(A, 'b', {
+    set: Object.defineProperty(
+      function (b) {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      },
+      'name',
+      {
+        value: 'set b',
+        configurable: true,
+      },
+    ),
+    configurable: true,
+  });
+  Object.defineProperty(A, 'prototype', { writable: false });
+  return A;
+})();`,
     modes: [
       {
         title: 'default',
@@ -4045,15 +16337,267 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[153],
       },
     ],
   },
   {
     title: 'spec — super class anonymous (input)',
-    source:
-      'class TestEmpty extends (class {}) {\n}\n\nclass TestConstructorOnly extends (class { constructor() {} }) {\n}\n\nclass TestMethodOnly extends (class { method() {} }) {\n}\n\nclass TestConstructorAndMethod extends (class {\n  constructor() {}\n  method() {}\n}) {\n}\n\nclass TestMultipleMethods extends (class {\n  m1() {}\n  m2() {}\n}) {}\n',
+    source: `class TestEmpty extends (class {}) {
+}
+
+class TestConstructorOnly extends (class { constructor() {} }) {
+}
+
+class TestMethodOnly extends (class { method() {} }) {
+}
+
+class TestConstructorAndMethod extends (class {
+  constructor() {}
+  method() {}
+}) {
+}
+
+class TestMultipleMethods extends (class {
+  m1() {}
+  m2() {}
+}) {}
+`,
     filename: 'input.js',
+    output: `var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+let TestEmpty = (__nox_super_0_38 => {
+  'use strict';
+  const TestEmpty = function TestEmpty() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(TestEmpty), arguments, new.target || TestEmpty);
+    return _this;
+  };
+  if (__nox_super_0_38 !== null && typeof __nox_super_0_38 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  TestEmpty.prototype = Object.create(__nox_super_0_38 && __nox_super_0_38.prototype, {
+    constructor: {
+      value: TestEmpty,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(TestEmpty, __nox_super_0_38);
+  else TestEmpty.__proto__ = __nox_super_0_38;
+  Object.defineProperty(TestEmpty, 'prototype', { writable: false });
+  return TestEmpty;
+})(
+  (() => {
+    'use strict';
+    const _Class = function _Class() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+    };
+    Object.defineProperty(_Class, 'prototype', { writable: false });
+    return _Class;
+  })(),
+);
+let TestConstructorOnly = (__nox_super_40_106 => {
+  'use strict';
+  const TestConstructorOnly = function TestConstructorOnly() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(
+      Object.getPrototypeOf(TestConstructorOnly),
+      arguments,
+      new.target || TestConstructorOnly,
+    );
+    return _this;
+  };
+  if (__nox_super_40_106 !== null && typeof __nox_super_40_106 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  TestConstructorOnly.prototype = Object.create(
+    __nox_super_40_106 && __nox_super_40_106.prototype,
+    {
+      constructor: {
+        value: TestConstructorOnly,
+        writable: true,
+        configurable: true,
+      },
+    },
+  );
+  if (Object.setPrototypeOf) Object.setPrototypeOf(TestConstructorOnly, __nox_super_40_106);
+  else TestConstructorOnly.__proto__ = __nox_super_40_106;
+  Object.defineProperty(TestConstructorOnly, 'prototype', { writable: false });
+  return TestConstructorOnly;
+})(
+  (() => {
+    'use strict';
+    const _Class24 = function _Class24() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+    };
+    Object.defineProperty(_Class24, 'prototype', { writable: false });
+    return _Class24;
+  })(),
+);
+let TestMethodOnly = (__nox_super_108_164 => {
+  'use strict';
+  const TestMethodOnly = function TestMethodOnly() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(
+      Object.getPrototypeOf(TestMethodOnly),
+      arguments,
+      new.target || TestMethodOnly,
+    );
+    return _this;
+  };
+  if (__nox_super_108_164 !== null && typeof __nox_super_108_164 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  TestMethodOnly.prototype = Object.create(__nox_super_108_164 && __nox_super_108_164.prototype, {
+    constructor: {
+      value: TestMethodOnly,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(TestMethodOnly, __nox_super_108_164);
+  else TestMethodOnly.__proto__ = __nox_super_108_164;
+  Object.defineProperty(TestMethodOnly, 'prototype', { writable: false });
+  return TestMethodOnly;
+})(
+  (() => {
+    'use strict';
+    const _Class29 = function _Class29() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+    };
+    Object.defineProperty(_Class29.prototype, 'method', {
+      value: Object.defineProperty(
+        function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        },
+        'name',
+        {
+          value: 'method',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(_Class29, 'prototype', { writable: false });
+    return _Class29;
+  })(),
+);
+let TestConstructorAndMethod = (__nox_super_166_253 => {
+  'use strict';
+  const TestConstructorAndMethod = function TestConstructorAndMethod() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(
+      Object.getPrototypeOf(TestConstructorAndMethod),
+      arguments,
+      new.target || TestConstructorAndMethod,
+    );
+    return _this;
+  };
+  if (__nox_super_166_253 !== null && typeof __nox_super_166_253 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  TestConstructorAndMethod.prototype = Object.create(
+    __nox_super_166_253 && __nox_super_166_253.prototype,
+    {
+      constructor: {
+        value: TestConstructorAndMethod,
+        writable: true,
+        configurable: true,
+      },
+    },
+  );
+  if (Object.setPrototypeOf) Object.setPrototypeOf(TestConstructorAndMethod, __nox_super_166_253);
+  else TestConstructorAndMethod.__proto__ = __nox_super_166_253;
+  Object.defineProperty(TestConstructorAndMethod, 'prototype', { writable: false });
+  return TestConstructorAndMethod;
+})(
+  (() => {
+    'use strict';
+    const _Class34 = function _Class34() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+    };
+    Object.defineProperty(_Class34.prototype, 'method', {
+      value: Object.defineProperty(
+        function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        },
+        'name',
+        {
+          value: 'method',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(_Class34, 'prototype', { writable: false });
+    return _Class34;
+  })(),
+);
+let TestMultipleMethods = (__nox_super_255_323 => {
+  'use strict';
+  const TestMultipleMethods = function TestMultipleMethods() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(
+      Object.getPrototypeOf(TestMultipleMethods),
+      arguments,
+      new.target || TestMultipleMethods,
+    );
+    return _this;
+  };
+  if (__nox_super_255_323 !== null && typeof __nox_super_255_323 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  TestMultipleMethods.prototype = Object.create(
+    __nox_super_255_323 && __nox_super_255_323.prototype,
+    {
+      constructor: {
+        value: TestMultipleMethods,
+        writable: true,
+        configurable: true,
+      },
+    },
+  );
+  if (Object.setPrototypeOf) Object.setPrototypeOf(TestMultipleMethods, __nox_super_255_323);
+  else TestMultipleMethods.__proto__ = __nox_super_255_323;
+  Object.defineProperty(TestMultipleMethods, 'prototype', { writable: false });
+  return TestMultipleMethods;
+})(
+  (() => {
+    'use strict';
+    const _Class39 = function _Class39() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+    };
+    Object.defineProperty(_Class39.prototype, 'm1', {
+      value: Object.defineProperty(
+        function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        },
+        'name',
+        {
+          value: 'm1',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(_Class39.prototype, 'm2', {
+      value: Object.defineProperty(
+        function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        },
+        'name',
+        {
+          value: 'm2',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(_Class39, 'prototype', { writable: false });
+    return _Class39;
+  })(),
+);`,
     modes: [
       {
         title: 'default',
@@ -4067,15 +16611,81 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[154],
       },
     ],
   },
   {
     title: 'spec — super correct new target without reflect (exec)',
-    source:
-      '"use strict";\n\nconst oldReflect = global.Reflect;\ntry {\n  global.Reflect = undefined;\n\n  let NewTarget;\n\n  class A {\n    constructor() { NewTarget = new.target; }\n  }\n  class B extends A {}\n\n  new A();\n  expect(NewTarget).toBe(A);\n\n  new B();\n  expect(NewTarget).toBe(B);\n} finally {\n  global.Reflect = oldReflect;\n}\n\n',
+    source: `"use strict";
+
+const oldReflect = global.Reflect;
+try {
+  global.Reflect = undefined;
+
+  let NewTarget;
+
+  class A {
+    constructor() { NewTarget = new.target; }
+  }
+  class B extends A {}
+
+  new A();
+  expect(NewTarget).toBe(A);
+
+  new B();
+  expect(NewTarget).toBe(B);
+} finally {
+  global.Reflect = oldReflect;
+}
+
+`,
     filename: 'exec.js',
+    output: `'use strict';
+var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+const oldReflect = global.Reflect;
+try {
+  global.Reflect = undefined;
+  let NewTarget;
+  let A = (() => {
+    'use strict';
+    const A = function A() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+      NewTarget = new.target;
+    };
+    Object.defineProperty(A, 'prototype', { writable: false });
+    return A;
+  })();
+  let B = (__nox_super_169_189 => {
+    'use strict';
+    const B = function B() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+      var _this = _construct(Object.getPrototypeOf(B), arguments, new.target || B);
+      return _this;
+    };
+    if (__nox_super_169_189 !== null && typeof __nox_super_169_189 !== 'function')
+      throw new TypeError('Super expression must either be null or a function');
+    B.prototype = Object.create(__nox_super_169_189 && __nox_super_169_189.prototype, {
+      constructor: {
+        value: B,
+        writable: true,
+        configurable: true,
+      },
+    });
+    if (Object.setPrototypeOf) Object.setPrototypeOf(B, __nox_super_169_189);
+    else B.__proto__ = __nox_super_169_189;
+    Object.defineProperty(B, 'prototype', { writable: false });
+    return B;
+  })(A);
+  new A();
+  expect(NewTarget).toBe(A);
+  new B();
+  expect(NewTarget).toBe(B);
+} finally {
+  global.Reflect = oldReflect;
+}`,
     modes: [
       {
         title: 'default',
@@ -4089,15 +16699,67 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[155],
       },
     ],
   },
   {
     title: 'spec — super correct new target (exec)',
-    source:
-      '"use strict";\n\nlet NewTarget;\n\nclass A {\n  constructor() { NewTarget = new.target; }\n}\nclass B extends A {}\n\nnew A();\nexpect(NewTarget).toBe(A);\n\nnew B();\nexpect(NewTarget).toBe(B);\n',
+    source: `"use strict";
+
+let NewTarget;
+
+class A {
+  constructor() { NewTarget = new.target; }
+}
+class B extends A {}
+
+new A();
+expect(NewTarget).toBe(A);
+
+new B();
+expect(NewTarget).toBe(B);
+`,
     filename: 'exec.js',
+    output: `'use strict';
+var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+let NewTarget;
+let A = (() => {
+  'use strict';
+  const A = function A() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    NewTarget = new.target;
+  };
+  Object.defineProperty(A, 'prototype', { writable: false });
+  return A;
+})();
+let B = (__nox_super_87_107 => {
+  'use strict';
+  const B = function B() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(B), arguments, new.target || B);
+    return _this;
+  };
+  if (__nox_super_87_107 !== null && typeof __nox_super_87_107 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  B.prototype = Object.create(__nox_super_87_107 && __nox_super_87_107.prototype, {
+    constructor: {
+      value: B,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(B, __nox_super_87_107);
+  else B.__proto__ = __nox_super_87_107;
+  Object.defineProperty(B, 'prototype', { writable: false });
+  return B;
+})(A);
+new A();
+expect(NewTarget).toBe(A);
+new B();
+expect(NewTarget).toBe(B);`,
     modes: [
       {
         title: 'default',
@@ -4111,14 +16773,46 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[156],
       },
     ],
   },
   {
     title: 'spec — super destructuring array pattern 1 (input)',
-    source: 'class Foo {\n  constructor(props) {\n    ;([x, ...super.client] = props);\n  }\n}',
+    source: `class Foo {
+  constructor(props) {
+    ;([x, ...super.client] = props);
+  }
+}`,
     filename: 'input.js',
+    output: `var _superReference2 = {
+  get: require('@babel/runtime/helpers/get'),
+  set: require('@babel/runtime/helpers/set'),
+};
+function _get(e, t, r) {
+  return _superReference2.get(e, t, r);
+}
+function _superReference(e, t, r) {
+  return {
+    get value() {
+      return _superReference2.get(e, t, r);
+    },
+    set value(u) {
+      _superReference2.set(e, t, u, r, !0);
+    },
+  };
+}
+_superReference.set = function (e, t, r, u) {
+  return _superReference2.set(e, t, u, r, !0);
+};
+let Foo = (() => {
+  'use strict';
+  const Foo = function Foo(props) {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    [x, ...super.client] = props;
+  };
+  Object.defineProperty(Foo, 'prototype', { writable: false });
+  return Foo;
+})();`,
     modes: [
       {
         title: 'default',
@@ -4132,14 +16826,47 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[157],
       },
     ],
   },
   {
     title: 'spec — super destructuring array pattern (input)',
-    source: 'class Foo {\n  constructor(props) {\n    ;([super.client] = props);\n  }\n}\n',
+    source: `class Foo {
+  constructor(props) {
+    ;([super.client] = props);
+  }
+}
+`,
     filename: 'input.js',
+    output: `var _superReference2 = {
+  get: require('@babel/runtime/helpers/get'),
+  set: require('@babel/runtime/helpers/set'),
+};
+function _get(e, t, r) {
+  return _superReference2.get(e, t, r);
+}
+function _superReference(e, t, r) {
+  return {
+    get value() {
+      return _superReference2.get(e, t, r);
+    },
+    set value(u) {
+      _superReference2.set(e, t, u, r, !0);
+    },
+  };
+}
+_superReference.set = function (e, t, r, u) {
+  return _superReference2.set(e, t, u, r, !0);
+};
+let Foo = (() => {
+  'use strict';
+  const Foo = function Foo(props) {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    [super.client] = props;
+  };
+  Object.defineProperty(Foo, 'prototype', { writable: false });
+  return Foo;
+})();`,
     modes: [
       {
         title: 'default',
@@ -4153,14 +16880,46 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[158],
       },
     ],
   },
   {
     title: 'spec — super destructuring object pattern 1 (input)',
-    source: 'class Foo {\n  constructor(props) {\n    ;({ x, ...super.client } = props)\n  }\n}',
+    source: `class Foo {
+  constructor(props) {
+    ;({ x, ...super.client } = props)
+  }
+}`,
     filename: 'input.js',
+    output: `var _superReference2 = {
+  get: require('@babel/runtime/helpers/get'),
+  set: require('@babel/runtime/helpers/set'),
+};
+function _get(e, t, r) {
+  return _superReference2.get(e, t, r);
+}
+function _superReference(e, t, r) {
+  return {
+    get value() {
+      return _superReference2.get(e, t, r);
+    },
+    set value(u) {
+      _superReference2.set(e, t, u, r, !0);
+    },
+  };
+}
+_superReference.set = function (e, t, r, u) {
+  return _superReference2.set(e, t, u, r, !0);
+};
+let Foo = (() => {
+  'use strict';
+  const Foo = function Foo(props) {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    ({ x, ...super.client } = props);
+  };
+  Object.defineProperty(Foo, 'prototype', { writable: false });
+  return Foo;
+})();`,
     modes: [
       {
         title: 'default',
@@ -4174,14 +16933,46 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[159],
       },
     ],
   },
   {
     title: 'spec — super destructuring object pattern (input)',
-    source: 'class Foo {\n  constructor(props) {\n    ;({ client: super.client } = props)\n  }\n}',
+    source: `class Foo {
+  constructor(props) {
+    ;({ client: super.client } = props)
+  }
+}`,
     filename: 'input.js',
+    output: `var _superReference2 = {
+  get: require('@babel/runtime/helpers/get'),
+  set: require('@babel/runtime/helpers/set'),
+};
+function _get(e, t, r) {
+  return _superReference2.get(e, t, r);
+}
+function _superReference(e, t, r) {
+  return {
+    get value() {
+      return _superReference2.get(e, t, r);
+    },
+    set value(u) {
+      _superReference2.set(e, t, u, r, !0);
+    },
+  };
+}
+_superReference.set = function (e, t, r, u) {
+  return _superReference2.set(e, t, u, r, !0);
+};
+let Foo = (() => {
+  'use strict';
+  const Foo = function Foo(props) {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    ({ client: super.client } = props);
+  };
+  Object.defineProperty(Foo, 'prototype', { writable: false });
+  return Foo;
+})();`,
     modes: [
       {
         title: 'default',
@@ -4195,15 +16986,194 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[160],
       },
     ],
   },
   {
     title: 'spec — super guaranteed (input)',
-    source:
-      'class Base {};\n\nnew class extends Base {\n  constructor() {\n    super() || null;\n  }\n}\n\nnew class extends Base {\n  constructor() {\n    super()?.();\n  }\n}\n\nnew class extends Base {\n  constructor() {\n    super()?.[null];\n  }\n}\n\nnew class extends Base {\n  constructor() {\n    1 + super();\n  }\n}\n',
+    source: `class Base {};
+
+new class extends Base {
+  constructor() {
+    super() || null;
+  }
+}
+
+new class extends Base {
+  constructor() {
+    super()?.();
+  }
+}
+
+new class extends Base {
+  constructor() {
+    super()?.[null];
+  }
+}
+
+new class extends Base {
+  constructor() {
+    1 + super();
+  }
+}
+`,
     filename: 'input.js',
+    output: `var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+let Base = (() => {
+  'use strict';
+  const Base = function Base() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Base, 'prototype', { writable: false });
+  return Base;
+})();
+new ((__nox_super_20_85 => {
+  'use strict';
+  const _Class = function _Class() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this,
+      _newtarget = new.target;
+    function _super() {
+      _this = _construct(Object.getPrototypeOf(_Class), arguments, _newtarget || _Class);
+      return _this;
+    }
+    var _result = function () {
+      _super() || null;
+    }.apply(void 0, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    if (_this === void 0)
+      throw new ReferenceError("this hasn't been initialised - super() hasn't been called");
+    return _this;
+  };
+  if (__nox_super_20_85 !== null && typeof __nox_super_20_85 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  _Class.prototype = Object.create(__nox_super_20_85 && __nox_super_20_85.prototype, {
+    constructor: {
+      value: _Class,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(_Class, __nox_super_20_85);
+  else _Class.__proto__ = __nox_super_20_85;
+  Object.defineProperty(_Class, 'prototype', { writable: false });
+  return _Class;
+})(Base))();
+new ((__nox_super_91_152 => {
+  'use strict';
+  const _Class18 = function _Class18() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this,
+      _newtarget = new.target;
+    function _super() {
+      _this = _construct(Object.getPrototypeOf(_Class18), arguments, _newtarget || _Class18);
+      return _this;
+    }
+    var _result = function () {
+      _super()?.();
+    }.apply(void 0, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    if (_this === void 0)
+      throw new ReferenceError("this hasn't been initialised - super() hasn't been called");
+    return _this;
+  };
+  if (__nox_super_91_152 !== null && typeof __nox_super_91_152 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  _Class18.prototype = Object.create(__nox_super_91_152 && __nox_super_91_152.prototype, {
+    constructor: {
+      value: _Class18,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(_Class18, __nox_super_91_152);
+  else _Class18.__proto__ = __nox_super_91_152;
+  Object.defineProperty(_Class18, 'prototype', { writable: false });
+  return _Class18;
+})(Base))();
+new ((__nox_super_158_223 => {
+  'use strict';
+  const _Class21 = function _Class21() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this,
+      _newtarget = new.target;
+    function _super() {
+      _this = _construct(Object.getPrototypeOf(_Class21), arguments, _newtarget || _Class21);
+      return _this;
+    }
+    var _result = function () {
+      _super()?.[null];
+    }.apply(void 0, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    if (_this === void 0)
+      throw new ReferenceError("this hasn't been initialised - super() hasn't been called");
+    return _this;
+  };
+  if (__nox_super_158_223 !== null && typeof __nox_super_158_223 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  _Class21.prototype = Object.create(__nox_super_158_223 && __nox_super_158_223.prototype, {
+    constructor: {
+      value: _Class21,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(_Class21, __nox_super_158_223);
+  else _Class21.__proto__ = __nox_super_158_223;
+  Object.defineProperty(_Class21, 'prototype', { writable: false });
+  return _Class21;
+})(Base))();
+new ((__nox_super_229_290 => {
+  'use strict';
+  const _Class24 = function _Class24() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this,
+      _newtarget = new.target;
+    function _super() {
+      _this = _construct(Object.getPrototypeOf(_Class24), arguments, _newtarget || _Class24);
+      return _this;
+    }
+    var _result = function () {
+      1 + _super();
+    }.apply(void 0, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    if (_this === void 0)
+      throw new ReferenceError("this hasn't been initialised - super() hasn't been called");
+    return _this;
+  };
+  if (__nox_super_229_290 !== null && typeof __nox_super_229_290 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  _Class24.prototype = Object.create(__nox_super_229_290 && __nox_super_229_290.prototype, {
+    constructor: {
+      value: _Class24,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(_Class24, __nox_super_229_290);
+  else _Class24.__proto__ = __nox_super_229_290;
+  Object.defineProperty(_Class24, 'prototype', { writable: false });
+  return _Class24;
+})(Base))();`,
     modes: [
       {
         title: 'default',
@@ -4217,14 +17187,19 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[161],
       },
     ],
   },
   {
     title: 'spec — super illegal non constructor call (input)',
-    source: 'class Test {\n  foo() {\n    super();\n  }\n}\n',
+    source: `class Test {
+  foo() {
+    super();
+  }
+}
+`,
     filename: 'input.js',
+    output: '[syntax-error] invalid-input',
     modes: [
       {
         title: 'default',
@@ -4238,15 +17213,396 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[162],
       },
     ],
   },
   {
     title: 'spec — super missing (exec)',
-    source:
-      'class Base {};\n\nexpect(() => new class extends Base {\n  constructor() {\n    x: { break x; super(); }\n  }\n}).toThrow();\n\nexpect(() => new class extends Base {\n  constructor() {\n    try {} catch { super(); }\n  }\n}).toThrow();\n\nexpect(() => new class extends Base {\n  constructor() {\n    try { throw 0; super(); } catch {}\n  }\n}).toThrow();\n\nexpect(() => new class extends Base {\n  constructor() {\n    true || super();\n  }\n}).toThrow();\n\nexpect(() => new class extends Base {\n  constructor() {\n    ({}) ?? super();\n  }\n}).toThrow();\n\nexpect(() => new class extends Base {\n  constructor() {\n    false && super();\n  }\n}).toThrow();\n\nexpect(() => new class extends Base {\n  constructor() {\n    null?.(super());\n  }\n}).toThrow();\n\n\nexpect(() => new class extends Base {\n  constructor() {\n    null?.[super()];\n  }\n}).toThrow();\n',
+    source: `class Base {};
+
+expect(() => new class extends Base {
+  constructor() {
+    x: { break x; super(); }
+  }
+}).toThrow();
+
+expect(() => new class extends Base {
+  constructor() {
+    try {} catch { super(); }
+  }
+}).toThrow();
+
+expect(() => new class extends Base {
+  constructor() {
+    try { throw 0; super(); } catch {}
+  }
+}).toThrow();
+
+expect(() => new class extends Base {
+  constructor() {
+    true || super();
+  }
+}).toThrow();
+
+expect(() => new class extends Base {
+  constructor() {
+    ({}) ?? super();
+  }
+}).toThrow();
+
+expect(() => new class extends Base {
+  constructor() {
+    false && super();
+  }
+}).toThrow();
+
+expect(() => new class extends Base {
+  constructor() {
+    null?.(super());
+  }
+}).toThrow();
+
+
+expect(() => new class extends Base {
+  constructor() {
+    null?.[super()];
+  }
+}).toThrow();
+`,
     filename: 'exec.js',
+    output: `var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+let Base = (() => {
+  'use strict';
+  const Base = function Base() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Base, 'prototype', { writable: false });
+  return Base;
+})();
+expect(
+  () =>
+    new ((__nox_super_33_106 => {
+      'use strict';
+      const _Class = function _Class() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+        var _this,
+          _newtarget = new.target;
+        function _super() {
+          _this = _construct(Object.getPrototypeOf(_Class), arguments, _newtarget || _Class);
+          return _this;
+        }
+        var _result = function () {
+          x: {
+            break x;
+            _super();
+          }
+        }.apply(void 0, arguments);
+        if (_result !== void 0) {
+          if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+            return _result;
+          throw new TypeError('Derived constructors may only return object or undefined');
+        }
+        if (_this === void 0)
+          throw new ReferenceError("this hasn't been initialised - super() hasn't been called");
+        return _this;
+      };
+      if (__nox_super_33_106 !== null && typeof __nox_super_33_106 !== 'function')
+        throw new TypeError('Super expression must either be null or a function');
+      _Class.prototype = Object.create(__nox_super_33_106 && __nox_super_33_106.prototype, {
+        constructor: {
+          value: _Class,
+          writable: true,
+          configurable: true,
+        },
+      });
+      if (Object.setPrototypeOf) Object.setPrototypeOf(_Class, __nox_super_33_106);
+      else _Class.__proto__ = __nox_super_33_106;
+      Object.defineProperty(_Class, 'prototype', { writable: false });
+      return _Class;
+    })(Base))(),
+).toThrow();
+expect(
+  () =>
+    new ((__nox_super_137_211 => {
+      'use strict';
+      const _Class18 = function _Class18() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+        var _this,
+          _newtarget = new.target;
+        function _super() {
+          _this = _construct(Object.getPrototypeOf(_Class18), arguments, _newtarget || _Class18);
+          return _this;
+        }
+        var _result = function () {
+          try {
+          } catch {
+            _super();
+          }
+        }.apply(void 0, arguments);
+        if (_result !== void 0) {
+          if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+            return _result;
+          throw new TypeError('Derived constructors may only return object or undefined');
+        }
+        if (_this === void 0)
+          throw new ReferenceError("this hasn't been initialised - super() hasn't been called");
+        return _this;
+      };
+      if (__nox_super_137_211 !== null && typeof __nox_super_137_211 !== 'function')
+        throw new TypeError('Super expression must either be null or a function');
+      _Class18.prototype = Object.create(__nox_super_137_211 && __nox_super_137_211.prototype, {
+        constructor: {
+          value: _Class18,
+          writable: true,
+          configurable: true,
+        },
+      });
+      if (Object.setPrototypeOf) Object.setPrototypeOf(_Class18, __nox_super_137_211);
+      else _Class18.__proto__ = __nox_super_137_211;
+      Object.defineProperty(_Class18, 'prototype', { writable: false });
+      return _Class18;
+    })(Base))(),
+).toThrow();
+expect(
+  () =>
+    new ((__nox_super_242_325 => {
+      'use strict';
+      const _Class21 = function _Class21() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+        var _this,
+          _newtarget = new.target;
+        function _super() {
+          _this = _construct(Object.getPrototypeOf(_Class21), arguments, _newtarget || _Class21);
+          return _this;
+        }
+        var _result = function () {
+          try {
+            throw 0;
+            _super();
+          } catch {}
+        }.apply(void 0, arguments);
+        if (_result !== void 0) {
+          if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+            return _result;
+          throw new TypeError('Derived constructors may only return object or undefined');
+        }
+        if (_this === void 0)
+          throw new ReferenceError("this hasn't been initialised - super() hasn't been called");
+        return _this;
+      };
+      if (__nox_super_242_325 !== null && typeof __nox_super_242_325 !== 'function')
+        throw new TypeError('Super expression must either be null or a function');
+      _Class21.prototype = Object.create(__nox_super_242_325 && __nox_super_242_325.prototype, {
+        constructor: {
+          value: _Class21,
+          writable: true,
+          configurable: true,
+        },
+      });
+      if (Object.setPrototypeOf) Object.setPrototypeOf(_Class21, __nox_super_242_325);
+      else _Class21.__proto__ = __nox_super_242_325;
+      Object.defineProperty(_Class21, 'prototype', { writable: false });
+      return _Class21;
+    })(Base))(),
+).toThrow();
+expect(
+  () =>
+    new ((__nox_super_356_421 => {
+      'use strict';
+      const _Class24 = function _Class24() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+        var _this,
+          _newtarget = new.target;
+        function _super() {
+          _this = _construct(Object.getPrototypeOf(_Class24), arguments, _newtarget || _Class24);
+          return _this;
+        }
+        var _result = function () {
+          true || _super();
+        }.apply(void 0, arguments);
+        if (_result !== void 0) {
+          if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+            return _result;
+          throw new TypeError('Derived constructors may only return object or undefined');
+        }
+        if (_this === void 0)
+          throw new ReferenceError("this hasn't been initialised - super() hasn't been called");
+        return _this;
+      };
+      if (__nox_super_356_421 !== null && typeof __nox_super_356_421 !== 'function')
+        throw new TypeError('Super expression must either be null or a function');
+      _Class24.prototype = Object.create(__nox_super_356_421 && __nox_super_356_421.prototype, {
+        constructor: {
+          value: _Class24,
+          writable: true,
+          configurable: true,
+        },
+      });
+      if (Object.setPrototypeOf) Object.setPrototypeOf(_Class24, __nox_super_356_421);
+      else _Class24.__proto__ = __nox_super_356_421;
+      Object.defineProperty(_Class24, 'prototype', { writable: false });
+      return _Class24;
+    })(Base))(),
+).toThrow();
+expect(
+  () =>
+    new ((__nox_super_452_517 => {
+      'use strict';
+      const _Class27 = function _Class27() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+        var _this,
+          _newtarget = new.target;
+        function _super() {
+          _this = _construct(Object.getPrototypeOf(_Class27), arguments, _newtarget || _Class27);
+          return _this;
+        }
+        var _result = function () {
+          ({}) ?? _super();
+        }.apply(void 0, arguments);
+        if (_result !== void 0) {
+          if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+            return _result;
+          throw new TypeError('Derived constructors may only return object or undefined');
+        }
+        if (_this === void 0)
+          throw new ReferenceError("this hasn't been initialised - super() hasn't been called");
+        return _this;
+      };
+      if (__nox_super_452_517 !== null && typeof __nox_super_452_517 !== 'function')
+        throw new TypeError('Super expression must either be null or a function');
+      _Class27.prototype = Object.create(__nox_super_452_517 && __nox_super_452_517.prototype, {
+        constructor: {
+          value: _Class27,
+          writable: true,
+          configurable: true,
+        },
+      });
+      if (Object.setPrototypeOf) Object.setPrototypeOf(_Class27, __nox_super_452_517);
+      else _Class27.__proto__ = __nox_super_452_517;
+      Object.defineProperty(_Class27, 'prototype', { writable: false });
+      return _Class27;
+    })(Base))(),
+).toThrow();
+expect(
+  () =>
+    new ((__nox_super_548_614 => {
+      'use strict';
+      const _Class30 = function _Class30() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+        var _this,
+          _newtarget = new.target;
+        function _super() {
+          _this = _construct(Object.getPrototypeOf(_Class30), arguments, _newtarget || _Class30);
+          return _this;
+        }
+        var _result = function () {
+          false && _super();
+        }.apply(void 0, arguments);
+        if (_result !== void 0) {
+          if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+            return _result;
+          throw new TypeError('Derived constructors may only return object or undefined');
+        }
+        if (_this === void 0)
+          throw new ReferenceError("this hasn't been initialised - super() hasn't been called");
+        return _this;
+      };
+      if (__nox_super_548_614 !== null && typeof __nox_super_548_614 !== 'function')
+        throw new TypeError('Super expression must either be null or a function');
+      _Class30.prototype = Object.create(__nox_super_548_614 && __nox_super_548_614.prototype, {
+        constructor: {
+          value: _Class30,
+          writable: true,
+          configurable: true,
+        },
+      });
+      if (Object.setPrototypeOf) Object.setPrototypeOf(_Class30, __nox_super_548_614);
+      else _Class30.__proto__ = __nox_super_548_614;
+      Object.defineProperty(_Class30, 'prototype', { writable: false });
+      return _Class30;
+    })(Base))(),
+).toThrow();
+expect(
+  () =>
+    new ((__nox_super_645_710 => {
+      'use strict';
+      const _Class33 = function _Class33() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+        var _this,
+          _newtarget = new.target;
+        function _super() {
+          _this = _construct(Object.getPrototypeOf(_Class33), arguments, _newtarget || _Class33);
+          return _this;
+        }
+        var _result = function () {
+          null?.(_super());
+        }.apply(void 0, arguments);
+        if (_result !== void 0) {
+          if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+            return _result;
+          throw new TypeError('Derived constructors may only return object or undefined');
+        }
+        if (_this === void 0)
+          throw new ReferenceError("this hasn't been initialised - super() hasn't been called");
+        return _this;
+      };
+      if (__nox_super_645_710 !== null && typeof __nox_super_645_710 !== 'function')
+        throw new TypeError('Super expression must either be null or a function');
+      _Class33.prototype = Object.create(__nox_super_645_710 && __nox_super_645_710.prototype, {
+        constructor: {
+          value: _Class33,
+          writable: true,
+          configurable: true,
+        },
+      });
+      if (Object.setPrototypeOf) Object.setPrototypeOf(_Class33, __nox_super_645_710);
+      else _Class33.__proto__ = __nox_super_645_710;
+      Object.defineProperty(_Class33, 'prototype', { writable: false });
+      return _Class33;
+    })(Base))(),
+).toThrow();
+expect(
+  () =>
+    new ((__nox_super_742_807 => {
+      'use strict';
+      const _Class36 = function _Class36() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+        var _this,
+          _newtarget = new.target;
+        function _super() {
+          _this = _construct(Object.getPrototypeOf(_Class36), arguments, _newtarget || _Class36);
+          return _this;
+        }
+        var _result = function () {
+          null?.[_super()];
+        }.apply(void 0, arguments);
+        if (_result !== void 0) {
+          if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+            return _result;
+          throw new TypeError('Derived constructors may only return object or undefined');
+        }
+        if (_this === void 0)
+          throw new ReferenceError("this hasn't been initialised - super() hasn't been called");
+        return _this;
+      };
+      if (__nox_super_742_807 !== null && typeof __nox_super_742_807 !== 'function')
+        throw new TypeError('Super expression must either be null or a function');
+      _Class36.prototype = Object.create(__nox_super_742_807 && __nox_super_742_807.prototype, {
+        constructor: {
+          value: _Class36,
+          writable: true,
+          configurable: true,
+        },
+      });
+      if (Object.setPrototypeOf) Object.setPrototypeOf(_Class36, __nox_super_742_807);
+      else _Class36.__proto__ = __nox_super_742_807;
+      Object.defineProperty(_Class36, 'prototype', { writable: false });
+      return _Class36;
+    })(Base))(),
+).toThrow();`,
     modes: [
       {
         title: 'default',
@@ -4260,15 +17616,396 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[163],
       },
     ],
   },
   {
     title: 'spec — super missing (input)',
-    source:
-      'class Base {};\n\nexpect(() => new class extends Base {\n  constructor() {\n    x: { break x; super(); }\n  }\n}).toThrow();\n\nexpect(() => new class extends Base {\n  constructor() {\n    try {} catch { super(); }\n  }\n}).toThrow();\n\nexpect(() => new class extends Base {\n  constructor() {\n    try { throw 0; super(); } catch {}\n  }\n}).toThrow();\n\nexpect(() => new class extends Base {\n  constructor() {\n    true || super();\n  }\n}).toThrow();\n\nexpect(() => new class extends Base {\n  constructor() {\n    ({}) ?? super();\n  }\n}).toThrow();\n\nexpect(() => new class extends Base {\n  constructor() {\n    false && super();\n  }\n}).toThrow();\n\nexpect(() => new class extends Base {\n  constructor() {\n    null?.(super());\n  }\n}).toThrow();\n\n\nexpect(() => new class extends Base {\n  constructor() {\n    null?.[super()];\n  }\n}).toThrow();\n',
+    source: `class Base {};
+
+expect(() => new class extends Base {
+  constructor() {
+    x: { break x; super(); }
+  }
+}).toThrow();
+
+expect(() => new class extends Base {
+  constructor() {
+    try {} catch { super(); }
+  }
+}).toThrow();
+
+expect(() => new class extends Base {
+  constructor() {
+    try { throw 0; super(); } catch {}
+  }
+}).toThrow();
+
+expect(() => new class extends Base {
+  constructor() {
+    true || super();
+  }
+}).toThrow();
+
+expect(() => new class extends Base {
+  constructor() {
+    ({}) ?? super();
+  }
+}).toThrow();
+
+expect(() => new class extends Base {
+  constructor() {
+    false && super();
+  }
+}).toThrow();
+
+expect(() => new class extends Base {
+  constructor() {
+    null?.(super());
+  }
+}).toThrow();
+
+
+expect(() => new class extends Base {
+  constructor() {
+    null?.[super()];
+  }
+}).toThrow();
+`,
     filename: 'input.js',
+    output: `var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+let Base = (() => {
+  'use strict';
+  const Base = function Base() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Base, 'prototype', { writable: false });
+  return Base;
+})();
+expect(
+  () =>
+    new ((__nox_super_33_106 => {
+      'use strict';
+      const _Class = function _Class() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+        var _this,
+          _newtarget = new.target;
+        function _super() {
+          _this = _construct(Object.getPrototypeOf(_Class), arguments, _newtarget || _Class);
+          return _this;
+        }
+        var _result = function () {
+          x: {
+            break x;
+            _super();
+          }
+        }.apply(void 0, arguments);
+        if (_result !== void 0) {
+          if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+            return _result;
+          throw new TypeError('Derived constructors may only return object or undefined');
+        }
+        if (_this === void 0)
+          throw new ReferenceError("this hasn't been initialised - super() hasn't been called");
+        return _this;
+      };
+      if (__nox_super_33_106 !== null && typeof __nox_super_33_106 !== 'function')
+        throw new TypeError('Super expression must either be null or a function');
+      _Class.prototype = Object.create(__nox_super_33_106 && __nox_super_33_106.prototype, {
+        constructor: {
+          value: _Class,
+          writable: true,
+          configurable: true,
+        },
+      });
+      if (Object.setPrototypeOf) Object.setPrototypeOf(_Class, __nox_super_33_106);
+      else _Class.__proto__ = __nox_super_33_106;
+      Object.defineProperty(_Class, 'prototype', { writable: false });
+      return _Class;
+    })(Base))(),
+).toThrow();
+expect(
+  () =>
+    new ((__nox_super_137_211 => {
+      'use strict';
+      const _Class18 = function _Class18() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+        var _this,
+          _newtarget = new.target;
+        function _super() {
+          _this = _construct(Object.getPrototypeOf(_Class18), arguments, _newtarget || _Class18);
+          return _this;
+        }
+        var _result = function () {
+          try {
+          } catch {
+            _super();
+          }
+        }.apply(void 0, arguments);
+        if (_result !== void 0) {
+          if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+            return _result;
+          throw new TypeError('Derived constructors may only return object or undefined');
+        }
+        if (_this === void 0)
+          throw new ReferenceError("this hasn't been initialised - super() hasn't been called");
+        return _this;
+      };
+      if (__nox_super_137_211 !== null && typeof __nox_super_137_211 !== 'function')
+        throw new TypeError('Super expression must either be null or a function');
+      _Class18.prototype = Object.create(__nox_super_137_211 && __nox_super_137_211.prototype, {
+        constructor: {
+          value: _Class18,
+          writable: true,
+          configurable: true,
+        },
+      });
+      if (Object.setPrototypeOf) Object.setPrototypeOf(_Class18, __nox_super_137_211);
+      else _Class18.__proto__ = __nox_super_137_211;
+      Object.defineProperty(_Class18, 'prototype', { writable: false });
+      return _Class18;
+    })(Base))(),
+).toThrow();
+expect(
+  () =>
+    new ((__nox_super_242_325 => {
+      'use strict';
+      const _Class21 = function _Class21() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+        var _this,
+          _newtarget = new.target;
+        function _super() {
+          _this = _construct(Object.getPrototypeOf(_Class21), arguments, _newtarget || _Class21);
+          return _this;
+        }
+        var _result = function () {
+          try {
+            throw 0;
+            _super();
+          } catch {}
+        }.apply(void 0, arguments);
+        if (_result !== void 0) {
+          if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+            return _result;
+          throw new TypeError('Derived constructors may only return object or undefined');
+        }
+        if (_this === void 0)
+          throw new ReferenceError("this hasn't been initialised - super() hasn't been called");
+        return _this;
+      };
+      if (__nox_super_242_325 !== null && typeof __nox_super_242_325 !== 'function')
+        throw new TypeError('Super expression must either be null or a function');
+      _Class21.prototype = Object.create(__nox_super_242_325 && __nox_super_242_325.prototype, {
+        constructor: {
+          value: _Class21,
+          writable: true,
+          configurable: true,
+        },
+      });
+      if (Object.setPrototypeOf) Object.setPrototypeOf(_Class21, __nox_super_242_325);
+      else _Class21.__proto__ = __nox_super_242_325;
+      Object.defineProperty(_Class21, 'prototype', { writable: false });
+      return _Class21;
+    })(Base))(),
+).toThrow();
+expect(
+  () =>
+    new ((__nox_super_356_421 => {
+      'use strict';
+      const _Class24 = function _Class24() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+        var _this,
+          _newtarget = new.target;
+        function _super() {
+          _this = _construct(Object.getPrototypeOf(_Class24), arguments, _newtarget || _Class24);
+          return _this;
+        }
+        var _result = function () {
+          true || _super();
+        }.apply(void 0, arguments);
+        if (_result !== void 0) {
+          if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+            return _result;
+          throw new TypeError('Derived constructors may only return object or undefined');
+        }
+        if (_this === void 0)
+          throw new ReferenceError("this hasn't been initialised - super() hasn't been called");
+        return _this;
+      };
+      if (__nox_super_356_421 !== null && typeof __nox_super_356_421 !== 'function')
+        throw new TypeError('Super expression must either be null or a function');
+      _Class24.prototype = Object.create(__nox_super_356_421 && __nox_super_356_421.prototype, {
+        constructor: {
+          value: _Class24,
+          writable: true,
+          configurable: true,
+        },
+      });
+      if (Object.setPrototypeOf) Object.setPrototypeOf(_Class24, __nox_super_356_421);
+      else _Class24.__proto__ = __nox_super_356_421;
+      Object.defineProperty(_Class24, 'prototype', { writable: false });
+      return _Class24;
+    })(Base))(),
+).toThrow();
+expect(
+  () =>
+    new ((__nox_super_452_517 => {
+      'use strict';
+      const _Class27 = function _Class27() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+        var _this,
+          _newtarget = new.target;
+        function _super() {
+          _this = _construct(Object.getPrototypeOf(_Class27), arguments, _newtarget || _Class27);
+          return _this;
+        }
+        var _result = function () {
+          ({}) ?? _super();
+        }.apply(void 0, arguments);
+        if (_result !== void 0) {
+          if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+            return _result;
+          throw new TypeError('Derived constructors may only return object or undefined');
+        }
+        if (_this === void 0)
+          throw new ReferenceError("this hasn't been initialised - super() hasn't been called");
+        return _this;
+      };
+      if (__nox_super_452_517 !== null && typeof __nox_super_452_517 !== 'function')
+        throw new TypeError('Super expression must either be null or a function');
+      _Class27.prototype = Object.create(__nox_super_452_517 && __nox_super_452_517.prototype, {
+        constructor: {
+          value: _Class27,
+          writable: true,
+          configurable: true,
+        },
+      });
+      if (Object.setPrototypeOf) Object.setPrototypeOf(_Class27, __nox_super_452_517);
+      else _Class27.__proto__ = __nox_super_452_517;
+      Object.defineProperty(_Class27, 'prototype', { writable: false });
+      return _Class27;
+    })(Base))(),
+).toThrow();
+expect(
+  () =>
+    new ((__nox_super_548_614 => {
+      'use strict';
+      const _Class30 = function _Class30() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+        var _this,
+          _newtarget = new.target;
+        function _super() {
+          _this = _construct(Object.getPrototypeOf(_Class30), arguments, _newtarget || _Class30);
+          return _this;
+        }
+        var _result = function () {
+          false && _super();
+        }.apply(void 0, arguments);
+        if (_result !== void 0) {
+          if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+            return _result;
+          throw new TypeError('Derived constructors may only return object or undefined');
+        }
+        if (_this === void 0)
+          throw new ReferenceError("this hasn't been initialised - super() hasn't been called");
+        return _this;
+      };
+      if (__nox_super_548_614 !== null && typeof __nox_super_548_614 !== 'function')
+        throw new TypeError('Super expression must either be null or a function');
+      _Class30.prototype = Object.create(__nox_super_548_614 && __nox_super_548_614.prototype, {
+        constructor: {
+          value: _Class30,
+          writable: true,
+          configurable: true,
+        },
+      });
+      if (Object.setPrototypeOf) Object.setPrototypeOf(_Class30, __nox_super_548_614);
+      else _Class30.__proto__ = __nox_super_548_614;
+      Object.defineProperty(_Class30, 'prototype', { writable: false });
+      return _Class30;
+    })(Base))(),
+).toThrow();
+expect(
+  () =>
+    new ((__nox_super_645_710 => {
+      'use strict';
+      const _Class33 = function _Class33() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+        var _this,
+          _newtarget = new.target;
+        function _super() {
+          _this = _construct(Object.getPrototypeOf(_Class33), arguments, _newtarget || _Class33);
+          return _this;
+        }
+        var _result = function () {
+          null?.(_super());
+        }.apply(void 0, arguments);
+        if (_result !== void 0) {
+          if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+            return _result;
+          throw new TypeError('Derived constructors may only return object or undefined');
+        }
+        if (_this === void 0)
+          throw new ReferenceError("this hasn't been initialised - super() hasn't been called");
+        return _this;
+      };
+      if (__nox_super_645_710 !== null && typeof __nox_super_645_710 !== 'function')
+        throw new TypeError('Super expression must either be null or a function');
+      _Class33.prototype = Object.create(__nox_super_645_710 && __nox_super_645_710.prototype, {
+        constructor: {
+          value: _Class33,
+          writable: true,
+          configurable: true,
+        },
+      });
+      if (Object.setPrototypeOf) Object.setPrototypeOf(_Class33, __nox_super_645_710);
+      else _Class33.__proto__ = __nox_super_645_710;
+      Object.defineProperty(_Class33, 'prototype', { writable: false });
+      return _Class33;
+    })(Base))(),
+).toThrow();
+expect(
+  () =>
+    new ((__nox_super_742_807 => {
+      'use strict';
+      const _Class36 = function _Class36() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+        var _this,
+          _newtarget = new.target;
+        function _super() {
+          _this = _construct(Object.getPrototypeOf(_Class36), arguments, _newtarget || _Class36);
+          return _this;
+        }
+        var _result = function () {
+          null?.[_super()];
+        }.apply(void 0, arguments);
+        if (_result !== void 0) {
+          if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+            return _result;
+          throw new TypeError('Derived constructors may only return object or undefined');
+        }
+        if (_this === void 0)
+          throw new ReferenceError("this hasn't been initialised - super() hasn't been called");
+        return _this;
+      };
+      if (__nox_super_742_807 !== null && typeof __nox_super_742_807 !== 'function')
+        throw new TypeError('Super expression must either be null or a function');
+      _Class36.prototype = Object.create(__nox_super_742_807 && __nox_super_742_807.prototype, {
+        constructor: {
+          value: _Class36,
+          writable: true,
+          configurable: true,
+        },
+      });
+      if (Object.setPrototypeOf) Object.setPrototypeOf(_Class36, __nox_super_742_807);
+      else _Class36.__proto__ = __nox_super_742_807;
+      Object.defineProperty(_Class36, 'prototype', { writable: false });
+      return _Class36;
+    })(Base))(),
+).toThrow();`,
     modes: [
       {
         title: 'default',
@@ -4282,15 +18019,80 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[163],
       },
     ],
   },
   {
     title: 'spec — super proto modifications (exec)',
-    source:
-      'var A_called = false;\nvar X_called = false;\n\nclass A { constructor() { A_called = true } }\nclass X { constructor() { X_called = true } }\nclass B extends A {}\n\nB.prototype.__proto__ = X.prototype;\nB.__proto__ = X;\n\nexpect(new B() instanceof B).toBe(true);\nexpect(new B() instanceof A).toBe(false);\nexpect(new B() instanceof X).toBe(true);\nexpect(A_called).toBe(false);\nexpect(X_called).toBe(true);\n',
+    source: `var A_called = false;
+var X_called = false;
+
+class A { constructor() { A_called = true } }
+class X { constructor() { X_called = true } }
+class B extends A {}
+
+B.prototype.__proto__ = X.prototype;
+B.__proto__ = X;
+
+expect(new B() instanceof B).toBe(true);
+expect(new B() instanceof A).toBe(false);
+expect(new B() instanceof X).toBe(true);
+expect(A_called).toBe(false);
+expect(X_called).toBe(true);
+`,
     filename: 'exec.js',
+    output: `var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+var A_called = false;
+var X_called = false;
+let A = (() => {
+  'use strict';
+  const A = function A() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    A_called = true;
+  };
+  Object.defineProperty(A, 'prototype', { writable: false });
+  return A;
+})();
+let X = (() => {
+  'use strict';
+  const X = function X() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    X_called = true;
+  };
+  Object.defineProperty(X, 'prototype', { writable: false });
+  return X;
+})();
+let B = (__nox_super_137_157 => {
+  'use strict';
+  const B = function B() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(B), arguments, new.target || B);
+    return _this;
+  };
+  if (__nox_super_137_157 !== null && typeof __nox_super_137_157 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  B.prototype = Object.create(__nox_super_137_157 && __nox_super_137_157.prototype, {
+    constructor: {
+      value: B,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(B, __nox_super_137_157);
+  else B.__proto__ = __nox_super_137_157;
+  Object.defineProperty(B, 'prototype', { writable: false });
+  return B;
+})(A);
+B.prototype.__proto__ = X.prototype;
+B.__proto__ = X;
+expect(new B() instanceof B).toBe(true);
+expect(new B() instanceof A).toBe(false);
+expect(new B() instanceof X).toBe(true);
+expect(A_called).toBe(false);
+expect(X_called).toBe(true);`,
     modes: [
       {
         title: 'default',
@@ -4304,15 +18106,82 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[164],
       },
     ],
   },
   {
     title: 'spec — super reference before bare super inline (exec)',
-    source:
-      'class Bar {}\n\nclass Foo extends Bar {\n  constructor() {\n    super.foo(super());\n  }\n}\n\nexpect(() => new Foo()).toThrow("this hasn\'t been initialised");\n',
+    source: `class Bar {}
+
+class Foo extends Bar {
+  constructor() {
+    super.foo(super());
+  }
+}
+
+expect(() => new Foo()).toThrow("this hasn't been initialised");
+`,
     filename: 'exec.js',
+    output: `var _construct2 = {
+  construct: require('@babel/runtime/helpers/construct'),
+  assertThisInitialized: require('@babel/runtime/helpers/assertThisInitialized'),
+};
+function _construct(t, e, r) {
+  return _construct2.construct(t, e, r);
+}
+_construct.assert = _construct2.assertThisInitialized;
+var _get2 = { get: require('@babel/runtime/helpers/get') };
+function _get(e, t, r) {
+  return _get2.get(e, t, r);
+}
+let Bar = (() => {
+  'use strict';
+  const Bar = function Bar() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Bar, 'prototype', { writable: false });
+  return Bar;
+})();
+let Foo = (__nox_super_14_85 => {
+  'use strict';
+  const Foo = function Foo() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this,
+      _newtarget = new.target;
+    function _super() {
+      _this = _construct(Object.getPrototypeOf(Foo), arguments, _newtarget || Foo);
+      return _this;
+    }
+    var _result = function () {
+      _get(Object.getPrototypeOf(Foo.prototype), 'foo', _construct.assert(_this)).call(
+        _construct.assert(_this),
+        _super(),
+      );
+    }.apply(void 0, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    if (_this === void 0)
+      throw new ReferenceError("this hasn't been initialised - super() hasn't been called");
+    return _this;
+  };
+  if (__nox_super_14_85 !== null && typeof __nox_super_14_85 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Foo.prototype = Object.create(__nox_super_14_85 && __nox_super_14_85.prototype, {
+    constructor: {
+      value: Foo,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo, __nox_super_14_85);
+  else Foo.__proto__ = __nox_super_14_85;
+  Object.defineProperty(Foo, 'prototype', { writable: false });
+  return Foo;
+})(Bar);
+expect(() => new Foo()).toThrow("this hasn't been initialised");`,
     modes: [
       {
         title: 'default',
@@ -4326,14 +18195,69 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[165],
       },
     ],
   },
   {
     title: 'spec — super reference before bare super inline (input)',
-    source: 'class Foo extends Bar {\n  constructor() {\n    super.foo(super());\n  }\n}\n',
+    source: `class Foo extends Bar {
+  constructor() {
+    super.foo(super());
+  }
+}
+`,
     filename: 'input.js',
+    output: `var _construct2 = {
+  construct: require('@babel/runtime/helpers/construct'),
+  assertThisInitialized: require('@babel/runtime/helpers/assertThisInitialized'),
+};
+function _construct(t, e, r) {
+  return _construct2.construct(t, e, r);
+}
+_construct.assert = _construct2.assertThisInitialized;
+var _get2 = { get: require('@babel/runtime/helpers/get') };
+function _get(e, t, r) {
+  return _get2.get(e, t, r);
+}
+let Foo = (__nox_super_0_71 => {
+  'use strict';
+  const Foo = function Foo() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this,
+      _newtarget = new.target;
+    function _super() {
+      _this = _construct(Object.getPrototypeOf(Foo), arguments, _newtarget || Foo);
+      return _this;
+    }
+    var _result = function () {
+      _get(Object.getPrototypeOf(Foo.prototype), 'foo', _construct.assert(_this)).call(
+        _construct.assert(_this),
+        _super(),
+      );
+    }.apply(void 0, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    if (_this === void 0)
+      throw new ReferenceError("this hasn't been initialised - super() hasn't been called");
+    return _this;
+  };
+  if (__nox_super_0_71 !== null && typeof __nox_super_0_71 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Foo.prototype = Object.create(__nox_super_0_71 && __nox_super_0_71.prototype, {
+    constructor: {
+      value: Foo,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo, __nox_super_0_71);
+  else Foo.__proto__ = __nox_super_0_71;
+  Object.defineProperty(Foo, 'prototype', { writable: false });
+  return Foo;
+})(Bar);`,
     modes: [
       {
         title: 'default',
@@ -4347,15 +18271,74 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[166],
       },
     ],
   },
   {
     title: 'spec — super reference before bare super (exec)',
-    source:
-      'class Bar {}\n\nclass Foo extends Bar {\n  constructor() {\n    super.foo();\n    super();\n  }\n}\n\nexpect(() => new Foo()).toThrow("this hasn\'t been initialised");\n',
+    source: `class Bar {}
+
+class Foo extends Bar {
+  constructor() {
+    super.foo();
+    super();
+  }
+}
+
+expect(() => new Foo()).toThrow("this hasn't been initialised");
+`,
     filename: 'exec.js',
+    output: `var _construct2 = {
+  construct: require('@babel/runtime/helpers/construct'),
+  assertThisInitialized: require('@babel/runtime/helpers/assertThisInitialized'),
+};
+function _construct(t, e, r) {
+  return _construct2.construct(t, e, r);
+}
+_construct.assert = _construct2.assertThisInitialized;
+var _get2 = { get: require('@babel/runtime/helpers/get') };
+function _get(e, t, r) {
+  return _get2.get(e, t, r);
+}
+let Bar = (() => {
+  'use strict';
+  const Bar = function Bar() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Bar, 'prototype', { writable: false });
+  return Bar;
+})();
+let Foo = (__nox_super_14_91 => {
+  'use strict';
+  const Foo = function Foo() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    _get(Object.getPrototypeOf(Foo.prototype), 'foo', _construct.assert(_this)).call(
+      _construct.assert(_this),
+    );
+    var _this = _construct(Object.getPrototypeOf(Foo), [], new.target || Foo);
+    var _result = function () {}.apply(_this, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    return _this;
+  };
+  if (__nox_super_14_91 !== null && typeof __nox_super_14_91 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Foo.prototype = Object.create(__nox_super_14_91 && __nox_super_14_91.prototype, {
+    constructor: {
+      value: Foo,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo, __nox_super_14_91);
+  else Foo.__proto__ = __nox_super_14_91;
+  Object.defineProperty(Foo, 'prototype', { writable: false });
+  return Foo;
+})(Bar);
+expect(() => new Foo()).toThrow("this hasn't been initialised");`,
     modes: [
       {
         title: 'default',
@@ -4369,14 +18352,61 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[167],
       },
     ],
   },
   {
     title: 'spec — super reference before bare super (input)',
-    source: 'class Foo extends Bar {\n  constructor() {\n    super.foo();\n    super();\n  }\n}\n',
+    source: `class Foo extends Bar {
+  constructor() {
+    super.foo();
+    super();
+  }
+}
+`,
     filename: 'input.js',
+    output: `var _construct2 = {
+  construct: require('@babel/runtime/helpers/construct'),
+  assertThisInitialized: require('@babel/runtime/helpers/assertThisInitialized'),
+};
+function _construct(t, e, r) {
+  return _construct2.construct(t, e, r);
+}
+_construct.assert = _construct2.assertThisInitialized;
+var _get2 = { get: require('@babel/runtime/helpers/get') };
+function _get(e, t, r) {
+  return _get2.get(e, t, r);
+}
+let Foo = (__nox_super_0_77 => {
+  'use strict';
+  const Foo = function Foo() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    _get(Object.getPrototypeOf(Foo.prototype), 'foo', _construct.assert(_this)).call(
+      _construct.assert(_this),
+    );
+    var _this = _construct(Object.getPrototypeOf(Foo), [], new.target || Foo);
+    var _result = function () {}.apply(_this, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    return _this;
+  };
+  if (__nox_super_0_77 !== null && typeof __nox_super_0_77 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Foo.prototype = Object.create(__nox_super_0_77 && __nox_super_0_77.prototype, {
+    constructor: {
+      value: Foo,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo, __nox_super_0_77);
+  else Foo.__proto__ = __nox_super_0_77;
+  Object.defineProperty(Foo, 'prototype', { writable: false });
+  return Foo;
+})(Bar);`,
     modes: [
       {
         title: 'default',
@@ -4390,15 +18420,93 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[168],
       },
     ],
   },
   {
     title: 'spec — super reference before in lambda 2 (exec)',
-    source:
-      'class Bar {\n  test() {}\n}\n\nclass Foo extends Bar {\n  constructor() {\n    const t = () => super.test()\n    t();\n    super();\n  }\n}\n\nexpect(() => new Foo()).toThrow("this hasn\'t been initialised");\n',
+    source: `class Bar {
+  test() {}
+}
+
+class Foo extends Bar {
+  constructor() {
+    const t = () => super.test()
+    t();
+    super();
+  }
+}
+
+expect(() => new Foo()).toThrow("this hasn't been initialised");
+`,
     filename: 'exec.js',
+    output: `var _construct2 = {
+  construct: require('@babel/runtime/helpers/construct'),
+  assertThisInitialized: require('@babel/runtime/helpers/assertThisInitialized'),
+};
+function _construct(t, e, r) {
+  return _construct2.construct(t, e, r);
+}
+_construct.assert = _construct2.assertThisInitialized;
+var _get2 = { get: require('@babel/runtime/helpers/get') };
+function _get(e, t, r) {
+  return _get2.get(e, t, r);
+}
+let Bar = (() => {
+  'use strict';
+  const Bar = function Bar() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Bar.prototype, 'test', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      },
+      'name',
+      {
+        value: 'test',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Bar, 'prototype', { writable: false });
+  return Bar;
+})();
+let Foo = (__nox_super_27_129 => {
+  'use strict';
+  const Foo = function Foo() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    const t = () =>
+      _get(Object.getPrototypeOf(Foo.prototype), 'test', _construct.assert(_this)).call(
+        _construct.assert(_this),
+      );
+    t();
+    var _this = _construct(Object.getPrototypeOf(Foo), [], new.target || Foo);
+    var _result = function () {}.apply(_this, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    return _this;
+  };
+  if (__nox_super_27_129 !== null && typeof __nox_super_27_129 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Foo.prototype = Object.create(__nox_super_27_129 && __nox_super_27_129.prototype, {
+    constructor: {
+      value: Foo,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo, __nox_super_27_129);
+  else Foo.__proto__ = __nox_super_27_129;
+  Object.defineProperty(Foo, 'prototype', { writable: false });
+  return Foo;
+})(Bar);
+expect(() => new Foo()).toThrow("this hasn't been initialised");`,
     modes: [
       {
         title: 'default',
@@ -4412,15 +18520,66 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[169],
       },
     ],
   },
   {
     title: 'spec — super reference before in lambda 2 (input)',
-    source:
-      'class Foo extends Bar {\n  constructor() {\n    var t = () => super.test()\n    super.foo();\n    super();\n  }\n}\n',
+    source: `class Foo extends Bar {
+  constructor() {
+    var t = () => super.test()
+    super.foo();
+    super();
+  }
+}
+`,
     filename: 'input.js',
+    output: `var _construct2 = {
+  construct: require('@babel/runtime/helpers/construct'),
+  assertThisInitialized: require('@babel/runtime/helpers/assertThisInitialized'),
+};
+function _construct(t, e, r) {
+  return _construct2.construct(t, e, r);
+}
+_construct.assert = _construct2.assertThisInitialized;
+var _get2 = { get: require('@babel/runtime/helpers/get') };
+function _get(e, t, r) {
+  return _get2.get(e, t, r);
+}
+let Foo = (__nox_super_0_108 => {
+  'use strict';
+  const Foo = function Foo() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var t = () =>
+      _get(Object.getPrototypeOf(Foo.prototype), 'test', _construct.assert(_this)).call(
+        _construct.assert(_this),
+      );
+    _get(Object.getPrototypeOf(Foo.prototype), 'foo', _construct.assert(_this)).call(
+      _construct.assert(_this),
+    );
+    var _this = _construct(Object.getPrototypeOf(Foo), [], new.target || Foo);
+    var _result = function () {}.apply(_this, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    return _this;
+  };
+  if (__nox_super_0_108 !== null && typeof __nox_super_0_108 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Foo.prototype = Object.create(__nox_super_0_108 && __nox_super_0_108.prototype, {
+    constructor: {
+      value: Foo,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo, __nox_super_0_108);
+  else Foo.__proto__ = __nox_super_0_108;
+  Object.defineProperty(Foo, 'prototype', { writable: false });
+  return Foo;
+})(Bar);`,
     modes: [
       {
         title: 'default',
@@ -4434,15 +18593,94 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[170],
       },
     ],
   },
   {
     title: 'spec — super reference before in lambda 3 (exec)',
-    source:
-      'class Bar {\n  test() {}\n}\n\nclass Foo extends Bar {\n  constructor() {\n    const t = () => super.test()\n    super();\n    t();\n  }\n}\n\nnew Foo();\n',
+    source: `class Bar {
+  test() {}
+}
+
+class Foo extends Bar {
+  constructor() {
+    const t = () => super.test()
+    super();
+    t();
+  }
+}
+
+new Foo();
+`,
     filename: 'exec.js',
+    output: `var _construct2 = {
+  construct: require('@babel/runtime/helpers/construct'),
+  assertThisInitialized: require('@babel/runtime/helpers/assertThisInitialized'),
+};
+function _construct(t, e, r) {
+  return _construct2.construct(t, e, r);
+}
+_construct.assert = _construct2.assertThisInitialized;
+var _get2 = { get: require('@babel/runtime/helpers/get') };
+function _get(e, t, r) {
+  return _get2.get(e, t, r);
+}
+let Bar = (() => {
+  'use strict';
+  const Bar = function Bar() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Bar.prototype, 'test', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      },
+      'name',
+      {
+        value: 'test',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Bar, 'prototype', { writable: false });
+  return Bar;
+})();
+let Foo = (__nox_super_27_129 => {
+  'use strict';
+  const Foo = function Foo() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    const t = () =>
+      _get(Object.getPrototypeOf(Foo.prototype), 'test', _construct.assert(_this)).call(
+        _construct.assert(_this),
+      );
+    var _this = _construct(Object.getPrototypeOf(Foo), [], new.target || Foo);
+    var _result = function () {
+      t();
+    }.apply(_this, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    return _this;
+  };
+  if (__nox_super_27_129 !== null && typeof __nox_super_27_129 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Foo.prototype = Object.create(__nox_super_27_129 && __nox_super_27_129.prototype, {
+    constructor: {
+      value: Foo,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo, __nox_super_27_129);
+  else Foo.__proto__ = __nox_super_27_129;
+  Object.defineProperty(Foo, 'prototype', { writable: false });
+  return Foo;
+})(Bar);
+new Foo();`,
     modes: [
       {
         title: 'default',
@@ -4456,15 +18694,64 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[171],
       },
     ],
   },
   {
     title: 'spec — super reference before in lambda 3 (input)',
-    source:
-      'class Foo extends Bar {\n  constructor() {\n    const t = () => super.test()\n    super();\n    t();\n  }\n}',
+    source: `class Foo extends Bar {
+  constructor() {
+    const t = () => super.test()
+    super();
+    t();
+  }
+}`,
     filename: 'input.js',
+    output: `var _construct2 = {
+  construct: require('@babel/runtime/helpers/construct'),
+  assertThisInitialized: require('@babel/runtime/helpers/assertThisInitialized'),
+};
+function _construct(t, e, r) {
+  return _construct2.construct(t, e, r);
+}
+_construct.assert = _construct2.assertThisInitialized;
+var _get2 = { get: require('@babel/runtime/helpers/get') };
+function _get(e, t, r) {
+  return _get2.get(e, t, r);
+}
+let Foo = (__nox_super_0_102 => {
+  'use strict';
+  const Foo = function Foo() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    const t = () =>
+      _get(Object.getPrototypeOf(Foo.prototype), 'test', _construct.assert(_this)).call(
+        _construct.assert(_this),
+      );
+    var _this = _construct(Object.getPrototypeOf(Foo), [], new.target || Foo);
+    var _result = function () {
+      t();
+    }.apply(_this, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    return _this;
+  };
+  if (__nox_super_0_102 !== null && typeof __nox_super_0_102 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Foo.prototype = Object.create(__nox_super_0_102 && __nox_super_0_102.prototype, {
+    constructor: {
+      value: Foo,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo, __nox_super_0_102);
+  else Foo.__proto__ = __nox_super_0_102;
+  Object.defineProperty(Foo, 'prototype', { writable: false });
+  return Foo;
+})(Bar);`,
     modes: [
       {
         title: 'default',
@@ -4478,15 +18765,90 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[172],
       },
     ],
   },
   {
     title: 'spec — super reference before in lambda (exec)',
-    source:
-      'class Bar {\n  test() {}\n}\n\nclass Foo extends Bar {\n  constructor() {\n    const t = () => super.test()\n    super();\n  }\n}\n\nnew Foo();',
+    source: `class Bar {
+  test() {}
+}
+
+class Foo extends Bar {
+  constructor() {
+    const t = () => super.test()
+    super();
+  }
+}
+
+new Foo();`,
     filename: 'exec.js',
+    output: `var _construct2 = {
+  construct: require('@babel/runtime/helpers/construct'),
+  assertThisInitialized: require('@babel/runtime/helpers/assertThisInitialized'),
+};
+function _construct(t, e, r) {
+  return _construct2.construct(t, e, r);
+}
+_construct.assert = _construct2.assertThisInitialized;
+var _get2 = { get: require('@babel/runtime/helpers/get') };
+function _get(e, t, r) {
+  return _get2.get(e, t, r);
+}
+let Bar = (() => {
+  'use strict';
+  const Bar = function Bar() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Bar.prototype, 'test', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      },
+      'name',
+      {
+        value: 'test',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Bar, 'prototype', { writable: false });
+  return Bar;
+})();
+let Foo = (__nox_super_27_120 => {
+  'use strict';
+  const Foo = function Foo() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    const t = () =>
+      _get(Object.getPrototypeOf(Foo.prototype), 'test', _construct.assert(_this)).call(
+        _construct.assert(_this),
+      );
+    var _this = _construct(Object.getPrototypeOf(Foo), [], new.target || Foo);
+    var _result = function () {}.apply(_this, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    return _this;
+  };
+  if (__nox_super_27_120 !== null && typeof __nox_super_27_120 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Foo.prototype = Object.create(__nox_super_27_120 && __nox_super_27_120.prototype, {
+    constructor: {
+      value: Foo,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo, __nox_super_27_120);
+  else Foo.__proto__ = __nox_super_27_120;
+  Object.defineProperty(Foo, 'prototype', { writable: false });
+  return Foo;
+})(Bar);
+new Foo();`,
     modes: [
       {
         title: 'default',
@@ -4500,15 +18862,62 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[173],
       },
     ],
   },
   {
     title: 'spec — super reference before in lambda (input)',
-    source:
-      'class Foo extends Bar {\n  constructor() {\n    const t = () => super.test()\n    super();\n  }\n}\n',
+    source: `class Foo extends Bar {
+  constructor() {
+    const t = () => super.test()
+    super();
+  }
+}
+`,
     filename: 'input.js',
+    output: `var _construct2 = {
+  construct: require('@babel/runtime/helpers/construct'),
+  assertThisInitialized: require('@babel/runtime/helpers/assertThisInitialized'),
+};
+function _construct(t, e, r) {
+  return _construct2.construct(t, e, r);
+}
+_construct.assert = _construct2.assertThisInitialized;
+var _get2 = { get: require('@babel/runtime/helpers/get') };
+function _get(e, t, r) {
+  return _get2.get(e, t, r);
+}
+let Foo = (__nox_super_0_93 => {
+  'use strict';
+  const Foo = function Foo() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    const t = () =>
+      _get(Object.getPrototypeOf(Foo.prototype), 'test', _construct.assert(_this)).call(
+        _construct.assert(_this),
+      );
+    var _this = _construct(Object.getPrototypeOf(Foo), [], new.target || Foo);
+    var _result = function () {}.apply(_this, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    return _this;
+  };
+  if (__nox_super_0_93 !== null && typeof __nox_super_0_93 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Foo.prototype = Object.create(__nox_super_0_93 && __nox_super_0_93.prototype, {
+    constructor: {
+      value: Foo,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo, __nox_super_0_93);
+  else Foo.__proto__ = __nox_super_0_93;
+  Object.defineProperty(Foo, 'prototype', { writable: false });
+  return Foo;
+})(Bar);`,
     modes: [
       {
         title: 'default',
@@ -4522,15 +18931,106 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[174],
       },
     ],
   },
   {
     title: 'spec — super reference in prop exression (exec)',
-    source:
-      'let called = false;\n\nclass A {\n  get prop() {\n    called = true;\n  }\n}\n\nclass B extends A {\n  constructor() {\n    super[super().prop]\n  }\n}\n\nexpect(() => {\n  new B();\n}).toThrow(ReferenceError);\nexpect(called).toBe(false);\n',
+    source: `let called = false;
+
+class A {
+  get prop() {
+    called = true;
+  }
+}
+
+class B extends A {
+  constructor() {
+    super[super().prop]
+  }
+}
+
+expect(() => {
+  new B();
+}).toThrow(ReferenceError);
+expect(called).toBe(false);
+`,
     filename: 'exec.js',
+    output: `var _construct2 = {
+  construct: require('@babel/runtime/helpers/construct'),
+  assertThisInitialized: require('@babel/runtime/helpers/assertThisInitialized'),
+};
+function _construct(t, e, r) {
+  return _construct2.construct(t, e, r);
+}
+_construct.assert = _construct2.assertThisInitialized;
+var _get2 = { get: require('@babel/runtime/helpers/get') };
+function _get(e, t, r) {
+  return _get2.get(e, t, r);
+}
+let called = false;
+let A = (() => {
+  'use strict';
+  const A = function A() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(A.prototype, 'prop', {
+    get: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        called = true;
+      },
+      'name',
+      {
+        value: 'get prop',
+        configurable: true,
+      },
+    ),
+    configurable: true,
+  });
+  Object.defineProperty(A, 'prototype', { writable: false });
+  return A;
+})();
+let B = (__nox_super_72_139 => {
+  'use strict';
+  const B = function B() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this,
+      _newtarget = new.target;
+    function _super() {
+      _this = _construct(Object.getPrototypeOf(B), arguments, _newtarget || B);
+      return _this;
+    }
+    var _result = function () {
+      _get(Object.getPrototypeOf(B.prototype), _super().prop, _construct.assert(_this));
+    }.apply(void 0, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    if (_this === void 0)
+      throw new ReferenceError("this hasn't been initialised - super() hasn't been called");
+    return _this;
+  };
+  if (__nox_super_72_139 !== null && typeof __nox_super_72_139 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  B.prototype = Object.create(__nox_super_72_139 && __nox_super_72_139.prototype, {
+    constructor: {
+      value: B,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(B, __nox_super_72_139);
+  else B.__proto__ = __nox_super_72_139;
+  Object.defineProperty(B, 'prototype', { writable: false });
+  return B;
+})(A);
+expect(() => {
+  new B();
+}).toThrow(ReferenceError);
+expect(called).toBe(false);`,
     modes: [
       {
         title: 'default',
@@ -4544,14 +19044,68 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[175],
       },
     ],
   },
   {
     title: 'spec — super reference in prop exression (input)',
-    source: 'class Foo extends Bar {\n  constructor() {\n    super[super().method]();\n  }\n}\n',
+    source: `class Foo extends Bar {
+  constructor() {
+    super[super().method]();
+  }
+}
+`,
     filename: 'input.js',
+    output: `var _construct2 = {
+  construct: require('@babel/runtime/helpers/construct'),
+  assertThisInitialized: require('@babel/runtime/helpers/assertThisInitialized'),
+};
+function _construct(t, e, r) {
+  return _construct2.construct(t, e, r);
+}
+_construct.assert = _construct2.assertThisInitialized;
+var _get2 = { get: require('@babel/runtime/helpers/get') };
+function _get(e, t, r) {
+  return _get2.get(e, t, r);
+}
+let Foo = (__nox_super_0_76 => {
+  'use strict';
+  const Foo = function Foo() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this,
+      _newtarget = new.target;
+    function _super() {
+      _this = _construct(Object.getPrototypeOf(Foo), arguments, _newtarget || Foo);
+      return _this;
+    }
+    var _result = function () {
+      _get(Object.getPrototypeOf(Foo.prototype), _super().method, _construct.assert(_this)).call(
+        _construct.assert(_this),
+      );
+    }.apply(void 0, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    if (_this === void 0)
+      throw new ReferenceError("this hasn't been initialised - super() hasn't been called");
+    return _this;
+  };
+  if (__nox_super_0_76 !== null && typeof __nox_super_0_76 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Foo.prototype = Object.create(__nox_super_0_76 && __nox_super_0_76.prototype, {
+    constructor: {
+      value: Foo,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo, __nox_super_0_76);
+  else Foo.__proto__ = __nox_super_0_76;
+  Object.defineProperty(Foo, 'prototype', { writable: false });
+  return Foo;
+})(Bar);`,
     modes: [
       {
         title: 'default',
@@ -4565,15 +19119,91 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[176],
       },
     ],
   },
   {
     title: 'spec — super spread args (exec)',
-    source:
-      '// test262/test/language/expressions/super/call-spread-err-sngl-err-itr-get-get.js\n\nvar iter = {};\nObject.defineProperty(iter, Symbol.iterator, {\n  get: function() {\n    throw new Error("err");\n  }\n});\n\nclass Test262ParentClass {\n  constructor() {}\n}\n\nclass Test262ChildClass extends Test262ParentClass {\n  constructor() {\n    super(...iter);\n  }\n}\n\nexpect(()=>{\n  new Test262ChildClass();\n}).toThrow("err");\n',
+    source: `// test262/test/language/expressions/super/call-spread-err-sngl-err-itr-get-get.js
+
+var iter = {};
+Object.defineProperty(iter, Symbol.iterator, {
+  get: function() {
+    throw new Error("err");
+  }
+});
+
+class Test262ParentClass {
+  constructor() {}
+}
+
+class Test262ChildClass extends Test262ParentClass {
+  constructor() {
+    super(...iter);
+  }
+}
+
+expect(()=>{
+  new Test262ChildClass();
+}).toThrow("err");
+`,
     filename: 'exec.js',
+    output: `var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+// test262/test/language/expressions/super/call-spread-err-sngl-err-itr-get-get.js
+var iter = {};
+Object.defineProperty(iter, Symbol.iterator, {
+  get: function () {
+    throw new Error('err');
+  },
+});
+let Test262ParentClass = (() => {
+  'use strict';
+  const Test262ParentClass = function Test262ParentClass() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Test262ParentClass, 'prototype', { writable: false });
+  return Test262ParentClass;
+})();
+let Test262ChildClass = (__nox_super_252_348 => {
+  'use strict';
+  const Test262ChildClass = function Test262ChildClass() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(
+      Object.getPrototypeOf(Test262ChildClass),
+      [...iter],
+      new.target || Test262ChildClass,
+    );
+    var _result = function () {}.apply(_this, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    return _this;
+  };
+  if (__nox_super_252_348 !== null && typeof __nox_super_252_348 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Test262ChildClass.prototype = Object.create(
+    __nox_super_252_348 && __nox_super_252_348.prototype,
+    {
+      constructor: {
+        value: Test262ChildClass,
+        writable: true,
+        configurable: true,
+      },
+    },
+  );
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Test262ChildClass, __nox_super_252_348);
+  else Test262ChildClass.__proto__ = __nox_super_252_348;
+  Object.defineProperty(Test262ChildClass, 'prototype', { writable: false });
+  return Test262ChildClass;
+})(Test262ParentClass);
+expect(() => {
+  new Test262ChildClass();
+}).toThrow('err');`,
     modes: [
       {
         title: 'default',
@@ -4587,15 +19217,62 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[177],
       },
     ],
   },
   {
     title: 'spec — this not allowed before super in derived classes 2 (exec)',
-    source:
-      'class Bar {}\n\nclass Foo extends Bar {\n  constructor() {\n    super(this);\n  }\n}\n\nexpect(() => new Foo()).toThrow("this hasn\'t been initialised");\n',
+    source: `class Bar {}
+
+class Foo extends Bar {
+  constructor() {
+    super(this);
+  }
+}
+
+expect(() => new Foo()).toThrow("this hasn't been initialised");
+`,
     filename: 'exec.js',
+    output: `var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+let Bar = (() => {
+  'use strict';
+  const Bar = function Bar() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Bar, 'prototype', { writable: false });
+  return Bar;
+})();
+let Foo = (__nox_super_14_78 => {
+  'use strict';
+  const Foo = function Foo() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this = _construct(Object.getPrototypeOf(Foo), [this], new.target || Foo);
+    var _result = function () {}.apply(_this, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    return _this;
+  };
+  if (__nox_super_14_78 !== null && typeof __nox_super_14_78 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Foo.prototype = Object.create(__nox_super_14_78 && __nox_super_14_78.prototype, {
+    constructor: {
+      value: Foo,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo, __nox_super_14_78);
+  else Foo.__proto__ = __nox_super_14_78;
+  Object.defineProperty(Foo, 'prototype', { writable: false });
+  return Foo;
+})(Bar);
+expect(() => new Foo()).toThrow("this hasn't been initialised");`,
     modes: [
       {
         title: 'default',
@@ -4609,15 +19286,70 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[178],
       },
     ],
   },
   {
     title: 'spec — this not allowed before super in derived classes 3 (exec)',
-    source:
-      'class Bar {}\n\nclass Foo extends Bar {\n  constructor() {\n    const fn = () => this;\n    fn();\n    super();\n  }\n}\n\nexpect(() => new Foo()).toThrow("this hasn\'t been initialised");\n',
+    source: `class Bar {}
+
+class Foo extends Bar {
+  constructor() {
+    const fn = () => this;
+    fn();
+    super();
+  }
+}
+
+expect(() => new Foo()).toThrow("this hasn't been initialised");
+`,
     filename: 'exec.js',
+    output: `var _construct2 = {
+  construct: require('@babel/runtime/helpers/construct'),
+  assertThisInitialized: require('@babel/runtime/helpers/assertThisInitialized'),
+};
+function _construct(t, e, r) {
+  return _construct2.construct(t, e, r);
+}
+_construct.assert = _construct2.assertThisInitialized;
+let Bar = (() => {
+  'use strict';
+  const Bar = function Bar() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Bar, 'prototype', { writable: false });
+  return Bar;
+})();
+let Foo = (__nox_super_14_111 => {
+  'use strict';
+  const Foo = function Foo() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    const fn = () => _construct.assert(_this);
+    fn();
+    var _this = _construct(Object.getPrototypeOf(Foo), [], new.target || Foo);
+    var _result = function () {}.apply(_this, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    return _this;
+  };
+  if (__nox_super_14_111 !== null && typeof __nox_super_14_111 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Foo.prototype = Object.create(__nox_super_14_111 && __nox_super_14_111.prototype, {
+    constructor: {
+      value: Foo,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo, __nox_super_14_111);
+  else Foo.__proto__ = __nox_super_14_111;
+  Object.defineProperty(Foo, 'prototype', { writable: false });
+  return Foo;
+})(Bar);
+expect(() => new Foo()).toThrow("this hasn't been initialised");`,
     modes: [
       {
         title: 'default',
@@ -4631,15 +19363,57 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[179],
       },
     ],
   },
   {
     title: 'spec — this not allowed before super in derived classes 3 (input)',
-    source:
-      'class Foo extends Bar {\n  constructor() {\n    const fn = () => this;\n    fn();\n    super();\n  }\n}\n',
+    source: `class Foo extends Bar {
+  constructor() {
+    const fn = () => this;
+    fn();
+    super();
+  }
+}
+`,
     filename: 'input.js',
+    output: `var _construct2 = {
+  construct: require('@babel/runtime/helpers/construct'),
+  assertThisInitialized: require('@babel/runtime/helpers/assertThisInitialized'),
+};
+function _construct(t, e, r) {
+  return _construct2.construct(t, e, r);
+}
+_construct.assert = _construct2.assertThisInitialized;
+let Foo = (__nox_super_0_97 => {
+  'use strict';
+  const Foo = function Foo() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    const fn = () => _construct.assert(_this);
+    fn();
+    var _this = _construct(Object.getPrototypeOf(Foo), [], new.target || Foo);
+    var _result = function () {}.apply(_this, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    return _this;
+  };
+  if (__nox_super_0_97 !== null && typeof __nox_super_0_97 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Foo.prototype = Object.create(__nox_super_0_97 && __nox_super_0_97.prototype, {
+    constructor: {
+      value: Foo,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo, __nox_super_0_97);
+  else Foo.__proto__ = __nox_super_0_97;
+  Object.defineProperty(Foo, 'prototype', { writable: false });
+  return Foo;
+})(Bar);`,
     modes: [
       {
         title: 'default',
@@ -4653,15 +19427,71 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[180],
       },
     ],
   },
   {
     title: 'spec — this not allowed before super in derived classes 4 (exec)',
-    source:
-      'class Bar {}\n\nclass Foo extends Bar {\n  constructor() {\n    const fn = () => this;\n    super();\n    fn();\n  }\n}\n\nnew Foo();\n',
+    source: `class Bar {}
+
+class Foo extends Bar {
+  constructor() {
+    const fn = () => this;
+    super();
+    fn();
+  }
+}
+
+new Foo();
+`,
     filename: 'exec.js',
+    output: `var _construct2 = {
+  construct: require('@babel/runtime/helpers/construct'),
+  assertThisInitialized: require('@babel/runtime/helpers/assertThisInitialized'),
+};
+function _construct(t, e, r) {
+  return _construct2.construct(t, e, r);
+}
+_construct.assert = _construct2.assertThisInitialized;
+let Bar = (() => {
+  'use strict';
+  const Bar = function Bar() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Bar, 'prototype', { writable: false });
+  return Bar;
+})();
+let Foo = (__nox_super_14_111 => {
+  'use strict';
+  const Foo = function Foo() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    const fn = () => _construct.assert(_this);
+    var _this = _construct(Object.getPrototypeOf(Foo), [], new.target || Foo);
+    var _result = function () {
+      fn();
+    }.apply(_this, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    return _this;
+  };
+  if (__nox_super_14_111 !== null && typeof __nox_super_14_111 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Foo.prototype = Object.create(__nox_super_14_111 && __nox_super_14_111.prototype, {
+    constructor: {
+      value: Foo,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo, __nox_super_14_111);
+  else Foo.__proto__ = __nox_super_14_111;
+  Object.defineProperty(Foo, 'prototype', { writable: false });
+  return Foo;
+})(Bar);
+new Foo();`,
     modes: [
       {
         title: 'default',
@@ -4675,15 +19505,58 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[181],
       },
     ],
   },
   {
     title: 'spec — this not allowed before super in derived classes 4 (input)',
-    source:
-      'class Foo extends Bar {\n  constructor() {\n    const fn = () => this;\n    super();\n    fn();\n  }\n}\n',
+    source: `class Foo extends Bar {
+  constructor() {
+    const fn = () => this;
+    super();
+    fn();
+  }
+}
+`,
     filename: 'input.js',
+    output: `var _construct2 = {
+  construct: require('@babel/runtime/helpers/construct'),
+  assertThisInitialized: require('@babel/runtime/helpers/assertThisInitialized'),
+};
+function _construct(t, e, r) {
+  return _construct2.construct(t, e, r);
+}
+_construct.assert = _construct2.assertThisInitialized;
+let Foo = (__nox_super_0_97 => {
+  'use strict';
+  const Foo = function Foo() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    const fn = () => _construct.assert(_this);
+    var _this = _construct(Object.getPrototypeOf(Foo), [], new.target || Foo);
+    var _result = function () {
+      fn();
+    }.apply(_this, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    return _this;
+  };
+  if (__nox_super_0_97 !== null && typeof __nox_super_0_97 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Foo.prototype = Object.create(__nox_super_0_97 && __nox_super_0_97.prototype, {
+    constructor: {
+      value: Foo,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo, __nox_super_0_97);
+  else Foo.__proto__ = __nox_super_0_97;
+  Object.defineProperty(Foo, 'prototype', { writable: false });
+  return Foo;
+})(Bar);`,
     modes: [
       {
         title: 'default',
@@ -4697,15 +19570,75 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[182],
       },
     ],
   },
   {
     title: 'spec — this not allowed before super in derived classes 5 (exec)',
-    source:
-      'class Bar {}\n\nclass Foo extends Bar {\n  constructor() {\n    Foo[this];\n  }\n}\n\nexpect(() => new Foo()).toThrow("this hasn\'t been initialised");\n',
+    source: `class Bar {}
+
+class Foo extends Bar {
+  constructor() {
+    Foo[this];
+  }
+}
+
+expect(() => new Foo()).toThrow("this hasn't been initialised");
+`,
     filename: 'exec.js',
+    output: `var _construct2 = {
+  construct: require('@babel/runtime/helpers/construct'),
+  assertThisInitialized: require('@babel/runtime/helpers/assertThisInitialized'),
+};
+function _construct(t, e, r) {
+  return _construct2.construct(t, e, r);
+}
+_construct.assert = _construct2.assertThisInitialized;
+let Bar = (() => {
+  'use strict';
+  const Bar = function Bar() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Bar, 'prototype', { writable: false });
+  return Bar;
+})();
+let Foo = (__nox_super_14_76 => {
+  'use strict';
+  const Foo = function Foo() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this,
+      _newtarget = new.target;
+    function _super() {
+      _this = _construct(Object.getPrototypeOf(Foo), arguments, _newtarget || Foo);
+      return _this;
+    }
+    var _result = function () {
+      Foo[_construct.assert(_this)];
+    }.apply(void 0, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    if (_this === void 0)
+      throw new ReferenceError("this hasn't been initialised - super() hasn't been called");
+    return _this;
+  };
+  if (__nox_super_14_76 !== null && typeof __nox_super_14_76 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Foo.prototype = Object.create(__nox_super_14_76 && __nox_super_14_76.prototype, {
+    constructor: {
+      value: Foo,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo, __nox_super_14_76);
+  else Foo.__proto__ = __nox_super_14_76;
+  Object.defineProperty(Foo, 'prototype', { writable: false });
+  return Foo;
+})(Bar);
+expect(() => new Foo()).toThrow("this hasn't been initialised");`,
     modes: [
       {
         title: 'default',
@@ -4719,14 +19652,62 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[183],
       },
     ],
   },
   {
     title: 'spec — this not allowed before super in derived classes 5 (input)',
-    source: 'class Foo extends Bar {\n  constructor() {\n    Foo[this];\n  }\n}\n',
+    source: `class Foo extends Bar {
+  constructor() {
+    Foo[this];
+  }
+}
+`,
     filename: 'input.js',
+    output: `var _construct2 = {
+  construct: require('@babel/runtime/helpers/construct'),
+  assertThisInitialized: require('@babel/runtime/helpers/assertThisInitialized'),
+};
+function _construct(t, e, r) {
+  return _construct2.construct(t, e, r);
+}
+_construct.assert = _construct2.assertThisInitialized;
+let Foo = (__nox_super_0_62 => {
+  'use strict';
+  const Foo = function Foo() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    var _this,
+      _newtarget = new.target;
+    function _super() {
+      _this = _construct(Object.getPrototypeOf(Foo), arguments, _newtarget || Foo);
+      return _this;
+    }
+    var _result = function () {
+      Foo[_construct.assert(_this)];
+    }.apply(void 0, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    if (_this === void 0)
+      throw new ReferenceError("this hasn't been initialised - super() hasn't been called");
+    return _this;
+  };
+  if (__nox_super_0_62 !== null && typeof __nox_super_0_62 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Foo.prototype = Object.create(__nox_super_0_62 && __nox_super_0_62.prototype, {
+    constructor: {
+      value: Foo,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo, __nox_super_0_62);
+  else Foo.__proto__ = __nox_super_0_62;
+  Object.defineProperty(Foo, 'prototype', { writable: false });
+  return Foo;
+})(Bar);`,
     modes: [
       {
         title: 'default',
@@ -4740,15 +19721,68 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[184],
       },
     ],
   },
   {
     title: 'spec — this not allowed before super in derived classes (exec)',
-    source:
-      'class Bar {}\n\nclass Foo extends Bar {\n  constructor() {\n    this.foo = "bar";\n    super();\n  }\n}\n\nexpect(() => new Foo()).toThrow();\n',
+    source: `class Bar {}
+
+class Foo extends Bar {
+  constructor() {
+    this.foo = "bar";
+    super();
+  }
+}
+
+expect(() => new Foo()).toThrow();
+`,
     filename: 'exec.js',
+    output: `var _construct2 = {
+  construct: require('@babel/runtime/helpers/construct'),
+  assertThisInitialized: require('@babel/runtime/helpers/assertThisInitialized'),
+};
+function _construct(t, e, r) {
+  return _construct2.construct(t, e, r);
+}
+_construct.assert = _construct2.assertThisInitialized;
+let Bar = (() => {
+  'use strict';
+  const Bar = function Bar() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Bar, 'prototype', { writable: false });
+  return Bar;
+})();
+let Foo = (__nox_super_14_96 => {
+  'use strict';
+  const Foo = function Foo() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    _construct.assert(_this).foo = 'bar';
+    var _this = _construct(Object.getPrototypeOf(Foo), [], new.target || Foo);
+    var _result = function () {}.apply(_this, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    return _this;
+  };
+  if (__nox_super_14_96 !== null && typeof __nox_super_14_96 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Foo.prototype = Object.create(__nox_super_14_96 && __nox_super_14_96.prototype, {
+    constructor: {
+      value: Foo,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo, __nox_super_14_96);
+  else Foo.__proto__ = __nox_super_14_96;
+  Object.defineProperty(Foo, 'prototype', { writable: false });
+  return Foo;
+})(Bar);
+expect(() => new Foo()).toThrow();`,
     modes: [
       {
         title: 'default',
@@ -4762,15 +19796,55 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[185],
       },
     ],
   },
   {
     title: 'spec — this not allowed before super in derived classes (input)',
-    source:
-      'class Foo extends Bar {\n  constructor() {\n    this.foo = "bar";\n    super();\n  }\n}\n',
+    source: `class Foo extends Bar {
+  constructor() {
+    this.foo = "bar";
+    super();
+  }
+}
+`,
     filename: 'input.js',
+    output: `var _construct2 = {
+  construct: require('@babel/runtime/helpers/construct'),
+  assertThisInitialized: require('@babel/runtime/helpers/assertThisInitialized'),
+};
+function _construct(t, e, r) {
+  return _construct2.construct(t, e, r);
+}
+_construct.assert = _construct2.assertThisInitialized;
+let Foo = (__nox_super_0_82 => {
+  'use strict';
+  const Foo = function Foo() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    _construct.assert(_this).foo = 'bar';
+    var _this = _construct(Object.getPrototypeOf(Foo), [], new.target || Foo);
+    var _result = function () {}.apply(_this, arguments);
+    if (_result !== void 0) {
+      if ((typeof _result === 'object' && _result !== null) || typeof _result === 'function')
+        return _result;
+      throw new TypeError('Derived constructors may only return object or undefined');
+    }
+    return _this;
+  };
+  if (__nox_super_0_82 !== null && typeof __nox_super_0_82 !== 'function')
+    throw new TypeError('Super expression must either be null or a function');
+  Foo.prototype = Object.create(__nox_super_0_82 && __nox_super_0_82.prototype, {
+    constructor: {
+      value: Foo,
+      writable: true,
+      configurable: true,
+    },
+  });
+  if (Object.setPrototypeOf) Object.setPrototypeOf(Foo, __nox_super_0_82);
+  else Foo.__proto__ = __nox_super_0_82;
+  Object.defineProperty(Foo, 'prototype', { writable: false });
+  return Foo;
+})(Bar);`,
     modes: [
       {
         title: 'default',
@@ -4784,7 +19858,6 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[186],
       },
     ],
   },

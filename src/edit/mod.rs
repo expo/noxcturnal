@@ -1194,7 +1194,7 @@ mod tests {
                 names: Vec::new(),
                 public_start: 0,
                 public_end: 0,
-                order: None,
+                order: Some(0),
             });
         }
         for index in 0..COUNT {
@@ -1212,10 +1212,21 @@ mod tests {
                 names: Vec::new(),
                 public_start: offset as u32,
                 public_end: offset as u32,
-                order: None,
+                order: Some(1),
             });
         }
-        let _ = expand_copies(&source, &mut edits).unwrap();
+        let expansions = expand_copies(&source, &mut edits).unwrap();
+        // Each two-byte copy contains one insertion between its original x's.
+        // Check every distinct range: merely completing would also pass if the
+        // expansion cache incorrectly reused the first range for all copies.
+        for (index, expansion) in expansions[..COUNT].iter().enumerate() {
+            assert_eq!(
+                crate::sourcemap::render_code(&source, expansion.as_ref().unwrap()),
+                "xyx".repeat(index + 1),
+                "copy of {} original bytes",
+                (index + 1) * 2
+            );
+        }
     }
 
     #[test]
@@ -1240,7 +1251,7 @@ mod tests {
                 names: Vec::new(),
                 public_start: 0,
                 public_end: 0,
-                order: None,
+                order: Some(0),
             });
         }
         for index in 0..COUNT {
@@ -1258,9 +1269,19 @@ mod tests {
                 names: Vec::new(),
                 public_start: start as u32,
                 public_end: start as u32 + 1,
-                order: None,
+                order: Some(1),
             });
         }
-        let _ = expand_copies(&source, &mut edits).unwrap();
+        let expansions = expand_copies(&source, &mut edits).unwrap();
+        // Move holes remove text only at its old location. Copies must retain
+        // all original bytes, including those covered by the holes.
+        for (index, expansion) in expansions[..COUNT].iter().enumerate() {
+            assert_eq!(
+                crate::sourcemap::render_code(&source, expansion.as_ref().unwrap()),
+                "xx".repeat(index + 1),
+                "copy across {} move holes",
+                index + 1
+            );
+        }
     }
 }

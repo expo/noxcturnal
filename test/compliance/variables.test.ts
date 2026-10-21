@@ -102,10 +102,8 @@ test('a getter-only private assignment evaluates its receiver and RHS without in
   expect(result.result).toEqual(['receiver', 'rhs', true]);
 });
 
-// Babel's default block-scoping transform does not enable its TDZ emulation,
-// so it uses readOnlyError here and throws TypeError after the RHS. Keep the
-// specification result executable until the canonical transform changes or a
-// dedicated TDZ mode is introduced.
+// Default block scoping currently throws TypeError after the RHS without TDZ
+// emulation. Keep the desired ReferenceError regression until TDZ support exists.
 test.fails('assignment before a const declaration throws the TDZ ReferenceError', () => {
   const result = execute<{ result: unknown[] }>(
     `
@@ -152,7 +150,7 @@ test('object rest applies ToPropertyKey to computed exclusions exactly once', ()
   expect(result.result).toEqual(['selected', { keep: 'kept' }, ['string']]);
 });
 
-test('object-rest computed keys match Babel for callable Symbol.toPrimitive results', () => {
+test('object-rest computed keys accept callable Symbol.toPrimitive results', () => {
   const result = execute<{ result: boolean }>(
     `
       const key = { [Symbol.toPrimitive]() { return function invalid() {}; } };
@@ -259,7 +257,7 @@ test('for-of IteratorClose preserves a thrown body completion over a throwing re
   expect(result.result).toEqual(['return', 'body']);
 });
 
-test('for-of accepts primitive IteratorClose results like Babel', () => {
+test('for-of accepts primitive IteratorClose results', () => {
   const result = execute<{ result: boolean }>(
     `
       const iterable = {
@@ -280,7 +278,7 @@ test('for-of accepts primitive IteratorClose results like Babel', () => {
   expect(result.result).toBe(false);
 });
 
-test('for-of uses Babel return lookups and preserves the iterator receiver', () => {
+test('for-of looks up return again when closing and preserves the iterator receiver', () => {
   const result = execute<{ result: unknown[] }>(
     `
       const calls = [];
@@ -326,7 +324,7 @@ test('continue targeting the same for-of loop does not close its iterator', () =
   expect(result.result).toEqual([1, 2]);
 });
 
-test('for-of reads next per step like Babel and preserves its iterator receiver', () => {
+test('for-of reads next per step and preserves its iterator receiver', () => {
   const result = execute<{ result: unknown[] }>(
     `
       const calls = [];
@@ -358,7 +356,7 @@ test('for-of reads next per step like Babel and preserves its iterator receiver'
   ]);
 });
 
-test('for-of accepts primitive next results like Babel', () => {
+test('for-of accepts primitive next results', () => {
   const result = execute<{ result: unknown[] }>(
     `
       const calls = [];
@@ -661,14 +659,15 @@ test('simple parameters before a default remain unmapped from arguments', () => 
     `
       function read(first, second = 2) {
         first = 9;
+        const argumentAfterParameterWrite = arguments[0];
         arguments[0] = 7;
-        return [first, arguments[0], second];
+        return [first, arguments[0], second, argumentAfterParameterWrite];
       }
       globalThis.result = read(1);
     `,
     { transforms: { parameters: true } },
   );
-  expect(result.result).toEqual([9, 7, 2]);
+  expect(result.result).toEqual([9, 7, 2, 1]);
 });
 
 test('default and destructured setter parameters preserve assignment behavior', () => {
@@ -728,9 +727,8 @@ test('arrow parameter lowering preserves lexical this and arguments', () => {
   expect(result.result).toEqual(['prefix', 4, 'prefix']);
 });
 
-// Native execution establishes the specification result independently of the
-// transform. Compile outside test.fails so transform errors cannot accidentally
-// satisfy these known runtime regressions.
+// Compile outside test.fails so transform errors cannot accidentally satisfy
+// known runtime regressions. Each row states its expected runtime behavior.
 const additionalComplianceCases: {
   name: string;
   source: string;
@@ -912,18 +910,7 @@ const additionalComplianceCases: {
     expected: 2,
     knownFailure: false,
   },
-  {
-    name: 'parameter defaults preserve anonymous function names',
-    source: `
-      function read(value = function () {}) {
-        return value.name;
-      }
-      globalThis.result = read();
-    `,
-    plan: { transforms: { parameters: true } },
-    expected: 'value',
-    knownFailure: true,
-  },
+
   {
     name: 'for-of iterable evaluation preserves the loop-head TDZ',
     source: `
@@ -941,20 +928,7 @@ const additionalComplianceCases: {
     expected: 'ReferenceError',
     knownFailure: true,
   },
-  {
-    name: 'array destructuring honors an overridden array iterator',
-    source: `
-      const input = [1, 2];
-      input[Symbol.iterator] = function* () {
-        yield 9;
-      };
-      const [value] = input;
-      globalThis.result = value;
-    `,
-    plan: { transforms: { destructuring: true } },
-    expected: 9,
-    knownFailure: true,
-  },
+
   {
     name: 'parameter arrows created before super defer reading this until called',
     source: `
@@ -972,18 +946,7 @@ const additionalComplianceCases: {
     expected: true,
     knownFailure: false,
   },
-  {
-    name: 'destructuring defaults preserve anonymous function names in bindings and assignments',
-    source: `
-      const { value = function () {} } = {};
-      let other;
-      ({ other = function () {} } = {});
-      globalThis.result = [value.name, other.name];
-    `,
-    plan: { transforms: { destructuring: true } },
-    expected: ['value', 'other'],
-    knownFailure: true,
-  },
+
   {
     name: 'generator parameter defaults execute when the generator is called',
     source: `
@@ -1051,34 +1014,7 @@ const additionalComplianceCases: {
     expected: ['value', 'fail'],
     knownFailure: true,
   },
-  {
-    name: 'default parameters named arguments do not shadow generated argument reads',
-    source: `
-      function read(arguments = 1) {
-        return arguments;
-      }
-      globalThis.result = [read(), read(2)];
-    `,
-    plan: { transforms: { parameters: true } },
-    expected: [1, 2],
-    knownFailure: true,
-  },
-  {
-    name: 'non-simple parameters preserve the throwing arguments.callee accessor',
-    source: `
-      function read(value = 1) {
-        try {
-          return arguments.callee === read;
-        } catch (e) {
-          return e.name;
-        }
-      }
-      globalThis.result = read();
-    `,
-    plan: { transforms: { parameters: true } },
-    expected: 'TypeError',
-    knownFailure: true,
-  },
+
   {
     name: 'parameter arrows observe reassignment of the enclosing arguments binding',
     source: `
@@ -1093,26 +1029,7 @@ const additionalComplianceCases: {
     expected: 'changed',
     knownFailure: true,
   },
-  {
-    name: 'parameter lowering preserves arrow non-constructability and absence of prototype',
-    source: `
-      const read = (value = 1) => value;
-      let outcome;
-      try {
-        new read();
-        outcome = 'constructed';
-      } catch (e) {
-        outcome = e.name;
-      }
-      globalThis.result = [
-        outcome,
-        Object.prototype.hasOwnProperty.call(read, 'prototype'),
-      ];
-    `,
-    plan: { transforms: { parameters: true } },
-    expected: ['TypeError', false],
-    knownFailure: true,
-  },
+
   {
     name: 'array destructuring assignment evaluates its target before advancing the iterator',
     source: `
@@ -1204,33 +1121,52 @@ const additionalComplianceCases: {
   },
   {
     name: 'for-of ignores shadowed Symbol',
-    source: `function read(Symbol){const values=[];for(const value of [1,2])values.push(value);return values;}globalThis.result=read(null);`,
+    source: `
+      function read(Symbol) {
+        const values = [];
+        for (const value of [1, 2]) values.push(value);
+        return values;
+      }
+      globalThis.result = read(null);
+    `,
     plan: { transforms: { forOf: true } },
     expected: [1, 2],
     knownFailure: false,
   },
   {
     name: 'iterator acquisition must reject primitive iterator',
-    source: `const events=[];const descriptor=Object.getOwnPropertyDescriptor(Number.prototype,'next');Object.defineProperty(Number.prototype,'next',{configurable:true,value(){events.push('next');return{done:true};}});try{try{for(const value of {[Symbol.iterator](){return 1;}}){}}catch(e){events.push(e.name);}}finally{if(descriptor)Object.defineProperty(Number.prototype,'next',descriptor);else delete Number.prototype.next;}globalThis.result=events;`,
+    source: `
+      const events = [];
+      const descriptor = Object.getOwnPropertyDescriptor(Number.prototype, 'next');
+      Object.defineProperty(Number.prototype, 'next', {
+        configurable: true,
+        value() {
+          events.push('next');
+          return { done: true };
+        },
+      });
+      try {
+        try {
+          for (const value of {
+            [Symbol.iterator]() {
+              return 1;
+            },
+          }) {
+          }
+        } catch (e) {
+          events.push(e.name);
+        }
+      } finally {
+        if (descriptor) Object.defineProperty(Number.prototype, 'next', descriptor);
+        else delete Number.prototype.next;
+      }
+      globalThis.result = events;
+    `,
     plan: { transforms: { forOf: true } },
     expected: ['TypeError'],
     knownFailure: true,
   },
-  {
-    name: 'array elisions do not read iterator values',
-    source: `
-    const events = [];
-    const iterable = { [Symbol.iterator]() { return {
-      next() { return { done: false, get value() { events.push('value'); return 1; } }; },
-      return() { events.push('return'); return {}; }
-    }; } };
-    const [,] = iterable;
-    globalThis.result = events;
-      `,
-    plan: { transforms: { destructuring: true } },
-    expected: ['return'],
-    knownFailure: true,
-  },
+
   {
     name: 'array rest creates dense elements for holes',
     source: `
@@ -1252,76 +1188,7 @@ const additionalComplianceCases: {
     expected: [1, [2]],
     knownFailure: false,
   },
-  {
-    name: 'array rest ignores species',
-    source: `
-    const events = [];
-    class Values extends Array { static get [Symbol.species]() { events.push('species'); return Array; } }
-    const [...rest] = new Values(1, 2);
-    globalThis.result = [rest, events];
-      `,
-    plan: { transforms: { destructuring: true } },
-    expected: [[1, 2], []],
-    knownFailure: false,
-  },
-  {
-    name: 'object rest uses a single ownKeys snapshot',
-    source: `
-    const events = [];
-    const source = new Proxy({ a: 1 }, { ownKeys(target) { events.push('keys'); return Reflect.ownKeys(target); } });
-    const { ...rest } = source;
-    globalThis.result = [rest.a, events];
-      `,
-    plan: { transforms: { objectRestSpread: { loose: false, useBuiltIns: false } } },
-    expected: [1, ['keys']],
-    knownFailure: false,
-  },
-  {
-    name: 'object rest excludes symbols added during copying',
-    source: `
-    const symbol = Symbol('late');
-    const source = { get a() { this[symbol] = 2; return 1; } };
-    const { ...rest } = source;
-    globalThis.result = [rest.a, Object.hasOwn(rest, symbol)];
-      `,
-    plan: { transforms: { objectRestSpread: { loose: false, useBuiltIns: false } } },
-    expected: [1, false],
-    knownFailure: false,
-  },
-  {
-    name: 'array destructuring rejects legacy iterator-only object',
-    source: `
-    const input = { '@@iterator'() { return { next() { return { value: 1, done: false }; }, return() { return {}; } }; } };
-    try { const [value] = input; globalThis.result = value; }
-    catch (error) { globalThis.result = error.name; }
-      `,
-    plan: { transforms: { destructuring: true } },
-    expected: 'TypeError',
-    knownFailure: true,
-  },
-  {
-    name: 'object rest rechecks enumerability after earlier getter',
-    source: `
-    const source = { get a() { Object.defineProperty(this, 'b', { enumerable: false }); return 1; }, b: 2 };
-    const { ...rest } = source;
-    globalThis.result = [rest.a, Object.hasOwn(rest, 'b')];
-      `,
-    plan: { transforms: { objectRestSpread: { loose: false, useBuiltIns: false } } },
-    expected: [1, false],
-    knownFailure: false,
-  },
-  {
-    name: 'object rest uses a single ownKeys snapshot with excluded key',
-    source: `
-    const events = [];
-    const source = new Proxy({ a: 1 }, { ownKeys(target) { events.push('keys'); return Reflect.ownKeys(target); } });
-    const { missing, ...rest } = source;
-    globalThis.result = [rest.a, events];
-      `,
-    plan: { transforms: { objectRestSpread: { loose: false, useBuiltIns: false } } },
-    expected: [1, ['keys']],
-    knownFailure: true,
-  },
+
   {
     name: 'object rest excludes symbols added during copying with excluded key',
     source: `
@@ -1334,17 +1201,7 @@ const additionalComplianceCases: {
     expected: [1, false],
     knownFailure: true,
   },
-  {
-    name: 'object rest rechecks enumerability after earlier getter with excluded key',
-    source: `
-    const source = { get a() { Object.defineProperty(this, 'b', { enumerable: false }); return 1; }, b: 2 };
-    const { missing, ...rest } = source;
-    globalThis.result = [rest.a, Object.hasOwn(rest, 'b')];
-      `,
-    plan: { transforms: { objectRestSpread: { loose: false, useBuiltIns: false } } },
-    expected: [1, false],
-    knownFailure: true,
-  },
+
   {
     name: 'array assignment returns original iterable',
     source: `
@@ -1366,8 +1223,27 @@ const additionalComplianceCases: {
   {
     name: 'empty array pattern acquires and closes without stepping',
     source: `
- const events=[];const source={[Symbol.iterator](){events.push('iterator');return{get next(){events.push('next:get');return()=>{events.push('next:call');return{done:true};};},return(){events.push('return');return{};}};}};
- const []=source;globalThis.result=events;
+      const events = [];
+      const source = {
+        [Symbol.iterator]() {
+          events.push('iterator');
+          return {
+            get next() {
+              events.push('next:get');
+              return () => {
+                events.push('next:call');
+                return { done: true };
+              };
+            },
+            return() {
+              events.push('return');
+              return {};
+            },
+          };
+        },
+      };
+      const [] = source;
+      globalThis.result = events;
     `,
     plan: { transforms: { destructuring: true } },
     expected: ['iterator', 'next:get', 'return'],
@@ -1376,8 +1252,18 @@ const additionalComplianceCases: {
   {
     name: 'object assignment target precedes default initializer',
     source: `
- const events=[];const output={};function target(){events.push('target');return output;}function fallback(){events.push('default');return 3;}
- ({value:target().value=fallback()}={});globalThis.result=[output.value,events];
+      const events = [];
+      const output = {};
+      function target() {
+        events.push('target');
+        return output;
+      }
+      function fallback() {
+        events.push('default');
+        return 3;
+      }
+      ({ value: target().value = fallback() } = {});
+      globalThis.result = [output.value, events];
     `,
     plan: { transforms: { destructuring: true } },
     expected: [3, ['target', 'default']],
@@ -1386,39 +1272,52 @@ const additionalComplianceCases: {
   {
     name: 'object assignment target exception prevents default initializer',
     source: `
- const events=[];function target(){events.push('target');throw new Error('target');}function fallback(){events.push('default');return 3;}
- try{({value:target().value=fallback()}={});}catch(error){events.push(error.message);}globalThis.result=events;
+      const events = [];
+      function target() {
+        events.push('target');
+        throw new Error('target');
+      }
+      function fallback() {
+        events.push('default');
+        return 3;
+      }
+      try {
+        ({ value: target().value = fallback() } = {});
+      } catch (error) {
+        events.push(error.message);
+      }
+      globalThis.result = events;
     `,
     plan: { transforms: { destructuring: true } },
     expected: ['target', 'target'],
     knownFailure: false,
   },
-  {
-    name: 'array binding defaults interleave iterator steps',
-    source: `
- const events=[];const source={[Symbol.iterator](){return{next(){events.push('next');return{value:undefined,done:false};},return(){events.push('return');return{};}};}};
- const [a=(events.push('a'),1),b=(events.push('b'),2)]=source;globalThis.result=events;
-    `,
-    plan: { transforms: { destructuring: true } },
-    expected: ['next', 'a', 'next', 'b', 'return'],
-    knownFailure: true,
-  },
-  {
-    name: 'object assignment with default evaluates target before source getter',
-    source: `
- const events=[];const output={};function target(){events.push('target');return output;}
- const source={get value(){events.push('get');return 3;}};
- ({value:target().value=1}=source);globalThis.result=[output.value,events];
-    `,
-    plan: { transforms: { destructuring: true } },
-    expected: [3, ['target', 'get']],
-    knownFailure: true,
-  },
+
   {
     name: 'array destructuring stops before next step on nested pattern failure',
     source: `
- const events=[];let i=0;const source={[Symbol.iterator](){return{next(){events.push('next');return{value:i++===0?null:2,done:false};},return(){events.push('return');return{};}};}};
- try{const [{value},second]=source;}catch(error){events.push(error.name);}globalThis.result=events;
+      const events = [];
+      let i = 0;
+      const source = {
+        [Symbol.iterator]() {
+          return {
+            next() {
+              events.push('next');
+              return { value: i++ === 0 ? null : 2, done: false };
+            },
+            return() {
+              events.push('return');
+              return {};
+            },
+          };
+        },
+      };
+      try {
+        const [{ value }, second] = source;
+      } catch (error) {
+        events.push(error.name);
+      }
+      globalThis.result = events;
     `,
     plan: { transforms: { destructuring: true } },
     expected: ['next', 'return', 'TypeError'],
@@ -1444,47 +1343,7 @@ const additionalComplianceCases: {
     expected: true,
     knownFailure: false,
   },
-  {
-    name: 'parameter arrows preserve lexical this in direct eval',
-    source: `
- function make(){return (value=1)=>eval('this.value');}
- const read=make.call({value:3});globalThis.result=read.call({value:9});
-    `,
-    plan: { transforms: { parameters: true } },
-    expected: 3,
-    knownFailure: true,
-  },
-  {
-    name: 'parameter arrows preserve lexical arguments in direct eval',
-    source: `
- function make(value){return (unused=1)=>eval('arguments[0]');}
- globalThis.result=make(3)(9);
-    `,
-    plan: { transforms: { parameters: true } },
-    expected: 3,
-    knownFailure: true,
-  },
-  {
-    name: 'catch destructuring defaults cannot see body lexical bindings',
-    source: `
- const value='outer';let result;
- try{throw {};}catch({item=value}){let value='body';result=item;}
- globalThis.result=result;
-    `,
-    plan: { transforms: { destructuring: true } },
-    expected: 'outer',
-    knownFailure: true,
-  },
-  {
-    name: 'catch destructuring default closures keep outer lexical bindings',
-    source: `
- const value='outer';let result;try{throw {};}catch({read=()=>value}){let value='body';result=read();}
- globalThis.result=result;
-    `,
-    plan: { transforms: { destructuring: true } },
-    expected: 'outer',
-    knownFailure: true,
-  },
+
   {
     name: 'for-of destructuring defaults cannot see body lexical bindings',
     source: `
@@ -1499,48 +1358,62 @@ const additionalComplianceCases: {
   {
     name: 'for-of destructuring closes iterator if nested pattern fails',
     source: `
- const events=[];const source={[Symbol.iterator](){return{next(){events.push('next');return{value:null,done:false};},return(){events.push('return');return{};}};}};
- try{for(const {value} of source){}}catch(error){events.push(error.name);}globalThis.result=events;
+      const events = [];
+      const source = {
+        [Symbol.iterator]() {
+          return {
+            next() {
+              events.push('next');
+              return { value: null, done: false };
+            },
+            return() {
+              events.push('return');
+              return {};
+            },
+          };
+        },
+      };
+      try {
+        for (const { value } of source) {
+        }
+      } catch (error) {
+        events.push(error.name);
+      }
+      globalThis.result = events;
     `,
     plan: { transforms: { destructuring: true } },
     expected: ['next', 'return', 'TypeError'],
     knownFailure: false,
   },
-  {
-    name: 'array destructuring does not close after iterator value getter throws',
-    source: `
- const events=[];const iterable={[Symbol.iterator](){return {next(){return {done:false,get value(){events.push('value');throw new Error('value');}};},return(){events.push('return');return {};}};}};
- try{const [value]=iterable;}catch(error){events.push(error.message);}globalThis.result=events;
-    `,
-    plan: { transforms: { destructuring: true } },
-    expected: ['value', 'value'],
-    knownFailure: true,
-  },
-  {
-    name: 'array destructuring rejects primitive iterator result objects',
-    source: `
- const events=[];const iterable={[Symbol.iterator](){return {next(){events.push('next');return 1;},return(){events.push('return');return {};}};}};
- try{const [value]=iterable;events.push(value===undefined?'accepted':'value');}catch(error){events.push(error.name);}globalThis.result=events;
-    `,
-    plan: { transforms: { destructuring: true } },
-    expected: ['next', 'TypeError'],
-    knownFailure: true,
-  },
-  {
-    name: 'array destructuring retrieves iterator return once',
-    source: `
- const events=[];const iterable={[Symbol.iterator](){return {next(){return {done:false,value:1};},get return(){events.push('get:return');return function(){events.push('return');return {};};}};}};
- const [value]=iterable;globalThis.result=[value,events];
-    `,
-    plan: { transforms: { destructuring: true } },
-    expected: [1, ['get:return', 'return']],
-    knownFailure: true,
-  },
+
   {
     name: 'array destructuring does not close after iterator done getter throws',
     source: `
- const events=[];const iterable={[Symbol.iterator](){return {next(){return {get done(){events.push('done');throw new Error('done');}};},return(){events.push('return');return {};}};}};
- try{const [value]=iterable;}catch(error){events.push(error.message);}globalThis.result=events;
+      const events = [];
+      const iterable = {
+        [Symbol.iterator]() {
+          return {
+            next() {
+              return {
+                get done() {
+                  events.push('done');
+                  throw new Error('done');
+                },
+              };
+            },
+            return() {
+              events.push('return');
+              return {};
+            },
+          };
+        },
+      };
+      try {
+        const [value] = iterable;
+      } catch (error) {
+        events.push(error.message);
+      }
+      globalThis.result = events;
     `,
     plan: { transforms: { destructuring: true } },
     expected: ['done', 'done'],
@@ -1549,9 +1422,30 @@ const additionalComplianceCases: {
   {
     name: 'array binding initializer errors take precedence over iterator close errors',
     source: `
- const events=[];const iterable={[Symbol.iterator](){return {next(){return {done:false,value:undefined};},return(){events.push('return');throw new Error('close');}};}};
- function initialize(){events.push('init');throw new Error('init');}
- try{const [value=initialize()]=iterable;}catch(error){events.push(error.message);}globalThis.result=events;
+      const events = [];
+      const iterable = {
+        [Symbol.iterator]() {
+          return {
+            next() {
+              return { done: false, value: undefined };
+            },
+            return() {
+              events.push('return');
+              throw new Error('close');
+            },
+          };
+        },
+      };
+      function initialize() {
+        events.push('init');
+        throw new Error('init');
+      }
+      try {
+        const [value = initialize()] = iterable;
+      } catch (error) {
+        events.push(error.message);
+      }
+      globalThis.result = events;
     `,
     plan: { transforms: { destructuring: true } },
     expected: ['init', 'return', 'init'],
@@ -1621,28 +1515,7 @@ const additionalComplianceCases: {
     expected: ['one', { other: 'other' }],
     knownFailure: false,
   },
-  {
-    name: 'destructuring assignments in parameter defaults isolate reentrant temporaries',
-    source: `
- let a,b;function read(source,result=({a,b}=source)){return [result===source,b];}
- const inner={a:10,b:20};const outer={get a(){read(inner);return 1;},b:2};
- globalThis.result=read(outer);
-    `,
-    plan: { transforms: { destructuring: true } },
-    expected: [true, 2],
-    knownFailure: true,
-  },
-  {
-    name: 'destructuring assignments in field initializers isolate reentrant temporaries',
-    source: `
- let a,b;let source;class Value{result=({a,b}=source);}
- const inner={a:10,b:20};const outer={get a(){source=inner;new Value();return 1;},b:2};source=outer;
- const value=new Value();globalThis.result=[value.result===outer,b];
-    `,
-    plan: { transforms: { destructuring: true } },
-    expected: [true, 2],
-    knownFailure: true,
-  },
+
   {
     name: 'destructuring assignments in function bodies isolate reentrant temporaries',
     source: `
@@ -1657,7 +1530,11 @@ const additionalComplianceCases: {
   {
     name: 'nested default assignments preserve both assignment results',
     source: `
- let a,b,c;const inner={c:3};const outer={b:2};const result=({a=({c}=inner),b}=outer);globalThis.result=[result===outer,a===inner,b,c];
+      let a, b, c;
+      const inner = { c: 3 };
+      const outer = { b: 2 };
+      const result = ({ a = ({ c } = inner), b } = outer);
+      globalThis.result = [result === outer, a === inner, b, c];
     `,
     plan: { transforms: { destructuring: true } },
     expected: [true, true, 2, 3],
@@ -1666,7 +1543,11 @@ const additionalComplianceCases: {
   {
     name: 'nested default assignments preserve later outer array elements',
     source: `
- let a,b,c;const inner=[3];const outer=[undefined,2];const result=([a=([c]=inner),b]=outer);globalThis.result=[result===outer,a===inner,b,c];
+      let a, b, c;
+      const inner = [3];
+      const outer = [undefined, 2];
+      const result = ([a = ([c] = inner), b] = outer);
+      globalThis.result = [result === outer, a === inner, b, c];
     `,
     plan: { transforms: { destructuring: true } },
     expected: [true, true, 2, 3],
@@ -1675,7 +1556,20 @@ const additionalComplianceCases: {
   {
     name: 'destructuring assignment rest target runs before source copying',
     source: `
- const events=[];const source={get a(){events.push('get');return 1;}};const target={};function receiver(){events.push('target');return target;}({...receiver().rest}=source);globalThis.result=[events,target.rest];
+      const events = [];
+      const source = {
+        get a() {
+          events.push('get');
+          return 1;
+        },
+      };
+      const target = {};
+      function receiver() {
+        events.push('target');
+        return target;
+      }
+      ({ ...receiver().rest } = source);
+      globalThis.result = [events, target.rest];
     `,
     plan: { transforms: { destructuring: true } },
     expected: [['target', 'get'], { a: 1 }],
@@ -1684,8 +1578,18 @@ const additionalComplianceCases: {
   {
     name: 'array patterns in rest parameters use the rest array iterator',
     source: `
- const original=Array.prototype[Symbol.iterator];
- try{Array.prototype[Symbol.iterator]=function*(){yield 77;};function read(...[value]){return value;}globalThis.result=read(1,2);}finally{Array.prototype[Symbol.iterator]=original;}
+      const original = Array.prototype[Symbol.iterator];
+      try {
+        Array.prototype[Symbol.iterator] = function* () {
+          yield 77;
+        };
+        function read(...[value]) {
+          return value;
+        }
+        globalThis.result = read(1, 2);
+      } finally {
+        Array.prototype[Symbol.iterator] = original;
+      }
     `,
     plan: { transforms: { parameters: true } },
     expected: 77,
@@ -1694,8 +1598,30 @@ const additionalComplianceCases: {
   {
     name: 'empty array rest parameter patterns acquire and close iterators',
     source: `
- const events=[];const original=Array.prototype[Symbol.iterator];
- try{Array.prototype[Symbol.iterator]=function(){events.push('iterator');return {next(){events.push('next');return {done:true};},return(){events.push('return');return {};}};};function read(...[]){return 1;}read(1);globalThis.result=events;}finally{Array.prototype[Symbol.iterator]=original;}
+      const events = [];
+      const original = Array.prototype[Symbol.iterator];
+      try {
+        Array.prototype[Symbol.iterator] = function () {
+          events.push('iterator');
+          return {
+            next() {
+              events.push('next');
+              return { done: true };
+            },
+            return() {
+              events.push('return');
+              return {};
+            },
+          };
+        };
+        function read(...[]) {
+          return 1;
+        }
+        read(1);
+        globalThis.result = events;
+      } finally {
+        Array.prototype[Symbol.iterator] = original;
+      }
     `,
     plan: { transforms: { parameters: true } },
     expected: ['iterator', 'return'],
@@ -1704,8 +1630,20 @@ const additionalComplianceCases: {
   {
     name: 'rest identifier parameters do not acquire array iterators',
     source: `
- const events=[];const original=Array.prototype[Symbol.iterator];
- try{Array.prototype[Symbol.iterator]=function(){events.push('iterator');throw new Error('unexpected');};function read(...values){return values[0];}globalThis.result=[read(1,2),events];}finally{Array.prototype[Symbol.iterator]=original;}
+      const events = [];
+      const original = Array.prototype[Symbol.iterator];
+      try {
+        Array.prototype[Symbol.iterator] = function () {
+          events.push('iterator');
+          throw new Error('unexpected');
+        };
+        function read(...values) {
+          return values[0];
+        }
+        globalThis.result = [read(1, 2), events];
+      } finally {
+        Array.prototype[Symbol.iterator] = original;
+      }
     `,
     plan: { transforms: { parameters: true } },
     expected: [1, []],
@@ -1732,31 +1670,24 @@ const additionalComplianceCases: {
   {
     name: 'array rest parameter iterator observes the populated rest array',
     source: `
- const original=Array.prototype[Symbol.iterator];
- try{Array.prototype[Symbol.iterator]=function*(){yield this.length;};function read(...[value]){return value;}globalThis.result=read(1,2);}finally{Array.prototype[Symbol.iterator]=original;}
+      const original = Array.prototype[Symbol.iterator];
+      try {
+        Array.prototype[Symbol.iterator] = function* () {
+          yield this.length;
+        };
+        function read(...[value]) {
+          return value;
+        }
+        globalThis.result = read(1, 2);
+      } finally {
+        Array.prototype[Symbol.iterator] = original;
+      }
     `,
     plan: { transforms: { parameters: true } },
     expected: 2,
     knownFailure: false,
   },
-  {
-    name: 'later parameters read original arguments after earlier defaults mutate arguments',
-    source: `
- function read(first=(arguments[1]=99),second){return [first,second,arguments[1]];}globalThis.result=read(undefined,2);
-    `,
-    plan: { transforms: { parameters: true } },
-    expected: [99, 2, 99],
-    knownFailure: true,
-  },
-  {
-    name: 'rest parameters read original arguments after defaults mutate arguments',
-    source: `
- function read(first=(arguments[1]=99),...rest){return [rest,arguments[1]];}globalThis.result=read(undefined,2,3);
-    `,
-    plan: { transforms: { parameters: true } },
-    expected: [[2, 3], 99],
-    knownFailure: true,
-  },
+
   {
     name: 'rest parameter length ignores arguments length mutations in defaults',
     source: `
@@ -1784,15 +1715,7 @@ const additionalComplianceCases: {
     expected: [1, 2],
     knownFailure: false,
   },
-  {
-    name: 'leading parameters remain unmapped when a later parameter has a default',
-    source: `
- function read(first,second=2){first=9;return arguments[0];}globalThis.result=read(1);
-    `,
-    plan: { transforms: { parameters: true } },
-    expected: 1,
-    knownFailure: false,
-  },
+
   {
     name: 'leading parameters remain unmapped when followed by rest',
     source: `
@@ -1805,7 +1728,15 @@ const additionalComplianceCases: {
   {
     name: 'earlier parameter defaults reject reads of uninitialized rest bindings',
     source: `
- function read(first=rest,...rest){return first;}try{read();globalThis.result='accepted';}catch(error){globalThis.result=error.name;}
+      function read(first = rest, ...rest) {
+        return first;
+      }
+      try {
+        read();
+        globalThis.result = 'accepted';
+      } catch (error) {
+        globalThis.result = error.name;
+      }
     `,
     plan: { transforms: { parameters: true } },
     expected: 'ReferenceError',
@@ -1814,7 +1745,14 @@ const additionalComplianceCases: {
   {
     name: 'typeof uninitialized rest bindings throws during defaults',
     source: `
- function read(first=typeof rest,...rest){return first;}try{globalThis.result=read();}catch(error){globalThis.result=error.name;}
+      function read(first = typeof rest, ...rest) {
+        return first;
+      }
+      try {
+        globalThis.result = read();
+      } catch (error) {
+        globalThis.result = error.name;
+      }
     `,
     plan: { transforms: { parameters: true } },
     expected: 'ReferenceError',
@@ -1823,7 +1761,14 @@ const additionalComplianceCases: {
   {
     name: 'earlier defaults cannot assign to uninitialized rest bindings',
     source: `
- function read(first=(rest=2),...rest){return first;}try{globalThis.result=read();}catch(error){globalThis.result=error.name;}
+      function read(first = (rest = 2), ...rest) {
+        return first;
+      }
+      try {
+        globalThis.result = read();
+      } catch (error) {
+        globalThis.result = error.name;
+      }
     `,
     plan: { transforms: { parameters: true } },
     expected: 'ReferenceError',
@@ -1832,7 +1777,15 @@ const additionalComplianceCases: {
   {
     name: 'earlier defaults reject uninitialized array rest pattern bindings',
     source: `
- function read(first=second,...[second]){return first;}try{read();globalThis.result='accepted';}catch(error){globalThis.result=error.name;}
+      function read(first = second, ...[second]) {
+        return first;
+      }
+      try {
+        read();
+        globalThis.result = 'accepted';
+      } catch (error) {
+        globalThis.result = error.name;
+      }
     `,
     plan: { transforms: { parameters: true } },
     expected: 'ReferenceError',
@@ -1850,7 +1803,15 @@ const additionalComplianceCases: {
   {
     name: 'earlier defaults reject uninitialized object rest pattern bindings',
     source: `
- function read(first=length,...{length}){return first;}try{read();globalThis.result='accepted';}catch(error){globalThis.result=error.name;}
+      function read(first = length, ...{ length }) {
+        return first;
+      }
+      try {
+        read();
+        globalThis.result = 'accepted';
+      } catch (error) {
+        globalThis.result = error.name;
+      }
     `,
     plan: { transforms: { parameters: true } },
     expected: 'ReferenceError',
@@ -1901,30 +1862,33 @@ const additionalComplianceCases: {
     expected: [1, 9],
     knownFailure: false,
   },
-  {
-    name: 'rest array creation bypasses inherited numeric setters',
-    source: `
- const original=Object.getOwnPropertyDescriptor(Array.prototype,'0');let calls=0;
- try{Object.defineProperty(Array.prototype,'0',{configurable:true,set(value){calls++;}});function read(...rest){return [Object.hasOwn(rest,'0'),rest[0]];}const value=read(1);globalThis.result=[value,calls];}finally{if(original)Object.defineProperty(Array.prototype,'0',original);else delete Array.prototype[0];}
-    `,
-    plan: { transforms: { parameters: true } },
-    expected: [[true, 1], 0],
-    knownFailure: true,
-  },
-  {
-    name: 'rest array creation bypasses inherited nonwritable numeric properties',
-    source: `
- const original=Object.getOwnPropertyDescriptor(Array.prototype,'0');
- try{Object.defineProperty(Array.prototype,'0',{configurable:true,value:99,writable:false});function read(...rest){return [Object.hasOwn(rest,'0'),rest[0]];}try{globalThis.result=read(1);}catch(error){globalThis.result=error.name;}}finally{if(original)Object.defineProperty(Array.prototype,'0',original);else delete Array.prototype[0];}
-    `,
-    plan: { transforms: { parameters: true } },
-    expected: [true, 1],
-    knownFailure: true,
-  },
+
   {
     name: 'for-of closing ignores own call properties on return methods',
     source: `
- const events=[];function close(){events.push('close');return {};}close.call=()=>{events.push('override');return {};};const source={[Symbol.iterator](){return {next(){return {done:false,value:1};},return:close};}};for(const value of source){break;}globalThis.result=events;
+      const events = [];
+      function close() {
+        events.push('close');
+        return {};
+      }
+      close.call = () => {
+        events.push('override');
+        return {};
+      };
+      const source = {
+        [Symbol.iterator]() {
+          return {
+            next() {
+              return { done: false, value: 1 };
+            },
+            return: close,
+          };
+        },
+      };
+      for (const value of source) {
+        break;
+      }
+      globalThis.result = events;
     `,
     plan: { transforms: { forOf: true } },
     expected: ['close'],
@@ -1933,25 +1897,50 @@ const additionalComplianceCases: {
   {
     name: 'for-of closing rejects noncallable return objects with call properties',
     source: `
- const events=[];const source={[Symbol.iterator](){return {next(){return {done:false,value:1};},return:{call(){events.push('override');return {};}}};}};try{for(const value of source){break;}}catch(error){events.push(error.name);}globalThis.result=events;
+      const events = [];
+      const source = {
+        [Symbol.iterator]() {
+          return {
+            next() {
+              return { done: false, value: 1 };
+            },
+            return: {
+              call() {
+                events.push('override');
+                return {};
+              },
+            },
+          };
+        },
+      };
+      try {
+        for (const value of source) {
+          break;
+        }
+      } catch (error) {
+        events.push(error.name);
+      }
+      globalThis.result = events;
     `,
     plan: { transforms: { forOf: true } },
     expected: ['TypeError'],
     knownFailure: false,
   },
-  {
-    name: 'object rest rejects callable results from Symbol.toPrimitive',
-    source: `
- const key={[Symbol.toPrimitive](){return function invalid(){};}};try{const {[key]:value,...rest}={};globalThis.result='accepted';}catch(error){globalThis.result=error.name;}
-    `,
-    plan: { transforms: { destructuring: true } },
-    expected: 'TypeError',
-    knownFailure: true,
-  },
+
   {
     name: 'object rest accepts null results from Symbol.toPrimitive',
     source: `
- const key={[Symbol.toPrimitive](){return null;}};try{const {[key]:value,...rest}={null:1,other:2};globalThis.result=[value,rest];}catch(error){globalThis.result=error.name;}
+      const key = {
+        [Symbol.toPrimitive]() {
+          return null;
+        },
+      };
+      try {
+        const { [key]: value, ...rest } = { null: 1, other: 2 };
+        globalThis.result = [value, rest];
+      } catch (error) {
+        globalThis.result = error.name;
+      }
     `,
     plan: { transforms: { destructuring: true } },
     expected: [1, { other: 2 }],
@@ -1960,7 +1949,18 @@ const additionalComplianceCases: {
   {
     name: 'object rest treats null Symbol.toPrimitive methods as absent',
     source: `
- const key={[Symbol.toPrimitive]:null,toString(){return 'value';}};try{const {[key]:value,...rest}={value:1,other:2};globalThis.result=[value,rest];}catch(error){globalThis.result=error.name;}
+      const key = {
+        [Symbol.toPrimitive]: null,
+        toString() {
+          return 'value';
+        },
+      };
+      try {
+        const { [key]: value, ...rest } = { value: 1, other: 2 };
+        globalThis.result = [value, rest];
+      } catch (error) {
+        globalThis.result = error.name;
+      }
     `,
     plan: { transforms: { destructuring: true } },
     expected: [1, { other: 2 }],
@@ -1969,7 +1969,14 @@ const additionalComplianceCases: {
   {
     name: 'object rest coerces callable keys with the string hint',
     source: `
- const hints=[];function key(){}key[Symbol.toPrimitive]=hint=>{hints.push(hint);return hint;};const {[key]:value,...rest}={string:1,default:2};globalThis.result=[value,rest,hints];
+      const hints = [];
+      function key() {}
+      key[Symbol.toPrimitive] = hint => {
+        hints.push(hint);
+        return hint;
+      };
+      const { [key]: value, ...rest } = { string: 1, default: 2 };
+      globalThis.result = [value, rest, hints];
     `,
     plan: { transforms: { destructuring: true } },
     expected: [1, { default: 2 }, ['string']],
@@ -1978,7 +1985,17 @@ const additionalComplianceCases: {
   {
     name: 'object rest rejects ordinary object primitive conversion results',
     source: `
- const key={[Symbol.toPrimitive](){return {};}};try{const {[key]:value,...rest}={};globalThis.result='accepted';}catch(error){globalThis.result=error.name;}
+      const key = {
+        [Symbol.toPrimitive]() {
+          return {};
+        },
+      };
+      try {
+        const { [key]: value, ...rest } = {};
+        globalThis.result = 'accepted';
+      } catch (error) {
+        globalThis.result = error.name;
+      }
     `,
     plan: { transforms: { destructuring: true } },
     expected: 'TypeError',
@@ -1987,7 +2004,18 @@ const additionalComplianceCases: {
   {
     name: 'object rest preserves symbols returned by ordinary key conversion',
     source: `
- const symbol=Symbol();const key={toString(){return symbol;}};try{const {[key]:value,...rest}={[symbol]:1,other:2};globalThis.result=[value,rest];}catch(error){globalThis.result=error.name;}
+      const symbol = Symbol();
+      const key = {
+        toString() {
+          return symbol;
+        },
+      };
+      try {
+        const { [key]: value, ...rest } = { [symbol]: 1, other: 2 };
+        globalThis.result = [value, rest];
+      } catch (error) {
+        globalThis.result = error.name;
+      }
     `,
     plan: { transforms: { destructuring: true } },
     expected: [1, { other: 2 }],
@@ -1996,7 +2024,19 @@ const additionalComplianceCases: {
   {
     name: 'object rest reads absent Symbol.toPrimitive hooks once',
     source: `
- const events=[];const key={get [Symbol.toPrimitive](){events.push('hook');return undefined;},toString(){events.push('string');return 'value';}};const {[key]:value,...rest}={value:1,other:2};globalThis.result=[value,rest,events];
+      const events = [];
+      const key = {
+        get [Symbol.toPrimitive]() {
+          events.push('hook');
+          return undefined;
+        },
+        toString() {
+          events.push('string');
+          return 'value';
+        },
+      };
+      const { [key]: value, ...rest } = { value: 1, other: 2 };
+      globalThis.result = [value, rest, events];
     `,
     plan: { transforms: { destructuring: true } },
     expected: [1, { other: 2 }, ['hook', 'string']],
@@ -2005,7 +2045,19 @@ const additionalComplianceCases: {
   {
     name: 'object rest falls back from object toString results to valueOf',
     source: `
- const events=[];const key={toString(){events.push('string');return {};},valueOf(){events.push('value');return 'key';}};const {[key]:value,...rest}={key:1,other:2};globalThis.result=[value,rest,events];
+      const events = [];
+      const key = {
+        toString() {
+          events.push('string');
+          return {};
+        },
+        valueOf() {
+          events.push('value');
+          return 'key';
+        },
+      };
+      const { [key]: value, ...rest } = { key: 1, other: 2 };
+      globalThis.result = [value, rest, events];
     `,
     plan: { transforms: { destructuring: true } },
     expected: [1, { other: 2 }, ['string', 'value']],
@@ -2014,7 +2066,14 @@ const additionalComplianceCases: {
   {
     name: 'array destructuring rejects typed arrays with disabled iterators',
     source: `
- const source=new Uint8Array([1,2]);source[Symbol.iterator]=null;try{const [value]=source;globalThis.result=value;}catch(error){globalThis.result=error.name;}
+      const source = new Uint8Array([1, 2]);
+      source[Symbol.iterator] = null;
+      try {
+        const [value] = source;
+        globalThis.result = value;
+      } catch (error) {
+        globalThis.result = error.name;
+      }
     `,
     plan: { transforms: { destructuring: true } },
     expected: 'TypeError',
@@ -2023,7 +2082,13 @@ const additionalComplianceCases: {
   {
     name: 'array destructuring rejects spoofed typed array tags',
     source: `
- const source={0:1,length:1,[Symbol.toStringTag]:'Uint8Array'};try{const [value]=source;globalThis.result=value;}catch(error){globalThis.result=error.name;}
+      const source = { 0: 1, length: 1, [Symbol.toStringTag]: 'Uint8Array' };
+      try {
+        const [value] = source;
+        globalThis.result = value;
+      } catch (error) {
+        globalThis.result = error.name;
+      }
     `,
     plan: { transforms: { destructuring: true } },
     expected: 'TypeError',
@@ -2032,7 +2097,14 @@ const additionalComplianceCases: {
   {
     name: 'array destructuring rejects Maps with disabled iterators',
     source: `
- const source=new Map([['a',1]]);source[Symbol.iterator]=null;try{const [value]=source;globalThis.result=value;}catch(error){globalThis.result=error.name;}
+      const source = new Map([['a', 1]]);
+      source[Symbol.iterator] = null;
+      try {
+        const [value] = source;
+        globalThis.result = value;
+      } catch (error) {
+        globalThis.result = error.name;
+      }
     `,
     plan: { transforms: { destructuring: true } },
     expected: 'TypeError',
@@ -2041,7 +2113,12 @@ const additionalComplianceCases: {
   {
     name: 'array destructuring honors a valid custom typed array iterator',
     source: `
- const source=new Uint8Array([1,2]);source[Symbol.iterator]=function*(){yield 3;};const [value]=source;globalThis.result=value;
+      const source = new Uint8Array([1, 2]);
+      source[Symbol.iterator] = function* () {
+        yield 3;
+      };
+      const [value] = source;
+      globalThis.result = value;
     `,
     plan: { transforms: { destructuring: true } },
     expected: 3,
@@ -2066,9 +2143,6 @@ describe.each(additionalComplianceCases)(
       return context.result;
     };
 
-    test('native execution', () => {
-      expect(run(source)).toEqual(expected);
-    });
     const transformedTest = knownFailure ? test.fails : test;
     transformedTest('transformed execution', () => {
       expect(run(code)).toEqual(expected);

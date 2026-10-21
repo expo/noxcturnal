@@ -4,10 +4,10 @@ import { createEditor } from '../editor';
 import { NativeTransformSession } from '../session';
 
 const cases = [
-  { name: 'global regex', search: /a/g, all: false, fails: true },
-  { name: 'non-global regex', search: /a/, all: false, fails: false },
-  { name: 'global replaceAll', search: /a/g, all: true, fails: false },
-  { name: 'string replace', search: 'a', all: false, fails: false },
+  { name: 'global regex', search: /a/g, all: false },
+  { name: 'non-global regex', search: /a/, all: false },
+  { name: 'global replaceAll', search: /a/g, all: true },
+  { name: 'string replace', search: 'a', all: false },
 ];
 describe.each(cases)('$name', entry => {
   let actual: string;

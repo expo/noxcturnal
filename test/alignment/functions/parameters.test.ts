@@ -54,13 +54,17 @@ globalThis.__result = [Read(), new Read()];`,
 test('aligns non-simple setters with Babel', async () => {
   await expect(
     alignBabelBehavior({
-      source: `const value = { set field(next = 1) {} };`,
+      source: `const received = [];
+const value = { set field(next = 1) { received.push(next); } };
+value.field = undefined;
+value.field = 4;
+globalThis.__result = received;`,
       filename: 'input.js',
       plugins: [parameters],
       noxcturnal: { transforms: { parameters: true } },
       output: { mustNotMatch: [/next = 1/] },
     }),
-  ).resolves.toBeUndefined();
+  ).resolves.toEqual([1, 4]);
 });
 
 test('aligns rest parameters followed by captured lexical bindings with Babel', async () => {

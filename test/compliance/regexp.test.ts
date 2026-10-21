@@ -57,6 +57,11 @@ test('dot-all covers every line terminator without rewriting literal dots', () =
       ];
     `,
     { transforms: { regexpDotAll: true } },
+    {},
+    'input.js',
+    code => {
+      expect(code).not.toMatch(/\/s[;),\]]/);
+    },
   );
   expect(result.result).toEqual([[true, true, true, true], true, false, true]);
 });
@@ -113,6 +118,12 @@ test('Unicode astral character classes preserve ranges, negation, and quantifier
       ];
     `,
     { transforms: { regexpUnicode: true } },
+    {},
+    'input.js',
+    code => {
+      expect(code).not.toMatch(/\\u\{1F600\}/);
+      expect(code).not.toMatch(/\/u[;),\]]/);
+    },
   );
   expect(result.result).toEqual([true, false, true, false, true]);
 });
@@ -145,6 +156,11 @@ test('Unicode ignore-case lowering preserves Unicode-only BMP simple folds', () 
       ];
     `,
     { transforms: { regexpUnicode: true } },
+    {},
+    'input.js',
+    code => {
+      expect(code).not.toMatch(/\/[dgimsuvy]*u[dgimsuvy]*/);
+    },
   );
   expect(result.result).toEqual([
     true,
@@ -277,6 +293,11 @@ test('Unicode property classes support outer negation and ECMAScript set escapes
       ];
     `,
     { transforms: { regexpUnicodePropertyEscapes: true } },
+    {},
+    'input.js',
+    code => {
+      expect(code).not.toMatch(/\\[pP]\{/u);
+    },
   );
   expect(result.result).toEqual([
     true,
@@ -312,6 +333,12 @@ test('Unicode property complements remain code-point atomic after Unicode-flag r
       ];
     `,
     { transforms: { regexpUnicode: true, regexpUnicodePropertyEscapes: true } },
+    {},
+    'input.js',
+    code => {
+      expect(code).not.toMatch(/\\[pP]\{/u);
+      expect(code).not.toMatch(/\/[dgimsuvy]*u[dgimsuvy]*/);
+    },
   );
   expect(result.result).toEqual([false, false, true, true, true, true, false, true, false]);
 });
@@ -327,6 +354,12 @@ test('Unicode lowering automatically composes property-escape lowering', () => {
       ];
     `,
     { transforms: { regexpUnicode: true } },
+    {},
+    'input.js',
+    code => {
+      expect(code).not.toMatch(/\\[pP]\{/u);
+      expect(code).not.toMatch(/\/[dgimsuvy]*u[dgimsuvy]*/);
+    },
   );
   expect(result.result).toEqual([true, false, true, false]);
 });
@@ -407,6 +440,13 @@ test('Unicode-set algebra operates on strings and string properties', () => {
       ];
     `,
     { transforms: { regexpUnicodeSets: true } },
+    {},
+    'input.js',
+    code => {
+      expect(code).not.toMatch(/\/v\b/);
+      expect(code).not.toMatch(/&&/);
+      expect(code).not.toMatch(/--/);
+    },
   );
   expect(result.result).toEqual([true, false, true, false, true, false, false, true]);
 });
@@ -435,6 +475,12 @@ test('Unicode properties of strings match complete canonical emoji sequences', (
       ];
     `,
     { transforms: { regexpUnicodeSets: true } },
+    {},
+    'input.js',
+    code => {
+      expect(code).not.toMatch(/\\p\{/u);
+      expect(code).not.toMatch(/\/v/u);
+    },
   );
   expect(result.result).toEqual([
     true,
@@ -477,6 +523,12 @@ test('forward named backreferences resolve against later capture groups', () => 
       globalThis.result = [match[0], match.groups.word];
     `,
     { transforms: { regexpNamedCaptureGroups: true } },
+    {},
+    'input.js',
+    code => {
+      expect(code).not.toMatch(/\(\?<word>/);
+      expect(code).not.toMatch(/\\k<word>/);
+    },
   );
   expect(result.result).toEqual(['a', 'a']);
 });
@@ -490,6 +542,12 @@ test('duplicate named groups in disjoint alternatives expose the participating c
       globalThis.result = [first[0], first.groups.word, second[0], second.groups.word];
     `,
     { transforms: { regexpNamedCaptureGroups: true } },
+    {},
+    'input.js',
+    code => {
+      expect(code).not.toMatch(/\(\?<word>/);
+      expect(code).not.toMatch(/\\k<word>/);
+    },
   );
   expect(result.result).toEqual(['aa', 'a', 'bb', 'b']);
 });
@@ -543,6 +601,11 @@ test('escaped named-group lookalikes remain ordinary regexp text', () => {
       globalThis.result = [found, expression.source];
     `,
     { transforms: { regexpNamedCaptureGroups: true } },
+    {},
+    'input.js',
+    code => {
+      expect(code).not.toMatch(/_wrapRegExp/);
+    },
   );
   expect(result.result).toEqual([null, String.raw`no-groups-\(?<looks-like-a-group>looks\)`]);
 });
@@ -594,7 +657,6 @@ test('Unicode property escapes support negation and case-insensitive matching', 
 const additionalComplianceCases: {
   name: string;
   source: string;
-  nativeSource?: string;
   plan: import('../../js').PreflightPlan;
   expected: unknown;
   knownFailure: boolean;
@@ -612,56 +674,15 @@ const additionalComplianceCases: {
     expected: ['a', true],
     knownFailure: false,
   },
-  {
-    name: 'lowered Unicode regexps advance empty matchAll results by code point',
-    source: `
-      globalThis.result = Array.from('😀'.matchAll(/(?:)/gu), (match) => match.index);
-    `,
-    plan: { transforms: { regexpUnicode: true } },
-    expected: [0, 2],
-    knownFailure: true,
-  },
-  {
-    name: 'lowered Unicode regexps preserve exec starting inside a surrogate pair',
-    source: `
-      const regexp = /./gu;
-      regexp.lastIndex = 1;
-      const match = regexp.exec('😀');
-      globalThis.result = [match && match[0], match && match.index, regexp.lastIndex];
-    `,
-    plan: { transforms: { regexpUnicode: true } },
-    expected: ['😀', 0, 2],
-    knownFailure: true,
-  },
-  {
-    name: 'lowered Unicode ignore-case regexps preserve non-ASCII word boundaries',
-    source: String.raw`globalThis.result=[/\bſ\b/iu.test('ſ'),/\bK\b/iu.test('K')];`,
-    plan: { transforms: { regexpUnicode: true } },
-    expected: [true, true],
-    knownFailure: true,
-  },
-  {
-    name: 'sticky literal ignores shadowed RegExp',
-    source: `function read(RegExp){return /a/y.test('a');}globalThis.result=read(null);`,
-    plan: { transforms: { regexpSticky: true } },
-    expected: true,
-    knownFailure: true,
-  },
+
   {
     name: 'duplicate named quantified backreference',
     source: String.raw`globalThis.result=[/^(?:(?<x>a)|(?<x>b))\k<x>+$/.test('aaa'),/^(?:(?<x>a)|(?<x>b))\k<x>+$/.test('bbb')];`,
     plan: { transforms: { regexpNamedCaptureGroups: true } },
     expected: [true, true],
     knownFailure: false,
-    nativeSource: String.raw`globalThis.result=[/^(?:(a)|(b))(?:\1\2)+$/.test('aaa'),/^(?:(a)|(b))(?:\1\2)+$/.test('bbb')];`,
   },
-  {
-    name: 'named backreference before digit',
-    source: String.raw`globalThis.result=[/^(?<x>a)\k<x>2$/.test('aa2'),/^(?<x>a)\k<x>2$/.test('a\n')];`,
-    plan: { transforms: { regexpNamedCaptureGroups: true } },
-    expected: [true, false],
-    knownFailure: false,
-  },
+
   {
     name: 'named backreference before digit unicode',
     source: String.raw`globalThis.result=/^(?<x>a)\k<x>2$/u.test('aa2');`,
@@ -713,24 +734,7 @@ const additionalComplianceCases: {
     expected: ['z', 'a', 'm'],
     knownFailure: false,
   },
-  {
-    name: 'Unicode ignore-case backreferences fold Kelvin sign',
-    source: String.raw`
- globalThis.result=[/^(k)\1$/iu.test('kK'),/^(K)\1$/iu.test('Kk')];
-    `,
-    plan: { transforms: { regexpUnicode: true } },
-    expected: [true, true],
-    knownFailure: true,
-  },
-  {
-    name: 'Unicode ignore-case backreferences fold long s',
-    source: String.raw`
- globalThis.result=[/^(s)\1$/iu.test('sſ'),/^(ſ)\1$/iu.test('ſs')];
-    `,
-    plan: { transforms: { regexpUnicode: true } },
-    expected: [true, true],
-    knownFailure: true,
-  },
+
   {
     name: 'Unicode ignore-case literals fold Kelvin sign',
     source: String.raw`
@@ -749,33 +753,7 @@ const additionalComplianceCases: {
     expected: ['😀😀', '😀'],
     knownFailure: false,
   },
-  {
-    name: 'named replacement expansion preserves a following decimal digit',
-    source: `
- globalThis.result='abcdefghij'.replace(/(?<x>a)(b)(c)(d)(e)(f)(g)(h)(i)(j)/,'$<x>0');
-    `,
-    plan: { transforms: { regexpNamedCaptureGroups: true } },
-    expected: 'a0',
-    knownFailure: true,
-  },
-  {
-    name: 'named replacement expansion respects escaped dollar signs',
-    source: `
- globalThis.result='a'.replace(/(?<x>a)/,'$$<x>');
-    `,
-    plan: { transforms: { regexpNamedCaptureGroups: true } },
-    expected: '$<x>',
-    knownFailure: true,
-  },
-  {
-    name: 'named capture replacement calls ignore own apply properties',
-    source: `
- function replace(){return 'correct';}replace.apply=()=> 'wrong';globalThis.result='a'.replace(/(?<x>a)/,replace);
-    `,
-    plan: { transforms: { regexpNamedCaptureGroups: true } },
-    expected: 'correct',
-    knownFailure: true,
-  },
+
   {
     name: 'named replacement strings preserve unknown capture expansion',
     source: `
@@ -785,15 +763,7 @@ const additionalComplianceCases: {
     expected: ':a',
     knownFailure: false,
   },
-  {
-    name: 'named string replacement uses groups returned by custom exec',
-    source: `
- const pattern=/(?<x>a)/;pattern.exec=function(){const match=['a','positional'];match.index=0;match.input='a';match.groups={x:'custom'};return match;};globalThis.result='a'.replace(pattern,'$<x>');
-    `,
-    plan: { transforms: { regexpNamedCaptureGroups: true } },
-    expected: 'custom',
-    knownFailure: true,
-  },
+
   {
     name: 'named replacement callback uses groups returned by custom exec',
     source: `
@@ -803,42 +773,7 @@ const additionalComplianceCases: {
     expected: 'custom',
     knownFailure: false,
   },
-  {
-    name: 'regexp constructor cloning preserves named capture groups',
-    source: `
- const pattern=/(?<x>a)/;const clone=new RegExp(pattern);const match=clone.exec('a');globalThis.result=match.groups?.x;
-    `,
-    plan: { transforms: { regexpNamedCaptureGroups: true } },
-    expected: 'a',
-    knownFailure: true,
-  },
-  {
-    name: 'named string replacement respects absent groups from custom exec',
-    source: `
- const pattern=/(?<x>a)/;pattern.exec=function(){const match=['a','positional'];match.index=0;match.input='a';return match;};globalThis.result='a'.replace(pattern,'$<x>');
-    `,
-    plan: { transforms: { regexpNamedCaptureGroups: true } },
-    expected: '$<x>',
-    knownFailure: true,
-  },
-  {
-    name: 'RegExp function preserves named regexp identity without flags',
-    source: `
- const pattern=/(?<x>a)/;pattern.lastIndex=2;globalThis.result=[RegExp(pattern)===pattern,RegExp(pattern).lastIndex];
-    `,
-    plan: { transforms: { regexpNamedCaptureGroups: true } },
-    expected: [true, 2],
-    knownFailure: true,
-  },
-  {
-    name: 'named replacement callbacks omit groups when custom exec omits them',
-    source: `
- const pattern=/(?<x>a)/;pattern.exec=function(){const match=['a','positional'];match.index=0;match.input='a';return match;};globalThis.result='a'.replace(pattern,(...args)=>args.length+':'+typeof args.at(-1));
-    `,
-    plan: { transforms: { regexpNamedCaptureGroups: true } },
-    expected: '4:string',
-    knownFailure: true,
-  },
+
   {
     name: 'named capture global exec resets lastIndex after failure',
     source: `
@@ -859,26 +794,20 @@ const additionalComplianceCases: {
   },
 ];
 
-describe.each(additionalComplianceCases)(
-  '$name',
-  ({ source, nativeSource, plan, expected, knownFailure }) => {
-    let code: string;
-    beforeAll(() => {
-      code = compile(source, plan);
-    });
+describe.each(additionalComplianceCases)('$name', ({ source, plan, expected, knownFailure }) => {
+  let code: string;
+  beforeAll(() => {
+    code = compile(source, plan);
+  });
 
-    const run = (input: string) => {
-      const context: Record<string, unknown> = {};
-      new Function('globalThis', input)(context);
-      return context.result;
-    };
+  const run = (input: string) => {
+    const context: Record<string, unknown> = {};
+    new Function('globalThis', input)(context);
+    return context.result;
+  };
 
-    test('native execution', () => {
-      expect(run(nativeSource ?? source)).toEqual(expected);
-    });
-    const transformedTest = knownFailure ? test.fails : test;
-    transformedTest('transformed execution', () => {
-      expect(run(code)).toEqual(expected);
-    });
-  },
-);
+  const transformedTest = knownFailure ? test.fails : test;
+  transformedTest('transformed execution', () => {
+    expect(run(code)).toEqual(expected);
+  });
+});

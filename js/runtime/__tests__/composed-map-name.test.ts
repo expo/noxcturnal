@@ -1,15 +1,6 @@
-import { createRequire } from 'node:module';
 import { originalPositionFor, TraceMap } from '@jridgewell/trace-mapping';
 import { beforeAll, describe, expect, test } from 'vitest';
 import { defineNativePipeline, registerParserAdapter, transform } from '../../index';
-
-// Resolve the exact composition dependency used by the installed Babel core.
-const require = createRequire(import.meta.url);
-const babelRequire = createRequire(require.resolve('@babel/core'));
-const remapping = babelRequire('@jridgewell/remapping') as (
-  maps: object[],
-  loader: () => null,
-) => ConstructorParameters<typeof TraceMap>[0];
 
 for (const outerNamed of [false, true])
   describe.each([false, true])(`outer named=${outerNamed}, inner named=%s`, innerNamed => {
@@ -34,10 +25,6 @@ for (const outerNamed of [false, true])
         names: innerNamed ? ['originalName'] : [],
         mappings: innerNamed ? ';GAKQA' : ';GAKQ',
       };
-      const reference = remapping([outer, inner], () => null);
-      expect(originalPositionFor(new TraceMap(reference), { line: 1, column: 0 })).toEqual(
-        expected,
-      );
       const unregister = registerParserAdapter({
         name: 'composed-map-names-audit',
         version: '1',

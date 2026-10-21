@@ -6,19 +6,16 @@ const cases = [
     name: 'statement and callee share start',
     source: 'call(argument); trailing;',
     parent: 'ExpressionStatement' as const,
-    fails: true,
   },
   {
     name: 'call and callee share start',
     source: 'call(argument); trailing;',
     parent: 'CallExpression' as const,
-    fails: true,
   },
   {
     name: 'function descendants start later',
     source: 'function call(argument){} trailing;',
     parent: 'Function' as const,
-    fails: false,
   },
 ];
 describe.each([false, true])('nested traversal: %s', nested => {

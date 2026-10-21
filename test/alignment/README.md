@@ -17,6 +17,22 @@ that exposes semantics over a large snapshot. The Hermes parser-update matrix is
 the exception: those rows live in `test/fixtures/flow-parser-update/` and are
 shared with the public Flow tests.
 
+Related regressions share a feature suite, with named `describe` sections for
+their original scenarios. Keep the suite focused on one feature or composition
+boundary; a separate file for every regression adds module loading and worker
+isolation costs without adding coverage. Each section retains its own fixture
+data and execution helpers so unrelated setup cannot affect its assertions.
+
+Keep alignment where the canonical comparison is still the useful contract.
+Established behavior can move to a direct compliance regression with explicit
+expected results. Preserve unique native observations and output assertions;
+the historical Babel/source controls need not remain after that replacement.
+The class and private helper fallback matrices now live in
+`test/compliance/class-helper-fallback.test.ts` and
+`test/compliance/private-helper-fallback.test.ts`. They retain every declared
+helper version, both module formats, and helper import/fallback assertions
+without executing the old reference controls.
+
 ## Comparison modes
 
 - `alignBabelTransform` canonicalizes both outputs through the same Babel parser
@@ -29,6 +45,12 @@ shared with the public Flow tests.
   `message`. Every behavioral fixture must also declare syntax that must be
   absent from (or present in) Noxcturnal's output, so a no-op transform cannot
   pass merely because Node supports the input.
+  At least one syntax assertion must reject the original source: forbidden
+  syntax must occur in the input, or required output syntax must be absent from
+  it. This prevents an identity transform from satisfying the fixture. Regex
+  checks preserve the caller's `lastIndex`. The helper also rejects successful
+  executions that never assign `globalThis.__result`; explicitly assigning
+  `undefined` is valid.
 - `alignHermesFlowTransform` uses the transforms exported by the pinned
   `hermes-parser`, strips the remaining Flow annotations, and compares that output
   structurally with native Flow erasure.

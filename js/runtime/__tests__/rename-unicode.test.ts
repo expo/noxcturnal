@@ -1,5 +1,4 @@
-import { transformSync, type NodePath } from '@babel/core';
-import { beforeAll, describe, expect, test } from 'vitest';
+import { expect, test } from 'vitest';
 import { defineNativePlugin, defineNativePipeline, defineVisitor, transform } from '../../index';
 const source = 'const value=3; globalThis.result=value;';
 function run(code: string) {
@@ -7,24 +6,9 @@ function run(code: string) {
   new Function('globalThis', code)(context);
   return context.result;
 }
-describe.each(['π', '变量', 'a\u0301', '𐐀', 'renamed'])('rename to %s', name => {
-  let actual: unknown, reference: unknown;
-  beforeAll(() => {
-    reference = run(
-      transformSync(source, {
-        configFile: false,
-        babelrc: false,
-        plugins: [
-          () => ({
-            visitor: {
-              Program(path: NodePath) {
-                path.scope.rename('value', name);
-              },
-            },
-          }),
-        ],
-      })!.code!,
-    );
+test.each(['π', '变量', 'a\u0301', '𐐀', 'renamed'])(
+  'rename to %s preserves the binding value',
+  name => {
     const plugin = defineNativePlugin({
       name: 'rename-unicode',
       pre(context) {
@@ -43,11 +27,6 @@ describe.each(['π', '变量', 'a\u0301', '𐐀', 'renamed'])('rename to %s', na
     );
     expect(result.status).toBe('complete');
     if (result.status !== 'complete') throw new Error('Unexpected bailout');
-    actual = run(result.code);
-  });
-  test('native identifier control', () => expect(run(source.replaceAll('value', name))).toBe(3));
-  test('Babel rename control', () => expect(reference).toBe(3));
-  (name === 'renamed' ? test : test)('renames a valid Unicode binding', () =>
-    expect(actual).toBe(3),
-  );
-});
+    expect(run(result.code)).toBe(3);
+  },
+);

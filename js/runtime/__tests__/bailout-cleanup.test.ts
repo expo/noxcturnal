@@ -2,10 +2,10 @@ import { beforeAll, describe, expect, test } from 'vitest';
 import { defineNativePipeline, defineNativePlugin, transform } from '../../index';
 
 describe.each([
-  { name: 'unsupported first cleanup throws', filename: 'input.txt', throwing: 0, fails: true },
-  { name: 'unsupported middle cleanup throws', filename: 'input.txt', throwing: 1, fails: true },
-  { name: 'unsupported successful cleanup', filename: 'input.txt', throwing: -1, fails: false },
-  { name: 'supported first cleanup throws', filename: 'input.js', throwing: 0, fails: false },
+  { name: 'unsupported first cleanup throws', filename: 'input.txt', throwing: 0 },
+  { name: 'unsupported middle cleanup throws', filename: 'input.txt', throwing: 1 },
+  { name: 'unsupported successful cleanup', filename: 'input.txt', throwing: -1 },
+  { name: 'supported first cleanup throws', filename: 'input.js', throwing: 0 },
 ])('$name', entry => {
   let counts: number[];
   beforeAll(() => {

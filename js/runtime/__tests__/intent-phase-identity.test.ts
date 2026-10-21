@@ -7,14 +7,13 @@ import {
 } from '../../index';
 
 const cases = [
-  { name: 'distinct phase names', together: false, repeated: false, rejected: false, fails: false },
-  { name: 'repeated phase names', together: false, repeated: true, rejected: false, fails: true },
+  { name: 'distinct phase names', together: false, repeated: false, rejected: false },
+  { name: 'repeated phase names', together: false, repeated: true, rejected: false },
   {
     name: 'different ranges within one phase',
     together: true,
     repeated: false,
     rejected: true,
-    fails: false,
   },
 ];
 describe.each(cases)('$name', entry => {

@@ -3,10 +3,10 @@ import { packEdits } from '../edits';
 import { native } from '../../native/binding';
 
 const cases = [
-  { name: 'surrogate pair spans separate strings', strings: ['\ud800', '\udc00'], fails: true },
-  { name: 'surrogate pair inside one string', strings: ['\ud800\udc00', 'x'], fails: false },
-  { name: 'isolated surrogate followed by ASCII', strings: ['\ud800', 'x'], fails: false },
-  { name: 'ordinary separate strings', strings: ['a', 'b'], fails: false },
+  { name: 'surrogate pair spans separate strings', strings: ['\ud800', '\udc00'] },
+  { name: 'surrogate pair inside one string', strings: ['\ud800\udc00', 'x'] },
+  { name: 'isolated surrogate followed by ASCII', strings: ['\ud800', 'x'] },
+  { name: 'ordinary separate strings', strings: ['a', 'b'] },
 ];
 describe.each(cases)('$name', entry => {
   let decoded: string | null;

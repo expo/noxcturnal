@@ -85,8 +85,15 @@ export function expectBabelSupportedNoxcturnalBailout(
   if (result.status === 'bailout') assert.equal(result.reason, reason);
 }
 
-/** Execute both outputs and compare the JSON-compatible value assigned to `globalThis.__result`. */
+/** Execute both outputs and compare the tagged value assigned to `globalThis.__result`. */
 export async function alignBabelBehavior(options: BehaviorAlignmentOptions): Promise<unknown> {
+  const matchesSource = (pattern: RegExp): boolean =>
+    new RegExp(pattern.source, pattern.flags).test(options.source);
+  assert.ok(
+    options.output.mustNotMatch.some(matchesSource) ||
+      (options.output.mustMatch ?? []).some(pattern => !matchesSource(pattern)),
+    'Behavioral alignment must assert output syntax that rejects the original source',
+  );
   const reference = babel.transformSync(options.source, {
     babelrc: false,
     comments: false,
@@ -107,10 +114,18 @@ export async function alignBabelBehavior(options: BehaviorAlignmentOptions): Pro
     throw new Error(`Noxcturnal ${transformed.status}: ${transformed.reason}`);
   }
   for (const pattern of options.output.mustMatch ?? []) {
-    assert.match(transformed.code, pattern, `Noxcturnal output does not contain ${pattern}`);
+    assert.match(
+      transformed.code,
+      new RegExp(pattern.source, pattern.flags),
+      `Noxcturnal output does not contain ${pattern}`,
+    );
   }
   for (const pattern of options.output.mustNotMatch) {
-    assert.doesNotMatch(transformed.code, pattern, `Noxcturnal output still contains ${pattern}`);
+    assert.doesNotMatch(
+      transformed.code,
+      new RegExp(pattern.source, pattern.flags),
+      `Noxcturnal output still contains ${pattern}`,
+    );
   }
 
   const babelValue = await execute(reference.code, options.globals);
@@ -245,6 +260,15 @@ async function execute(
     new vm.Script(source, { filename: 'alignment-output.js' }).runInContext(context, {
       timeout: 1_000,
     });
+  } catch (error) {
+    return { status: 'threw', error: errorDetails(error) };
+  }
+  // A missing observation is a fixture error, not a program's thrown outcome.
+  assert.ok(
+    Object.hasOwn(context, '__result'),
+    'Behavioral alignment must assign globalThis.__result (which may explicitly be undefined)',
+  );
+  try {
     let timeout: ReturnType<typeof setTimeout> | undefined;
     const value = await Promise.race([
       Promise.resolve(context.__result),

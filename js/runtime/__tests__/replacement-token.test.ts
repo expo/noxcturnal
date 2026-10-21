@@ -9,7 +9,6 @@ const cases = [
     expression: /(?<x>a)/,
     replacement: '$<>',
     all: false,
-    fails: true,
   },
   {
     name: 'global empty named token',
@@ -17,7 +16,6 @@ const cases = [
     expression: /(?<x>a)/g,
     replacement: '$<>',
     all: true,
-    fails: true,
   },
   {
     name: 'empty token without named captures',
@@ -25,7 +23,6 @@ const cases = [
     expression: /(a)/,
     replacement: '$<>',
     all: false,
-    fails: false,
   },
   {
     name: 'escaped named token',
@@ -33,7 +30,6 @@ const cases = [
     expression: /(?<x>a)/,
     replacement: '$$<x>',
     all: false,
-    fails: false,
   },
   {
     name: 'absent named token',
@@ -41,7 +37,6 @@ const cases = [
     expression: /(?<x>a)/,
     replacement: '$<missing>',
     all: false,
-    fails: false,
   },
   {
     name: 'two-digit fallback',
@@ -49,7 +44,6 @@ const cases = [
     expression: /(a)/,
     replacement: '$12',
     all: false,
-    fails: false,
   },
   {
     name: 'leading zero capture',
@@ -57,7 +51,6 @@ const cases = [
     expression: /(a)/,
     replacement: '$01',
     all: false,
-    fails: false,
   },
 ];
 describe.each(cases)('$name', entry => {

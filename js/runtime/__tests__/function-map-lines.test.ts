@@ -1,4 +1,3 @@
-import { parseSync } from '@babel/core';
 import { beforeAll, describe, expect, test } from 'vitest';
 import { defineNativePipeline, transform, type FunctionMap } from '../../index';
 import { native } from '../../native/binding';
@@ -49,10 +48,6 @@ describe.each(separators)('function frame after $name', entry => {
   let actual: ReturnType<typeof frames>;
   beforeAll(() => {
     const source = `void '🙂';${entry.text}function named(){}`;
-    const statement = parseSync(source, { babelrc: false, configFile: false })!.program.body[1];
-    expect(statement.type).toBe('FunctionDeclaration');
-    expect(statement.loc!.start.line).toBe(2);
-    expect(statement.loc!.start.column).toBe(0);
     const standalone = native.generateFunctionMap(source, 'input.js');
     const result = transform(source, 'input.js', defineNativePipeline({ phases: [] }), {
       functionMap: true,

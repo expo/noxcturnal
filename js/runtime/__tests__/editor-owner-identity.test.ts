@@ -2,16 +2,15 @@ import { beforeAll, describe, expect, test } from 'vitest';
 import { defineNativePipeline, defineNativePlugin, transform } from '../../index';
 
 const cases = [
-  { name: 'different names', sharedName: false, configured: false, separate: false, fails: false },
-  { name: 'shared name', sharedName: true, configured: false, separate: false, fails: true },
+  { name: 'different names', sharedName: false, configured: false, separate: false },
+  { name: 'shared name', sharedName: true, configured: false, separate: false },
   {
     name: 'configured definitions',
     sharedName: true,
     configured: true,
     separate: false,
-    fails: true,
   },
-  { name: 'separate phases', sharedName: true, configured: true, separate: true, fails: false },
+  { name: 'separate phases', sharedName: true, configured: true, separate: true },
 ];
 describe.each(cases)('$name', entry => {
   let actual: unknown;

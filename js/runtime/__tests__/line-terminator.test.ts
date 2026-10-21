@@ -1,4 +1,3 @@
-import { parseSync } from '@babel/core';
 import { beforeAll, describe, expect, test } from 'vitest';
 import { defineNativePipeline, defineNativePlugin, defineVisitor, transform } from '../../index';
 
@@ -29,16 +28,6 @@ describe.each(cases)('visitor location after $name', entry => {
     );
     expect(result.status).toBe('complete');
     expect(actual).toBeDefined();
-  });
-  test('Babel parser location control', () => {
-    const statement = parseSync(source, { configFile: false, babelrc: false })!.program.body[1]!;
-    expect(statement.type).toBe('ExpressionStatement');
-    if (statement.type !== 'ExpressionStatement') throw new Error('unexpected statement');
-    const loc = statement.expression.loc!;
-    expect({
-      start: { line: loc.start.line, column: loc.start.column },
-      end: { line: loc.end.line, column: loc.end.column },
-    }).toEqual(expected);
   });
   test('public visitor reports line and UTF-16 column', () => {
     expect(actual).toEqual(expected);

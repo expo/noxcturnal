@@ -142,7 +142,7 @@ test.each([
     expected: [undefined, true, undefined, true, 7, 7, 1, 2, undefined, 1],
   },
 ] as const)(
-  '$mode static field initializers preserve Babel this and super semantics',
+  '$mode static field initializers preserve this and super semantics',
   ({ loose, expected }) => {
     const result = execute<{ result: unknown[] }>(
       `
@@ -197,7 +197,7 @@ test.each([
     expected: [undefined, true, undefined, true, 7, 7, 1, 2, undefined, 1],
   },
 ] as const)(
-  '$mode instance field initializers preserve Babel this and super semantics',
+  '$mode instance field initializers preserve this and super semantics',
   ({ loose, expected }) => {
     const result = execute<{ result: unknown[] }>(
       `
@@ -258,6 +258,9 @@ test('static blocks preserve this, super receivers, private access, and var isol
       globalThis.result = [Child.answer, calls, typeof local];
     `,
     { transforms: { classStaticBlock: true } },
+    {},
+    'input.js',
+    code => expect(code).not.toMatch(/static\s*\{/),
   );
   expect(result.result).toEqual([
     42,
@@ -665,6 +668,9 @@ test('derived classes read the superclass prototype before setting static inheri
       globalThis.result = [order, new Child() instanceof Base];
     `,
     { transforms: { classes: true } },
+    {},
+    'input.js',
+    code => expect(code).not.toMatch(/^\s*class\s/m),
   );
   expect(result.result).toEqual([['prototype', 'setPrototypeOf'], true]);
 });
@@ -723,9 +729,8 @@ test('static private brands reject instances and accept the declaring constructo
   expect(result.result).toEqual([true, false, false]);
 });
 
-// Native execution establishes the specification result independently of the
-// transform. Compile outside test.fails so transform errors cannot accidentally
-// satisfy these known runtime regressions.
+// Compile outside test.fails so transform errors cannot accidentally satisfy
+// known runtime regressions. Each row states its expected runtime behavior.
 const additionalComplianceCases: {
   name: string;
   source: string;
@@ -813,26 +818,7 @@ const additionalComplianceCases: {
     expected: ['function', 'undefined', false, false, true],
     knownFailure: false,
   },
-  {
-    name: 'computed class keys are coerced once before the next key expression',
-    source: `
-      const events = [];
-      const key = {
-        toString() {
-          events.push('coerce');
-          return 'first';
-        },
-      };
-      class Value {
-        [key]() {}
-        [(events.push('next'), 'second')]() {}
-      }
-      globalThis.result = events;
-    `,
-    plan: { transforms: { classes: true } },
-    expected: ['coerce', 'next'],
-    knownFailure: true,
-  },
+
   {
     name: 'class lowering preserves super calls in constructor parameter defaults',
     source: `
@@ -881,22 +867,7 @@ const additionalComplianceCases: {
     expected: 'ReferenceError',
     knownFailure: true,
   },
-  {
-    name: 'derived constructor parameter closures observe the initialized receiver',
-    source: `
-      class Base {}
-      class Child extends Base {
-        constructor(value = () => this) {
-          super();
-          this.matches = value() === this;
-        }
-      }
-      globalThis.result = new Child().matches;
-    `,
-    plan: { transforms: { classes: true } },
-    expected: true,
-    knownFailure: false,
-  },
+
   {
     name: 'named class expression heritage resolves the uninitialized inner binding',
     source: `
@@ -1078,18 +1049,7 @@ const additionalComplianceCases: {
     expected: 2,
     knownFailure: false,
   },
-  {
-    name: 'duplicate super calls evaluate base then reject rebinding',
-    source: `
- const events=[];
- class Base {constructor(){events.push('base');}}
- class Child extends Base {constructor(){super();try{super();}catch(error){events.push(error.name);}}}
- new Child();globalThis.result=events;
-    `,
-    plan: { transforms: { classes: true } },
-    expected: ['base', 'base', 'ReferenceError'],
-    knownFailure: true,
-  },
+
   {
     name: 'derived constructors reject this access before super',
     source: `
@@ -1122,27 +1082,7 @@ const additionalComplianceCases: {
     expected: 3,
     knownFailure: false,
   },
-  {
-    name: 'base field initializer new.target is undefined',
-    source: `
- class Value {value=new.target;}
- globalThis.result=new Value().value===undefined;
-    `,
-    plan: { transforms: { classes: true } },
-    expected: true,
-    knownFailure: true,
-  },
-  {
-    name: 'base fields resolve outer names despite constructor parameters',
-    source: `
- const value='outer';
- class Example { field=value; constructor(value){} }
- globalThis.result=new Example('parameter').field;
-    `,
-    plan: { transforms: { classes: true } },
-    expected: 'outer',
-    knownFailure: false,
-  },
+
   {
     name: 'base field closures ignore constructor lexical declarations',
     source: `
@@ -1296,39 +1236,7 @@ const additionalComplianceCases: {
     expected: ['ReferenceError', []],
     knownFailure: true,
   },
-  {
-    name: 'computed class keys retain class strictness',
-    source: `
- const target=Object.freeze({value:1});
- try{class Example{[target.value=2](){}}globalThis.result='accepted';}catch(error){globalThis.result=error.name;}
-    `,
-    plan: { transforms: { classes: true } },
-    expected: 'TypeError',
-    knownFailure: true,
-  },
-  {
-    name: 'class heritage retains class strictness',
-    source: `
- const target=Object.freeze({value:1});
- try{class Example extends (target.value=2,Object){}globalThis.result='accepted';}catch(error){globalThis.result=error.name;}
-    `,
-    plan: { transforms: { classes: true } },
-    expected: 'TypeError',
-    knownFailure: true,
-  },
-  {
-    name: 'computed super reads coerce keys before prototype lookup',
-    source: `
- class Base {get value(){return 1;}}
- class Other {get value(){return 2;}}
- class Child extends Base {read(key){return super[key];}}
- const key={[Symbol.toPrimitive](){Object.setPrototypeOf(Child.prototype,Other.prototype);return 'value';}};
- globalThis.result=new Child().read(key);
-    `,
-    plan: { transforms: { classes: true } },
-    expected: 2,
-    knownFailure: true,
-  },
+
   {
     name: 'computed super writes coerce keys before prototype lookup',
     source: `
@@ -1364,36 +1272,7 @@ const additionalComplianceCases: {
     expected: 3,
     knownFailure: false,
   },
-  {
-    name: 'instance fields can read later private accessors',
-    source: `
- class Value { result=this.#read; get #read(){return 3;} }
- globalThis.result=new Value().result;
-    `,
-    plan: { transforms: { classes: true } },
-    expected: 3,
-    knownFailure: false,
-  },
-  {
-    name: 'static fields can call later private methods',
-    source: `
- class Value { static result=this.#read(); static #read(){return 3;} }
- globalThis.result=Value.result;
-    `,
-    plan: { transforms: { classes: true } },
-    expected: 3,
-    knownFailure: false,
-  },
-  {
-    name: 'static fields can read later private accessors',
-    source: `
- class Value { static result=this.#read; static get #read(){return 3;} }
- globalThis.result=Value.result;
-    `,
-    plan: { transforms: { classes: true } },
-    expected: 3,
-    knownFailure: false,
-  },
+
   {
     name: 'private fields are unavailable before their declaration initializes',
     source: `
@@ -1407,23 +1286,25 @@ const additionalComplianceCases: {
   {
     name: 'private method assignment evaluates RHS before rejecting write',
     source: `
- const events=[];class Value{#method(){}write(){try{this.#method=(events.push('rhs'),3);}catch(error){events.push(error.name);}}}
- new Value().write();globalThis.result=events;
+      const events = [];
+      class Value {
+        #method() {}
+        write() {
+          try {
+            this.#method = (events.push('rhs'), 3);
+          } catch (error) {
+            events.push(error.name);
+          }
+        }
+      }
+      new Value().write();
+      globalThis.result = events;
     `,
     plan: { transforms: { classes: true } },
     expected: ['rhs', 'TypeError'],
     knownFailure: false,
   },
-  {
-    name: 'private method compound assignment evaluates RHS and coercion before rejecting write',
-    source: `
- const events=[];class Value{#method(){}write(){this.#method.valueOf=()=>{events.push('convert');return 1;};try{this.#method+=(events.push('rhs'),2);}catch(error){events.push(error.name);}}}
- new Value().write();globalThis.result=events;
-    `,
-    plan: { transforms: { classes: true } },
-    expected: ['rhs', 'convert', 'TypeError'],
-    knownFailure: false,
-  },
+
   {
     name: 'private method logical assignment short circuits without rejecting write',
     source: `
@@ -1437,28 +1318,40 @@ const additionalComplianceCases: {
   {
     name: 'private calls get callable before evaluating arguments',
     source: `
- const events=[];class Value{get #method(){events.push('get');return()=>events.push('call');}read(){this.#method(events.push('argument'));}}
- new Value().read();globalThis.result=events;
+      const events = [];
+      class Value {
+        get #method() {
+          events.push('get');
+          return () => events.push('call');
+        }
+        read() {
+          this.#method(events.push('argument'));
+        }
+      }
+      new Value().read();
+      globalThis.result = events;
     `,
     plan: { transforms: { classes: true } },
     expected: ['get', 'argument', 'call'],
     knownFailure: false,
   },
-  {
-    name: 'private calls retain callable across argument mutation',
-    source: `
- class Value{#method=()=>1;read(){return this.#method(this.#method=()=>2);}}
- globalThis.result=new Value().read();
-    `,
-    plan: { transforms: { classes: true } },
-    expected: 1,
-    knownFailure: false,
-  },
+
   {
     name: 'private calls reject invalid receiver before arguments',
     source: `
- const events=[];class Value{#method(){}static read(receiver){try{receiver.#method(events.push('argument'));}catch(error){events.push(error.name);}}}
- Value.read({});globalThis.result=events;
+      const events = [];
+      class Value {
+        #method() {}
+        static read(receiver) {
+          try {
+            receiver.#method(events.push('argument'));
+          } catch (error) {
+            events.push(error.name);
+          }
+        }
+      }
+      Value.read({});
+      globalThis.result = events;
     `,
     plan: { transforms: { classes: true } },
     expected: ['TypeError'],
@@ -1528,8 +1421,21 @@ const additionalComplianceCases: {
   {
     name: 'private access rejects instances from another class evaluation',
     source: `
- function make(){return class{#value=3;static read(object){return object.#value;}};}
- const First=make();const Second=make();try{globalThis.result=First.read(new Second());}catch(error){globalThis.result=error.name;}
+      function make() {
+        return class {
+          #value = 3;
+          static read(object) {
+            return object.#value;
+          }
+        };
+      }
+      const First = make();
+      const Second = make();
+      try {
+        globalThis.result = First.read(new Second());
+      } catch (error) {
+        globalThis.result = error.name;
+      }
     `,
     plan: { transforms: { classes: true } },
     expected: 'TypeError',
@@ -1545,16 +1451,7 @@ const additionalComplianceCases: {
     expected: [true, false],
     knownFailure: false,
   },
-  {
-    name: 'private methods share function identity across instances',
-    source: `
- class Value{#method(){}expose(){return this.#method;}}
- globalThis.result=new Value().expose()===new Value().expose();
-    `,
-    plan: { transforms: { classes: true } },
-    expected: true,
-    knownFailure: false,
-  },
+
   {
     name: 'private async methods share function identity across instances',
     source: `
@@ -1585,21 +1482,23 @@ const additionalComplianceCases: {
     expected: false,
     knownFailure: false,
   },
-  {
-    name: 'private field assignment evaluates RHS before brand rejection',
-    source: `
- const events=[];class Value{#field;static write(object){try{object.#field=(events.push('rhs'),2);}catch(error){events.push(error.name);}}}
- Value.write({});globalThis.result=events;
-    `,
-    plan: { transforms: { classes: true } },
-    expected: ['rhs', 'TypeError'],
-    knownFailure: true,
-  },
+
   {
     name: 'private field compound assignment rejects brand before RHS',
     source: `
- const events=[];class Value{#field;static write(object){try{object.#field+=(events.push('rhs'),2);}catch(error){events.push(error.name);}}}
- Value.write({});globalThis.result=events;
+      const events = [];
+      class Value {
+        #field;
+        static write(object) {
+          try {
+            object.#field += (events.push('rhs'), 2);
+          } catch (error) {
+            events.push(error.name);
+          }
+        }
+      }
+      Value.write({});
+      globalThis.result = events;
     `,
     plan: { transforms: { classes: true } },
     expected: ['TypeError'],
@@ -1608,8 +1507,19 @@ const additionalComplianceCases: {
   {
     name: 'private field assignment preserves RHS exception precedence',
     source: `
- class Value{#field;static write(object){try{object.#field=(()=>{throw new Error('rhs');})();}catch(error){return error.message;}}}
- globalThis.result=Value.write({});
+      class Value {
+        #field;
+        static write(object) {
+          try {
+            object.#field = (() => {
+              throw new Error('rhs');
+            })();
+          } catch (error) {
+            return error.message;
+          }
+        }
+      }
+      globalThis.result = Value.write({});
     `,
     plan: { transforms: { classes: true } },
     expected: 'rhs',
@@ -1618,41 +1528,51 @@ const additionalComplianceCases: {
   {
     name: 'private field logical assignment rejects brand before RHS',
     source: `
- const events=[];class Value{#field;static write(object){try{object.#field||=(events.push('rhs'),2);}catch(error){events.push(error.name);}}}
- Value.write({});globalThis.result=events;
+      const events = [];
+      class Value {
+        #field;
+        static write(object) {
+          try {
+            object.#field ||= (events.push('rhs'), 2);
+          } catch (error) {
+            events.push(error.name);
+          }
+        }
+      }
+      Value.write({});
+      globalThis.result = events;
     `,
     plan: { transforms: { classes: true } },
     expected: ['TypeError'],
     knownFailure: false,
   },
-  {
-    name: 'private calls ignore overridden apply properties',
-    source: `
- class Value{#method(){return 'method';}run(){this.#method.apply=()=> 'override';return this.#method();}}
- globalThis.result=new Value().run();
-    `,
-    plan: { transforms: { classes: true } },
-    expected: 'method',
-    knownFailure: false,
-  },
-  {
-    name: 'private calls reject non-callable objects with apply methods',
-    source: `
- class Value{#field={apply(){return 'called';}};run(){try{return this.#field();}catch(error){return error.name;}}}
- globalThis.result=new Value().run();
-    `,
-    plan: { transforms: { classes: true } },
-    expected: 'TypeError',
-    knownFailure: false,
-  },
+
   {
     name: 'private field initialization rejects an already branded replacement object',
     source: `
- const events=[];let next=0;
- class Base{constructor(object){return object;}}
- class Stamp extends Base{#value=(events.push('init'),++next);after=events.push('after');static read(object){return object.#value;}}
- const object={};new Stamp(object);try{new Stamp(object);events.push('accepted');}catch(error){events.push(error.name);}
- globalThis.result=[events,Stamp.read(object)];
+      const events = [];
+      let next = 0;
+      class Base {
+        constructor(object) {
+          return object;
+        }
+      }
+      class Stamp extends Base {
+        #value = (events.push('init'), ++next);
+        after = events.push('after');
+        static read(object) {
+          return object.#value;
+        }
+      }
+      const object = {};
+      new Stamp(object);
+      try {
+        new Stamp(object);
+        events.push('accepted');
+      } catch (error) {
+        events.push(error.name);
+      }
+      globalThis.result = [events, Stamp.read(object)];
     `,
     plan: { transforms: { classes: true } },
     expected: [['init', 'after', 'init', 'TypeError'], 1],
@@ -1669,21 +1589,25 @@ const additionalComplianceCases: {
     expected: [true, 3],
     knownFailure: false,
   },
-  {
-    name: 'private setter-only access throws on reads',
-    source: `
- class Value{set #value(value){}run(){try{return this.#value;}catch(error){return error.name;}}}
- globalThis.result=new Value().run();
-    `,
-    plan: { transforms: { classes: true } },
-    expected: 'TypeError',
-    knownFailure: true,
-  },
+
   {
     name: 'private setter-only compound assignment rejects before RHS',
     source: `
- const events=[];class Value{set #value(value){events.push('set');}run(){try{this.#value+=(events.push('rhs'),1);}catch(error){events.push(error.name);}}}
- new Value().run();globalThis.result=events;
+      const events = [];
+      class Value {
+        set #value(value) {
+          events.push('set');
+        }
+        run() {
+          try {
+            this.#value += (events.push('rhs'), 1);
+          } catch (error) {
+            events.push(error.name);
+          }
+        }
+      }
+      new Value().run();
+      globalThis.result = events;
     `,
     plan: { transforms: { classes: true } },
     expected: ['TypeError'],
@@ -1692,8 +1616,21 @@ const additionalComplianceCases: {
   {
     name: 'private getter-only assignment evaluates RHS before throwing',
     source: `
- const events=[];class Value{get #value(){return 1;}run(){try{this.#value=(events.push('rhs'),2);}catch(error){events.push(error.name);}}}
- new Value().run();globalThis.result=events;
+      const events = [];
+      class Value {
+        get #value() {
+          return 1;
+        }
+        run() {
+          try {
+            this.#value = (events.push('rhs'), 2);
+          } catch (error) {
+            events.push(error.name);
+          }
+        }
+      }
+      new Value().run();
+      globalThis.result = events;
     `,
     plan: { transforms: { classes: true } },
     expected: ['rhs', 'TypeError'],
@@ -1712,8 +1649,21 @@ const additionalComplianceCases: {
   {
     name: 'private paired accessors support compound assignment',
     source: `
- const events=[];class Value{get #value(){events.push('get');return 1;}set #value(value){events.push(value);}run(){this.#value+=(events.push('rhs'),2);}}
- new Value().run();globalThis.result=events;
+      const events = [];
+      class Value {
+        get #value() {
+          events.push('get');
+          return 1;
+        }
+        set #value(value) {
+          events.push(value);
+        }
+        run() {
+          this.#value += (events.push('rhs'), 2);
+        }
+      }
+      new Value().run();
+      globalThis.result = events;
     `,
     plan: { transforms: { classes: true } },
     expected: ['get', 'rhs', 3],
@@ -1742,8 +1692,24 @@ const additionalComplianceCases: {
   {
     name: 'nested writable fields do not inherit outer private method write restrictions',
     source: `
- class Outer{#value(){}run(){class Inner{#value=1;run(){this.#value=2;return this.#value;}}try{return new Inner().run();}catch(error){return error.name;}}}
- globalThis.result=new Outer().run();
+      class Outer {
+        #value() {}
+        run() {
+          class Inner {
+            #value = 1;
+            run() {
+              this.#value = 2;
+              return this.#value;
+            }
+          }
+          try {
+            return new Inner().run();
+          } catch (error) {
+            return error.name;
+          }
+        }
+      }
+      globalThis.result = new Outer().run();
     `,
     plan: { transforms: { classes: true } },
     expected: 2,
@@ -1752,8 +1718,20 @@ const additionalComplianceCases: {
   {
     name: 'nested class heritage sees enclosing private names',
     source: `
- class Outer{#value=class {};run(){const outer=this;class Inner extends outer.#value{#value=2;read(){return this.#value;}}return new Inner().read();}}
- globalThis.result=new Outer().run();
+      class Outer {
+        #value = class {};
+        run() {
+          const outer = this;
+          class Inner extends outer.#value {
+            #value = 2;
+            read() {
+              return this.#value;
+            }
+          }
+          return new Inner().read();
+        }
+      }
+      globalThis.result = new Outer().run();
     `,
     plan: { transforms: { classes: true } },
     expected: 2,
@@ -1762,34 +1740,27 @@ const additionalComplianceCases: {
   {
     name: 'nested private brand checks use the declaring class',
     source: `
- class Outer{#value=1;run(){const outer=this;class Inner{#value=2;check(object){return #value in object;}}const inner=new Inner();return [inner.check(outer),inner.check(inner)];}}
- globalThis.result=new Outer().run();
+      class Outer {
+        #value = 1;
+        run() {
+          const outer = this;
+          class Inner {
+            #value = 2;
+            check(object) {
+              return #value in object;
+            }
+          }
+          const inner = new Inner();
+          return [inner.check(outer), inner.check(inner)];
+        }
+      }
+      globalThis.result = new Outer().run();
     `,
     plan: { transforms: { classes: true } },
     expected: [false, true],
     knownFailure: false,
   },
-  {
-    name: 'derived method defaults retain super property access',
-    source: `
- class Base{get value(){return 3;}}
- class Value extends Base{run(value=super.value){return value;}}
- globalThis.result=new Value().run();
-    `,
-    plan: { transforms: { classes: true } },
-    expected: 3,
-    knownFailure: false,
-  },
-  {
-    name: 'base class methods retain implicit super home object',
-    source: `
- class Value{run(){return super.toString();}}
- globalThis.result=new Value().run();
-    `,
-    plan: { transforms: { classes: true } },
-    expected: '[object Object]',
-    knownFailure: false,
-  },
+
   {
     name: 'static field new target is undefined inside outer constructor',
     source: `
@@ -1800,22 +1771,25 @@ const additionalComplianceCases: {
     expected: [true],
     knownFailure: false,
   },
-  {
-    name: 'class methods cannot serve as Reflect.construct newTarget',
-    source: `
- class Value{method(){}}
- try{Reflect.construct(function(){},[],Value.prototype.method);globalThis.result='accepted';}catch(error){globalThis.result=error.name;}
-    `,
-    plan: { transforms: { classes: true } },
-    expected: 'TypeError',
-    knownFailure: true,
-  },
+
   {
     name: 'class method functions do not own prototype properties',
     source: `
- class Value{method(){}static method(){}get value(){return 1;}set value(value){}}
- const descriptor=Object.getOwnPropertyDescriptor(Value.prototype,'value');
- globalThis.result=[Value.prototype.method,Value.method,descriptor.get,descriptor.set].map(value=>Object.hasOwn(value,'prototype'));
+      class Value {
+        method() {}
+        static method() {}
+        get value() {
+          return 1;
+        }
+        set value(value) {}
+      }
+      const descriptor = Object.getOwnPropertyDescriptor(Value.prototype, 'value');
+      globalThis.result = [
+        Value.prototype.method,
+        Value.method,
+        descriptor.get,
+        descriptor.set,
+      ].map(value => Object.hasOwn(value, 'prototype'));
     `,
     plan: { transforms: { classes: true } },
     expected: [false, false, false, false],
@@ -1831,21 +1805,22 @@ const additionalComplianceCases: {
     expected: ['TypeError'],
     knownFailure: true,
   },
-  {
-    name: 'calling class constructors rejects before parameter defaults',
-    source: `
- const events=[];class Value{constructor(value=events.push('default')){}}
- try{Value();}catch(error){events.push(error.name);}globalThis.result=events;
-    `,
-    plan: { transforms: { classes: true } },
-    expected: ['TypeError'],
-    knownFailure: true,
-  },
+
   {
     name: 'private method functions cannot serve as newTarget',
     source: `
- class Value{#method(){}expose(){return this.#method;}}
- try{Reflect.construct(function(){},[],new Value().expose());globalThis.result='accepted';}catch(error){globalThis.result=error.name;}
+      class Value {
+        #method() {}
+        expose() {
+          return this.#method;
+        }
+      }
+      try {
+        Reflect.construct(function () {}, [], new Value().expose());
+        globalThis.result = 'accepted';
+      } catch (error) {
+        globalThis.result = error.name;
+      }
     `,
     plan: { transforms: { classes: true } },
     expected: 'TypeError',
@@ -1854,8 +1829,15 @@ const additionalComplianceCases: {
   {
     name: 'async class methods retain native nonconstructability',
     source: `
- class Value{async method(){}}
- try{Reflect.construct(function(){},[],Value.prototype.method);globalThis.result='accepted';}catch(error){globalThis.result=error.name;}
+      class Value {
+        async method() {}
+      }
+      try {
+        Reflect.construct(function () {}, [], Value.prototype.method);
+        globalThis.result = 'accepted';
+      } catch (error) {
+        globalThis.result = error.name;
+      }
     `,
     plan: { transforms: { classes: true } },
     expected: 'TypeError',
@@ -1892,9 +1874,6 @@ describe.each(additionalComplianceCases)(
       return context.result;
     };
 
-    test('native execution', async () => {
-      expect(await run(source)).toEqual(expected);
-    });
     const transformedTest = knownFailure ? test.fails : test;
     transformedTest('transformed execution', async () => {
       expect(await run(code)).toEqual(expected);

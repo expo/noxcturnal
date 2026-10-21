@@ -1,105 +1,14 @@
 import { runFixtures, type FixtureCase } from '../fixture';
 
-const expectedOutputs = [
-  'function test() {\n  let { a: b } = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : {};\n}',
-  'function t() {\n  let [, , a] = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : [1, 2, 3];\n  return a;\n}\nexpect(t()).toBe(3);\nexpect(t([4, 5, 6])).toBe(6);',
-  'function t() {\n  let [, , a] = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : [1, 2, 3];\n  return a;\n}',
-  '// @flow\nexport function transformFileSync(_arg) {\n  let filename = arguments.length > 0 ? arguments[0] : void 0;\n  let opts = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : {};\n}',
-  'function f(_arg) {\n  let a = arguments.length > 0 ? arguments[0] : void 0;\n  let b = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : a;\n  let c = arguments.length > 2 && arguments[2] !== void 0 ? arguments[2] : b;\n  return c;\n}\nexpect(f(3)).toBe(3);',
-  'const bar = true;\nfunction foo() {\n  let a = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : bar;\n  for (var _len = arguments.length, b = [], _key = 1; _key < _len; _key++) {\n    b[_key - 1] = arguments[_key];\n  }\n  return (() => {\n    const bar = false;\n    expect(b[0]).toBe(2);\n    expect(b[1]).toBe(3);\n  })();\n}\nfoo(1, 2, 3);',
-  'class Ref {\n  static nextId = 0;\n  constructor() {\n    let id = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : ++Ref.nextId;\n    let n = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : id;\n    this.id = n;\n  }\n}\nexpect(new Ref().id).toBe(1);\nexpect(new Ref().id).toBe(2);',
-  'class Ref {\n  constructor() {\n    let ref = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : Ref;\n    this.ref = ref;\n  }\n}\nexpect(new Ref().ref).toBe(Ref);',
-  "var t = function () {\n  let e = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 'foo';\n  let f = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : 5;\n  return e + ' bar ' + f;\n};\nvar a = function (_arg) {\n  let e = arguments.length > 0 ? arguments[0] : void 0;\n  let f = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : 5;\n  return e + ' bar ' + f;\n};",
-  "function required(msg) {\n  throw new Error(msg);\n}\nfunction sum() {\n  let { arr = required('arr is required') } =\n    arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : { arr: (arr = []) };\n  let length = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : arr.length;\n  let i = 0;\n  let acc = 0;\n  for (let item of arr) {\n    if (i >= length) return acc;\n    acc += item;\n    i++;\n  }\n  return acc;\n}\nexpect(sum({ arr: [1, 2] })).toBe(3);",
-  'function fn(_arg) {\n  let a1 = arguments.length > 0 ? arguments[0] : void 0;\n  let a2 = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : 4;\n  let { a3, a4 } = arguments.length > 2 ? arguments[2] : void 0;\n  let a5 = arguments.length > 3 ? arguments[3] : void 0;\n  let { a6, a7 } = arguments.length > 4 && arguments[4] !== void 0 ? arguments[4] : {};\n}',
-  'const a = 1;\nfunction rest() {\n  let b = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : a;\n  for (var _len = arguments.length, a = [], _key = 1; _key < _len; _key++) {\n    a[_key - 1] = arguments[_key];\n  }\n  expect(b).toBe(1);\n}\nrest(undefined, 2);\nfunction rest2() {\n  let b = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : a;\n  for (var _len9 = arguments.length, a = [], _key10 = 1; _key10 < _len9; _key10++) {\n    a[_key10 - 1] = arguments[_key10];\n  }\n  expect(a[0]).toBe(2);\n}\nrest2(undefined, 2);\nfunction rest3() {\n  let b = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : a;\n  for (var _len11 = arguments.length, a = [], _key12 = 1; _key12 < _len11; _key12++) {\n    a[_key12 - 1] = arguments[_key12];\n  }\n  expect(a).toHaveLength(1);\n}\nrest3(undefined, 2);',
-  "var t = function () {\n  let f = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 'foo';\n  return f + ' bar';\n};",
-  "// #3861\nfunction t() {\n  let x = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 'default';\n  let { a, b } = arguments.length > 1 ? arguments[1] : void 0;\n  for (var _len = arguments.length, args = [], _key = 2; _key < _len; _key++) {\n    args[_key - 2] = arguments[_key];\n  }\n  console.log(x, a, b, args);\n}",
-  'function t() {\n  let undefined = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 17;\n  let a = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : 3;\n  return a;\n}\nexpect(t()).toBe(3);',
-  'let f = function () {\n  let x = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 0;\n  return x + 1;\n};',
-  'function fn(_arg) {\n  let a = arguments.length > 0 ? arguments[0] : void 0;\n  let b = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : c();\n  return b;\n}',
-  'class Bar extends Foo {\n  constructor() {\n    let f = () => {\n      let x = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : super();\n      return x;\n    };\n    f();\n  }\n}',
-  'class Bar extends Foo {\n  constructor() {\n    let f = () => {\n      for (var _len = arguments.length, args = [], _key = 0; _key < _len; _key++) {\n        args[_key - 0] = arguments[_key];\n      }\n      return super(...args);\n    };\n    f();\n  }\n}',
-  'function f() {\n  let [] = arguments.length > 0 ? arguments[0] : void 0;\n  return async function* () {}.call(this);\n}\nexpect(() => {\n  f();\n}).toThrow(TypeError);',
-  'function func() {\n  for (var _len = arguments.length, arguments = [], _key = 0; _key < _len; _key++) {\n    arguments[_key - 0] = arguments[_key];\n  }\n  return arguments;\n}\nexpect(func(1, 2, 3)).toStrictEqual([1, 2, 3]);',
-  'function func() {\n  for (var _len = arguments.length, arguments = [], _key = 0; _key < _len; _key++) {\n    arguments[_key - 0] = arguments[_key];\n  }\n  console.log(arguments);\n}\nfunc(1, 2, 3);',
-  "function foo() {\n  let a = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 'foo';\n  let b = arguments.length > 1 ? arguments[1] : void 0;\n}",
-  'function f(_arg) {\n  let a = arguments.length > 0 ? arguments[0] : void 0;\n  let b = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : a;\n  let c = arguments.length > 2 && arguments[2] !== void 0 ? arguments[2] : b;\n  return c;\n}\nexpect(3).toBe(f(3));',
-  "let x = 'outside';\nfunction outer() {\n  let a = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : () => eval('x');\n  return (() => {\n    let x = 'inside';\n    return a();\n  })();\n}\nouter();",
-  'class Ref {\n  constructor() {\n    let id = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : ++Ref.nextID;\n    this.id = id;\n  }\n}\nRef.nextID = 0;',
-  "let x = 'outside';\nfunction outer() {\n  let a = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : () => x;\n  return (() => {\n    let x = 'inside';\n    return a();\n  })();\n}\nouter();",
-  'class Ref {\n  constructor() {\n    let ref = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : Ref;\n    this.ref = ref;\n  }\n}\nclass X {\n  constructor() {\n    let x = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : foo;\n    this.x = x;\n  }\n}',
-  'const defaultValue = 1;\nconst obj = {\n  set field(_arg) {\n    let num = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : defaultValue;\n    this.num = num;\n  },\n};\nobj.field = void 0;\nexpect(obj.num).toBe(defaultValue);',
-  'const obj = {\n  set field(_arg) {\n    let num = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 1;\n    this.num = num;\n  },\n};',
-  '// @flow\nfunction foo(_arg, _arg7) {\n  let x = arguments.length > 0 ? arguments[0] : void 0;\n  let y = arguments.length > 1 ? arguments[1] : void 0;\n  for (var _len = arguments.length, z = [], _key = 2; _key < _len; _key++) {\n    z[_key - 2] = arguments[_key];\n  }\n  x + y + z[0];\n}',
-  'function foo() {\n  let a = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 2;\n  return (a => {\n    function a() {}\n  })(a);\n}',
-  "function fn(_arg) {\n  var _arguments = typeof arguments === 'undefined' ? void 0 : arguments;\n  let a = arguments.length > 0 ? arguments[0] : void 0;\n  let [] = arguments.length > 1 ? arguments[1] : void 0;\n  let b = arguments.length > 2 && arguments[2] !== void 0 ? arguments[2] : 2;\n  return function* () {\n    yield a;\n    yield _arguments;\n    yield this;\n    return b;\n  }.call(this);\n}",
-  "export class Test {\n  invite() {\n    let options = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : {};\n    const privacy = options.privacy || 'Private';\n    console.log(this);\n  }\n}",
-  'var a;\nclass Test {\n  invite() {\n    let p = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : a;\n    return (() => {\n      let a;\n      this;\n    })();\n  }\n}',
-  'function foo() {\n  let a = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 2;\n  return (a => {\n    for (let a = 1; a > 0; a--);\n    expect(a).toBe(2);\n  })(a);\n}\nfoo();',
-  'function foo() {\n  let a = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 2;\n  return (a => {\n    for (let a, i = 0; i < 1; i++) a = 1;\n    expect(a).toBe(2);\n  })(a);\n}\nfoo();',
-  'function value() {\n  let { x, y } = arguments.length > 0 ? arguments[0] : void 0;\n  return x * y;\n}\nfunction valueWithDefault() {\n  let { x, y } = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : {};\n  return x * y;\n}',
-  "const args = 'bar';\nfunction foo() {\n  for (var _len = arguments.length, args = [], _key = 0; _key < _len; _key++) {\n    args[_key - 0] = arguments[_key];\n  }\n  return args;\n}",
-  'function first() {\n  for (var _len = arguments.length, values = [], _key = 0; _key < _len; _key++) {\n    values[_key - 0] = arguments[_key];\n  }\n  var index = 0;\n  return values[index++];\n}',
-  '// @flow\nlet oneOf = function () {\n  for (var _len = arguments.length, nodes = [], _key = 0; _key < _len; _key++) {\n    nodes[_key - 0] = arguments[_key];\n  }\n  if (nodes.length === 1) {\n    return nodes[0];\n  }\n  return new OneOfNode(nodes);\n};',
-  'function f1(_arg) {\n  let a = arguments.length > 0 ? arguments[0] : void 0;\n  for (var _len = arguments.length, rest = [], _key = 1; _key < _len; _key++) {\n    rest[_key - 1] = arguments[_key];\n  }\n  let b = rest[rest.length - 3];\n  let c = rest[rest.length - 2];\n  let d = rest[rest.length - 1];\n  return [a, b, c, d];\n}\nexpect(f1(1, 2)).toEqual([1, undefined, undefined, 2]);\nfunction f2(_arg14) {\n  let a = arguments.length > 0 ? arguments[0] : void 0;\n  for (var _len12 = arguments.length, rest = [], _key13 = 1; _key13 < _len12; _key13++) {\n    rest[_key13 - 1] = arguments[_key13];\n  }\n  return rest[-1];\n}\nexpect(f2(1, 2)).toBeUndefined();',
-  'function f(_arg) {\n  let a = arguments.length > 0 ? arguments[0] : void 0;\n  for (var _len = arguments.length, rest = [], _key = 1; _key < _len; _key++) {\n    rest[_key - 1] = arguments[_key];\n  }\n  let b = rest[rest.length - 3];\n  let c = rest[rest.length - 2];\n  let d = rest[rest.length - 1];\n  return [a, b, c, d];\n}\nfunction f(_arg11) {\n  let a = arguments.length > 0 ? arguments[0] : void 0;\n  for (var _len9 = arguments.length, rest = [], _key10 = 1; _key10 < _len9; _key10++) {\n    rest[_key10 - 1] = arguments[_key10];\n  }\n  return rest[-1];\n}',
-  "function func(_arg, _arg8) {\n  let a = arguments.length > 0 ? arguments[0] : void 0;\n  let b = arguments.length > 1 ? arguments[1] : void 0;\n  for (var _len = arguments.length, arguments = [], _key = 2; _key < _len; _key++) {\n    arguments[_key - 2] = arguments[_key];\n  }\n  return [a, b, arguments];\n}\nexpect(func('a', 'b', 1, 2, 3)).toStrictEqual(['a', 'b', [1, 2, 3]]);",
-  "function func(_arg, _arg7) {\n  let a = arguments.length > 0 ? arguments[0] : void 0;\n  let b = arguments.length > 1 ? arguments[1] : void 0;\n  for (var _len = arguments.length, arguments = [], _key = 2; _key < _len; _key++) {\n    arguments[_key - 2] = arguments[_key];\n  }\n  return [a, b, arguments];\n}\nfunc('a', 'b', 1, 2, 3);",
-  'function x() {\n  for (var _len = arguments.length, rest = [], _key = 0; _key < _len; _key++) {\n    rest[_key - 0] = arguments[_key];\n  }\n  arguments;\n}',
-  '// @flow\nvar concat = function () {\n  for (var _len = arguments.length, args = [], _key = 0; _key < _len; _key++) {\n    args[_key - 0] = arguments[_key];\n  }\n  var x = args[0];\n  var y = args[1];\n};\nvar somefun = function () {\n  let get2ndArg = function (a, b) {\n    for (var _len29 = arguments.length, args1 = [], _key30 = 2; _key30 < _len29; _key30++) {\n      args1[_key30 - 2] = arguments[_key30];\n    }\n    var _b = args1[0];\n    let somef = function (x, y, z) {\n      for (var _len31 = arguments.length, args2 = [], _key32 = 3; _key32 < _len31; _key32++) {\n        args2[_key32 - 3] = arguments[_key32];\n      }\n      var _a = args2[0];\n    };\n    let somefg = function (c, d, e, f) {\n      for (var _len33 = arguments.length, args3 = [], _key34 = 4; _key34 < _len33; _key34++) {\n        args3[_key34 - 4] = arguments[_key34];\n      }\n      var _a = args3[0];\n    };\n    var _d = args1[1];\n  };\n  let get3rdArg = function () {\n    for (var _len35 = arguments.length, args = [], _key36 = 0; _key36 < _len35; _key36++) {\n      args[_key36 - 0] = arguments[_key36];\n    }\n    return args[2];\n  };\n};\nfunction demo1() {\n  for (var _len37 = arguments.length, args = [], _key38 = 0; _key38 < _len37; _key38++) {\n    args[_key38 - 0] = arguments[_key38];\n  }\n  return i => {\n    return args[i + 0];\n  };\n}\nvar x = function () {\n  for (var _len39 = arguments.length, rest = [], _key40 = 0; _key40 < _len39; _key40++) {\n    rest[_key40 - 0] = arguments[_key40];\n  }\n  if (noNeedToWork) return 0;\n  return rest;\n};\nvar innerclassproperties = function () {\n  for (var _len41 = arguments.length, args = [], _key42 = 0; _key42 < _len41; _key42++) {\n    args[_key42 - 0] = arguments[_key42];\n  }\n  return class {\n    static args = args;\n    args = args;\n  };\n};',
-  'var concat = async function () {\n  for (var _len = arguments.length, args = [], _key = 0; _key < _len; _key++) {\n    args[_key - 0] = arguments[_key];\n  }\n  var x = args[0];\n  var y = args[1];\n};\nvar x = async function () {\n  for (var _len8 = arguments.length, rest = [], _key9 = 0; _key9 < _len8; _key9++) {\n    rest[_key9 - 0] = arguments[_key9];\n  }\n  if (noNeedToWork) return 0;\n  return rest;\n};',
-  'const deepAssign = function () {\n  for (var _len = arguments.length, args = [], _key = 0; _key < _len; _key++) {\n    args[_key - 0] = arguments[_key];\n  }\n  return (args = []);\n};',
-  '// single reference\nfunction r() {\n  for (var _len = arguments.length, rest = [], _key = 0; _key < _len; _key++) {\n    rest[_key - 0] = arguments[_key];\n  }\n  if (noNeedToWork) return 0;\n  return rest;\n}\n// multiple references\nfunction r() {\n  for (var _len15 = arguments.length, rest = [], _key16 = 0; _key16 < _len15; _key16++) {\n    rest[_key16 - 0] = arguments[_key16];\n  }\n  if (noNeedToWork) return 0;\n  rest;\n  rest;\n}\n// multiple nested references\nfunction r() {\n  for (var _len17 = arguments.length, rest = [], _key18 = 0; _key18 < _len17; _key18++) {\n    rest[_key18 - 0] = arguments[_key18];\n  }\n  if (noNeedToWork) return 0;\n  if (true) {\n    return rest;\n  } else {\n    return rest;\n  }\n}\n// deeply nested\nfunction r() {\n  for (var _len19 = arguments.length, rest = [], _key20 = 0; _key20 < _len19; _key20++) {\n    rest[_key20 - 0] = arguments[_key20];\n  }\n  if (true) {\n    if (true) {\n      return rest;\n    } else {\n      return rest;\n    }\n  }\n}\n// nested reference with root reference\nfunction r() {\n  for (var _len21 = arguments.length, rest = [], _key22 = 0; _key22 < _len21; _key22++) {\n    rest[_key22 - 0] = arguments[_key22];\n  }\n  if (noNeedToWork) return 0;\n  if (lol) rest;\n  rest;\n}\n// nested functions\nfunction a() {\n  for (var _len23 = arguments.length, args = [], _key24 = 0; _key24 < _len23; _key24++) {\n    args[_key24 - 0] = arguments[_key24];\n  }\n  return function () {\n    function b() {}\n    console.log("Shouldn\'t args be from a\'s scope?", args);\n  };\n}\n// loop\nfunction runQueue(_arg) {\n  let queue = arguments.length > 0 ? arguments[0] : void 0;\n  for (var _len25 = arguments.length, args = [], _key26 = 1; _key26 < _len25; _key26++) {\n    args[_key26 - 1] = arguments[_key26];\n  }\n  for (let i = 0; i < queue.length; i++) {\n    queue[i](...args);\n  }\n}\n// nested loop\nfunction runQueue(_arg30) {\n  let queue = arguments.length > 0 ? arguments[0] : void 0;\n  for (var _len28 = arguments.length, args = [], _key29 = 1; _key29 < _len28; _key29++) {\n    args[_key29 - 1] = arguments[_key29];\n  }\n  if (foo) {\n    for (let i = 0; i < queue.length; i++) {\n      queue[i](...args);\n    }\n  }\n}\nfunction r() {\n  for (var _len31 = arguments.length, rest = [], _key32 = 0; _key32 < _len31; _key32++) {\n    rest[_key32 - 0] = arguments[_key32];\n  }\n  if (noNeedToWork) return 0;\n  [rest[0]] = x;\n  return rest;\n}',
-  'var length = function (_arg, _arg8) {\n  let a = arguments.length > 0 ? arguments[0] : void 0;\n  let b = arguments.length > 1 ? arguments[1] : void 0;\n  for (var _len = arguments.length, items = [], _key = 2; _key < _len; _key++) {\n    items[_key - 2] = arguments[_key];\n  }\n  return items.length;\n};\nexpect(length()).toBe(0);\nexpect(length(1)).toBe(0);\nexpect(length(1, 2)).toBe(0);\nexpect(length(1, 2, 3)).toBe(1);',
-  'var t = function (_arg) {\n  let f = arguments.length > 0 ? arguments[0] : void 0;\n  for (var _len = arguments.length, items = [], _key = 1; _key < _len; _key++) {\n    items[_key - 1] = arguments[_key];\n  }\n  items[0];\n  items[items.length - 1];\n};\nfunction t(_arg8) {\n  let f = arguments.length > 0 ? arguments[0] : void 0;\n  for (var _len6 = arguments.length, items = [], _key7 = 1; _key7 < _len6; _key7++) {\n    items[_key7 - 1] = arguments[_key7];\n  }\n  items;\n  items[0];\n  items[items.length - 1];\n}',
-  "var x = function (_arg) {\n  let foo = arguments.length > 0 ? arguments[0] : void 0;\n  for (var _len = arguments.length, bar = [], _key = 1; _key < _len; _key++) {\n    bar[_key - 1] = arguments[_key];\n  }\n  console.log(bar);\n};\nvar y = function (_arg28) {\n  let foo = arguments.length > 0 ? arguments[0] : void 0;\n  for (var _len26 = arguments.length, bar = [], _key27 = 1; _key27 < _len26; _key27++) {\n    bar[_key27 - 1] = arguments[_key27];\n  }\n  return (bar => {\n    var x = function z(bar) {\n      bar[1] = 5;\n    };\n  })(bar);\n};\nvar b = function (_arg31, _arg32) {\n  let x = arguments.length > 0 ? arguments[0] : void 0;\n  let y = arguments.length > 1 ? arguments[1] : void 0;\n  for (var _len29 = arguments.length, args = [], _key30 = 2; _key30 < _len29; _key30++) {\n    args[_key30 - 2] = arguments[_key30];\n  }\n  console.log(args[0]);\n  args.pop();\n  console.log(args[1]);\n};\nvar z = function (_arg35) {\n  let foo = arguments.length > 0 ? arguments[0] : void 0;\n  for (var _len33 = arguments.length, bar = [], _key34 = 1; _key34 < _len33; _key34++) {\n    bar[_key34 - 1] = arguments[_key34];\n  }\n  var x = function () {\n    bar[1] = 5;\n  };\n};\nvar a = function (_arg38) {\n  let foo = arguments.length > 0 ? arguments[0] : void 0;\n  for (var _len36 = arguments.length, bar = [], _key37 = 1; _key37 < _len36; _key37++) {\n    bar[_key37 - 1] = arguments[_key37];\n  }\n  return bar.join(',');\n};\nvar b = function (_arg41) {\n  let foo = arguments.length > 0 ? arguments[0] : void 0;\n  for (var _len39 = arguments.length, bar = [], _key40 = 1; _key40 < _len39; _key40++) {\n    bar[_key40 - 1] = arguments[_key40];\n  }\n  var join = 'join';\n  return bar[join];\n};\nvar b = function () {\n  for (var _len42 = arguments.length, bar = [], _key43 = 0; _key43 < _len42; _key43++) {\n    bar[_key43 - 0] = arguments[_key43];\n  }\n  return bar.len;\n};\nvar b = function (_arg46) {\n  let foo = arguments.length > 0 ? arguments[0] : void 0;\n  for (var _len44 = arguments.length, bar = [], _key45 = 1; _key45 < _len44; _key45++) {\n    bar[_key45 - 1] = arguments[_key45];\n  }\n  return bar.length * 2;\n};\nvar b = function (_arg49, _arg50) {\n  let foo = arguments.length > 0 ? arguments[0] : void 0;\n  let baz = arguments.length > 1 ? arguments[1] : void 0;\n  for (var _len47 = arguments.length, bar = [], _key48 = 2; _key48 < _len47; _key48++) {\n    bar[_key48 - 2] = arguments[_key48];\n  }\n  return bar.length;\n};\nfunction x() {\n  for (var _len51 = arguments.length, rest = [], _key52 = 0; _key52 < _len51; _key52++) {\n    rest[_key52 - 0] = arguments[_key52];\n  }\n  rest[0] = 0;\n}\nfunction swap() {\n  for (var _len53 = arguments.length, rest = [], _key54 = 0; _key54 < _len53; _key54++) {\n    rest[_key54 - 0] = arguments[_key54];\n  }\n  [rest[0], rest[1]] = [rest[1], rest[0]];\n}\nfunction forIn() {\n  for (var _len55 = arguments.length, rest = [], _key56 = 0; _key56 < _len55; _key56++) {\n    rest[_key56 - 0] = arguments[_key56];\n  }\n  for (rest[0] in this) {\n    foo(rest[0]);\n  }\n}\nfunction inc() {\n  for (var _len57 = arguments.length, rest = [], _key58 = 0; _key58 < _len57; _key58++) {\n    rest[_key58 - 0] = arguments[_key58];\n  }\n  ++rest[0];\n}\nfunction dec() {\n  for (var _len59 = arguments.length, rest = [], _key60 = 0; _key60 < _len59; _key60++) {\n    rest[_key60 - 0] = arguments[_key60];\n  }\n  --rest[0];\n}\nfunction del() {\n  for (var _len61 = arguments.length, rest = [], _key62 = 0; _key62 < _len61; _key62++) {\n    rest[_key62 - 0] = arguments[_key62];\n  }\n  delete rest[0];\n}\nfunction method() {\n  for (var _len63 = arguments.length, rest = [], _key64 = 0; _key64 < _len63; _key64++) {\n    rest[_key64 - 0] = arguments[_key64];\n  }\n  rest[0]();\n}\nfunction newExp() {\n  for (var _len65 = arguments.length, rest = [], _key66 = 0; _key66 < _len65; _key66++) {\n    rest[_key66 - 0] = arguments[_key66];\n  }\n  new rest[0]();\n}\n// In addition to swap() above because at some point someone tried checking\n// grandparent path for isArrayExpression() to deopt.\nfunction arrayDestructure() {\n  for (var _len67 = arguments.length, rest = [], _key68 = 0; _key68 < _len67; _key68++) {\n    rest[_key68 - 0] = arguments[_key68];\n  }\n  [rest[0]] = x;\n}\nfunction forOf() {\n  for (var _len69 = arguments.length, rest = [], _key70 = 0; _key70 < _len69; _key70++) {\n    rest[_key70 - 0] = arguments[_key70];\n  }\n  for (rest[0] of this);\n}\nfunction postfixIncrement() {\n  for (var _len71 = arguments.length, rest = [], _key72 = 0; _key72 < _len71; _key72++) {\n    rest[_key72 - 0] = arguments[_key72];\n  }\n  rest[0]++;\n}\nfunction postfixDecrement() {\n  for (var _len73 = arguments.length, rest = [], _key74 = 0; _key74 < _len73; _key74++) {\n    rest[_key74 - 0] = arguments[_key74];\n  }\n  rest[0]--;\n}",
-  'var t = function () {\n  for (var _len = arguments.length, items = [], _key = 0; _key < _len; _key++) {\n    items[_key - 0] = arguments[_key];\n  }\n  var x = items[0];\n  var y = items[1];\n};\nfunction t() {\n  for (var _len8 = arguments.length, items = [], _key9 = 0; _key9 < _len8; _key9++) {\n    items[_key9 - 0] = arguments[_key9];\n  }\n  var x = items[0];\n  var y = items[1];\n}\nfunction t() {\n  for (var _len10 = arguments.length, items = [], _key11 = 0; _key11 < _len10; _key11++) {\n    items[_key11 - 0] = arguments[_key11];\n  }\n  var a = [];\n  for (var i = 0; i < items.length; i++) {\n    a.push(i);\n  }\n  return a;\n}\n// https://github.com/babel/babel/pull/2833#issuecomment-166039291\nfunction t() {\n  for (var _len12 = arguments.length, items = [], _key13 = 0; _key13 < _len12; _key13++) {\n    items[_key13 - 0] = arguments[_key13];\n  }\n  for (let i = 0; i < items.length; i++) {\n    return items[i];\n  }\n}',
-  'var t = function (_arg) {\n  let f = arguments.length > 0 ? arguments[0] : void 0;\n  for (var _len = arguments.length, items = [], _key = 1; _key < _len; _key++) {\n    items[_key - 1] = arguments[_key];\n  }\n  var x = f;\n  x = items[0];\n  x = items[1];\n};\nfunction t(_arg13) {\n  let f = arguments.length > 0 ? arguments[0] : void 0;\n  for (var _len11 = arguments.length, items = [], _key12 = 1; _key12 < _len11; _key12++) {\n    items[_key12 - 1] = arguments[_key12];\n  }\n  var x = f;\n  x = items[0];\n  x = items[1];\n}\nfunction u(_arg16, _arg17) {\n  let f = arguments.length > 0 ? arguments[0] : void 0;\n  let g = arguments.length > 1 ? arguments[1] : void 0;\n  for (var _len14 = arguments.length, items = [], _key15 = 2; _key15 < _len14; _key15++) {\n    items[_key15 - 2] = arguments[_key15];\n  }\n  var x = f;\n  var y = g;\n  x[12] = items[0];\n  y.prop = items[1];\n  var z = items[2] | 0 || 12;\n}',
-  'function a() {\n  for (var _len = arguments.length, args = [], _key = 0; _key < _len; _key++) {\n    args[_key - 0] = arguments[_key];\n  }\n  const foo = function () {\n    for (var _len11 = arguments.length, list = [], _key12 = 0; _key12 < _len11; _key12++) {\n      list[_key12 - 0] = arguments[_key12];\n    }\n    return bar(...list);\n  };\n  foo(...args);\n}\nfunction b() {\n  for (var _len13 = arguments.length, args = [], _key14 = 0; _key14 < _len13; _key14++) {\n    args[_key14 - 0] = arguments[_key14];\n  }\n  return (args => {\n    const foo = function () {\n      for (var _len15 = arguments.length, args = [], _key16 = 0; _key16 < _len15; _key16++) {\n        args[_key16 - 0] = arguments[_key16];\n      }\n      return bar(...args);\n    };\n    foo(...args);\n  })(args);\n}\nfunction c() {\n  for (var _len17 = arguments.length, args = [], _key18 = 0; _key18 < _len17; _key18++) {\n    args[_key18 - 0] = arguments[_key18];\n  }\n  return (args => {\n    const foo = function () {\n      for (var _len19 = arguments.length, args = [], _key20 = 0; _key20 < _len19; _key20++) {\n        args[_key20 - 0] = arguments[_key20];\n      }\n      return bar(...args);\n    };\n    foo([]);\n  })(args);\n}\nfunction d(_arg) {\n  let thing = arguments.length > 0 ? arguments[0] : void 0;\n  for (var _len21 = arguments.length, args = [], _key22 = 1; _key22 < _len21; _key22++) {\n    args[_key22 - 1] = arguments[_key22];\n  }\n  return (args => {\n    const foo = function () {\n      for (var _len24 = arguments.length, args = [], _key25 = 0; _key25 < _len24; _key25++) {\n        args[_key25 - 0] = arguments[_key25];\n      }\n      return bar(...args);\n    };\n    {\n      let args = thing;\n      foo(thing);\n    }\n  })(args);\n}',
-  'function broken(_arg) {\n  let x = arguments.length > 0 ? arguments[0] : void 0;\n  for (var _len = arguments.length, foo = [], _key = 1; _key < _len; _key++) {\n    foo[_key - 1] = arguments[_key];\n  }\n  if (true) {\n    class Foo extends Bar {}\n    return hello(...foo);\n  }\n}',
-  'function foo() {\n  for (var _len = arguments.length, _args = [], _key = 0; _key < _len; _key++) {\n    _args[_key - 0] = arguments[_key];\n  }\n  let { length } = _args;\n  return length;\n}\nexpect(foo(1, 2, 3)).toEqual(3);',
-  'function foo() {\n  for (var _len = arguments.length, _args = [], _key = 0; _key < _len; _key++) {\n    _args[_key - 0] = arguments[_key];\n  }\n  let [a] = _args;\n}',
-  '// optimisation\nfunction foo() {\n  for (var _len = arguments.length, bar = [], _key = 0; _key < _len; _key++) {\n    bar[_key - 0] = arguments[_key];\n  }\n  foo(...bar);\n}\n// deoptimisation\nfunction foo(_arg) {\n  let a = arguments.length > 0 ? arguments[0] : void 0;\n  for (var _len7 = arguments.length, b = [], _key8 = 1; _key8 < _len7; _key8++) {\n    b[_key8 - 1] = arguments[_key8];\n  }\n  foo(...b);\n}\nfunction foo() {\n  for (var _len10 = arguments.length, b = [], _key11 = 0; _key11 < _len10; _key11++) {\n    b[_key11 - 0] = arguments[_key11];\n  }\n  foo(1, ...b);\n}\nfunction foo() {\n  for (var _len12 = arguments.length, args = [], _key13 = 0; _key13 < _len12; _key13++) {\n    args[_key13 - 0] = arguments[_key13];\n  }\n  args.pop();\n  foo(...args);\n}',
-  'function u() {\n  for (var _len = arguments.length, items = [], _key = 0; _key < _len; _key++) {\n    items[_key - 0] = arguments[_key];\n  }\n  items[0];\n}\nfunction v(_arg) {\n  let event = arguments.length > 0 ? arguments[0] : void 0;\n  for (var _len7 = arguments.length, args = [], _key8 = 1; _key8 < _len7; _key8++) {\n    args[_key8 - 1] = arguments[_key8];\n  }\n  args;\n}',
-  'function foo() {\n  let a = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 2;\n  return (a => {\n    for (var i of [0]) var a = 1;\n    expect(a).toBe(1);\n  })(a);\n}\nfoo();',
-  'function foo() {\n  let a = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 2;\n  return (a => {\n    for (var [a] of [[1]]);\n    expect(a).toBe(1);\n  })(a);\n}\nfoo();',
-  'function foo() {\n  let a = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 2;\n  return (a => {\n    for (var i of [0]) var a;\n    expect(a).toBe(2);\n  })(a);\n}\nfoo();',
-  'function foo() {\n  let a = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 2;\n  return (a => {\n    for (var a, i = 0; i < 1; i++);\n    expect(a).toBe(2);\n  })(a);\n}\nfoo();',
-  'function f() {\n  let a = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 2;\n  let b = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : 3;\n  return ((a, b) => {\n    var a,\n      b = 4;\n    var a;\n    var b;\n    return a + b;\n  })(a, b);\n}',
-  'function f() {\n  let a = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 2;\n  let b = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : 3;\n  return (a => {\n    var a;\n    var { a } = { a: 4 };\n    return a + b;\n  })(a);\n}',
-  'function foo() {\n  let { a, b } = arguments.length > 0 ? arguments[0] : void 0;\n  return (a => {\n    var a = 3;\n    var c = 2;\n    var d = a + b + c;\n  })(a);\n}',
-  'function foo() {\n  let [a, b] = arguments.length > 0 ? arguments[0] : void 0;\n  return (a => {\n    var a = 3;\n    var c = 2;\n    var d = a + b + c;\n  })(a);\n}',
-  'var x = 1;\nfunction foo(_arg) {\n  let x = arguments.length > 0 ? arguments[0] : void 0;\n  let y =\n    arguments.length > 1 && arguments[1] !== void 0\n      ? arguments[1]\n      : function () {\n          x = 2;\n        };\n  return (x => {\n    var x = 3;\n    y();\n    expect(x).toBe(3);\n  })(x);\n}\nfoo();\nexpect(x).toBe(1);',
-  'function foo() {\n  let a = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 2;\n  return (a => {\n    var a = 1;\n  })(a);\n}',
-  'function f() {\n  for (var _len = arguments.length, _args = [], _key = 0; _key < _len; _key++) {\n    _args[_key - 0] = arguments[_key];\n  }\n  let { length: x = 0, y = x } = _args;\n  return (x => {\n    var x;\n    return x;\n  })(x);\n}\nfunction g() {\n  for (var _len8 = arguments.length, _args7 = [], _key9 = 0; _key9 < _len8; _key9++) {\n    _args7[_key9 - 0] = arguments[_key9];\n  }\n  let { length: x = 0, y = x } = _args7;\n  return (x => {\n    var x = 1;\n    return x;\n  })(x);\n}',
-  'function f() {\n  for (var _len = arguments.length, _args = [], _key = 0; _key < _len; _key++) {\n    _args[_key - 0] = arguments[_key];\n  }\n  let [x, y = x] = _args;\n  return (x => {\n    var x;\n    return x;\n  })(x);\n}\nfunction g() {\n  for (var _len8 = arguments.length, _args7 = [], _key9 = 0; _key9 < _len8; _key9++) {\n    _args7[_key9 - 0] = arguments[_key9];\n  }\n  let [x, y = x] = _args7;\n  return (x => {\n    var x = 1;\n    return x;\n  })(x);\n}',
-  'function f() {\n  for (var _len = arguments.length, x = [], _key = 0; _key < _len; _key++) {\n    x[_key - 0] = arguments[_key];\n  }\n  return (x => {\n    var x;\n    return x;\n  })(x);\n}\nfunction g() {\n  for (var _len5 = arguments.length, x = [], _key6 = 0; _key6 < _len5; _key6++) {\n    x[_key6 - 0] = arguments[_key6];\n  }\n  return (x => {\n    var x = 1;\n    return x;\n  })(x);\n}',
-  'function f() {\n  let a = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 2;\n  let b = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : 3;\n  return ((a, b) => {\n    var { a } = { a: 4 };\n    var a;\n    var b;\n    return a + b;\n  })(a, b);\n}',
-  "(function () {\n  let i = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : '__proto__';\n  return (i => {\n    for (var i in {});\n  })(i);\n});",
-  'class A {\n  a = b => {\n    {\n      ({ b } = {});\n    }\n  };\n}',
-  'function test(_arg) {\n  let a = arguments.length > 0 ? arguments[0] : void 0;\n  let b = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : 1;\n  return (a => {\n    var a = a + b;\n    return a;\n  })(a);\n}\nexpect(test(2)).toBe(3);',
-  'function test(_arg) {\n  let a = arguments.length > 0 ? arguments[0] : void 0;\n  let b = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : 1;\n  return (a => {\n    var a = a + b;\n    return a;\n  })(a);\n}',
-  '// @flow\nfunction a() {\n  let b = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : {};\n  let c;\n}\nfunction d() {\n  let e = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : () => {};\n  let T;\n}',
-  'function a() {\n  let b = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : {};\n  let c;\n}\nfunction d() {\n  let e = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : () => {};\n  let T;\n}',
-  'class A extends B {\n  handle = (() => {\n    let x = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 0;\n    console.log(x, this, new.target, super.y);\n  })(() => {\n    let y = 0;\n    var _this = this;\n    return function () {\n      let x = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : y;\n      return x + _this;\n    };\n  })(function () {\n    let x = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 1;\n  })(this);\n}',
-  'class A extends B {\n  #handle = (() => {\n    let x = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 0;\n    console.log(x, this, new.target, super.y);\n  })(() => {\n    let y = 0;\n    var _this = this;\n    return function () {\n      let x = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : y;\n      return x + _this;\n    };\n  })(function () {\n    let x = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 1;\n  })(this);\n}',
-  'class A {\n  #handle = function () {\n    let x = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 0;\n    console.log(x);\n  };\n}',
-  'class A {\n  handle = function () {\n    let x = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 0;\n    console.log(x);\n  };\n}',
-  "(function () {\n  function foo() {\n    let p = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 1;\n    return async function* () {\n      yield 'hello';\n      yield p;\n    }.call(this);\n  }\n  return (async () => {\n    const res = [];\n    for await (const x of foo()) res.push(x);\n    expect(res).toEqual(['hello', 1]);\n  })();\n});",
-  "import { copy } from './copyPaste';\nclass Thing {\n  handleCopySomething() {\n    copy();\n  }\n  completelyUnrelated() {\n    let copy = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 123;\n  }\n}",
-  "import args from 'utils/url/args';\n\nexport default class App extends Component {\n  exportType = '';\n\n  componentDidMount() {\n    this.exportType = args.get('type', window.location.href);\n  }\n}",
-  "const a = 'bar';\nfunction foo() {\n  for (var _len = arguments.length, a = [], _key = 0; _key < _len; _key++) {\n    a[_key - 0] = arguments[_key];\n  }\n  return a;\n}",
-  'function wrapper(fn) {\n  return function () {\n    for (var _len = arguments.length, args = [], _key = 0; _key < _len; _key++) {\n      args[_key - 0] = arguments[_key];\n    }\n    while (someCondition) {\n      const val = fn(...args);\n      return val.test(() => {\n        console.log(val);\n      });\n    }\n  };\n}',
-  '(function () {\n  const err = new Error();\n  async function f() {\n    let a =\n      arguments.length > 0 && arguments[0] !== void 0\n        ? arguments[0]\n        : (() => {\n            throw err;\n          })();\n    return (async a => {\n      throw 1;\n      var a = await a;\n      return a;\n    })(a);\n  }\n  return (async () => {\n    let p;\n    expect(() => {\n      p = f();\n    }).not.toThrow();\n    await expect(p).rejects.toThrow(err);\n  })();\n});',
-  'function f() {\n  let a = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 1;\n  return function* (a) {\n    var a = yield a;\n    return a;\n  }.call(this, a);\n}\nasync function g() {\n  let a = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 1;\n  return (async a => {\n    var a = await a;\n    return a;\n  })(a);\n}\nfunction h() {\n  let a = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 1;\n  return async function* (a) {\n    var a = await (yield a);\n    return a;\n  }.call(this, a);\n}',
-];
-
 export const fixtureCases = [
   {
     title: 'assumption ignoreFunctionLength — complex assignment (input)',
-    source: 'function test({a: b} = {}) {}\n',
+    source: `function test({a: b} = {}) {}
+`,
     filename: 'input.js',
+    output: `function test() {
+  let { a: b } = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : {};
+}`,
     modes: [
       {
         title: 'default',
@@ -108,15 +17,23 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[0],
       },
     ],
   },
   {
     title: 'assumption ignoreFunctionLength — default array destructuring (exec)',
-    source:
-      'function t([,,a] = [1,2,3]) { return a }\n\nexpect(t()).toBe(3);\nexpect(t([4,5,6])).toBe(6);\n',
+    source: `function t([,,a] = [1,2,3]) { return a }
+
+expect(t()).toBe(3);
+expect(t([4,5,6])).toBe(6);
+`,
     filename: 'exec.js',
+    output: `function t() {
+  let [, , a] = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : [1, 2, 3];
+  return a;
+}
+expect(t()).toBe(3);
+expect(t([4, 5, 6])).toBe(6);`,
     modes: [
       {
         title: 'default',
@@ -125,14 +42,18 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[1],
       },
     ],
   },
   {
     title: 'assumption ignoreFunctionLength — default array destructuring (input)',
-    source: 'function t([,,a] = [1,2,3]) { return a }\n',
+    source: `function t([,,a] = [1,2,3]) { return a }
+`,
     filename: 'input.js',
+    output: `function t() {
+  let [, , a] = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : [1, 2, 3];
+  return a;
+}`,
     modes: [
       {
         title: 'default',
@@ -141,15 +62,23 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[2],
       },
     ],
   },
   {
     title: 'assumption ignoreFunctionLength — default assignment with types (input)',
-    source:
-      '// @flow\nexport function transformFileSync(\n  filename: string,\n  opts?: Object = {},\n): string {}\n',
+    source: `// @flow
+export function transformFileSync(
+  filename: string,
+  opts?: Object = {},
+): string {}
+`,
     filename: 'input.mjs',
+    output: `// @flow
+export function transformFileSync(_arg) {
+  let filename = arguments.length > 0 ? arguments[0] : void 0;
+  let opts = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : {};
+}`,
     modes: [
       {
         title: 'default',
@@ -158,14 +87,23 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[3],
       },
     ],
   },
   {
     title: 'assumption ignoreFunctionLength — default earlier params (exec)',
-    source: 'function f(a, b = a, c = b) { return c; }\n\nexpect(f(3)).toBe(3);\n',
+    source: `function f(a, b = a, c = b) { return c; }
+
+expect(f(3)).toBe(3);
+`,
     filename: 'exec.js',
+    output: `function f(_arg) {
+  let a = arguments.length > 0 ? arguments[0] : void 0;
+  let b = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : a;
+  let c = arguments.length > 2 && arguments[2] !== void 0 ? arguments[2] : b;
+  return c;
+}
+expect(f(3)).toBe(3);`,
     modes: [
       {
         title: 'default',
@@ -174,15 +112,35 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[4],
       },
     ],
   },
   {
     title: 'assumption ignoreFunctionLength — default iife 1128 (exec)',
-    source:
-      'const bar = true;\n\nfunction foo(a = bar, ...b) {\n  const bar = false;\n  expect(b[0]).toBe(2);\n  expect(b[1]).toBe(3);\n}\n\nfoo(1, 2, 3);\n',
+    source: `const bar = true;
+
+function foo(a = bar, ...b) {
+  const bar = false;
+  expect(b[0]).toBe(2);
+  expect(b[1]).toBe(3);
+}
+
+foo(1, 2, 3);
+`,
     filename: 'exec.js',
+    output: `const bar = true;
+function foo() {
+  let a = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : bar;
+  for (var _len = arguments.length, b = [], _key = 1; _key < _len; _key++) {
+    b[_key - 1] = arguments[_key];
+  }
+  return (() => {
+    const bar = false;
+    expect(b[0]).toBe(2);
+    expect(b[1]).toBe(3);
+  })();
+}
+foo(1, 2, 3);`,
     modes: [
       {
         title: 'default',
@@ -191,15 +149,32 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[5],
       },
     ],
   },
   {
     title: 'assumption ignoreFunctionLength — default iife 4253 (exec)',
-    source:
-      'class Ref {\n  static nextId = 0\n  constructor(id = ++Ref.nextId, n = id) {\n    this.id = n\n  }\n}\n\nexpect(new Ref().id).toBe(1);\nexpect(new Ref().id).toBe(2);\n',
+    source: `class Ref {
+  static nextId = 0
+  constructor(id = ++Ref.nextId, n = id) {
+    this.id = n
+  }
+}
+
+expect(new Ref().id).toBe(1);
+expect(new Ref().id).toBe(2);
+`,
     filename: 'exec.js',
+    output: `class Ref {
+  static nextId = 0;
+  constructor() {
+    let id = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : ++Ref.nextId;
+    let n = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : id;
+    this.id = n;
+  }
+}
+expect(new Ref().id).toBe(1);
+expect(new Ref().id).toBe(2);`,
     modes: [
       {
         title: 'default',
@@ -208,15 +183,27 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[6],
       },
     ],
   },
   {
     title: 'assumption ignoreFunctionLength — default iife self (exec)',
-    source:
-      'class Ref {\n  constructor(ref = Ref) {\n    this.ref = ref\n  }\n}\n\nexpect(new Ref().ref).toBe(Ref);\n',
+    source: `class Ref {
+  constructor(ref = Ref) {
+    this.ref = ref
+  }
+}
+
+expect(new Ref().ref).toBe(Ref);
+`,
     filename: 'exec.js',
+    output: `class Ref {
+  constructor() {
+    let ref = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : Ref;
+    this.ref = ref;
+  }
+}
+expect(new Ref().ref).toBe(Ref);`,
     modes: [
       {
         title: 'default',
@@ -225,15 +212,30 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[7],
       },
     ],
   },
   {
     title: 'assumption ignoreFunctionLength — default multiple (input)',
-    source:
-      'var t = function (e = "foo", f = 5) {\n  return e + " bar " + f;\n};\n\nvar a = function (e, f = 5) {\n  return e + " bar " + f;\n};\n',
+    source: `var t = function (e = "foo", f = 5) {
+  return e + " bar " + f;
+};
+
+var a = function (e, f = 5) {
+  return e + " bar " + f;
+};
+`,
     filename: 'input.js',
+    output: `var t = function () {
+  let e = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 'foo';
+  let f = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : 5;
+  return e + ' bar ' + f;
+};
+var a = function (_arg) {
+  let e = arguments.length > 0 ? arguments[0] : void 0;
+  let f = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : 5;
+  return e + ' bar ' + f;
+};`,
     modes: [
       {
         title: 'default',
@@ -242,15 +244,49 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[8],
       },
     ],
   },
   {
     title: 'assumption ignoreFunctionLength — default object destructuring (exec)',
-    source:
-      "function required(msg) {\n  throw new Error(msg);\n}\n\nfunction sum(\n  { arr = required('arr is required') } = { arr: arr = [] },\n  length = arr.length\n) {\n  let i = 0;\n  let acc = 0;\n  for (let item of arr) {\n    if (i >= length) return acc;\n    acc += item;\n    i++;\n  }\n  return acc;\n}\n\nexpect(sum({arr:[1,2]})).toBe(3);\n",
+    source: `function required(msg) {
+  throw new Error(msg);
+}
+
+function sum(
+  { arr = required('arr is required') } = { arr: arr = [] },
+  length = arr.length
+) {
+  let i = 0;
+  let acc = 0;
+  for (let item of arr) {
+    if (i >= length) return acc;
+    acc += item;
+    i++;
+  }
+  return acc;
+}
+
+expect(sum({arr:[1,2]})).toBe(3);
+`,
     filename: 'exec.js',
+    output: `function required(msg) {
+  throw new Error(msg);
+}
+function sum() {
+  let { arr = required('arr is required') } =
+    arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : { arr: (arr = []) };
+  let length = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : arr.length;
+  let i = 0;
+  let acc = 0;
+  for (let item of arr) {
+    if (i >= length) return acc;
+    acc += item;
+    i++;
+  }
+  return acc;
+}
+expect(sum({ arr: [1, 2] })).toBe(3);`,
     modes: [
       {
         title: 'default',
@@ -259,14 +295,28 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[9],
       },
     ],
   },
   {
     title: 'assumption ignoreFunctionLength — default rest mix (input)',
-    source: 'function fn(\n  a1,\n  a2 = 4,\n  {a3, a4},\n  a5,\n  {a6, a7} = {}) {\n\n}\n',
+    source: `function fn(
+  a1,
+  a2 = 4,
+  {a3, a4},
+  a5,
+  {a6, a7} = {}) {
+
+}
+`,
     filename: 'input.js',
+    output: `function fn(_arg) {
+  let a1 = arguments.length > 0 ? arguments[0] : void 0;
+  let a2 = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : 4;
+  let { a3, a4 } = arguments.length > 2 ? arguments[2] : void 0;
+  let a5 = arguments.length > 3 ? arguments[3] : void 0;
+  let { a6, a7 } = arguments.length > 4 && arguments[4] !== void 0 ? arguments[4] : {};
+}`,
     modes: [
       {
         title: 'default',
@@ -275,15 +325,53 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[10],
       },
     ],
   },
   {
     title: 'assumption ignoreFunctionLength — default rest (exec)',
-    source:
-      'const a = 1;\nfunction rest(b = a, ...a) {\n  expect(b).toBe(1);\n}\nrest(undefined, 2)\n\nfunction rest2(b = a, ...a) {\n  expect(a[0]).toBe(2);\n}\nrest2(undefined, 2)\n\nfunction rest3(b = a, ...a) {\n  expect(a).toHaveLength(1);\n}\nrest3(undefined, 2)\n',
+    source: `const a = 1;
+function rest(b = a, ...a) {
+  expect(b).toBe(1);
+}
+rest(undefined, 2)
+
+function rest2(b = a, ...a) {
+  expect(a[0]).toBe(2);
+}
+rest2(undefined, 2)
+
+function rest3(b = a, ...a) {
+  expect(a).toHaveLength(1);
+}
+rest3(undefined, 2)
+`,
     filename: 'exec.js',
+    output: `const a = 1;
+function rest() {
+  let b = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : a;
+  for (var _len = arguments.length, a = [], _key = 1; _key < _len; _key++) {
+    a[_key - 1] = arguments[_key];
+  }
+  expect(b).toBe(1);
+}
+rest(undefined, 2);
+function rest2() {
+  let b = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : a;
+  for (var _len9 = arguments.length, a = [], _key10 = 1; _key10 < _len9; _key10++) {
+    a[_key10 - 1] = arguments[_key10];
+  }
+  expect(a[0]).toBe(2);
+}
+rest2(undefined, 2);
+function rest3() {
+  let b = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : a;
+  for (var _len11 = arguments.length, a = [], _key12 = 1; _key12 < _len11; _key12++) {
+    a[_key12 - 1] = arguments[_key12];
+  }
+  expect(a).toHaveLength(1);
+}
+rest3(undefined, 2);`,
     modes: [
       {
         title: 'default',
@@ -292,14 +380,20 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[11],
       },
     ],
   },
   {
     title: 'assumption ignoreFunctionLength — default single (input)',
-    source: 'var t = function (f = "foo") {\n  return f + " bar";\n};\n',
+    source: `var t = function (f = "foo") {
+  return f + " bar";
+};
+`,
     filename: 'input.js',
+    output: `var t = function () {
+  let f = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 'foo';
+  return f + ' bar';
+};`,
     modes: [
       {
         title: 'default',
@@ -308,15 +402,26 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[12],
       },
     ],
   },
   {
     title: 'assumption ignoreFunctionLength — destructuring rest (input)',
-    source:
-      '// #3861\nfunction t(x = "default", { a, b }, ...args) {\n  console.log(x, a, b, args);\n}\n',
+    source: `// #3861
+function t(x = "default", { a, b }, ...args) {
+  console.log(x, a, b, args);
+}
+`,
     filename: 'input.js',
+    output: `// #3861
+function t() {
+  let x = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 'default';
+  let { a, b } = arguments.length > 1 ? arguments[1] : void 0;
+  for (var _len = arguments.length, args = [], _key = 2; _key < _len; _key++) {
+    args[_key - 2] = arguments[_key];
+  }
+  console.log(x, a, b, args);
+}`,
     modes: [
       {
         title: 'default',
@@ -325,14 +430,24 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[13],
       },
     ],
   },
   {
     title: 'assumption ignoreFunctionLength — overwrite undefined (exec)',
-    source: 'function t(undefined = 17, a = 3) {\n  return a;\n}\n\nexpect(t()).toBe(3);\n',
+    source: `function t(undefined = 17, a = 3) {
+  return a;
+}
+
+expect(t()).toBe(3);
+`,
     filename: 'exec.js',
+    output: `function t() {
+  let undefined = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 17;
+  let a = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : 3;
+  return a;
+}
+expect(t()).toBe(3);`,
     modes: [
       {
         title: 'default',
@@ -341,14 +456,18 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[14],
       },
     ],
   },
   {
     title: 'assumption noNewArrows false — default (input)',
-    source: 'let f = (x = 0) => x + 1;\n',
+    source: `let f = (x = 0) => x + 1;
+`,
     filename: 'input.js',
+    output: `let f = function () {
+  let x = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 0;
+  return x + 1;
+};`,
     modes: [
       {
         title: 'default',
@@ -357,14 +476,21 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[15],
       },
     ],
   },
   {
     title: 'loose — ignoreFunctionLength (input)',
-    source: 'function fn(a, b = c()) {\n  return b;\n}\n',
+    source: `function fn(a, b = c()) {
+  return b;
+}
+`,
     filename: 'input.js',
+    output: `function fn(_arg) {
+  let a = arguments.length > 0 ? arguments[0] : void 0;
+  let b = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : c();
+  return b;
+}`,
     modes: [
       {
         title: 'default',
@@ -373,15 +499,28 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[16],
       },
     ],
   },
   {
     title: 'parameters — arrow default super no classes plugin (input)',
-    source:
-      'class Bar extends Foo {\n    constructor() {\n        let f = (x = super()) => x;\n        f();\n    }\n}\n',
+    source: `class Bar extends Foo {
+    constructor() {
+        let f = (x = super()) => x;
+        f();
+    }
+}
+`,
     filename: 'input.js',
+    output: `class Bar extends Foo {
+  constructor() {
+    let f = () => {
+      let x = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : super();
+      return x;
+    };
+    f();
+  }
+}`,
     modes: [
       {
         title: 'default',
@@ -390,15 +529,30 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[17],
       },
     ],
   },
   {
     title: 'parameters — arrow rest super no classes plugin (input)',
-    source:
-      'class Bar extends Foo {\n    constructor() {\n        let f = (...args) => super(...args);\n        f();\n    }\n}\n',
+    source: `class Bar extends Foo {
+    constructor() {
+        let f = (...args) => super(...args);
+        f();
+    }
+}
+`,
     filename: 'input.js',
+    output: `class Bar extends Foo {
+  constructor() {
+    let f = () => {
+      for (var _len = arguments.length, args = [], _key = 0; _key < _len; _key++) {
+        args[_key - 0] = arguments[_key];
+      }
+      return super(...args);
+    };
+    f();
+  }
+}`,
     modes: [
       {
         title: 'default',
@@ -407,14 +561,25 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[18],
       },
     ],
   },
   {
     title: 'parameters — async generator (exec)',
-    source: 'async function* f([]) {};\n\nexpect(() => {\n  f();\n}).toThrow(TypeError);\n',
+    source: `async function* f([]) {};
+
+expect(() => {
+  f();
+}).toThrow(TypeError);
+`,
     filename: 'exec.js',
+    output: `function f() {
+  let [] = arguments.length > 0 ? arguments[0] : void 0;
+  return async function* () {}.call(this);
+}
+expect(() => {
+  f();
+}).toThrow(TypeError);`,
     modes: [
       {
         title: 'default',
@@ -423,14 +588,25 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[19],
       },
     ],
   },
   {
     title: 'parameters — async generator (input)',
-    source: 'async function* f([]) {};\n\nexpect(() => {\n  f();\n}).toThrow(TypeError);\n',
+    source: `async function* f([]) {};
+
+expect(() => {
+  f();
+}).toThrow(TypeError);
+`,
     filename: 'input.js',
+    output: `function f() {
+  let [] = arguments.length > 0 ? arguments[0] : void 0;
+  return async function* () {}.call(this);
+}
+expect(() => {
+  f();
+}).toThrow(TypeError);`,
     modes: [
       {
         title: 'default',
@@ -439,15 +615,24 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[19],
       },
     ],
   },
   {
     title: 'parameters — default arguments (exec)',
-    source:
-      'function func(...arguments) {\n    return arguments;\n}\nexpect(func(1, 2, 3)).toStrictEqual([1, 2, 3])\n',
+    source: `function func(...arguments) {
+    return arguments;
+}
+expect(func(1, 2, 3)).toStrictEqual([1, 2, 3])
+`,
     filename: 'exec.js',
+    output: `function func() {
+  for (var _len = arguments.length, arguments = [], _key = 0; _key < _len; _key++) {
+    arguments[_key - 0] = arguments[_key];
+  }
+  return arguments;
+}
+expect(func(1, 2, 3)).toStrictEqual([1, 2, 3]);`,
     modes: [
       {
         title: 'default',
@@ -456,15 +641,24 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[20],
       },
     ],
   },
   {
     title: 'parameters — default arguments (input)',
-    source:
-      'function func(...arguments) {\n    console.log(arguments); // [1, 2, 3]\n}\nfunc(1, 2, 3);\n',
+    source: `function func(...arguments) {
+    console.log(arguments); // [1, 2, 3]
+}
+func(1, 2, 3);
+`,
     filename: 'input.js',
+    output: `function func() {
+  for (var _len = arguments.length, arguments = [], _key = 0; _key < _len; _key++) {
+    arguments[_key - 0] = arguments[_key];
+  }
+  console.log(arguments);
+}
+func(1, 2, 3);`,
     modes: [
       {
         title: 'default',
@@ -473,14 +667,20 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[21],
       },
     ],
   },
   {
     title: 'parameters — default before last (input)',
-    source: 'function foo(a = "foo", b) {\n\n}\n',
+    source: `function foo(a = "foo", b) {
+
+}
+`,
     filename: 'input.js',
+    output: `function foo() {
+  let a = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 'foo';
+  let b = arguments.length > 1 ? arguments[1] : void 0;
+}`,
     modes: [
       {
         title: 'default',
@@ -489,14 +689,23 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[22],
       },
     ],
   },
   {
     title: 'parameters — default earlier params (exec)',
-    source: 'function f(a, b = a, c = b) { return c; }\n\nexpect(3).toBe(f(3));\n',
+    source: `function f(a, b = a, c = b) { return c; }
+
+expect(3).toBe(f(3));
+`,
     filename: 'exec.js',
+    output: `function f(_arg) {
+  let a = arguments.length > 0 ? arguments[0] : void 0;
+  let b = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : a;
+  let c = arguments.length > 2 && arguments[2] !== void 0 ? arguments[2] : b;
+  return c;
+}
+expect(3).toBe(f(3));`,
     modes: [
       {
         title: 'default',
@@ -505,15 +714,28 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[23],
       },
     ],
   },
   {
     title: 'parameters — default eval (input)',
-    source:
-      'let x = "outside";\nfunction outer(a = () => eval("x")) {\n  let x = "inside";\n  return a();\n}\nouter();\n',
+    source: `let x = "outside";
+function outer(a = () => eval("x")) {
+  let x = "inside";
+  return a();
+}
+outer();
+`,
     filename: 'input.js',
+    output: `let x = 'outside';
+function outer() {
+  let a = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : () => eval('x');
+  return (() => {
+    let x = 'inside';
+    return a();
+  })();
+}
+outer();`,
     modes: [
       {
         title: 'default',
@@ -522,15 +744,25 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[24],
       },
     ],
   },
   {
     title: 'parameters — default iife 4253 (input)',
-    source:
-      'class Ref {\n  constructor(id = ++Ref.nextID) {\n    this.id = id\n  }\n}\nRef.nextID = 0',
+    source: `class Ref {
+  constructor(id = ++Ref.nextID) {
+    this.id = id
+  }
+}
+Ref.nextID = 0`,
     filename: 'input.js',
+    output: `class Ref {
+  constructor() {
+    let id = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : ++Ref.nextID;
+    this.id = id;
+  }
+}
+Ref.nextID = 0;`,
     modes: [
       {
         title: 'default',
@@ -539,15 +771,28 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[25],
       },
     ],
   },
   {
     title: 'parameters — default iife 9947 (input)',
-    source:
-      'let x = "outside";\nfunction outer(a = () => x) {\n  let x = "inside";\n  return a();\n}\nouter();\n',
+    source: `let x = "outside";
+function outer(a = () => x) {
+  let x = "inside";
+  return a();
+}
+outer();
+`,
     filename: 'input.js',
+    output: `let x = 'outside';
+function outer() {
+  let a = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : () => x;
+  return (() => {
+    let x = 'inside';
+    return a();
+  })();
+}
+outer();`,
     modes: [
       {
         title: 'default',
@@ -556,15 +801,36 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[26],
       },
     ],
   },
   {
     title: 'parameters — default iife self (input)',
-    source:
-      'class Ref {\n  constructor(ref = Ref) {\n    this.ref = ref\n  }\n}\n\nclass X {\n  constructor(x = foo) {\n    this.x = x\n  }\n}\n',
+    source: `class Ref {
+  constructor(ref = Ref) {
+    this.ref = ref
+  }
+}
+
+class X {
+  constructor(x = foo) {
+    this.x = x
+  }
+}
+`,
     filename: 'input.js',
+    output: `class Ref {
+  constructor() {
+    let ref = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : Ref;
+    this.ref = ref;
+  }
+}
+class X {
+  constructor() {
+    let x = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : foo;
+    this.x = x;
+  }
+}`,
     modes: [
       {
         title: 'default',
@@ -573,15 +839,53 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[27],
       },
     ],
   },
   {
     title: 'parameters — default rest (input)',
-    source:
-      'const a = 1;\nfunction rest(b = a, ...a) {\n  expect(b).toBe(1);\n}\nrest(undefined, 2)\n\nfunction rest2(b = a, ...a) {\n  expect(a[0]).toBe(2);\n}\nrest2(undefined, 2)\n\nfunction rest3(b = a, ...a) {\n  expect(a).toHaveLength(1);\n}\nrest3(undefined, 2)\n',
+    source: `const a = 1;
+function rest(b = a, ...a) {
+  expect(b).toBe(1);
+}
+rest(undefined, 2)
+
+function rest2(b = a, ...a) {
+  expect(a[0]).toBe(2);
+}
+rest2(undefined, 2)
+
+function rest3(b = a, ...a) {
+  expect(a).toHaveLength(1);
+}
+rest3(undefined, 2)
+`,
     filename: 'input.js',
+    output: `const a = 1;
+function rest() {
+  let b = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : a;
+  for (var _len = arguments.length, a = [], _key = 1; _key < _len; _key++) {
+    a[_key - 1] = arguments[_key];
+  }
+  expect(b).toBe(1);
+}
+rest(undefined, 2);
+function rest2() {
+  let b = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : a;
+  for (var _len9 = arguments.length, a = [], _key10 = 1; _key10 < _len9; _key10++) {
+    a[_key10 - 1] = arguments[_key10];
+  }
+  expect(a[0]).toBe(2);
+}
+rest2(undefined, 2);
+function rest3() {
+  let b = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : a;
+  for (var _len11 = arguments.length, a = [], _key12 = 1; _key12 < _len11; _key12++) {
+    a[_key12 - 1] = arguments[_key12];
+  }
+  expect(a).toHaveLength(1);
+}
+rest3(undefined, 2);`,
     modes: [
       {
         title: 'default',
@@ -590,15 +894,31 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[11],
       },
     ],
   },
   {
     title: 'parameters — default setter (exec)',
-    source:
-      'const defaultValue = 1;\nconst obj = {\n  set field(num = defaultValue) {\n    this.num = num;\n  }\n};\nobj.field = void 0;\n\nexpect(obj.num).toBe(defaultValue);\n',
+    source: `const defaultValue = 1;
+const obj = {
+  set field(num = defaultValue) {
+    this.num = num;
+  }
+};
+obj.field = void 0;
+
+expect(obj.num).toBe(defaultValue);
+`,
     filename: 'exec.js',
+    output: `const defaultValue = 1;
+const obj = {
+  set field(_arg) {
+    let num = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : defaultValue;
+    this.num = num;
+  },
+};
+obj.field = void 0;
+expect(obj.num).toBe(defaultValue);`,
     modes: [
       {
         title: 'default',
@@ -607,14 +927,24 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[28],
       },
     ],
   },
   {
     title: 'parameters — default setter (input)',
-    source: 'const obj = {\n  set field(num = 1) {\n    this.num = num;\n  }\n};\n',
+    source: `const obj = {
+  set field(num = 1) {
+    this.num = num;
+  }
+};
+`,
     filename: 'input.js',
+    output: `const obj = {
+  set field(_arg) {
+    let num = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 1;
+    this.num = num;
+  },
+};`,
     modes: [
       {
         title: 'default',
@@ -623,15 +953,26 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[29],
       },
     ],
   },
   {
     title: 'parameters — flow this param (input)',
-    source:
-      '// @flow\nfunction foo (this : number, x : number, y : string, ...z : any) {\n    x + y + z[0];\n}\n',
+    source: `// @flow
+function foo (this : number, x : number, y : string, ...z : any) {
+    x + y + z[0];
+}
+`,
     filename: 'input.js',
+    output: `// @flow
+function foo(_arg, _arg7) {
+  let x = arguments.length > 0 ? arguments[0] : void 0;
+  let y = arguments.length > 1 ? arguments[1] : void 0;
+  for (var _len = arguments.length, z = [], _key = 2; _key < _len; _key++) {
+    z[_key - 2] = arguments[_key];
+  }
+  x + y + z[0];
+}`,
     modes: [
       {
         title: 'default',
@@ -640,14 +981,24 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[30],
       },
     ],
   },
   {
     title: 'parameters — fn decl same as param (input)',
-    source: 'function foo(a = 2) {\n  function a() {\n\n  }\n}\n',
+    source: `function foo(a = 2) {
+  function a() {
+
+  }
+}
+`,
     filename: 'input.js',
+    output: `function foo() {
+  let a = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 2;
+  return (a => {
+    function a() {}
+  })(a);
+}`,
     modes: [
       {
         title: 'default',
@@ -656,15 +1007,31 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[31],
       },
     ],
   },
   {
     title: 'parameters — generator (input)',
-    source:
-      'function* fn(a, [], b = 2) {\n  yield a;\n  yield arguments;\n  yield this;\n  return b;\n}\n',
+    source: `function* fn(a, [], b = 2) {
+  yield a;
+  yield arguments;
+  yield this;
+  return b;
+}
+`,
     filename: 'input.ts',
+    output: `function fn(_arg) {
+  var _arguments = typeof arguments === 'undefined' ? void 0 : arguments;
+  let a = arguments.length > 0 ? arguments[0] : void 0;
+  let [] = arguments.length > 1 ? arguments[1] : void 0;
+  let b = arguments.length > 2 && arguments[2] !== void 0 ? arguments[2] : 2;
+  return function* () {
+    yield a;
+    yield _arguments;
+    yield this;
+    return b;
+  }.call(this);
+}`,
     modes: [
       {
         title: 'default',
@@ -673,15 +1040,25 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[32],
       },
     ],
   },
   {
     title: 'parameters — iife this 9385 (input)',
-    source:
-      'export class Test {\n  invite(options: { privacy: string } = {}) {\n    const privacy = options.privacy || "Private"\n    console.log(this)\n  }\n}',
+    source: `export class Test {
+  invite(options: { privacy: string } = {}) {
+    const privacy = options.privacy || "Private"
+    console.log(this)
+  }
+}`,
     filename: 'input.mjs',
+    output: `export class Test {
+  invite() {
+    let options = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : {};
+    const privacy = options.privacy || 'Private';
+    console.log(this);
+  }
+}`,
     modes: [
       {
         title: 'default',
@@ -691,14 +1068,30 @@ export const fixtureCases = [
           },
           typescript: 'strip',
         },
-        output: expectedOutputs[33],
       },
     ],
   },
   {
     title: 'parameters — iife this (input)',
-    source: 'var a;\n\nclass Test {\n  invite(p = a) {\n    let a;\n    this;\n  }\n}',
+    source: `var a;
+
+class Test {
+  invite(p = a) {
+    let a;
+    this;
+  }
+}`,
     filename: 'input.js',
+    output: `var a;
+class Test {
+  invite() {
+    let p = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : a;
+    return (() => {
+      let a;
+      this;
+    })();
+  }
+}`,
     modes: [
       {
         title: 'default',
@@ -707,15 +1100,26 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[34],
       },
     ],
   },
   {
     title: 'parameters — let for init same as param (exec)',
-    source:
-      'function foo(a = 2) {\n  for (let a = 1; a > 0; a--);\n  expect(a).toBe(2);\n}\nfoo();\n',
+    source: `function foo(a = 2) {
+  for (let a = 1; a > 0; a--);
+  expect(a).toBe(2);
+}
+foo();
+`,
     filename: 'exec.js',
+    output: `function foo() {
+  let a = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 2;
+  return (a => {
+    for (let a = 1; a > 0; a--);
+    expect(a).toBe(2);
+  })(a);
+}
+foo();`,
     modes: [
       {
         title: 'default',
@@ -724,15 +1128,26 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[35],
       },
     ],
   },
   {
     title: 'parameters — let no init for init same as param (exec)',
-    source:
-      'function foo(a = 2) {\n  for (let a, i = 0; i < 1; i++) a = 1;\n  expect(a).toBe(2);\n}\nfoo();\n',
+    source: `function foo(a = 2) {
+  for (let a, i = 0; i < 1; i++) a = 1;
+  expect(a).toBe(2);
+}
+foo();
+`,
     filename: 'exec.js',
+    output: `function foo() {
+  let a = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 2;
+  return (a => {
+    for (let a, i = 0; i < 1; i++) a = 1;
+    expect(a).toBe(2);
+  })(a);
+}
+foo();`,
     modes: [
       {
         title: 'default',
@@ -741,15 +1156,34 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[36],
       },
     ],
   },
   {
     title: 'parameters — preserve types (input)',
-    source:
-      'type Point = {\n  x: number;\n  y: number;\n};\n\nfunction value({ x, y }: Point) {\n  return x * y;\n}\n\nfunction valueWithDefault({ x, y }: Point = {}) {\n  return x * y;\n}\n\n',
+    source: `type Point = {
+  x: number;
+  y: number;
+};
+
+function value({ x, y }: Point) {
+  return x * y;
+}
+
+function valueWithDefault({ x, y }: Point = {}) {
+  return x * y;
+}
+
+`,
     filename: 'input.ts',
+    output: `function value() {
+  let { x, y } = arguments.length > 0 ? arguments[0] : void 0;
+  return x * y;
+}
+function valueWithDefault() {
+  let { x, y } = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : {};
+  return x * y;
+}`,
     modes: [
       {
         title: 'default',
@@ -759,14 +1193,24 @@ export const fixtureCases = [
           },
           typescript: 'strip',
         },
-        output: expectedOutputs[37],
       },
     ],
   },
   {
     title: 'parameters — regression 4333 (input)',
-    source: "const args = 'bar';\nfunction foo(...args) {\n  return args;\n}\n",
+    source: `const args = 'bar';
+function foo(...args) {
+  return args;
+}
+`,
     filename: 'input.js',
+    output: `const args = 'bar';
+function foo() {
+  for (var _len = arguments.length, args = [], _key = 0; _key < _len; _key++) {
+    args[_key - 0] = arguments[_key];
+  }
+  return args;
+}`,
     modes: [
       {
         title: 'default',
@@ -775,14 +1219,24 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[38],
       },
     ],
   },
   {
     title: 'parameters — regression 4348 (input)',
-    source: 'function first(...values) {\n  var index = 0;\n  return values[index++];\n}\n',
+    source: `function first(...values) {
+  var index = 0;
+  return values[index++];
+}
+`,
     filename: 'input.js',
+    output: `function first() {
+  for (var _len = arguments.length, values = [], _key = 0; _key < _len; _key++) {
+    values[_key - 0] = arguments[_key];
+  }
+  var index = 0;
+  return values[index++];
+}`,
     modes: [
       {
         title: 'default',
@@ -791,15 +1245,30 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[39],
       },
     ],
   },
   {
     title: 'parameters — regression 4634 (input)',
-    source:
-      '// @flow\nlet oneOf = (...nodes) => {\n  if (nodes.length === 1) {\n    return nodes[0];\n  }\n  return ((new OneOfNode(nodes)): any)\n}\n',
+    source: `// @flow
+let oneOf = (...nodes) => {
+  if (nodes.length === 1) {
+    return nodes[0];
+  }
+  return ((new OneOfNode(nodes)): any)
+}
+`,
     filename: 'input.js',
+    output: `// @flow
+let oneOf = function () {
+  for (var _len = arguments.length, nodes = [], _key = 0; _key < _len; _key++) {
+    nodes[_key - 0] = arguments[_key];
+  }
+  if (nodes.length === 1) {
+    return nodes[0];
+  }
+  return new OneOfNode(nodes);
+};`,
     modes: [
       {
         title: 'default',
@@ -808,15 +1277,44 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[40],
       },
     ],
   },
   {
     title: 'parameters — regression 5787 (exec)',
-    source:
-      'function f1(a, ...rest) {\n  let b = rest[rest.length - 3];\n  let c = rest[rest.length - 2];\n  let d = rest[rest.length - 1];\n  return [a, b, c, d];\n}\nexpect(f1(1, 2)).toEqual([1, undefined, undefined, 2]);\n\nfunction f2(a, ...rest) {\n  return rest[-1];\n}\nexpect(f2(1, 2)).toBeUndefined();\n',
+    source: `function f1(a, ...rest) {
+  let b = rest[rest.length - 3];
+  let c = rest[rest.length - 2];
+  let d = rest[rest.length - 1];
+  return [a, b, c, d];
+}
+expect(f1(1, 2)).toEqual([1, undefined, undefined, 2]);
+
+function f2(a, ...rest) {
+  return rest[-1];
+}
+expect(f2(1, 2)).toBeUndefined();
+`,
     filename: 'exec.js',
+    output: `function f1(_arg) {
+  let a = arguments.length > 0 ? arguments[0] : void 0;
+  for (var _len = arguments.length, rest = [], _key = 1; _key < _len; _key++) {
+    rest[_key - 1] = arguments[_key];
+  }
+  let b = rest[rest.length - 3];
+  let c = rest[rest.length - 2];
+  let d = rest[rest.length - 1];
+  return [a, b, c, d];
+}
+expect(f1(1, 2)).toEqual([1, undefined, undefined, 2]);
+function f2(_arg14) {
+  let a = arguments.length > 0 ? arguments[0] : void 0;
+  for (var _len12 = arguments.length, rest = [], _key13 = 1; _key13 < _len12; _key13++) {
+    rest[_key13 - 1] = arguments[_key13];
+  }
+  return rest[-1];
+}
+expect(f2(1, 2)).toBeUndefined();`,
     modes: [
       {
         title: 'default',
@@ -825,15 +1323,40 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[41],
       },
     ],
   },
   {
     title: 'parameters — regression 5787 (input)',
-    source:
-      'function f(a, ...rest) {\n  let b = rest[rest.length - 3];\n  let c = rest[rest.length - 2];\n  let d = rest[rest.length - 1];\n  return [a, b, c, d];\n}\n\nfunction f(a, ...rest) {\n  return rest[-1];\n}\n',
+    source: `function f(a, ...rest) {
+  let b = rest[rest.length - 3];
+  let c = rest[rest.length - 2];
+  let d = rest[rest.length - 1];
+  return [a, b, c, d];
+}
+
+function f(a, ...rest) {
+  return rest[-1];
+}
+`,
     filename: 'input.js',
+    output: `function f(_arg) {
+  let a = arguments.length > 0 ? arguments[0] : void 0;
+  for (var _len = arguments.length, rest = [], _key = 1; _key < _len; _key++) {
+    rest[_key - 1] = arguments[_key];
+  }
+  let b = rest[rest.length - 3];
+  let c = rest[rest.length - 2];
+  let d = rest[rest.length - 1];
+  return [a, b, c, d];
+}
+function f(_arg11) {
+  let a = arguments.length > 0 ? arguments[0] : void 0;
+  for (var _len9 = arguments.length, rest = [], _key10 = 1; _key10 < _len9; _key10++) {
+    rest[_key10 - 1] = arguments[_key10];
+  }
+  return rest[-1];
+}`,
     modes: [
       {
         title: 'default',
@@ -842,15 +1365,26 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[42],
       },
     ],
   },
   {
     title: 'parameters — rest argument with other arguments (exec)',
-    source:
-      "function func(a, b, ...arguments) {\n    return [a, b, arguments];\n}\n\nexpect(func('a', 'b', 1, 2, 3)).toStrictEqual(['a', 'b', [1, 2, 3]])",
+    source: `function func(a, b, ...arguments) {
+    return [a, b, arguments];
+}
+
+expect(func('a', 'b', 1, 2, 3)).toStrictEqual(['a', 'b', [1, 2, 3]])`,
     filename: 'exec.js',
+    output: `function func(_arg, _arg8) {
+  let a = arguments.length > 0 ? arguments[0] : void 0;
+  let b = arguments.length > 1 ? arguments[1] : void 0;
+  for (var _len = arguments.length, arguments = [], _key = 2; _key < _len; _key++) {
+    arguments[_key - 2] = arguments[_key];
+  }
+  return [a, b, arguments];
+}
+expect(func('a', 'b', 1, 2, 3)).toStrictEqual(['a', 'b', [1, 2, 3]]);`,
     modes: [
       {
         title: 'default',
@@ -859,15 +1393,26 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[43],
       },
     ],
   },
   {
     title: 'parameters — rest argument with other arguments (input)',
-    source:
-      "function func(a, b, ...arguments) {\n    return [a, b, arguments];\n}\n\nfunc('a', 'b', 1, 2, 3)",
+    source: `function func(a, b, ...arguments) {
+    return [a, b, arguments];
+}
+
+func('a', 'b', 1, 2, 3)`,
     filename: 'input.js',
+    output: `function func(_arg, _arg7) {
+  let a = arguments.length > 0 ? arguments[0] : void 0;
+  let b = arguments.length > 1 ? arguments[1] : void 0;
+  for (var _len = arguments.length, arguments = [], _key = 2; _key < _len; _key++) {
+    arguments[_key - 2] = arguments[_key];
+  }
+  return [a, b, arguments];
+}
+func('a', 'b', 1, 2, 3);`,
     modes: [
       {
         title: 'default',
@@ -876,14 +1421,22 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[44],
       },
     ],
   },
   {
     title: 'parameters — rest arguments deoptimisation (input)',
-    source: 'function x (...rest) {\n  arguments;\n}\n',
+    source: `function x (...rest) {
+  arguments;
+}
+`,
     filename: 'input.js',
+    output: `function x() {
+  for (var _len = arguments.length, rest = [], _key = 0; _key < _len; _key++) {
+    rest[_key - 0] = arguments[_key];
+  }
+  arguments;
+}`,
     modes: [
       {
         title: 'default',
@@ -892,15 +1445,109 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[45],
       },
     ],
   },
   {
     title: 'parameters — rest arrow functions (input)',
-    source:
-      '// @flow\nvar concat = (...args) => {\n  var x = args[0];\n  var y = args[1];\n};\n\nvar somefun = function () {\n  let get2ndArg = (a, b, ...args1) => {\n    var _b = args1[0];\n    let somef = (x, y, z, ...args2) => {\n      var _a = args2[0];\n    };\n    let somefg = (c, d, e, f, ...args3) => {\n      var _a = args3[0];\n    };\n    var _d = args1[1];\n  };\n  let get3rdArg = (...args) => args[2];\n}\n\nfunction demo1(...args) {\n  return (i) => {\n    return args[i+0];\n  };\n}\n\nvar x = (...rest) => {\n  if (noNeedToWork) return 0;\n  return rest;\n};\n\nvar innerclassproperties = (...args) => (\n  class {\n    static args = args;\n    args = args;\n  }\n);\n',
+    source: `// @flow
+var concat = (...args) => {
+  var x = args[0];
+  var y = args[1];
+};
+
+var somefun = function () {
+  let get2ndArg = (a, b, ...args1) => {
+    var _b = args1[0];
+    let somef = (x, y, z, ...args2) => {
+      var _a = args2[0];
+    };
+    let somefg = (c, d, e, f, ...args3) => {
+      var _a = args3[0];
+    };
+    var _d = args1[1];
+  };
+  let get3rdArg = (...args) => args[2];
+}
+
+function demo1(...args) {
+  return (i) => {
+    return args[i+0];
+  };
+}
+
+var x = (...rest) => {
+  if (noNeedToWork) return 0;
+  return rest;
+};
+
+var innerclassproperties = (...args) => (
+  class {
+    static args = args;
+    args = args;
+  }
+);
+`,
     filename: 'input.js',
+    output: `// @flow
+var concat = function () {
+  for (var _len = arguments.length, args = [], _key = 0; _key < _len; _key++) {
+    args[_key - 0] = arguments[_key];
+  }
+  var x = args[0];
+  var y = args[1];
+};
+var somefun = function () {
+  let get2ndArg = function (a, b) {
+    for (var _len29 = arguments.length, args1 = [], _key30 = 2; _key30 < _len29; _key30++) {
+      args1[_key30 - 2] = arguments[_key30];
+    }
+    var _b = args1[0];
+    let somef = function (x, y, z) {
+      for (var _len31 = arguments.length, args2 = [], _key32 = 3; _key32 < _len31; _key32++) {
+        args2[_key32 - 3] = arguments[_key32];
+      }
+      var _a = args2[0];
+    };
+    let somefg = function (c, d, e, f) {
+      for (var _len33 = arguments.length, args3 = [], _key34 = 4; _key34 < _len33; _key34++) {
+        args3[_key34 - 4] = arguments[_key34];
+      }
+      var _a = args3[0];
+    };
+    var _d = args1[1];
+  };
+  let get3rdArg = function () {
+    for (var _len35 = arguments.length, args = [], _key36 = 0; _key36 < _len35; _key36++) {
+      args[_key36 - 0] = arguments[_key36];
+    }
+    return args[2];
+  };
+};
+function demo1() {
+  for (var _len37 = arguments.length, args = [], _key38 = 0; _key38 < _len37; _key38++) {
+    args[_key38 - 0] = arguments[_key38];
+  }
+  return i => {
+    return args[i + 0];
+  };
+}
+var x = function () {
+  for (var _len39 = arguments.length, rest = [], _key40 = 0; _key40 < _len39; _key40++) {
+    rest[_key40 - 0] = arguments[_key40];
+  }
+  if (noNeedToWork) return 0;
+  return rest;
+};
+var innerclassproperties = function () {
+  for (var _len41 = arguments.length, args = [], _key42 = 0; _key42 < _len41; _key42++) {
+    args[_key42 - 0] = arguments[_key42];
+  }
+  return class {
+    static args = args;
+    args = args;
+  };
+};`,
     modes: [
       {
         title: 'default',
@@ -909,15 +1556,36 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[46],
       },
     ],
   },
   {
     title: 'parameters — rest async arrow functions (input)',
-    source:
-      'var concat = async (...args) => {\n  var x = args[0];\n  var y = args[1];\n};\n\nvar x = async (...rest) => {\n  if (noNeedToWork) return 0;\n  return rest;\n};\n',
+    source: `var concat = async (...args) => {
+  var x = args[0];
+  var y = args[1];
+};
+
+var x = async (...rest) => {
+  if (noNeedToWork) return 0;
+  return rest;
+};
+`,
     filename: 'input.js',
+    output: `var concat = async function () {
+  for (var _len = arguments.length, args = [], _key = 0; _key < _len; _key++) {
+    args[_key - 0] = arguments[_key];
+  }
+  var x = args[0];
+  var y = args[1];
+};
+var x = async function () {
+  for (var _len8 = arguments.length, rest = [], _key9 = 0; _key9 < _len8; _key9++) {
+    rest[_key9 - 0] = arguments[_key9];
+  }
+  if (noNeedToWork) return 0;
+  return rest;
+};`,
     modes: [
       {
         title: 'default',
@@ -926,14 +1594,20 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[47],
       },
     ],
   },
   {
     title: 'parameters — rest binding deoptimisation (input)',
-    source: 'const deepAssign = (...args) => args = [];\n',
+    source: `const deepAssign = (...args) => args = [];
+`,
     filename: 'input.js',
+    output: `const deepAssign = function () {
+  for (var _len = arguments.length, args = [], _key = 0; _key < _len; _key++) {
+    args[_key - 0] = arguments[_key];
+  }
+  return (args = []);
+};`,
     modes: [
       {
         title: 'default',
@@ -942,15 +1616,178 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[48],
       },
     ],
   },
   {
     title: 'parameters — rest deepest common ancestor earliest child (input)',
-    source:
-      '// single reference\nfunction r(...rest){\n  if (noNeedToWork) return 0;\n  return rest;\n}\n\n// multiple references\nfunction r(...rest){\n  if (noNeedToWork) return 0;\n\n  rest;\n  rest;\n}\n\n// multiple nested references\nfunction r(...rest){\n  if (noNeedToWork) return 0;\n\n  if (true) {\n    return rest;\n  } else {\n    return rest;\n  }\n}\n\n// deeply nested\nfunction r(...rest){\n  if (true) {\n    if (true) {\n      return rest;\n    } else {\n      return rest;\n    }\n  }\n}\n\n// nested reference with root reference\nfunction r(...rest){\n  if (noNeedToWork) return 0;\n\n  if (lol) rest;\n  rest;\n}\n\n// nested functions\nfunction a(...args) {\n  return function() {\n    function b() {}\n\n    console.log("Shouldn\'t args be from a\'s scope?", args);\n  };\n}\n\n// loop\nfunction runQueue(queue, ...args) {\n  for (let i = 0; i < queue.length; i++) {\n    queue[i](...args)\n  }\n}\n\n// nested loop\nfunction runQueue(queue, ...args) {\n  if (foo) {\n    for (let i = 0; i < queue.length; i++) {\n      queue[i](...args)\n    }\n  }\n}\n\nfunction r(...rest){\n  if (noNeedToWork) return 0;\n  [rest[0]] = x;\n  return rest;\n}\n',
+    source: `// single reference
+function r(...rest){
+  if (noNeedToWork) return 0;
+  return rest;
+}
+
+// multiple references
+function r(...rest){
+  if (noNeedToWork) return 0;
+
+  rest;
+  rest;
+}
+
+// multiple nested references
+function r(...rest){
+  if (noNeedToWork) return 0;
+
+  if (true) {
+    return rest;
+  } else {
+    return rest;
+  }
+}
+
+// deeply nested
+function r(...rest){
+  if (true) {
+    if (true) {
+      return rest;
+    } else {
+      return rest;
+    }
+  }
+}
+
+// nested reference with root reference
+function r(...rest){
+  if (noNeedToWork) return 0;
+
+  if (lol) rest;
+  rest;
+}
+
+// nested functions
+function a(...args) {
+  return function() {
+    function b() {}
+
+    console.log("Shouldn't args be from a's scope?", args);
+  };
+}
+
+// loop
+function runQueue(queue, ...args) {
+  for (let i = 0; i < queue.length; i++) {
+    queue[i](...args)
+  }
+}
+
+// nested loop
+function runQueue(queue, ...args) {
+  if (foo) {
+    for (let i = 0; i < queue.length; i++) {
+      queue[i](...args)
+    }
+  }
+}
+
+function r(...rest){
+  if (noNeedToWork) return 0;
+  [rest[0]] = x;
+  return rest;
+}
+`,
     filename: 'input.js',
+    output: `// single reference
+function r() {
+  for (var _len = arguments.length, rest = [], _key = 0; _key < _len; _key++) {
+    rest[_key - 0] = arguments[_key];
+  }
+  if (noNeedToWork) return 0;
+  return rest;
+}
+// multiple references
+function r() {
+  for (var _len15 = arguments.length, rest = [], _key16 = 0; _key16 < _len15; _key16++) {
+    rest[_key16 - 0] = arguments[_key16];
+  }
+  if (noNeedToWork) return 0;
+  rest;
+  rest;
+}
+// multiple nested references
+function r() {
+  for (var _len17 = arguments.length, rest = [], _key18 = 0; _key18 < _len17; _key18++) {
+    rest[_key18 - 0] = arguments[_key18];
+  }
+  if (noNeedToWork) return 0;
+  if (true) {
+    return rest;
+  } else {
+    return rest;
+  }
+}
+// deeply nested
+function r() {
+  for (var _len19 = arguments.length, rest = [], _key20 = 0; _key20 < _len19; _key20++) {
+    rest[_key20 - 0] = arguments[_key20];
+  }
+  if (true) {
+    if (true) {
+      return rest;
+    } else {
+      return rest;
+    }
+  }
+}
+// nested reference with root reference
+function r() {
+  for (var _len21 = arguments.length, rest = [], _key22 = 0; _key22 < _len21; _key22++) {
+    rest[_key22 - 0] = arguments[_key22];
+  }
+  if (noNeedToWork) return 0;
+  if (lol) rest;
+  rest;
+}
+// nested functions
+function a() {
+  for (var _len23 = arguments.length, args = [], _key24 = 0; _key24 < _len23; _key24++) {
+    args[_key24 - 0] = arguments[_key24];
+  }
+  return function () {
+    function b() {}
+    console.log("Shouldn't args be from a's scope?", args);
+  };
+}
+// loop
+function runQueue(_arg) {
+  let queue = arguments.length > 0 ? arguments[0] : void 0;
+  for (var _len25 = arguments.length, args = [], _key26 = 1; _key26 < _len25; _key26++) {
+    args[_key26 - 1] = arguments[_key26];
+  }
+  for (let i = 0; i < queue.length; i++) {
+    queue[i](...args);
+  }
+}
+// nested loop
+function runQueue(_arg30) {
+  let queue = arguments.length > 0 ? arguments[0] : void 0;
+  for (var _len28 = arguments.length, args = [], _key29 = 1; _key29 < _len28; _key29++) {
+    args[_key29 - 1] = arguments[_key29];
+  }
+  if (foo) {
+    for (let i = 0; i < queue.length; i++) {
+      queue[i](...args);
+    }
+  }
+}
+function r() {
+  for (var _len31 = arguments.length, rest = [], _key32 = 0; _key32 < _len31; _key32++) {
+    rest[_key32 - 0] = arguments[_key32];
+  }
+  if (noNeedToWork) return 0;
+  [rest[0]] = x;
+  return rest;
+}`,
     modes: [
       {
         title: 'default',
@@ -959,15 +1796,33 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[49],
       },
     ],
   },
   {
     title: 'parameters — rest length (exec)',
-    source:
-      'var length = function (a, b, ...items) {\n  return items.length;\n};\n\nexpect(length()).toBe(0);\nexpect(length(1)).toBe(0);\nexpect(length(1, 2)).toBe(0);\nexpect(length(1, 2, 3)).toBe(1);\n',
+    source: `var length = function (a, b, ...items) {
+  return items.length;
+};
+
+expect(length()).toBe(0);
+expect(length(1)).toBe(0);
+expect(length(1, 2)).toBe(0);
+expect(length(1, 2, 3)).toBe(1);
+`,
     filename: 'exec.js',
+    output: `var length = function (_arg, _arg8) {
+  let a = arguments.length > 0 ? arguments[0] : void 0;
+  let b = arguments.length > 1 ? arguments[1] : void 0;
+  for (var _len = arguments.length, items = [], _key = 2; _key < _len; _key++) {
+    items[_key - 2] = arguments[_key];
+  }
+  return items.length;
+};
+expect(length()).toBe(0);
+expect(length(1)).toBe(0);
+expect(length(1, 2)).toBe(0);
+expect(length(1, 2, 3)).toBe(1);`,
     modes: [
       {
         title: 'default',
@@ -976,15 +1831,40 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[50],
       },
     ],
   },
   {
     title: 'parameters — rest length (input)',
-    source:
-      'var t = function (f, ...items) {\n  items[0];\n  items[items.length - 1];\n};\n\nfunction t(f, ...items) {\n  items;\n  items[0];\n  items[items.length - 1];\n}\n',
+    source: `var t = function (f, ...items) {
+  items[0];
+  items[items.length - 1];
+};
+
+function t(f, ...items) {
+  items;
+  items[0];
+  items[items.length - 1];
+}
+`,
     filename: 'input.js',
+    output: `var t = function (_arg) {
+  let f = arguments.length > 0 ? arguments[0] : void 0;
+  for (var _len = arguments.length, items = [], _key = 1; _key < _len; _key++) {
+    items[_key - 1] = arguments[_key];
+  }
+  items[0];
+  items[items.length - 1];
+};
+function t(_arg8) {
+  let f = arguments.length > 0 ? arguments[0] : void 0;
+  for (var _len6 = arguments.length, items = [], _key7 = 1; _key7 < _len6; _key7++) {
+    items[_key7 - 1] = arguments[_key7];
+  }
+  items;
+  items[0];
+  items[items.length - 1];
+}`,
     modes: [
       {
         title: 'default',
@@ -993,15 +1873,256 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[51],
       },
     ],
   },
   {
     title: 'parameters — rest member expression deoptimisation (input)',
-    source:
-      'var x = function (foo, ...bar) {\n  console.log(bar);\n};\n\nvar y = function (foo, ...bar) {\n  var x = function z(bar) {\n    bar[1] = 5;\n  };\n};\n\nvar b = function (x, y, ...args) {\n  console.log(args[0]);\n  args.pop();\n  console.log(args[1]);\n};\n\nvar z = function (foo, ...bar) {\n  var x = function () {\n    bar[1] = 5;\n  };\n};\n\nvar a = function (foo, ...bar) {\n  return bar.join(",");\n};\n\nvar b = function (foo, ...bar) {\n  var join = "join";\n  return bar[join];\n};\n\nvar b = function (...bar) {\n  return bar.len;\n};\n\nvar b = function (foo, ...bar) {\n  return bar.length * 2;\n};\n\nvar b = function (foo, baz, ...bar) {\n  return bar.length;\n};\n\nfunction x (...rest) {\n  rest[0] = 0;\n}\n\nfunction swap (...rest) {\n  [rest[0], rest[1]] = [rest[1], rest[0]];\n}\n\nfunction forIn (...rest) {\n  for (rest[0] in this) {\n    foo(rest[0]);\n  }\n}\n\nfunction inc (...rest) {\n  ++rest[0];\n}\n\nfunction dec (...rest) {\n  --rest[0];\n}\n\nfunction del (...rest) {\n  delete rest[0];\n}\n\nfunction method (...rest) {\n  rest[0]();\n}\n\nfunction newExp (...rest) {\n  new rest[0]();\n}\n\n// In addition to swap() above because at some point someone tried checking\n// grandparent path for isArrayExpression() to deopt.\nfunction arrayDestructure (...rest) {\n  [rest[0]] = x;\n}\n\nfunction forOf (...rest) {\n  for (rest[0] of this);\n}\n\nfunction postfixIncrement (...rest) {\n  rest[0]++;\n}\n\nfunction postfixDecrement (...rest) {\n  rest[0]--;\n}\n',
+    source: `var x = function (foo, ...bar) {
+  console.log(bar);
+};
+
+var y = function (foo, ...bar) {
+  var x = function z(bar) {
+    bar[1] = 5;
+  };
+};
+
+var b = function (x, y, ...args) {
+  console.log(args[0]);
+  args.pop();
+  console.log(args[1]);
+};
+
+var z = function (foo, ...bar) {
+  var x = function () {
+    bar[1] = 5;
+  };
+};
+
+var a = function (foo, ...bar) {
+  return bar.join(",");
+};
+
+var b = function (foo, ...bar) {
+  var join = "join";
+  return bar[join];
+};
+
+var b = function (...bar) {
+  return bar.len;
+};
+
+var b = function (foo, ...bar) {
+  return bar.length * 2;
+};
+
+var b = function (foo, baz, ...bar) {
+  return bar.length;
+};
+
+function x (...rest) {
+  rest[0] = 0;
+}
+
+function swap (...rest) {
+  [rest[0], rest[1]] = [rest[1], rest[0]];
+}
+
+function forIn (...rest) {
+  for (rest[0] in this) {
+    foo(rest[0]);
+  }
+}
+
+function inc (...rest) {
+  ++rest[0];
+}
+
+function dec (...rest) {
+  --rest[0];
+}
+
+function del (...rest) {
+  delete rest[0];
+}
+
+function method (...rest) {
+  rest[0]();
+}
+
+function newExp (...rest) {
+  new rest[0]();
+}
+
+// In addition to swap() above because at some point someone tried checking
+// grandparent path for isArrayExpression() to deopt.
+function arrayDestructure (...rest) {
+  [rest[0]] = x;
+}
+
+function forOf (...rest) {
+  for (rest[0] of this);
+}
+
+function postfixIncrement (...rest) {
+  rest[0]++;
+}
+
+function postfixDecrement (...rest) {
+  rest[0]--;
+}
+`,
     filename: 'input.js',
+    output: `var x = function (_arg) {
+  let foo = arguments.length > 0 ? arguments[0] : void 0;
+  for (var _len = arguments.length, bar = [], _key = 1; _key < _len; _key++) {
+    bar[_key - 1] = arguments[_key];
+  }
+  console.log(bar);
+};
+var y = function (_arg28) {
+  let foo = arguments.length > 0 ? arguments[0] : void 0;
+  for (var _len26 = arguments.length, bar = [], _key27 = 1; _key27 < _len26; _key27++) {
+    bar[_key27 - 1] = arguments[_key27];
+  }
+  return (bar => {
+    var x = function z(bar) {
+      bar[1] = 5;
+    };
+  })(bar);
+};
+var b = function (_arg31, _arg32) {
+  let x = arguments.length > 0 ? arguments[0] : void 0;
+  let y = arguments.length > 1 ? arguments[1] : void 0;
+  for (var _len29 = arguments.length, args = [], _key30 = 2; _key30 < _len29; _key30++) {
+    args[_key30 - 2] = arguments[_key30];
+  }
+  console.log(args[0]);
+  args.pop();
+  console.log(args[1]);
+};
+var z = function (_arg35) {
+  let foo = arguments.length > 0 ? arguments[0] : void 0;
+  for (var _len33 = arguments.length, bar = [], _key34 = 1; _key34 < _len33; _key34++) {
+    bar[_key34 - 1] = arguments[_key34];
+  }
+  var x = function () {
+    bar[1] = 5;
+  };
+};
+var a = function (_arg38) {
+  let foo = arguments.length > 0 ? arguments[0] : void 0;
+  for (var _len36 = arguments.length, bar = [], _key37 = 1; _key37 < _len36; _key37++) {
+    bar[_key37 - 1] = arguments[_key37];
+  }
+  return bar.join(',');
+};
+var b = function (_arg41) {
+  let foo = arguments.length > 0 ? arguments[0] : void 0;
+  for (var _len39 = arguments.length, bar = [], _key40 = 1; _key40 < _len39; _key40++) {
+    bar[_key40 - 1] = arguments[_key40];
+  }
+  var join = 'join';
+  return bar[join];
+};
+var b = function () {
+  for (var _len42 = arguments.length, bar = [], _key43 = 0; _key43 < _len42; _key43++) {
+    bar[_key43 - 0] = arguments[_key43];
+  }
+  return bar.len;
+};
+var b = function (_arg46) {
+  let foo = arguments.length > 0 ? arguments[0] : void 0;
+  for (var _len44 = arguments.length, bar = [], _key45 = 1; _key45 < _len44; _key45++) {
+    bar[_key45 - 1] = arguments[_key45];
+  }
+  return bar.length * 2;
+};
+var b = function (_arg49, _arg50) {
+  let foo = arguments.length > 0 ? arguments[0] : void 0;
+  let baz = arguments.length > 1 ? arguments[1] : void 0;
+  for (var _len47 = arguments.length, bar = [], _key48 = 2; _key48 < _len47; _key48++) {
+    bar[_key48 - 2] = arguments[_key48];
+  }
+  return bar.length;
+};
+function x() {
+  for (var _len51 = arguments.length, rest = [], _key52 = 0; _key52 < _len51; _key52++) {
+    rest[_key52 - 0] = arguments[_key52];
+  }
+  rest[0] = 0;
+}
+function swap() {
+  for (var _len53 = arguments.length, rest = [], _key54 = 0; _key54 < _len53; _key54++) {
+    rest[_key54 - 0] = arguments[_key54];
+  }
+  [rest[0], rest[1]] = [rest[1], rest[0]];
+}
+function forIn() {
+  for (var _len55 = arguments.length, rest = [], _key56 = 0; _key56 < _len55; _key56++) {
+    rest[_key56 - 0] = arguments[_key56];
+  }
+  for (rest[0] in this) {
+    foo(rest[0]);
+  }
+}
+function inc() {
+  for (var _len57 = arguments.length, rest = [], _key58 = 0; _key58 < _len57; _key58++) {
+    rest[_key58 - 0] = arguments[_key58];
+  }
+  ++rest[0];
+}
+function dec() {
+  for (var _len59 = arguments.length, rest = [], _key60 = 0; _key60 < _len59; _key60++) {
+    rest[_key60 - 0] = arguments[_key60];
+  }
+  --rest[0];
+}
+function del() {
+  for (var _len61 = arguments.length, rest = [], _key62 = 0; _key62 < _len61; _key62++) {
+    rest[_key62 - 0] = arguments[_key62];
+  }
+  delete rest[0];
+}
+function method() {
+  for (var _len63 = arguments.length, rest = [], _key64 = 0; _key64 < _len63; _key64++) {
+    rest[_key64 - 0] = arguments[_key64];
+  }
+  rest[0]();
+}
+function newExp() {
+  for (var _len65 = arguments.length, rest = [], _key66 = 0; _key66 < _len65; _key66++) {
+    rest[_key66 - 0] = arguments[_key66];
+  }
+  new rest[0]();
+}
+// In addition to swap() above because at some point someone tried checking
+// grandparent path for isArrayExpression() to deopt.
+function arrayDestructure() {
+  for (var _len67 = arguments.length, rest = [], _key68 = 0; _key68 < _len67; _key68++) {
+    rest[_key68 - 0] = arguments[_key68];
+  }
+  [rest[0]] = x;
+}
+function forOf() {
+  for (var _len69 = arguments.length, rest = [], _key70 = 0; _key70 < _len69; _key70++) {
+    rest[_key70 - 0] = arguments[_key70];
+  }
+  for (rest[0] of this);
+}
+function postfixIncrement() {
+  for (var _len71 = arguments.length, rest = [], _key72 = 0; _key72 < _len71; _key72++) {
+    rest[_key72 - 0] = arguments[_key72];
+  }
+  rest[0]++;
+}
+function postfixDecrement() {
+  for (var _len73 = arguments.length, rest = [], _key74 = 0; _key74 < _len73; _key74++) {
+    rest[_key74 - 0] = arguments[_key74];
+  }
+  rest[0]--;
+}`,
     modes: [
       {
         title: 'default',
@@ -1010,15 +2131,70 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[52],
       },
     ],
   },
   {
     title: 'parameters — rest member expression optimisation (input)',
-    source:
-      'var t = function (...items) {\n  var x = items[0];\n  var y = items[1];\n}\n\nfunction t(...items) {\n  var x = items[0];\n  var y = items[1];\n}\n\nfunction t(...items) {\n  var a = [];\n  for (var i = 0; i < items.length; i++) {\n    a.push(i);\n  }\n  return a;\n}\n\n// https://github.com/babel/babel/pull/2833#issuecomment-166039291\nfunction t(...items) {\n  for (let i = 0; i < items.length; i++) {\n    return items[i];\n  }\n}\n',
+    source: `var t = function (...items) {
+  var x = items[0];
+  var y = items[1];
+}
+
+function t(...items) {
+  var x = items[0];
+  var y = items[1];
+}
+
+function t(...items) {
+  var a = [];
+  for (var i = 0; i < items.length; i++) {
+    a.push(i);
+  }
+  return a;
+}
+
+// https://github.com/babel/babel/pull/2833#issuecomment-166039291
+function t(...items) {
+  for (let i = 0; i < items.length; i++) {
+    return items[i];
+  }
+}
+`,
     filename: 'input.js',
+    output: `var t = function () {
+  for (var _len = arguments.length, items = [], _key = 0; _key < _len; _key++) {
+    items[_key - 0] = arguments[_key];
+  }
+  var x = items[0];
+  var y = items[1];
+};
+function t() {
+  for (var _len8 = arguments.length, items = [], _key9 = 0; _key9 < _len8; _key9++) {
+    items[_key9 - 0] = arguments[_key9];
+  }
+  var x = items[0];
+  var y = items[1];
+}
+function t() {
+  for (var _len10 = arguments.length, items = [], _key11 = 0; _key11 < _len10; _key11++) {
+    items[_key11 - 0] = arguments[_key11];
+  }
+  var a = [];
+  for (var i = 0; i < items.length; i++) {
+    a.push(i);
+  }
+  return a;
+}
+// https://github.com/babel/babel/pull/2833#issuecomment-166039291
+function t() {
+  for (var _len12 = arguments.length, items = [], _key13 = 0; _key13 < _len12; _key13++) {
+    items[_key13 - 0] = arguments[_key13];
+  }
+  for (let i = 0; i < items.length; i++) {
+    return items[i];
+  }
+}`,
     modes: [
       {
         title: 'default',
@@ -1027,15 +2203,62 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[53],
       },
     ],
   },
   {
     title: 'parameters — rest multiple (input)',
-    source:
-      'var t = function (f, ...items) {\n    var x = f;\n    x = items[0];\n    x = items[1];\n};\n\nfunction t(f, ...items) {\n    var x = f;\n    x = items[0];\n    x = items[1];\n}\n\nfunction u(f, g, ...items) {\n    var x = f;\n    var y = g;\n    x[12] = items[0];\n    y.prop = items[1];\n    var z = items[2] | 0 || 12;\n}\n',
+    source: `var t = function (f, ...items) {
+    var x = f;
+    x = items[0];
+    x = items[1];
+};
+
+function t(f, ...items) {
+    var x = f;
+    x = items[0];
+    x = items[1];
+}
+
+function u(f, g, ...items) {
+    var x = f;
+    var y = g;
+    x[12] = items[0];
+    y.prop = items[1];
+    var z = items[2] | 0 || 12;
+}
+`,
     filename: 'input.js',
+    output: `var t = function (_arg) {
+  let f = arguments.length > 0 ? arguments[0] : void 0;
+  for (var _len = arguments.length, items = [], _key = 1; _key < _len; _key++) {
+    items[_key - 1] = arguments[_key];
+  }
+  var x = f;
+  x = items[0];
+  x = items[1];
+};
+function t(_arg13) {
+  let f = arguments.length > 0 ? arguments[0] : void 0;
+  for (var _len11 = arguments.length, items = [], _key12 = 1; _key12 < _len11; _key12++) {
+    items[_key12 - 1] = arguments[_key12];
+  }
+  var x = f;
+  x = items[0];
+  x = items[1];
+}
+function u(_arg16, _arg17) {
+  let f = arguments.length > 0 ? arguments[0] : void 0;
+  let g = arguments.length > 1 ? arguments[1] : void 0;
+  for (var _len14 = arguments.length, items = [], _key15 = 2; _key15 < _len14; _key15++) {
+    items[_key15 - 2] = arguments[_key15];
+  }
+  var x = f;
+  var y = g;
+  x[12] = items[0];
+  y.prop = items[1];
+  var z = items[2] | 0 || 12;
+}`,
     modes: [
       {
         title: 'default',
@@ -1044,15 +2267,93 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[54],
       },
     ],
   },
   {
     title: 'parameters — rest nested 5656 (input)',
-    source:
-      'function a(...args) {\n  const foo = (...list) => bar(...list);\n  foo(...args);\n}\n\nfunction b(...args) {\n  const foo = (...args) => bar(...args);\n  foo(...args);\n}\n\nfunction c(...args) {\n  const foo = (...args) => bar(...args);\n  foo([]);\n}\n\nfunction d(thing, ...args) {\n  const foo = (...args) => bar(...args);\n  {\n    let args = thing;\n    foo(thing);\n  }\n}\n',
+    source: `function a(...args) {
+  const foo = (...list) => bar(...list);
+  foo(...args);
+}
+
+function b(...args) {
+  const foo = (...args) => bar(...args);
+  foo(...args);
+}
+
+function c(...args) {
+  const foo = (...args) => bar(...args);
+  foo([]);
+}
+
+function d(thing, ...args) {
+  const foo = (...args) => bar(...args);
+  {
+    let args = thing;
+    foo(thing);
+  }
+}
+`,
     filename: 'input.js',
+    output: `function a() {
+  for (var _len = arguments.length, args = [], _key = 0; _key < _len; _key++) {
+    args[_key - 0] = arguments[_key];
+  }
+  const foo = function () {
+    for (var _len11 = arguments.length, list = [], _key12 = 0; _key12 < _len11; _key12++) {
+      list[_key12 - 0] = arguments[_key12];
+    }
+    return bar(...list);
+  };
+  foo(...args);
+}
+function b() {
+  for (var _len13 = arguments.length, args = [], _key14 = 0; _key14 < _len13; _key14++) {
+    args[_key14 - 0] = arguments[_key14];
+  }
+  return (args => {
+    const foo = function () {
+      for (var _len15 = arguments.length, args = [], _key16 = 0; _key16 < _len15; _key16++) {
+        args[_key16 - 0] = arguments[_key16];
+      }
+      return bar(...args);
+    };
+    foo(...args);
+  })(args);
+}
+function c() {
+  for (var _len17 = arguments.length, args = [], _key18 = 0; _key18 < _len17; _key18++) {
+    args[_key18 - 0] = arguments[_key18];
+  }
+  return (args => {
+    const foo = function () {
+      for (var _len19 = arguments.length, args = [], _key20 = 0; _key20 < _len19; _key20++) {
+        args[_key20 - 0] = arguments[_key20];
+      }
+      return bar(...args);
+    };
+    foo([]);
+  })(args);
+}
+function d(_arg) {
+  let thing = arguments.length > 0 ? arguments[0] : void 0;
+  for (var _len21 = arguments.length, args = [], _key22 = 1; _key22 < _len21; _key22++) {
+    args[_key22 - 1] = arguments[_key22];
+  }
+  return (args => {
+    const foo = function () {
+      for (var _len24 = arguments.length, args = [], _key25 = 0; _key25 < _len24; _key25++) {
+        args[_key25 - 0] = arguments[_key25];
+      }
+      return bar(...args);
+    };
+    {
+      let args = thing;
+      foo(thing);
+    }
+  })(args);
+}`,
     modes: [
       {
         title: 'default',
@@ -1061,15 +2362,29 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[55],
       },
     ],
   },
   {
     title: 'parameters — rest nested iife (input)',
-    source:
-      'function broken(x, ...foo) {\n  if (true) {\n    class Foo extends Bar { }\n    return hello(...foo)\n  }\n}\n',
+    source: `function broken(x, ...foo) {
+  if (true) {
+    class Foo extends Bar { }
+    return hello(...foo)
+  }
+}
+`,
     filename: 'input.js',
+    output: `function broken(_arg) {
+  let x = arguments.length > 0 ? arguments[0] : void 0;
+  for (var _len = arguments.length, foo = [], _key = 1; _key < _len; _key++) {
+    foo[_key - 1] = arguments[_key];
+  }
+  if (true) {
+    class Foo extends Bar {}
+    return hello(...foo);
+  }
+}`,
     modes: [
       {
         title: 'default',
@@ -1078,15 +2393,26 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[56],
       },
     ],
   },
   {
     title: 'parameters — rest patterns (exec)',
-    source:
-      'function foo(...{ length }) {\n  return length;\n}\n\nexpect(foo(1, 2, 3)).toEqual(3);\n',
+    source: `function foo(...{ length }) {
+  return length;
+}
+
+expect(foo(1, 2, 3)).toEqual(3);
+`,
     filename: 'exec.js',
+    output: `function foo() {
+  for (var _len = arguments.length, _args = [], _key = 0; _key < _len; _key++) {
+    _args[_key - 0] = arguments[_key];
+  }
+  let { length } = _args;
+  return length;
+}
+expect(foo(1, 2, 3)).toEqual(3);`,
     modes: [
       {
         title: 'default',
@@ -1095,14 +2421,20 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[57],
       },
     ],
   },
   {
     title: 'parameters — rest patterns (input)',
-    source: 'function foo(...[a]) {}\n',
+    source: `function foo(...[a]) {}
+`,
     filename: 'input.js',
+    output: `function foo() {
+  for (var _len = arguments.length, _args = [], _key = 0; _key < _len; _key++) {
+    _args[_key - 0] = arguments[_key];
+  }
+  let [a] = _args;
+}`,
     modes: [
       {
         title: 'default',
@@ -1111,15 +2443,61 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[58],
       },
     ],
   },
   {
     title: 'parameters — rest spread optimisation (input)',
-    source:
-      '// optimisation\n\nfunction foo(...bar) {\n  foo(...bar);\n}\n\n// deoptimisation\n\nfunction foo(a, ...b) {\n  foo(...b);\n}\n\nfunction foo(...b) {\n  foo(1, ...b);\n}\n\nfunction foo(...args){\n  args.pop()\n  foo(...args);\n}\n',
+    source: `// optimisation
+
+function foo(...bar) {
+  foo(...bar);
+}
+
+// deoptimisation
+
+function foo(a, ...b) {
+  foo(...b);
+}
+
+function foo(...b) {
+  foo(1, ...b);
+}
+
+function foo(...args){
+  args.pop()
+  foo(...args);
+}
+`,
     filename: 'input.js',
+    output: `// optimisation
+function foo() {
+  for (var _len = arguments.length, bar = [], _key = 0; _key < _len; _key++) {
+    bar[_key - 0] = arguments[_key];
+  }
+  foo(...bar);
+}
+// deoptimisation
+function foo(_arg) {
+  let a = arguments.length > 0 ? arguments[0] : void 0;
+  for (var _len7 = arguments.length, b = [], _key8 = 1; _key8 < _len7; _key8++) {
+    b[_key8 - 1] = arguments[_key8];
+  }
+  foo(...b);
+}
+function foo() {
+  for (var _len10 = arguments.length, b = [], _key11 = 0; _key11 < _len10; _key11++) {
+    b[_key11 - 0] = arguments[_key11];
+  }
+  foo(1, ...b);
+}
+function foo() {
+  for (var _len12 = arguments.length, args = [], _key13 = 0; _key13 < _len12; _key13++) {
+    args[_key13 - 0] = arguments[_key13];
+  }
+  args.pop();
+  foo(...args);
+}`,
     modes: [
       {
         title: 'default',
@@ -1128,15 +2506,33 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[59],
       },
     ],
   },
   {
     title: 'parameters — rest ts this parameter (input)',
-    source:
-      'function u(this: Foo, ...items) {\n  items[0];\n}\n\nfunction v(this: Foo, event: string, ...args: any[]) {\n  args;\n}\n',
+    source: `function u(this: Foo, ...items) {
+  items[0];
+}
+
+function v(this: Foo, event: string, ...args: any[]) {
+  args;
+}
+`,
     filename: 'input.ts',
+    output: `function u() {
+  for (var _len = arguments.length, items = [], _key = 0; _key < _len; _key++) {
+    items[_key - 0] = arguments[_key];
+  }
+  items[0];
+}
+function v(_arg) {
+  let event = arguments.length > 0 ? arguments[0] : void 0;
+  for (var _len7 = arguments.length, args = [], _key8 = 1; _key8 < _len7; _key8++) {
+    args[_key8 - 1] = arguments[_key8];
+  }
+  args;
+}`,
     modes: [
       {
         title: 'default',
@@ -1146,15 +2542,26 @@ export const fixtureCases = [
           },
           typescript: 'strip',
         },
-        output: expectedOutputs[60],
       },
     ],
   },
   {
     title: 'parameters — var for body same as param (exec)',
-    source:
-      'function foo(a = 2) {\n  for (var i of [0]) var a = 1;\n  expect(a).toBe(1);\n}\nfoo();\n',
+    source: `function foo(a = 2) {
+  for (var i of [0]) var a = 1;
+  expect(a).toBe(1);
+}
+foo();
+`,
     filename: 'exec.js',
+    output: `function foo() {
+  let a = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 2;
+  return (a => {
+    for (var i of [0]) var a = 1;
+    expect(a).toBe(1);
+  })(a);
+}
+foo();`,
     modes: [
       {
         title: 'default',
@@ -1163,14 +2570,26 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[61],
       },
     ],
   },
   {
     title: 'parameters — var for init same as param (exec)',
-    source: 'function foo(a = 2) {\n  for (var [a] of [[1]]);\n  expect(a).toBe(1);\n}\nfoo();\n',
+    source: `function foo(a = 2) {
+  for (var [a] of [[1]]);
+  expect(a).toBe(1);
+}
+foo();
+`,
     filename: 'exec.js',
+    output: `function foo() {
+  let a = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 2;
+  return (a => {
+    for (var [a] of [[1]]);
+    expect(a).toBe(1);
+  })(a);
+}
+foo();`,
     modes: [
       {
         title: 'default',
@@ -1179,14 +2598,26 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[62],
       },
     ],
   },
   {
     title: 'parameters — var no init for body same as param (exec)',
-    source: 'function foo(a = 2) {\n  for (var i of [0]) var a;\n  expect(a).toBe(2);\n}\nfoo();\n',
+    source: `function foo(a = 2) {
+  for (var i of [0]) var a;
+  expect(a).toBe(2);
+}
+foo();
+`,
     filename: 'exec.js',
+    output: `function foo() {
+  let a = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 2;
+  return (a => {
+    for (var i of [0]) var a;
+    expect(a).toBe(2);
+  })(a);
+}
+foo();`,
     modes: [
       {
         title: 'default',
@@ -1195,15 +2626,26 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[63],
       },
     ],
   },
   {
     title: 'parameters — var no init for init same as param (exec)',
-    source:
-      'function foo(a = 2) {\n  for (var a, i = 0; i < 1; i++);\n  expect(a).toBe(2);\n}\nfoo();\n',
+    source: `function foo(a = 2) {
+  for (var a, i = 0; i < 1; i++);
+  expect(a).toBe(2);
+}
+foo();
+`,
     filename: 'exec.js',
+    output: `function foo() {
+  let a = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 2;
+  return (a => {
+    for (var a, i = 0; i < 1; i++);
+    expect(a).toBe(2);
+  })(a);
+}
+foo();`,
     modes: [
       {
         title: 'default',
@@ -1212,14 +2654,30 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[64],
       },
     ],
   },
   {
     title: 'parameters — var no init same as param (input)',
-    source: 'function f(a = 2, b = 3) {\n  var a, b = 4;\n  var a;\n  var b;\n  return a + b;\n}\n',
+    source: `function f(a = 2, b = 3) {
+  var a, b = 4;
+  var a;
+  var b;
+  return a + b;
+}
+`,
     filename: 'input.js',
+    output: `function f() {
+  let a = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 2;
+  let b = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : 3;
+  return ((a, b) => {
+    var a,
+      b = 4;
+    var a;
+    var b;
+    return a + b;
+  })(a, b);
+}`,
     modes: [
       {
         title: 'default',
@@ -1228,14 +2686,27 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[65],
       },
     ],
   },
   {
     title: 'parameters — var no init then var with init same as param (input)',
-    source: 'function f(a = 2, b = 3) {\n  var a;\n  var { a } = { a: 4 };\n  return a + b;\n}\n',
+    source: `function f(a = 2, b = 3) {
+  var a;
+  var { a } = { a: 4 };
+  return a + b;
+}
+`,
     filename: 'input.js',
+    output: `function f() {
+  let a = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 2;
+  let b = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : 3;
+  return (a => {
+    var a;
+    var { a } = { a: 4 };
+    return a + b;
+  })(a);
+}`,
     modes: [
       {
         title: 'default',
@@ -1244,14 +2715,26 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[66],
       },
     ],
   },
   {
     title: 'parameters — var same as array pattern param (input)',
-    source: 'function foo({a, b}) {\n  var a = 3;\n  var c = 2;\n  var d = a + b + c;\n}\n',
+    source: `function foo({a, b}) {
+  var a = 3;
+  var c = 2;
+  var d = a + b + c;
+}
+`,
     filename: 'input.js',
+    output: `function foo() {
+  let { a, b } = arguments.length > 0 ? arguments[0] : void 0;
+  return (a => {
+    var a = 3;
+    var c = 2;
+    var d = a + b + c;
+  })(a);
+}`,
     modes: [
       {
         title: 'default',
@@ -1260,14 +2743,26 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[67],
       },
     ],
   },
   {
     title: 'parameters — var same as object pattern param (input)',
-    source: 'function foo([a, b]) {\n  var a = 3;\n  var c = 2;\n  var d = a + b + c;\n}\n',
+    source: `function foo([a, b]) {
+  var a = 3;
+  var c = 2;
+  var d = a + b + c;
+}
+`,
     filename: 'input.js',
+    output: `function foo() {
+  let [a, b] = arguments.length > 0 ? arguments[0] : void 0;
+  return (a => {
+    var a = 3;
+    var c = 2;
+    var d = a + b + c;
+  })(a);
+}`,
     modes: [
       {
         title: 'default',
@@ -1276,15 +2771,38 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[68],
       },
     ],
   },
   {
     title: 'parameters — var same as param closure (exec)',
-    source:
-      'var x = 1\nfunction foo(x, y = function () { x = 2 }) {\n  var x = 3\n  y()\n  expect(x).toBe(3);\n}\nfoo()\nexpect(x).toBe(1);\n',
+    source: `var x = 1
+function foo(x, y = function () { x = 2 }) {
+  var x = 3
+  y()
+  expect(x).toBe(3);
+}
+foo()
+expect(x).toBe(1);
+`,
     filename: 'exec.js',
+    output: `var x = 1;
+function foo(_arg) {
+  let x = arguments.length > 0 ? arguments[0] : void 0;
+  let y =
+    arguments.length > 1 && arguments[1] !== void 0
+      ? arguments[1]
+      : function () {
+          x = 2;
+        };
+  return (x => {
+    var x = 3;
+    y();
+    expect(x).toBe(3);
+  })(x);
+}
+foo();
+expect(x).toBe(1);`,
     modes: [
       {
         title: 'default',
@@ -1293,14 +2811,22 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[69],
       },
     ],
   },
   {
     title: 'parameters — var same as param (input)',
-    source: 'function foo(a = 2) {\n  var a = 1;\n}\n',
+    source: `function foo(a = 2) {
+  var a = 1;
+}
+`,
     filename: 'input.js',
+    output: `function foo() {
+  let a = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 2;
+  return (a => {
+    var a = 1;
+  })(a);
+}`,
     modes: [
       {
         title: 'default',
@@ -1309,15 +2835,42 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[70],
       },
     ],
   },
   {
     title: 'parameters — var same name as nested in rest param 2 (input)',
-    source:
-      'function f(...{ length: x = 0, y = x }) {\n  var x;\n  return x;\n}\n\nfunction g(...{ length: x = 0, y = x }) {\n  var x = 1;\n  return x;\n}\n',
+    source: `function f(...{ length: x = 0, y = x }) {
+  var x;
+  return x;
+}
+
+function g(...{ length: x = 0, y = x }) {
+  var x = 1;
+  return x;
+}
+`,
     filename: 'input.js',
+    output: `function f() {
+  for (var _len = arguments.length, _args = [], _key = 0; _key < _len; _key++) {
+    _args[_key - 0] = arguments[_key];
+  }
+  let { length: x = 0, y = x } = _args;
+  return (x => {
+    var x;
+    return x;
+  })(x);
+}
+function g() {
+  for (var _len8 = arguments.length, _args7 = [], _key9 = 0; _key9 < _len8; _key9++) {
+    _args7[_key9 - 0] = arguments[_key9];
+  }
+  let { length: x = 0, y = x } = _args7;
+  return (x => {
+    var x = 1;
+    return x;
+  })(x);
+}`,
     modes: [
       {
         title: 'default',
@@ -1326,15 +2879,42 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[71],
       },
     ],
   },
   {
     title: 'parameters — var same name as nested in rest param (input)',
-    source:
-      'function f(...[x, y = x]) {\n  var x;\n  return x;\n}\n\nfunction g(...[x, y = x]) {\n  var x = 1;\n  return x;\n}\n',
+    source: `function f(...[x, y = x]) {
+  var x;
+  return x;
+}
+
+function g(...[x, y = x]) {
+  var x = 1;
+  return x;
+}
+`,
     filename: 'input.js',
+    output: `function f() {
+  for (var _len = arguments.length, _args = [], _key = 0; _key < _len; _key++) {
+    _args[_key - 0] = arguments[_key];
+  }
+  let [x, y = x] = _args;
+  return (x => {
+    var x;
+    return x;
+  })(x);
+}
+function g() {
+  for (var _len8 = arguments.length, _args7 = [], _key9 = 0; _key9 < _len8; _key9++) {
+    _args7[_key9 - 0] = arguments[_key9];
+  }
+  let [x, y = x] = _args7;
+  return (x => {
+    var x = 1;
+    return x;
+  })(x);
+}`,
     modes: [
       {
         title: 'default',
@@ -1343,15 +2923,40 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[72],
       },
     ],
   },
   {
     title: 'parameters — var same name as rest param (input)',
-    source:
-      'function f(...x) {\n  var x;\n  return x;\n}\n\nfunction g(...x) {\n  var x = 1;\n  return x;\n}\n',
+    source: `function f(...x) {
+  var x;
+  return x;
+}
+
+function g(...x) {
+  var x = 1;
+  return x;
+}
+`,
     filename: 'input.js',
+    output: `function f() {
+  for (var _len = arguments.length, x = [], _key = 0; _key < _len; _key++) {
+    x[_key - 0] = arguments[_key];
+  }
+  return (x => {
+    var x;
+    return x;
+  })(x);
+}
+function g() {
+  for (var _len5 = arguments.length, x = [], _key6 = 0; _key6 < _len5; _key6++) {
+    x[_key6 - 0] = arguments[_key6];
+  }
+  return (x => {
+    var x = 1;
+    return x;
+  })(x);
+}`,
     modes: [
       {
         title: 'default',
@@ -1360,15 +2965,29 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[73],
       },
     ],
   },
   {
     title: 'parameters — var with init then var no init same as param (input)',
-    source:
-      'function f(a = 2, b = 3) {\n  var { a } = { a: 4 };\n  var a;\n  var b;\n  return a + b;\n}\n',
+    source: `function f(a = 2, b = 3) {
+  var { a } = { a: 4 };
+  var a;
+  var b;
+  return a + b;
+}
+`,
     filename: 'input.js',
+    output: `function f() {
+  let a = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 2;
+  let b = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : 3;
+  return ((a, b) => {
+    var { a } = { a: 4 };
+    var a;
+    var b;
+    return a + b;
+  })(a, b);
+}`,
     modes: [
       {
         title: 'default',
@@ -1377,14 +2996,22 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[74],
       },
     ],
   },
   {
     title: 'regression — 11231 (input)',
-    source: '(i = "__proto__") => {\n  for (var i in {});\n};\n',
+    source: `(i = "__proto__") => {
+  for (var i in {});
+};
+`,
     filename: 'input.mjs',
+    output: `(function () {
+  let i = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : '__proto__';
+  return (i => {
+    for (var i in {});
+  })(i);
+});`,
     modes: [
       {
         title: 'default',
@@ -1393,14 +3020,27 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[75],
       },
     ],
   },
   {
     title: 'regression — 11256 (input)',
-    source: 'class A {\n  a = b => {\n    {\n      ({ b } = {});\n    }\n  };\n}\n',
+    source: `class A {
+  a = b => {
+    {
+      ({ b } = {});
+    }
+  };
+}
+`,
     filename: 'input.js',
+    output: `class A {
+  a = b => {
+    {
+      ({ b } = {});
+    }
+  };
+}`,
     modes: [
       {
         title: 'default',
@@ -1409,15 +3049,28 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[76],
       },
     ],
   },
   {
     title: 'regression — 11303 (exec)',
-    source:
-      'function test(a, b = 1) {\n  var a = a + b;\n  return a;\n}\n\nexpect(test(2)).toBe(3);\n',
+    source: `function test(a, b = 1) {
+  var a = a + b;
+  return a;
+}
+
+expect(test(2)).toBe(3);
+`,
     filename: 'exec.js',
+    output: `function test(_arg) {
+  let a = arguments.length > 0 ? arguments[0] : void 0;
+  let b = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : 1;
+  return (a => {
+    var a = a + b;
+    return a;
+  })(a);
+}
+expect(test(2)).toBe(3);`,
     modes: [
       {
         title: 'default',
@@ -1426,14 +3079,25 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[77],
       },
     ],
   },
   {
     title: 'regression — 11303 (input)',
-    source: 'function test(a, b = 1) {\n  var a = a + b;\n  return a;\n}\n',
+    source: `function test(a, b = 1) {
+  var a = a + b;
+  return a;
+}
+`,
     filename: 'input.js',
+    output: `function test(_arg) {
+  let a = arguments.length > 0 ? arguments[0] : void 0;
+  let b = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : 1;
+  return (a => {
+    var a = a + b;
+    return a;
+  })(a);
+}`,
     modes: [
       {
         title: 'default',
@@ -1442,15 +3106,30 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[78],
       },
     ],
   },
   {
     title: 'regression — 11344 flow (input)',
-    source:
-      '// @flow\nfunction a(b: (c) => void = {}) {\n  let c;\n}\n\nfunction d(e = <T>() => {}) {\n  let T;\n}\n',
+    source: `// @flow
+function a(b: (c) => void = {}) {
+  let c;
+}
+
+function d(e = <T>() => {}) {
+  let T;
+}
+`,
     filename: 'input.js',
+    output: `// @flow
+function a() {
+  let b = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : {};
+  let c;
+}
+function d() {
+  let e = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : () => {};
+  let T;
+}`,
     modes: [
       {
         title: 'default',
@@ -1459,15 +3138,28 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[79],
       },
     ],
   },
   {
     title: 'regression — 11344 typescript (input)',
-    source:
-      'function a(b: (c) => void = {}) {\n  let c;\n}\n\nfunction d(e = <T>() => {}) {\n  let T;\n}\n',
+    source: `function a(b: (c) => void = {}) {
+  let c;
+}
+
+function d(e = <T>() => {}) {
+  let T;
+}
+`,
     filename: 'input.js',
+    output: `function a() {
+  let b = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : {};
+  let c;
+}
+function d() {
+  let e = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : () => {};
+  let T;
+}`,
     modes: [
       {
         title: 'default',
@@ -1477,15 +3169,36 @@ export const fixtureCases = [
           },
           typescript: 'strip',
         },
-        output: expectedOutputs[80],
       },
     ],
   },
   {
     title: 'regression — 13939 complex (input)',
-    source:
-      'class A extends B {\n  handle = ((x = 0) => {\n    console.log(x, this, new.target, super.y);\n  })(() => {\n    let y = 0;\n    return (x = y) => x + this;\n  })((x = 1) => {})(this);\n}\n',
+    source: `class A extends B {
+  handle = ((x = 0) => {
+    console.log(x, this, new.target, super.y);
+  })(() => {
+    let y = 0;
+    return (x = y) => x + this;
+  })((x = 1) => {})(this);
+}
+`,
     filename: 'input.js',
+    output: `class A extends B {
+  handle = (() => {
+    let x = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 0;
+    console.log(x, this, new.target, super.y);
+  })(() => {
+    let y = 0;
+    var _this = this;
+    return function () {
+      let x = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : y;
+      return x + _this;
+    };
+  })(function () {
+    let x = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 1;
+  })(this);
+}`,
     modes: [
       {
         title: 'default',
@@ -1494,15 +3207,36 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[81],
       },
     ],
   },
   {
     title: 'regression — 13939 private complex (input)',
-    source:
-      'class A extends B {\n  #handle = ((x = 0) => {\n    console.log(x, this, new.target, super.y);\n  })(() => {\n    let y = 0;\n    return (x = y) => x + this;\n  })((x = 1) => {})(this);\n}\n',
+    source: `class A extends B {
+  #handle = ((x = 0) => {
+    console.log(x, this, new.target, super.y);
+  })(() => {
+    let y = 0;
+    return (x = y) => x + this;
+  })((x = 1) => {})(this);
+}
+`,
     filename: 'input.js',
+    output: `class A extends B {
+  #handle = (() => {
+    let x = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 0;
+    console.log(x, this, new.target, super.y);
+  })(() => {
+    let y = 0;
+    var _this = this;
+    return function () {
+      let x = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : y;
+      return x + _this;
+    };
+  })(function () {
+    let x = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 1;
+  })(this);
+}`,
     modes: [
       {
         title: 'default',
@@ -1511,14 +3245,24 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[82],
       },
     ],
   },
   {
     title: 'regression — 13939 private (input)',
-    source: 'class A {\n  #handle = (x = 0) => {\n    console.log(x);\n  };\n}\n',
+    source: `class A {
+  #handle = (x = 0) => {
+    console.log(x);
+  };
+}
+`,
     filename: 'input.js',
+    output: `class A {
+  #handle = function () {
+    let x = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 0;
+    console.log(x);
+  };
+}`,
     modes: [
       {
         title: 'default',
@@ -1527,14 +3271,24 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[83],
       },
     ],
   },
   {
     title: 'regression — 13939 (input)',
-    source: 'class A {\n  handle = (x = 0) => {\n    console.log(x);\n  };\n}\n',
+    source: `class A {
+  handle = (x = 0) => {
+    console.log(x);
+  };
+}
+`,
     filename: 'input.js',
+    output: `class A {
+  handle = function () {
+    let x = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 0;
+    console.log(x);
+  };
+}`,
     modes: [
       {
         title: 'default',
@@ -1543,15 +3297,40 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[84],
       },
     ],
   },
   {
     title: 'regression — 15145 (exec)',
-    source:
-      '(function () {\nasync function * foo (p = 1) {\n  yield "hello";\n  yield p;\n}\n\nreturn (async () => {\n  const res = [];\n  for await (const x of foo()) res.push(x);\n  expect(res).toEqual(["hello", 1]);\n})();\n\n});\n',
+    source: `(function () {
+async function * foo (p = 1) {
+  yield "hello";
+  yield p;
+}
+
+return (async () => {
+  const res = [];
+  for await (const x of foo()) res.push(x);
+  expect(res).toEqual(["hello", 1]);
+})();
+
+});
+`,
     filename: 'exec.js',
+    output: `(function () {
+  function foo() {
+    let p = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 1;
+    return async function* () {
+      yield 'hello';
+      yield p;
+    }.call(this);
+  }
+  return (async () => {
+    const res = [];
+    for await (const x of foo()) res.push(x);
+    expect(res).toEqual(['hello', 1]);
+  })();
+});`,
     modes: [
       {
         title: 'default',
@@ -1560,15 +3339,32 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[85],
       },
     ],
   },
   {
     title: 'regression — 4209 (input)',
-    source:
-      "import { copy } from './copyPaste';\n\nclass Thing {\n  handleCopySomething() {\n    copy();\n  }\n\n  completelyUnrelated(copy = 123) {\n  }\n}\n",
+    source: `import { copy } from './copyPaste';
+
+class Thing {
+  handleCopySomething() {
+    copy();
+  }
+
+  completelyUnrelated(copy = 123) {
+  }
+}
+`,
     filename: 'input.mjs',
+    output: `import { copy } from './copyPaste';
+class Thing {
+  handleCopySomething() {
+    copy();
+  }
+  completelyUnrelated() {
+    let copy = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 123;
+  }
+}`,
     modes: [
       {
         title: 'default',
@@ -1577,15 +3373,31 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[86],
       },
     ],
   },
   {
     title: 'regression — 6057 expanded (input)',
-    source:
-      "import args from 'utils/url/args';\n\nexport default class App extends Component {\n  exportType = ''\n\n  componentDidMount() {\n    this.exportType = args.get('type', window.location.href);\n  }\n}\n",
+    source: `import args from 'utils/url/args';
+
+export default class App extends Component {
+  exportType = ''
+
+  componentDidMount() {
+    this.exportType = args.get('type', window.location.href);
+  }
+}
+`,
     filename: 'input.mjs',
+    output: `import args from 'utils/url/args';
+
+export default class App extends Component {
+  exportType = '';
+
+  componentDidMount() {
+    this.exportType = args.get('type', window.location.href);
+  }
+}`,
     modes: [
       {
         title: 'default',
@@ -1594,14 +3406,25 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[87],
       },
     ],
   },
   {
     title: 'regression — 6057 simple (input)',
-    source: "const a = 'bar';\nfunction foo(...a) {\n  return a;\n}\n\n",
+    source: `const a = 'bar';
+function foo(...a) {
+  return a;
+}
+
+`,
     filename: 'input.js',
+    output: `const a = 'bar';
+function foo() {
+  for (var _len = arguments.length, a = [], _key = 0; _key < _len; _key++) {
+    a[_key - 0] = arguments[_key];
+  }
+  return a;
+}`,
     modes: [
       {
         title: 'default',
@@ -1610,15 +3433,36 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[88],
       },
     ],
   },
   {
     title: 'regression — regression 2364 (input)',
-    source:
-      'function wrapper(fn) {\n  return (...args) => {\n    while (someCondition) {\n      const val = fn(...args);\n      return val.test(() => {\n        console.log(val);\n      });\n    }\n  };\n}\n',
+    source: `function wrapper(fn) {
+  return (...args) => {
+    while (someCondition) {
+      const val = fn(...args);
+      return val.test(() => {
+        console.log(val);
+      });
+    }
+  };
+}
+`,
     filename: 'input.js',
+    output: `function wrapper(fn) {
+  return function () {
+    for (var _len = arguments.length, args = [], _key = 0; _key < _len; _key++) {
+      args[_key - 0] = arguments[_key];
+    }
+    while (someCondition) {
+      const val = fn(...args);
+      return val.test(() => {
+        console.log(val);
+      });
+    }
+  };
+}`,
     modes: [
       {
         title: 'default',
@@ -1627,15 +3471,52 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[89],
       },
     ],
   },
   {
     title: 'regression — scope async param error async (exec)',
-    source:
-      '(function () {\nconst err = new Error();\n\nasync function f(a = (() => { throw err })()) {\n  throw 1;\n  var a = await a;\n  return a;\n}\n\nreturn (async () => {\n  let p;\n  expect(() => { p = f() }).not.toThrow();\n  await expect(p).rejects.toThrow(err);\n})();\n\n});\n',
+    source: `(function () {
+const err = new Error();
+
+async function f(a = (() => { throw err })()) {
+  throw 1;
+  var a = await a;
+  return a;
+}
+
+return (async () => {
+  let p;
+  expect(() => { p = f() }).not.toThrow();
+  await expect(p).rejects.toThrow(err);
+})();
+
+});
+`,
     filename: 'exec.js',
+    output: `(function () {
+  const err = new Error();
+  async function f() {
+    let a =
+      arguments.length > 0 && arguments[0] !== void 0
+        ? arguments[0]
+        : (() => {
+            throw err;
+          })();
+    return (async a => {
+      throw 1;
+      var a = await a;
+      return a;
+    })(a);
+  }
+  return (async () => {
+    let p;
+    expect(() => {
+      p = f();
+    }).not.toThrow();
+    await expect(p).rejects.toThrow(err);
+  })();
+});`,
     modes: [
       {
         title: 'default',
@@ -1644,15 +3525,48 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[90],
       },
     ],
   },
   {
     title: 'regression — scope gen async (input)',
-    source:
-      'function* f(a = 1) {\n  var a = yield a;\n  return a;\n}\n\nasync function g(a = 1) {\n  var a = await a;\n  return a;\n}\n\nasync function* h(a = 1) {\n  var a = await (yield a);\n  return a;\n}\n',
+    source: `function* f(a = 1) {
+  var a = yield a;
+  return a;
+}
+
+async function g(a = 1) {
+  var a = await a;
+  return a;
+}
+
+async function* h(a = 1) {
+  var a = await (yield a);
+  return a;
+}
+`,
     filename: 'input.js',
+    output: `function f() {
+  let a = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 1;
+  return function* (a) {
+    var a = yield a;
+    return a;
+  }.call(this, a);
+}
+async function g() {
+  let a = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 1;
+  return (async a => {
+    var a = await a;
+    return a;
+  })(a);
+}
+function h() {
+  let a = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 1;
+  return async function* (a) {
+    var a = await (yield a);
+    return a;
+  }.call(this, a);
+}`,
     modes: [
       {
         title: 'default',
@@ -1661,7 +3575,6 @@ export const fixtureCases = [
             parameters: true,
           },
         },
-        output: expectedOutputs[91],
       },
     ],
   },

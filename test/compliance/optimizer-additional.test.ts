@@ -1,5 +1,5 @@
 import { runInNewContext } from 'node:vm';
-import { beforeAll, describe, expect, test } from 'vitest';
+import { expect, test } from 'vitest';
 import { compile } from './runtime';
 
 // A .js file without module syntax is parsed as Script. Use a script realm so
@@ -28,15 +28,7 @@ function run(source: string): unknown {
   return context.result;
 }
 
-describe.each(cases)('$name', ({ source }) => {
-  let code: string;
-  beforeAll(() => {
-    code = compile(source, { optimize: { deadCodeElimination: true } }, 'input.js');
-  });
-  test('native script control', () => {
-    expect(run(source)).toBe(3);
-  });
-  test('transformed script preserves the global binding', () => {
-    expect(run(code)).toBe(3);
-  });
+test.each(cases)('$name', ({ source }) => {
+  const code = compile(source, { optimize: { deadCodeElimination: true } }, 'input.js');
+  expect(run(code)).toBe(3);
 });

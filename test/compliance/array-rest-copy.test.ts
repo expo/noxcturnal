@@ -18,11 +18,14 @@ for (const mode of ['inline', 'runtime'] as const) {
       const [...iterated] = new Set([4, 5]);
       declared.push(9);
       assigned[0] = 8;
-      globalThis.result = [
-        Array.from(input), declared, assigned, iterated,
-        Object.getPrototypeOf(declared) === Array.prototype,
-        declared !== assigned,
-      ];
+      globalThis.result = {
+        input: Array.from(input),
+        declared,
+        assigned,
+        iterated,
+        plainArray: Object.getPrototypeOf(declared) === Array.prototype,
+        independentCopies: declared !== assigned,
+      };
     `,
       {
         transforms: { destructuring: true },
@@ -30,6 +33,13 @@ for (const mode of ['inline', 'runtime'] as const) {
       },
       { require },
     );
-    expect(result.result).toEqual([[1, 2, 3], [1, 2, 3, 9], [8, 2, 3], [4, 5], true, true]);
+    expect(result.result).toEqual({
+      input: [1, 2, 3],
+      declared: [1, 2, 3, 9],
+      assigned: [8, 2, 3],
+      iterated: [4, 5],
+      plainArray: true,
+      independentCopies: true,
+    });
   });
 }

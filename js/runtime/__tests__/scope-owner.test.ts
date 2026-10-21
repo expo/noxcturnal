@@ -1,5 +1,4 @@
-import { transformSync, type NodePath } from '@babel/core';
-import { beforeAll, describe, expect, test } from 'vitest';
+import { expect, test } from 'vitest';
 import { defineNativePipeline, defineNativePlugin, defineVisitor, transform } from '../../index';
 const cases = [
   { type: 'ForStatement', name: 'index', source: 'for(let index=0;index<2;index++){}' },
@@ -14,40 +13,21 @@ const cases = [
   { type: 'FunctionDeclaration', name: 'param', source: 'function f(param){}' },
   { type: 'ArrowFunctionExpression', name: 'param', source: 'const f=param=>param;' },
 ] as const;
-describe.each(cases)('$type owner scope', entry => {
-  let nox: unknown, babel: unknown;
-  beforeAll(() => {
-    transformSync(entry.source, {
-      configFile: false,
-      babelrc: false,
-      plugins: [
-        () => ({
-          visitor: {
-            [entry.type](path: NodePath) {
-              babel = path.scope.hasBinding(entry.name);
-            },
-          },
-        }),
-      ],
-    });
-    const plugin = defineNativePlugin({
-      name: 'owner-scope-audit',
-      visitors: [
-        defineVisitor(entry.type, { scope: true }, path => {
-          nox = path.scope.hasBinding(entry.name);
-        }),
-      ],
-    });
-    const result = transform(
-      entry.source,
-      'input.js',
-      defineNativePipeline({ phases: [{ name: 'inspect', plugins: [plugin] }] }),
-    );
-    expect(result.status).toBe('complete');
-    expect(typeof nox).toBe('boolean');
+test.each(cases)('$type owner path exposes its local binding', entry => {
+  let nox: unknown;
+  const plugin = defineNativePlugin({
+    name: 'owner-scope-audit',
+    visitors: [
+      defineVisitor(entry.type, { scope: true }, path => {
+        nox = path.scope.hasBinding(entry.name);
+      }),
+    ],
   });
-  test('Babel sees the scope-owned binding', () => expect(babel).toBe(true));
-  const check =
-    entry.type === 'FunctionDeclaration' || entry.type === 'ArrowFunctionExpression' ? test : test;
-  check('owner path exposes its local binding', () => expect(nox).toBe(true));
+  const result = transform(
+    entry.source,
+    'input.js',
+    defineNativePipeline({ phases: [{ name: 'inspect', plugins: [plugin] }] }),
+  );
+  expect(result.status).toBe('complete');
+  expect(nox).toBe(true);
 });

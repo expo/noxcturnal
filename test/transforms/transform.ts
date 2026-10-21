@@ -19,8 +19,7 @@ export async function transformSource(
     filename,
     defineNativePipeline({ phases: [{ name: 'preflight', native: preflight }] }),
   );
-  expect(result.status, JSON.stringify(result)).toBe('complete');
-  if (result.status !== 'complete') return '';
+  if (result.status !== 'complete') throw new Error(JSON.stringify(result));
 
   const formatted = await format('output.js', result.code, {
     arrowParens: 'avoid',
@@ -81,7 +80,9 @@ export function expectBailout(
     filename,
     defineNativePipeline({ phases: [{ name: 'preflight', native: preflight }] }),
   );
-  expect(result.status, JSON.stringify(result)).toBe('bailout');
+  expect(result.status, result.status === 'bailout' ? undefined : JSON.stringify(result)).toBe(
+    'bailout',
+  );
   if (result.status === 'bailout') expect(result.reason).toBe(reason);
 }
 

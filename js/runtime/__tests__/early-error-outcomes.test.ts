@@ -1,5 +1,4 @@
 import { beforeAll, describe, expect, test } from 'vitest';
-import { transformSync } from '@babel/core';
 import {
   defineNativePipeline,
   defineNativePlugin,
@@ -29,13 +28,10 @@ for (const mode of ['native', 'visitor', 'scope', 'optimize'] as const) {
     let outcome: string;
     beforeAll(() => {
       const parseNative = () => new Function(entry.source);
-      const parseBabel = () => transformSync(entry.source, { configFile: false, babelrc: false });
       if (entry.invalid) {
         expect(parseNative).toThrow(SyntaxError);
-        expect(parseBabel).toThrow(SyntaxError);
       } else {
         expect(parseNative).not.toThrow();
-        expect(parseBabel).not.toThrow();
       }
       let visits = 0;
       const plugin = defineNativePlugin({

@@ -2,12 +2,15 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { nativeTargets } from './native-lib.mjs';
+import { currentTarget, nativeTargets } from './native-lib.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
 const environment = {
   ...process.env,
   CARGO_TARGET_DIR: process.env.CARGO_TARGET_DIR ?? path.join(root, 'target', 'dev'),
+  // napi builds with an explicit host target. Use that target for Clippy and
+  // tests too, so Cargo can reuse Oxc and Hermes artifacts between the checks.
+  CARGO_BUILD_TARGET: currentTarget().rustTarget,
 };
 const before = gitStatus();
 checkRepositoryShape();
@@ -19,7 +22,7 @@ const commands = [
   ['pnpm', ['lint']],
   ['pnpm', ['build']],
   ['pnpm', ['test']],
-  ['cargo', ['test']],
+  ['cargo', ['test', '--workspace']],
   ['pnpm', ['package:check']],
 ];
 for (const [command, args] of commands) {

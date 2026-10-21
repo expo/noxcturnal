@@ -4,13 +4,12 @@ import { createEditor } from '../editor';
 import { NativeTransformSession } from '../session';
 
 const cases = [
-  { name: 'sticky starts at supplied cursor', source: 'ba', flags: 'y', cursor: 1, fails: true },
+  { name: 'sticky starts at supplied cursor', source: 'ba', flags: 'y', cursor: 1 },
   {
     name: 'sticky does not restart an exhausted cursor',
     source: 'a',
     flags: 'y',
     cursor: 1,
-    fails: true,
   },
   ...[2 ** 32, Infinity, Number.MAX_SAFE_INTEGER, -4294967295, -Infinity, NaN, 0.9, 1.9].map(
     cursor => ({
@@ -20,8 +19,8 @@ const cases = [
       cursor,
     }),
   ),
-  { name: 'ordinary regex ignores cursor', source: 'ba', flags: '', cursor: 1, fails: false },
-  { name: 'global regex resets cursor', source: 'a', flags: 'g', cursor: 1, fails: false },
+  { name: 'ordinary regex ignores cursor', source: 'ba', flags: '', cursor: 1 },
+  { name: 'global regex resets cursor', source: 'a', flags: 'g', cursor: 1 },
 ];
 describe.each(cases)('$name', entry => {
   let expected: string;

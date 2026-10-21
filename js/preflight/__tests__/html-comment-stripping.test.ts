@@ -1,4 +1,3 @@
-import { transformSync } from '@babel/core';
 import { beforeAll, describe, expect, test } from 'vitest';
 import { defineNativePipeline, transform } from '../../index';
 
@@ -15,13 +14,6 @@ describe.each([
     let output: string;
     let rendered: string;
     beforeAll(() => {
-      const reference = transformSync(source, {
-        babelrc: false,
-        configFile: false,
-        sourceType: 'script',
-        comments: false,
-      })!.code!;
-      expect(reference).not.toContain('audit-marker');
       const compile = (compact: boolean) => {
         const result = transform(
           source,
@@ -36,7 +28,7 @@ describe.each([
       };
       output = compile(false);
       rendered = compile(true);
-      for (const code of [source, reference, output, rendered]) {
+      for (const code of [output, rendered]) {
         const context: Record<string, unknown> = {};
         new Function('globalThis', code)(context);
         expect(context.result).toBe(3);

@@ -1,4 +1,3 @@
-import { transformSync, type NodePath } from '@babel/core';
 import { beforeAll, describe, expect, test } from 'vitest';
 import { defineNativePipeline, defineNativePlugin, defineVisitor, transform } from '../../index';
 const cases = [
@@ -30,21 +29,8 @@ function run(source: string) {
   return context.result;
 }
 describe.each(cases)('$name', entry => {
-  let code: string, babel: string;
+  let code: string;
   beforeAll(() => {
-    babel = transformSync(entry.source, {
-      configFile: false,
-      babelrc: false,
-      plugins: [
-        () => ({
-          visitor: {
-            NumericLiteral(path: NodePath) {
-              path.addComment('leading', 'note', entry.line);
-            },
-          },
-        }),
-      ],
-    })!.code!;
     const plugin = defineNativePlugin({
       name: 'comment-audit',
       visitors: [
@@ -61,8 +47,6 @@ describe.each(cases)('$name', entry => {
     code = result.code;
     expect(code).toContain('note');
   });
-  test('original control', async () => expect(await run(entry.source)).toBe(3));
-  test('Babel comment control', async () => expect(await run(babel)).toBe(3));
   test('comment insertion preserves the statement', async () => expect(await run(code)).toBe(3));
 });
 

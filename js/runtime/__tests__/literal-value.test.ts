@@ -1,24 +1,18 @@
-import { beforeAll, describe, expect, test } from 'vitest';
+import { expect, test } from 'vitest';
 import { codeFactory } from '../fragments';
 
-describe.each([
-  { name: 'negative zero', value: -0, fails: true },
-  { name: 'NaN with a shadowed name', value: NaN, fails: true },
-  { name: 'infinity with a shadowed name', value: Infinity, fails: true },
-  { name: 'negative infinity with a shadowed name', value: -Infinity, fails: true },
-  { name: 'finite number', value: 3.25, fails: false },
-  { name: 'negative BigInt', value: -3n, fails: false },
-])('literal factory: $name', entry => {
-  let actual: unknown;
-  beforeAll(() => {
-    const fragment = codeFactory.literal(entry.value);
-    expect(fragment.mapping).toBe('sourceless');
-    // Compile and execute before expected-failure value assertions.
-    actual = new Function('NaN', 'Infinity', `return (${fragment.code});`)(7, 9);
-  });
-  test('generated expression preserves the supplied value', () => {
-    expect(Object.is(actual, entry.value)).toBe(true);
-  });
+test.each([
+  { name: 'negative zero', value: -0 },
+  { name: 'NaN with a shadowed name', value: NaN },
+  { name: 'infinity with a shadowed name', value: Infinity },
+  { name: 'negative infinity with a shadowed name', value: -Infinity },
+  { name: 'finite number', value: 3.25 },
+  { name: 'negative BigInt', value: -3n },
+])('literal factory preserves $name under shadowed globals', ({ value }) => {
+  const fragment = codeFactory.literal(value);
+  expect(fragment.mapping).toBe('sourceless');
+  const actual = new Function('NaN', 'Infinity', `return (${fragment.code});`)(7, 9);
+  expect(Object.is(actual, value)).toBe(true);
 });
 
 test.each([-0, NaN, Infinity, -Infinity])(

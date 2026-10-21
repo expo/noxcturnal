@@ -20,7 +20,6 @@ function run(source: string, external: boolean) {
   return context.result;
 }
 describe.each(cases)('$name', entry => {
-  test('original binding control', () => expect(run(entry.source, entry.external)).toEqual([3, 9]));
   describe.each([false, true])('identifier index warmed: %s', warm => {
     let code: string;
     beforeAll(() => {

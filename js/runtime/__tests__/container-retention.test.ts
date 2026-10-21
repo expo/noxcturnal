@@ -75,7 +75,7 @@ for (const method of [
         output = result.code;
         expect(output).toContain('/* inserted */');
       });
-      (retained ? test : test)('inserts inside the requested body', () => {
+      test('inserts inside the requested body', () => {
         expect(output).toBe(expected);
       });
     });

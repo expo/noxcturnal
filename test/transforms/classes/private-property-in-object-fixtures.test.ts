@@ -1,38 +1,58 @@
 import { runFixtures, type FixtureCase } from '../fixture';
 
-const expectedOutputs = [
-  "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\nvar _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },\n  _checkInRHS = _checkInRHS2.checkInRHS;\nlet Foo = (() => {\n  'use strict';\n  var _foo = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_foo');\n  function _initialize() {\n    Object.defineProperty(this, _foo, {\n      get: function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      },\n    });\n  }\n  const Foo = function Foo() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    _initialize.call(this);\n  };\n  Object.defineProperty(Foo.prototype, 'test', {\n    value: Object.defineProperty(\n      function (other) {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        return Object.prototype.hasOwnProperty.call(_checkInRHS(other), _foo);\n      },\n      'name',\n      {\n        value: 'test',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Foo, 'prototype', { writable: false });\n  return Foo;\n})();",
-  "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\nvar _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },\n  _checkInRHS = _checkInRHS2.checkInRHS;\nlet Foo = (() => {\n  'use strict';\n  var _foo = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_foo');\n  var _bar = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_bar');\n  function _initialize() {\n    Object.defineProperty(this, _bar, {\n      writable: true,\n      value: 'bar',\n    });\n  }\n  const Foo = function Foo() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    _initialize.call(this);\n  };\n  Object.defineProperty(Foo, 'test', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        return Object.prototype.hasOwnProperty.call(_checkInRHS(Foo), _foo);\n      },\n      'name',\n      {\n        value: 'test',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Foo.prototype, 'test', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        return Object.prototype.hasOwnProperty.call(_checkInRHS(this), _bar);\n      },\n      'name',\n      {\n        value: 'test',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Foo, 'prototype', { writable: false });\n  Object.defineProperty(Foo, _foo, {\n    writable: true,\n    value: 'foo',\n  });\n  return Foo;\n})();",
-  "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\nvar _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },\n  _checkInRHS = _checkInRHS2.checkInRHS;\nlet Foo = (() => {\n  'use strict';\n  var _foo = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_foo');\n  function _initialize() {\n    Object.defineProperty(this, _foo, {\n      writable: true,\n      value: 1,\n    });\n  }\n  const Foo = function Foo() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    _initialize.call(this);\n  };\n  Object.defineProperty(Foo.prototype, 'test', {\n    value: Object.defineProperty(\n      function (other) {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        return Object.prototype.hasOwnProperty.call(_checkInRHS(other), _foo);\n      },\n      'name',\n      {\n        value: 'test',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Foo, 'prototype', { writable: false });\n  return Foo;\n})();",
-  "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\nvar _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },\n  _checkInRHS = _checkInRHS2.checkInRHS;\nlet Foo = (() => {\n  'use strict';\n  var _foo = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_foo');\n  var _foo2 = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_foo2');\n  var _privateMethod = function () {\n    if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n  };\n  var _privateMethod18 = function () {\n    if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n  };\n  function _initialize() {\n    Object.defineProperty(this, _foo, { value: _privateMethod });\n    Object.defineProperty(this, _foo2, { value: _privateMethod18 });\n  }\n  const Foo = function Foo() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    _initialize.call(this);\n  };\n  Object.defineProperty(Foo.prototype, 'test', {\n    value: Object.defineProperty(\n      function (other) {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        return Object.prototype.hasOwnProperty.call(_checkInRHS(other), _foo);\n      },\n      'name',\n      {\n        value: 'test',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Foo.prototype, 'test2', {\n    value: Object.defineProperty(\n      function (other) {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        return Object.prototype.hasOwnProperty.call(_checkInRHS(other), _foo2);\n      },\n      'name',\n      {\n        value: 'test2',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Foo, 'prototype', { writable: false });\n  return Foo;\n})();\nconst cl = new Foo();\nexpect(cl.test({})).toBe(false);\nexpect(cl.test(cl)).toBe(true);\nexpect(cl.test2({})).toBe(false);\nexpect(cl.test2(cl)).toBe(true);",
-  "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\nvar _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },\n  _checkInRHS = _checkInRHS2.checkInRHS;\nlet Foo = (() => {\n  'use strict';\n  var _foo = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_foo');\n  var _foo2 = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_foo2');\n  var _privateMethod = function () {\n    if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n  };\n  var _privateMethod17 = function () {\n    if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n  };\n  function _initialize() {\n    Object.defineProperty(this, _foo, { value: _privateMethod });\n    Object.defineProperty(this, _foo2, { value: _privateMethod17 });\n  }\n  const Foo = function Foo() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    _initialize.call(this);\n  };\n  Object.defineProperty(Foo.prototype, 'test', {\n    value: Object.defineProperty(\n      function (other) {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        return Object.prototype.hasOwnProperty.call(_checkInRHS(other), _foo);\n      },\n      'name',\n      {\n        value: 'test',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Foo.prototype, 'test2', {\n    value: Object.defineProperty(\n      function (other) {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        return Object.prototype.hasOwnProperty.call(_checkInRHS(other), _foo2);\n      },\n      'name',\n      {\n        value: 'test2',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Foo, 'prototype', { writable: false });\n  return Foo;\n})();",
-  "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\nvar _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },\n  _checkInRHS = _checkInRHS2.checkInRHS;\nlet Foo = (() => {\n  'use strict';\n  var _foo = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_foo');\n  var _bar = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_bar');\n  function _initialize() {\n    Object.defineProperty(this, _foo, {\n      writable: true,\n      value: 1,\n    });\n    Object.defineProperty(this, _bar, {\n      writable: true,\n      value: 1,\n    });\n  }\n  const Foo = function Foo() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    _initialize.call(this);\n  };\n  Object.defineProperty(Foo.prototype, 'test', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        let Nested = (() => {\n          'use strict';\n          var _bar20 =\n            _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Nested_bar');\n          function _initialize22() {\n            Object.defineProperty(this, _bar20, {\n              writable: true,\n              value: 2,\n            });\n          }\n          const Nested = function Nested() {\n            if (!new.target) throw new TypeError('Cannot call a class as a function');\n            _initialize22.call(this);\n          };\n          Object.defineProperty(Nested.prototype, 'test', {\n            value: Object.defineProperty(\n              function () {\n                if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n                Object.prototype.hasOwnProperty.call(_checkInRHS(this), _foo);\n                Object.prototype.hasOwnProperty.call(_checkInRHS(this), _bar20);\n              },\n              'name',\n              {\n                value: 'test',\n                configurable: true,\n              },\n            ),\n            writable: true,\n            configurable: true,\n          });\n          Object.defineProperty(Nested, 'prototype', { writable: false });\n          return Nested;\n        })();\n        Object.prototype.hasOwnProperty.call(_checkInRHS(this), _foo);\n        Object.prototype.hasOwnProperty.call(_checkInRHS(this), _bar);\n      },\n      'name',\n      {\n        value: 'test',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Foo, 'prototype', { writable: false });\n  return Foo;\n})();",
-  "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\nvar _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },\n  _checkInRHS = _checkInRHS2.checkInRHS;\nlet Foo = (() => {\n  'use strict';\n  var _foo = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_foo');\n  function _initialize() {\n    Object.defineProperty(this, _foo, {\n      writable: true,\n      value: 1,\n    });\n  }\n  const Foo = function Foo() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    _initialize.call(this);\n  };\n  Object.defineProperty(Foo.prototype, 'test', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        let Nested = (() => {\n          'use strict';\n          var _foo18 =\n            _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Nested_foo');\n          function _initialize20() {\n            Object.defineProperty(this, _foo18, {\n              writable: true,\n              value: 2,\n            });\n          }\n          const Nested = function Nested() {\n            if (!new.target) throw new TypeError('Cannot call a class as a function');\n            _initialize20.call(this);\n          };\n          Object.defineProperty(Nested.prototype, 'test', {\n            value: Object.defineProperty(\n              function () {\n                if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n                Object.prototype.hasOwnProperty.call(_checkInRHS(this), _foo18);\n              },\n              'name',\n              {\n                value: 'test',\n                configurable: true,\n              },\n            ),\n            writable: true,\n            configurable: true,\n          });\n          Object.defineProperty(Nested, 'prototype', { writable: false });\n          return Nested;\n        })();\n        Object.prototype.hasOwnProperty.call(_checkInRHS(this), _foo);\n      },\n      'name',\n      {\n        value: 'test',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Foo, 'prototype', { writable: false });\n  return Foo;\n})();",
-  "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\nvar _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },\n  _checkInRHS = _checkInRHS2.checkInRHS;\nlet Foo = (() => {\n  'use strict';\n  var _foo = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_foo');\n  function _initialize() {\n    Object.defineProperty(this, _foo, {\n      writable: true,\n      value: 1,\n    });\n  }\n  const Foo = function Foo() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    _initialize.call(this);\n  };\n  Object.defineProperty(Foo.prototype, 'test', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        let Nested = (() => {\n          'use strict';\n          const Nested = function Nested() {\n            if (!new.target) throw new TypeError('Cannot call a class as a function');\n          };\n          Object.defineProperty(Nested.prototype, 'test', {\n            value: Object.defineProperty(\n              function () {\n                if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n                Object.prototype.hasOwnProperty.call(_checkInRHS(this), _foo);\n              },\n              'name',\n              {\n                value: 'test',\n                configurable: true,\n              },\n            ),\n            writable: true,\n            configurable: true,\n          });\n          Object.defineProperty(Nested, 'prototype', { writable: false });\n          return Nested;\n        })();\n        Object.prototype.hasOwnProperty.call(_checkInRHS(this), _foo);\n      },\n      'name',\n      {\n        value: 'test',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Foo, 'prototype', { writable: false });\n  return Foo;\n})();",
-  "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\nvar _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },\n  _checkInRHS = _checkInRHS2.checkInRHS;\nexpect(() =>\n  (() => {\n    'use strict';\n    var _p = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private__Class_p');\n    const _Class = function _Class() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n    };\n    Object.defineProperty(_Class, 'prototype', { writable: false });\n    Object.defineProperty(_Class, _p, {\n      writable: true,\n      value: Object.prototype.hasOwnProperty.call(_checkInRHS(0), _p),\n    });\n    return _Class;\n  })(),\n).toThrow(`right-hand side of 'in' should be an object, got number`);\nexpect(() =>\n  (() => {\n    'use strict';\n    var _p18 = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private__Class17_p');\n    const _Class17 = function _Class17() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n    };\n    Object.defineProperty(_Class17, 'prototype', { writable: false });\n    Object.defineProperty(_Class17, _p18, {\n      writable: true,\n      value: Object.prototype.hasOwnProperty.call(_checkInRHS(''), _p18),\n    });\n    return _Class17;\n  })(),\n).toThrow(`right-hand side of 'in' should be an object, got string`);\nexpect(() =>\n  (() => {\n    'use strict';\n    var _p23 = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private__Class22_p');\n    const _Class22 = function _Class22() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n    };\n    Object.defineProperty(_Class22, 'prototype', { writable: false });\n    Object.defineProperty(_Class22, _p23, {\n      writable: true,\n      value: Object.prototype.hasOwnProperty.call(_checkInRHS(true), _p23),\n    });\n    return _Class22;\n  })(),\n).toThrow(`right-hand side of 'in' should be an object, got boolean`);\nexpect(() =>\n  (() => {\n    'use strict';\n    var _p28 = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private__Class27_p');\n    const _Class27 = function _Class27() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n    };\n    Object.defineProperty(_Class27, 'prototype', { writable: false });\n    Object.defineProperty(_Class27, _p28, {\n      writable: true,\n      value: Object.prototype.hasOwnProperty.call(_checkInRHS(void 0), _p28),\n    });\n    return _Class27;\n  })(),\n).toThrow(`right-hand side of 'in' should be an object, got undefined`);\nexpect(() =>\n  (() => {\n    'use strict';\n    var _p33 = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private__Class32_p');\n    const _Class32 = function _Class32() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n    };\n    Object.defineProperty(_Class32, 'prototype', { writable: false });\n    Object.defineProperty(_Class32, _p33, {\n      writable: true,\n      value: Object.prototype.hasOwnProperty.call(_checkInRHS(null), _p33),\n    });\n    return _Class32;\n  })(),\n).toThrow(`right-hand side of 'in' should be an object, got null`);\nexpect(() =>\n  (() => {\n    'use strict';\n    var _p38 = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private__Class37_p');\n    const _Class37 = function _Class37() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n    };\n    Object.defineProperty(_Class37, 'prototype', { writable: false });\n    Object.defineProperty(_Class37, _p38, {\n      writable: true,\n      value: Object.prototype.hasOwnProperty.call(_checkInRHS(Symbol.iterator), _p38),\n    });\n    return _Class37;\n  })(),\n).toThrow(`right-hand side of 'in' should be an object, got symbol`);\nexpect(() =>\n  (() => {\n    'use strict';\n    var _p43 = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private__Class42_p');\n    const _Class42 = function _Class42() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n    };\n    Object.defineProperty(_Class42, 'prototype', { writable: false });\n    Object.defineProperty(_Class42, _p43, {\n      writable: true,\n      value: Object.prototype.hasOwnProperty.call(_checkInRHS(0n), _p43),\n    });\n    return _Class42;\n  })(),\n).toThrow(`right-hand side of 'in' should be an object, got bigint`);\nexpect(() =>\n  (() => {\n    'use strict';\n    var _p48 = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private__Class47_p');\n    var _privateMethod49 = function () {\n      if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n    };\n    const _Class47 = function _Class47() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n    };\n    Object.defineProperty(_Class47, 'prototype', { writable: false });\n    Object.defineProperty(_Class47, _p48, { value: _privateMethod49 });\n    Object.defineProperty(_Class47, 'q', {\n      value: Object.prototype.hasOwnProperty.call(_checkInRHS(0), _p48),\n      enumerable: true,\n      configurable: true,\n      writable: true,\n    });\n    return _Class47;\n  })(),\n).toThrow(`right-hand side of 'in' should be an object, got number`);\nexpect(() =>\n  (() => {\n    'use strict';\n    var _p53 = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private__Class52_p');\n    var _privateMethod54 = function () {\n      if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n    };\n    const _Class52 = function _Class52() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n    };\n    Object.defineProperty(_Class52, 'prototype', { writable: false });\n    Object.defineProperty(_Class52, _p53, { value: _privateMethod54 });\n    Object.defineProperty(_Class52, 'q', {\n      value: Object.prototype.hasOwnProperty.call(_checkInRHS(''), _p53),\n      enumerable: true,\n      configurable: true,\n      writable: true,\n    });\n    return _Class52;\n  })(),\n).toThrow(`right-hand side of 'in' should be an object, got string`);\nexpect(() =>\n  (() => {\n    'use strict';\n    var _p58 = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private__Class57_p');\n    var _privateMethod59 = function () {\n      if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n    };\n    const _Class57 = function _Class57() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n    };\n    Object.defineProperty(_Class57, 'prototype', { writable: false });\n    Object.defineProperty(_Class57, _p58, { value: _privateMethod59 });\n    Object.defineProperty(_Class57, 'q', {\n      value: Object.prototype.hasOwnProperty.call(_checkInRHS(true), _p58),\n      enumerable: true,\n      configurable: true,\n      writable: true,\n    });\n    return _Class57;\n  })(),\n).toThrow(`right-hand side of 'in' should be an object, got boolean`);\nexpect(() =>\n  (() => {\n    'use strict';\n    var _p63 = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private__Class62_p');\n    var _privateMethod64 = function () {\n      if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n    };\n    const _Class62 = function _Class62() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n    };\n    Object.defineProperty(_Class62, 'prototype', { writable: false });\n    Object.defineProperty(_Class62, _p63, { value: _privateMethod64 });\n    Object.defineProperty(_Class62, 'q', {\n      value: Object.prototype.hasOwnProperty.call(_checkInRHS(void 0), _p63),\n      enumerable: true,\n      configurable: true,\n      writable: true,\n    });\n    return _Class62;\n  })(),\n).toThrow(`right-hand side of 'in' should be an object, got undefined`);\nexpect(() =>\n  (() => {\n    'use strict';\n    var _p68 = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private__Class67_p');\n    var _privateMethod69 = function () {\n      if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n    };\n    const _Class67 = function _Class67() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n    };\n    Object.defineProperty(_Class67, 'prototype', { writable: false });\n    Object.defineProperty(_Class67, _p68, { value: _privateMethod69 });\n    Object.defineProperty(_Class67, 'q', {\n      value: Object.prototype.hasOwnProperty.call(_checkInRHS(null), _p68),\n      enumerable: true,\n      configurable: true,\n      writable: true,\n    });\n    return _Class67;\n  })(),\n).toThrow(`right-hand side of 'in' should be an object, got null`);\nexpect(() =>\n  (() => {\n    'use strict';\n    var _p73 = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private__Class72_p');\n    var _privateMethod74 = function () {\n      if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n    };\n    const _Class72 = function _Class72() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n    };\n    Object.defineProperty(_Class72, 'prototype', { writable: false });\n    Object.defineProperty(_Class72, _p73, { value: _privateMethod74 });\n    Object.defineProperty(_Class72, 'q', {\n      value: Object.prototype.hasOwnProperty.call(_checkInRHS(Symbol.iterator), _p73),\n      enumerable: true,\n      configurable: true,\n      writable: true,\n    });\n    return _Class72;\n  })(),\n).toThrow(`right-hand side of 'in' should be an object, got symbol`);\nexpect(() =>\n  (() => {\n    'use strict';\n    var _p78 = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private__Class77_p');\n    var _privateMethod79 = function () {\n      if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n    };\n    const _Class77 = function _Class77() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n    };\n    Object.defineProperty(_Class77, 'prototype', { writable: false });\n    Object.defineProperty(_Class77, _p78, { value: _privateMethod79 });\n    Object.defineProperty(_Class77, 'q', {\n      value: Object.prototype.hasOwnProperty.call(_checkInRHS(0n), _p78),\n      enumerable: true,\n      configurable: true,\n      writable: true,\n    });\n    return _Class77;\n  })(),\n).toThrow(`right-hand side of 'in' should be an object, got bigint`);\nexpect(\n  () =>\n    new ((() => {\n      'use strict';\n      var _p83 = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private__Class82_p');\n      function _initialize85() {\n        Object.defineProperty(this, _p83, {\n          writable: true,\n          value: Object.prototype.hasOwnProperty.call(_checkInRHS(0), _p83),\n        });\n      }\n      const _Class82 = function _Class82() {\n        if (!new.target) throw new TypeError('Cannot call a class as a function');\n        _initialize85.call(this);\n      };\n      Object.defineProperty(_Class82, 'prototype', { writable: false });\n      return _Class82;\n    })())(),\n).toThrow(`right-hand side of 'in' should be an object, got number`);\nexpect(\n  () =>\n    new ((() => {\n      'use strict';\n      var _p88 = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private__Class87_p');\n      function _initialize90() {\n        Object.defineProperty(this, _p88, {\n          writable: true,\n          value: Object.prototype.hasOwnProperty.call(_checkInRHS(''), _p88),\n        });\n      }\n      const _Class87 = function _Class87() {\n        if (!new.target) throw new TypeError('Cannot call a class as a function');\n        _initialize90.call(this);\n      };\n      Object.defineProperty(_Class87, 'prototype', { writable: false });\n      return _Class87;\n    })())(),\n).toThrow(`right-hand side of 'in' should be an object, got string`);\nexpect(\n  () =>\n    new ((() => {\n      'use strict';\n      var _p93 = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private__Class92_p');\n      function _initialize95() {\n        Object.defineProperty(this, _p93, {\n          writable: true,\n          value: Object.prototype.hasOwnProperty.call(_checkInRHS(true), _p93),\n        });\n      }\n      const _Class92 = function _Class92() {\n        if (!new.target) throw new TypeError('Cannot call a class as a function');\n        _initialize95.call(this);\n      };\n      Object.defineProperty(_Class92, 'prototype', { writable: false });\n      return _Class92;\n    })())(),\n).toThrow(`right-hand side of 'in' should be an object, got boolean`);\nexpect(\n  () =>\n    new ((() => {\n      'use strict';\n      var _p98 = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private__Class97_p');\n      function _initialize100() {\n        Object.defineProperty(this, _p98, {\n          writable: true,\n          value: Object.prototype.hasOwnProperty.call(_checkInRHS(void 0), _p98),\n        });\n      }\n      const _Class97 = function _Class97() {\n        if (!new.target) throw new TypeError('Cannot call a class as a function');\n        _initialize100.call(this);\n      };\n      Object.defineProperty(_Class97, 'prototype', { writable: false });\n      return _Class97;\n    })())(),\n).toThrow(`right-hand side of 'in' should be an object, got undefined`);\nexpect(\n  () =>\n    new ((() => {\n      'use strict';\n      var _p103 = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private__Class102_p');\n      function _initialize105() {\n        Object.defineProperty(this, _p103, {\n          writable: true,\n          value: Object.prototype.hasOwnProperty.call(_checkInRHS(null), _p103),\n        });\n      }\n      const _Class102 = function _Class102() {\n        if (!new.target) throw new TypeError('Cannot call a class as a function');\n        _initialize105.call(this);\n      };\n      Object.defineProperty(_Class102, 'prototype', { writable: false });\n      return _Class102;\n    })())(),\n).toThrow(`right-hand side of 'in' should be an object, got null`);\nexpect(\n  () =>\n    new ((() => {\n      'use strict';\n      var _p108 = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private__Class107_p');\n      function _initialize110() {\n        Object.defineProperty(this, _p108, {\n          writable: true,\n          value: Object.prototype.hasOwnProperty.call(_checkInRHS(Symbol.iterator), _p108),\n        });\n      }\n      const _Class107 = function _Class107() {\n        if (!new.target) throw new TypeError('Cannot call a class as a function');\n        _initialize110.call(this);\n      };\n      Object.defineProperty(_Class107, 'prototype', { writable: false });\n      return _Class107;\n    })())(),\n).toThrow(`right-hand side of 'in' should be an object, got symbol`);\nexpect(\n  () =>\n    new ((() => {\n      'use strict';\n      var _p113 = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private__Class112_p');\n      function _initialize115() {\n        Object.defineProperty(this, _p113, {\n          writable: true,\n          value: Object.prototype.hasOwnProperty.call(_checkInRHS(0n), _p113),\n        });\n      }\n      const _Class112 = function _Class112() {\n        if (!new.target) throw new TypeError('Cannot call a class as a function');\n        _initialize115.call(this);\n      };\n      Object.defineProperty(_Class112, 'prototype', { writable: false });\n      return _Class112;\n    })())(),\n).toThrow(`right-hand side of 'in' should be an object, got bigint`);\nexpect(\n  () =>\n    new ((() => {\n      'use strict';\n      var _p118 = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private__Class117_p');\n      var _privateMethod119 = function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      };\n      function _initialize120() {\n        Object.defineProperty(this, _p118, { value: _privateMethod119 });\n        Object.defineProperty(this, 'q', {\n          value: Object.prototype.hasOwnProperty.call(_checkInRHS(0), _p118),\n          enumerable: true,\n          configurable: true,\n          writable: true,\n        });\n      }\n      const _Class117 = function _Class117() {\n        if (!new.target) throw new TypeError('Cannot call a class as a function');\n        _initialize120.call(this);\n      };\n      Object.defineProperty(_Class117, 'prototype', { writable: false });\n      return _Class117;\n    })())(),\n).toThrow(`right-hand side of 'in' should be an object, got number`);\nexpect(\n  () =>\n    new ((() => {\n      'use strict';\n      var _p123 = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private__Class122_p');\n      var _privateMethod124 = function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      };\n      function _initialize125() {\n        Object.defineProperty(this, _p123, { value: _privateMethod124 });\n        Object.defineProperty(this, 'q', {\n          value: Object.prototype.hasOwnProperty.call(_checkInRHS(''), _p123),\n          enumerable: true,\n          configurable: true,\n          writable: true,\n        });\n      }\n      const _Class122 = function _Class122() {\n        if (!new.target) throw new TypeError('Cannot call a class as a function');\n        _initialize125.call(this);\n      };\n      Object.defineProperty(_Class122, 'prototype', { writable: false });\n      return _Class122;\n    })())(),\n).toThrow(`right-hand side of 'in' should be an object, got string`);\nexpect(\n  () =>\n    new ((() => {\n      'use strict';\n      var _p128 = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private__Class127_p');\n      var _privateMethod129 = function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      };\n      function _initialize130() {\n        Object.defineProperty(this, _p128, { value: _privateMethod129 });\n        Object.defineProperty(this, 'q', {\n          value: Object.prototype.hasOwnProperty.call(_checkInRHS(true), _p128),\n          enumerable: true,\n          configurable: true,\n          writable: true,\n        });\n      }\n      const _Class127 = function _Class127() {\n        if (!new.target) throw new TypeError('Cannot call a class as a function');\n        _initialize130.call(this);\n      };\n      Object.defineProperty(_Class127, 'prototype', { writable: false });\n      return _Class127;\n    })())(),\n).toThrow(`right-hand side of 'in' should be an object, got boolean`);\nexpect(\n  () =>\n    new ((() => {\n      'use strict';\n      var _p133 = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private__Class132_p');\n      var _privateMethod134 = function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      };\n      function _initialize135() {\n        Object.defineProperty(this, _p133, { value: _privateMethod134 });\n        Object.defineProperty(this, 'q', {\n          value: Object.prototype.hasOwnProperty.call(_checkInRHS(void 0), _p133),\n          enumerable: true,\n          configurable: true,\n          writable: true,\n        });\n      }\n      const _Class132 = function _Class132() {\n        if (!new.target) throw new TypeError('Cannot call a class as a function');\n        _initialize135.call(this);\n      };\n      Object.defineProperty(_Class132, 'prototype', { writable: false });\n      return _Class132;\n    })())(),\n).toThrow(`right-hand side of 'in' should be an object, got undefined`);\nexpect(\n  () =>\n    new ((() => {\n      'use strict';\n      var _p138 = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private__Class137_p');\n      var _privateMethod139 = function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      };\n      function _initialize140() {\n        Object.defineProperty(this, _p138, { value: _privateMethod139 });\n        Object.defineProperty(this, 'q', {\n          value: Object.prototype.hasOwnProperty.call(_checkInRHS(null), _p138),\n          enumerable: true,\n          configurable: true,\n          writable: true,\n        });\n      }\n      const _Class137 = function _Class137() {\n        if (!new.target) throw new TypeError('Cannot call a class as a function');\n        _initialize140.call(this);\n      };\n      Object.defineProperty(_Class137, 'prototype', { writable: false });\n      return _Class137;\n    })())(),\n).toThrow(`right-hand side of 'in' should be an object, got null`);\nexpect(\n  () =>\n    new ((() => {\n      'use strict';\n      var _p143 = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private__Class142_p');\n      var _privateMethod144 = function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      };\n      function _initialize145() {\n        Object.defineProperty(this, _p143, { value: _privateMethod144 });\n        Object.defineProperty(this, 'q', {\n          value: Object.prototype.hasOwnProperty.call(_checkInRHS(Symbol.iterator), _p143),\n          enumerable: true,\n          configurable: true,\n          writable: true,\n        });\n      }\n      const _Class142 = function _Class142() {\n        if (!new.target) throw new TypeError('Cannot call a class as a function');\n        _initialize145.call(this);\n      };\n      Object.defineProperty(_Class142, 'prototype', { writable: false });\n      return _Class142;\n    })())(),\n).toThrow(`right-hand side of 'in' should be an object, got symbol`);\nexpect(\n  () =>\n    new ((() => {\n      'use strict';\n      var _p148 = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private__Class147_p');\n      var _privateMethod149 = function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      };\n      function _initialize150() {\n        Object.defineProperty(this, _p148, { value: _privateMethod149 });\n        Object.defineProperty(this, 'q', {\n          value: Object.prototype.hasOwnProperty.call(_checkInRHS(0n), _p148),\n          enumerable: true,\n          configurable: true,\n          writable: true,\n        });\n      }\n      const _Class147 = function _Class147() {\n        if (!new.target) throw new TypeError('Cannot call a class as a function');\n        _initialize150.call(this);\n      };\n      Object.defineProperty(_Class147, 'prototype', { writable: false });\n      return _Class147;\n    })())(),\n).toThrow(`right-hand side of 'in' should be an object, got bigint`);",
-  "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\nvar _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },\n  _checkInRHS = _checkInRHS2.checkInRHS;\nlet Foo = (() => {\n  'use strict';\n  var _foo = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_foo');\n  const Foo = function Foo() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Foo.prototype, 'test', {\n    value: Object.defineProperty(\n      function (other) {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        return Object.prototype.hasOwnProperty.call(_checkInRHS(other), _foo);\n      },\n      'name',\n      {\n        value: 'test',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Foo, 'prototype', { writable: false });\n  Object.defineProperty(Foo, _foo, {\n    get: function () {\n      if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n    },\n  });\n  return Foo;\n})();",
-  "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\nvar _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },\n  _checkInRHS = _checkInRHS2.checkInRHS;\nlet Foo = (() => {\n  'use strict';\n  var _foo = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_foo');\n  const Foo = function Foo() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Foo.prototype, 'test', {\n    value: Object.defineProperty(\n      function (other) {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        return Object.prototype.hasOwnProperty.call(_checkInRHS(other), _foo);\n      },\n      'name',\n      {\n        value: 'test',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Foo, 'prototype', { writable: false });\n  Object.defineProperty(Foo, _foo, {\n    writable: true,\n    value: 1,\n  });\n  return Foo;\n})();",
-  "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\nvar _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },\n  _checkInRHS = _checkInRHS2.checkInRHS;\nlet Foo = (() => {\n  'use strict';\n  var _foo = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_foo');\n  var _privateMethod = function () {\n    if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n  };\n  const Foo = function Foo() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Foo.prototype, 'test', {\n    value: Object.defineProperty(\n      function (other) {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        return Object.prototype.hasOwnProperty.call(_checkInRHS(other), _foo);\n      },\n      'name',\n      {\n        value: 'test',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Foo, 'prototype', { writable: false });\n  Object.defineProperty(Foo, _foo, { value: _privateMethod });\n  return Foo;\n})();",
-  "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\nvar _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },\n  _checkInRHS = _checkInRHS2.checkInRHS;\nlet Foo = (() => {\n  'use strict';\n  var _foo = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_foo');\n  var _foo2 = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_foo2');\n  var _privateMethod = function () {\n    if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n  };\n  var _privateMethod17 = function () {\n    if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n  };\n  function _initialize() {\n    Object.defineProperty(this, _foo, { value: _privateMethod });\n    Object.defineProperty(this, _foo2, { value: _privateMethod17 });\n  }\n  const Foo = function Foo() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    _initialize.call(this);\n  };\n  Object.defineProperty(Foo.prototype, 'test', {\n    value: Object.defineProperty(\n      function (other) {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        return Object.prototype.hasOwnProperty.call(_checkInRHS(other), _foo);\n      },\n      'name',\n      {\n        value: 'test',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Foo.prototype, 'test2', {\n    value: Object.defineProperty(\n      function (other) {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        return Object.prototype.hasOwnProperty.call(_checkInRHS(other), _foo);\n      },\n      'name',\n      {\n        value: 'test2',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Foo, 'prototype', { writable: false });\n  return Foo;\n})();",
-  "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\nvar _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },\n  _checkInRHS = _checkInRHS2.checkInRHS;\nlet Foo = (() => {\n  'use strict';\n  var _foo = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_foo');\n  var _privateMethod = function () {\n    if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n  };\n  function _initialize() {\n    Object.defineProperty(this, _foo, { value: _privateMethod });\n  }\n  const Foo = function Foo() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    _initialize.call(this);\n  };\n  Object.defineProperty(Foo.prototype, 'test', {\n    value: Object.defineProperty(\n      function (other) {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        return Object.prototype.hasOwnProperty.call(_checkInRHS(other), _foo);\n      },\n      'name',\n      {\n        value: 'test',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Foo, 'prototype', { writable: false });\n  return Foo;\n})();",
-  "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\nvar _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },\n  _checkInRHS = _checkInRHS2.checkInRHS;\nlet Test = (() => {\n  'use strict';\n  var _x = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Test_x');\n  const Test = function Test() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Test.prototype, 'method', {\n    value: Object.defineProperty(\n      function (other) {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        const Test = 2;\n        const func = () => {\n          const Test = 3;\n          return Object.prototype.hasOwnProperty.call(_checkInRHS(other), _x) && Test;\n        };\n        return func() + Test;\n      },\n      'name',\n      {\n        value: 'method',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Test, 'prototype', { writable: false });\n  Object.defineProperty(Test, _x, {\n    writable: true,\n    value: 1,\n  });\n  return Test;\n})();\nconst t = new Test();\nconst t2 = new Test();\nexpect(t.method(Test)).toBe(5);",
-  "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\nvar _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },\n  _checkInRHS = _checkInRHS2.checkInRHS;\nlet Test = (() => {\n  'use strict';\n  var _x = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Test_x');\n  const Test = function Test() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(Test.prototype, 'method', {\n    value: Object.defineProperty(\n      function (other) {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        const Test = 2;\n        const func = () => {\n          const Test = 3;\n          return Object.prototype.hasOwnProperty.call(_checkInRHS(other), _x) && Test;\n        };\n        return func() + Test;\n      },\n      'name',\n      {\n        value: 'method',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(Test, 'prototype', { writable: false });\n  Object.defineProperty(Test, _x, {\n    writable: true,\n    value: 1,\n  });\n  return Test;\n})();",
-  "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\nvar _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },\n  _checkInRHS = _checkInRHS2.checkInRHS;\n(\n  x = (() => {\n    'use strict';\n    var _foo = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private__Class_foo');\n    function _initialize() {\n      Object.defineProperty(this, _foo, {\n        writable: true,\n        value: void 0,\n      });\n    }\n    const _Class = function _Class() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n      _initialize.call(this);\n    };\n    Object.defineProperty(_Class, 'name', {\n      value: 'x',\n      configurable: true,\n    });\n    Object.defineProperty(_Class.prototype, 'test', {\n      value: Object.defineProperty(\n        function (other) {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          return Object.prototype.hasOwnProperty.call(_checkInRHS(other), _foo);\n        },\n        'name',\n        {\n          value: 'test',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(_Class, 'prototype', { writable: false });\n    return _Class;\n  })(),\n) => {};",
-  "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\nvar _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },\n  _checkInRHS = _checkInRHS2.checkInRHS;\nfunction fn() {\n  return new ((() => {\n    'use strict';\n    var _priv = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private__Class_priv');\n    function _initialize() {\n      Object.defineProperty(this, _priv, {\n        writable: true,\n        value: void 0,\n      });\n    }\n    const _Class = function _Class() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n      _initialize.call(this);\n    };\n    Object.defineProperty(_Class.prototype, 'method', {\n      value: Object.defineProperty(\n        function (obj) {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          return Object.prototype.hasOwnProperty.call(_checkInRHS(obj), _priv);\n        },\n        'name',\n        {\n          value: 'method',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(_Class, 'prototype', { writable: false });\n    return _Class;\n  })())();\n}",
-  "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\nvar _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },\n  _checkInRHS = _checkInRHS2.checkInRHS;\nfunction fn() {\n  return new ((() => {\n    'use strict';\n    var _priv = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private__Class_priv');\n    const _Class = function _Class() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n    };\n    Object.defineProperty(_Class.prototype, 'method', {\n      value: Object.defineProperty(\n        function (obj) {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          return Object.prototype.hasOwnProperty.call(_checkInRHS(obj), _priv);\n        },\n        'name',\n        {\n          value: 'method',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(_Class, 'prototype', { writable: false });\n    Object.defineProperty(_Class, _priv, {\n      writable: true,\n      value: void 0,\n    });\n    return _Class;\n  })())();\n}",
-  "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\nvar _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },\n  _checkInRHS = _checkInRHS2.checkInRHS;\nlet hasW, hasX, hasY, hasZ;\nlet halfConstructed;\nlet F = (() => {\n  'use strict';\n  var _z = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_F_z');\n  var _y = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_F_y');\n  var _w = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_F_w');\n  var _x = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_F_x');\n  var _privateMethod = function () {\n    if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n  };\n  function _initialize() {\n    Object.defineProperty(this, _z, { value: _privateMethod });\n    Object.defineProperty(this, _w, {\n      get: function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      },\n    });\n    Object.defineProperty(this, _x, {\n      writable: true,\n      value: 0,\n    });\n    Object.defineProperty(this, _y, {\n      writable: true,\n      value: (() => {\n        halfConstructed = this;\n        throw 'error';\n      })(),\n    });\n  }\n  const F = function F() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    _initialize.call(this);\n  };\n  Object.defineProperty(F.prototype, 'm', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        hasW = Object.prototype.hasOwnProperty.call(_checkInRHS(this), _w);\n        hasX = Object.prototype.hasOwnProperty.call(_checkInRHS(this), _x);\n        hasY = Object.prototype.hasOwnProperty.call(_checkInRHS(this), _y);\n        hasZ = Object.prototype.hasOwnProperty.call(_checkInRHS(this), _z);\n      },\n      'name',\n      {\n        value: 'm',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(F, 'prototype', { writable: false });\n  return F;\n})();\ntry {\n  new F();\n} catch {}\nhalfConstructed.m();\nexpect(hasW).toBe(true);\nexpect(hasX).toBe(true);\nexpect(hasY).toBe(false);\nexpect(hasZ).toBe(true);",
-  "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\nvar _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },\n  _checkInRHS = _checkInRHS2.checkInRHS;\nlet F = (() => {\n  'use strict';\n  var _z = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_F_z');\n  var _y = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_F_y');\n  var _w = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_F_w');\n  var _x = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_F_x');\n  var _privateMethod = function () {\n    if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n  };\n  function _initialize() {\n    Object.defineProperty(this, _z, { value: _privateMethod });\n    Object.defineProperty(this, _w, {\n      get: function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      },\n    });\n    Object.defineProperty(this, _x, {\n      writable: true,\n      value: 0,\n    });\n    Object.defineProperty(this, _y, {\n      writable: true,\n      value: (() => {\n        throw 'error';\n      })(),\n    });\n  }\n  const F = function F() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    _initialize.call(this);\n  };\n  Object.defineProperty(F.prototype, 'm', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        Object.prototype.hasOwnProperty.call(_checkInRHS(this), _w);\n        Object.prototype.hasOwnProperty.call(_checkInRHS(this), _x);\n        Object.prototype.hasOwnProperty.call(_checkInRHS(this), _y);\n        Object.prototype.hasOwnProperty.call(_checkInRHS(this), _z);\n      },\n      'name',\n      {\n        value: 'm',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(F, 'prototype', { writable: false });\n  return F;\n})();",
-  "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\nvar _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },\n  _checkInRHS = _checkInRHS2.checkInRHS;\nlet hasW, hasX, hasY, hasZ;\nlet halfConstructed;\ntry {\n  let F = (() => {\n    'use strict';\n    var _z = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_F_z');\n    var _y = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_F_y');\n    var _w = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_F_w');\n    var _x = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_F_x');\n    var _privateMethod = function () {\n      if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n    };\n    const F = function F() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n    };\n    Object.defineProperty(F, 'm', {\n      value: Object.defineProperty(\n        function () {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          hasW = Object.prototype.hasOwnProperty.call(_checkInRHS(this), _w);\n          hasX = Object.prototype.hasOwnProperty.call(_checkInRHS(this), _x);\n          hasY = Object.prototype.hasOwnProperty.call(_checkInRHS(this), _y);\n          hasZ = Object.prototype.hasOwnProperty.call(_checkInRHS(this), _z);\n        },\n        'name',\n        {\n          value: 'm',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(F, 'prototype', { writable: false });\n    Object.defineProperty(F, _z, { value: _privateMethod });\n    Object.defineProperty(F, _w, {\n      get: function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      },\n    });\n    Object.defineProperty(F, _x, {\n      writable: true,\n      value: 0,\n    });\n    Object.defineProperty(F, _y, {\n      writable: true,\n      value: (() => {\n        halfConstructed = F;\n        throw 'error';\n      })(),\n    });\n    return F;\n  })();\n} catch {}\nhalfConstructed.m();\nexpect(hasW).toBe(true);\nexpect(hasX).toBe(true);\nexpect(hasY).toBe(false);\nexpect(hasZ).toBe(true);",
-  "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\nvar _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },\n  _checkInRHS = _checkInRHS2.checkInRHS;\nlet F = (() => {\n  'use strict';\n  var _z = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_F_z');\n  var _x = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_F_x');\n  var _y = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_F_y');\n  var _privateMethod = function () {\n    if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n  };\n  const F = function F() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(F, 'm', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        Object.prototype.hasOwnProperty.call(_checkInRHS(this), _x);\n        Object.prototype.hasOwnProperty.call(_checkInRHS(this), _y);\n        Object.prototype.hasOwnProperty.call(_checkInRHS(this), _z);\n      },\n      'name',\n      {\n        value: 'm',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(F, 'prototype', { writable: false });\n  Object.defineProperty(F, _z, { value: _privateMethod });\n  Object.defineProperty(F, _x, {\n    writable: true,\n    value: 0,\n  });\n  Object.defineProperty(F, _y, {\n    writable: true,\n    value: (() => {\n      throw 'error';\n    })(),\n  });\n  return F;\n})();",
-  "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\nvar _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },\n  _checkInRHS = _checkInRHS2.checkInRHS;\nlet A = (() => {\n  'use strict';\n  var _m = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_A_m');\n  var _x = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_A_x');\n  var _privateMethod = function () {\n    if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n  };\n  function _initialize() {\n    Object.defineProperty(this, _m, { value: _privateMethod });\n    Object.defineProperty(this, _x, {\n      writable: true,\n      value: void 0,\n    });\n  }\n  const A = function A() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n    _initialize.call(this);\n  };\n  Object.defineProperty(A.prototype, 'test', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        Object.prototype.hasOwnProperty.call(_checkInRHS(this), _x);\n        Object.prototype.hasOwnProperty.call(_checkInRHS(this), _m);\n        Object.prototype.hasOwnProperty.call(_checkInRHS(this), _x);\n        Object.prototype.hasOwnProperty.call(_checkInRHS(this), _m);\n      },\n      'name',\n      {\n        value: 'test',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(A, 'prototype', { writable: false });\n  return A;\n})();",
-  "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\nvar _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },\n  _checkInRHS = _checkInRHS2.checkInRHS;\nlet A = (() => {\n  'use strict';\n  var _foo = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_A_foo');\n  const A = function A() {\n    if (!new.target) throw new TypeError('Cannot call a class as a function');\n  };\n  Object.defineProperty(A.prototype, 'test', {\n    value: Object.defineProperty(\n      function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        let A = function fn(A) {\n          return Object.prototype.hasOwnProperty.call(_checkInRHS(A), _foo);\n        };\n      },\n      'name',\n      {\n        value: 'test',\n        configurable: true,\n      },\n    ),\n    writable: true,\n    configurable: true,\n  });\n  Object.defineProperty(A, 'prototype', { writable: false });\n  Object.defineProperty(A, _foo, {\n    writable: true,\n    value: void 0,\n  });\n  return A;\n})();",
-] as const;
-
 export const fixtureCases = [
   {
     title: 'assumption privateFieldsAsProperties — accessor (input)',
-    source: 'class Foo {\n  get #foo() {}\n\n  test(other) {\n    return #foo in other;\n  }\n}\n',
+    source: `class Foo {
+  get #foo() {}
+
+  test(other) {
+    return #foo in other;
+  }
+}
+`,
     filename: 'input.js',
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+  _checkInRHS = _checkInRHS2.checkInRHS;
+let Foo = (() => {
+  'use strict';
+  var _foo = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_foo');
+  function _initialize() {
+    Object.defineProperty(this, _foo, {
+      get: function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      },
+    });
+  }
+  const Foo = function Foo() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    _initialize.call(this);
+  };
+  Object.defineProperty(Foo.prototype, 'test', {
+    value: Object.defineProperty(
+      function (other) {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return Object.prototype.hasOwnProperty.call(_checkInRHS(other), _foo);
+      },
+      'name',
+      {
+        value: 'test',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Foo, 'prototype', { writable: false });
+  return Foo;
+})();`,
     modes: [
       {
         title: 'loose',
@@ -50,15 +70,85 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[0],
       },
     ],
   },
   {
     title: 'assumption privateFieldsAsProperties — compiled classes (input)',
-    source:
-      'class Foo {\n  static #foo = "foo";\n  #bar = "bar";\n\n  static test() {\n    return #foo in Foo;\n  }\n\n  test() {\n    return #bar in this;\n  }\n}\n',
+    source: `class Foo {
+  static #foo = "foo";
+  #bar = "bar";
+
+  static test() {
+    return #foo in Foo;
+  }
+
+  test() {
+    return #bar in this;
+  }
+}
+`,
     filename: 'input.js',
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+  _checkInRHS = _checkInRHS2.checkInRHS;
+let Foo = (() => {
+  'use strict';
+  var _foo = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_foo');
+  var _bar = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_bar');
+  function _initialize() {
+    Object.defineProperty(this, _bar, {
+      writable: true,
+      value: 'bar',
+    });
+  }
+  const Foo = function Foo() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    _initialize.call(this);
+  };
+  Object.defineProperty(Foo, 'test', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return Object.prototype.hasOwnProperty.call(_checkInRHS(Foo), _foo);
+      },
+      'name',
+      {
+        value: 'test',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Foo.prototype, 'test', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return Object.prototype.hasOwnProperty.call(_checkInRHS(this), _bar);
+      },
+      'name',
+      {
+        value: 'test',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Foo, 'prototype', { writable: false });
+  Object.defineProperty(Foo, _foo, {
+    writable: true,
+    value: 'foo',
+  });
+  return Foo;
+})();`,
     modes: [
       {
         title: 'loose',
@@ -76,14 +166,60 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[1],
       },
     ],
   },
   {
     title: 'assumption privateFieldsAsProperties — field (input)',
-    source: 'class Foo {\n  #foo = 1;\n\n  test(other) {\n    return #foo in other;\n  }\n}\n',
+    source: `class Foo {
+  #foo = 1;
+
+  test(other) {
+    return #foo in other;
+  }
+}
+`,
     filename: 'input.js',
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+  _checkInRHS = _checkInRHS2.checkInRHS;
+let Foo = (() => {
+  'use strict';
+  var _foo = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_foo');
+  function _initialize() {
+    Object.defineProperty(this, _foo, {
+      writable: true,
+      value: 1,
+    });
+  }
+  const Foo = function Foo() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    _initialize.call(this);
+  };
+  Object.defineProperty(Foo.prototype, 'test', {
+    value: Object.defineProperty(
+      function (other) {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return Object.prototype.hasOwnProperty.call(_checkInRHS(other), _foo);
+      },
+      'name',
+      {
+        value: 'test',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Foo, 'prototype', { writable: false });
+  return Foo;
+})();`,
     modes: [
       {
         title: 'loose',
@@ -101,15 +237,96 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[2],
       },
     ],
   },
   {
     title: 'assumption privateFieldsAsProperties — method (exec)',
-    source:
-      'class Foo {\n  #foo() { }\n  #foo2() { }\n\n  test(other) {\n    return #foo in other;\n  }\n  test2(other) {\n    return #foo2 in other;\n  }\n}\n\nconst cl = new Foo();\n\nexpect(cl.test({})).toBe(false);\nexpect(cl.test(cl)).toBe(true);\nexpect(cl.test2({})).toBe(false);\nexpect(cl.test2(cl)).toBe(true);\n',
+    source: `class Foo {
+  #foo() { }
+  #foo2() { }
+
+  test(other) {
+    return #foo in other;
+  }
+  test2(other) {
+    return #foo2 in other;
+  }
+}
+
+const cl = new Foo();
+
+expect(cl.test({})).toBe(false);
+expect(cl.test(cl)).toBe(true);
+expect(cl.test2({})).toBe(false);
+expect(cl.test2(cl)).toBe(true);
+`,
     filename: 'exec.js',
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+  _checkInRHS = _checkInRHS2.checkInRHS;
+let Foo = (() => {
+  'use strict';
+  var _foo = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_foo');
+  var _foo2 = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_foo2');
+  var _privateMethod = function () {
+    if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+  };
+  var _privateMethod18 = function () {
+    if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+  };
+  function _initialize() {
+    Object.defineProperty(this, _foo, { value: _privateMethod });
+    Object.defineProperty(this, _foo2, { value: _privateMethod18 });
+  }
+  const Foo = function Foo() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    _initialize.call(this);
+  };
+  Object.defineProperty(Foo.prototype, 'test', {
+    value: Object.defineProperty(
+      function (other) {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return Object.prototype.hasOwnProperty.call(_checkInRHS(other), _foo);
+      },
+      'name',
+      {
+        value: 'test',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Foo.prototype, 'test2', {
+    value: Object.defineProperty(
+      function (other) {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return Object.prototype.hasOwnProperty.call(_checkInRHS(other), _foo2);
+      },
+      'name',
+      {
+        value: 'test2',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Foo, 'prototype', { writable: false });
+  return Foo;
+})();
+const cl = new Foo();
+expect(cl.test({})).toBe(false);
+expect(cl.test(cl)).toBe(true);
+expect(cl.test2({})).toBe(false);
+expect(cl.test2(cl)).toBe(true);`,
     modes: [
       {
         title: 'loose',
@@ -127,15 +344,84 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[3],
       },
     ],
   },
   {
     title: 'assumption privateFieldsAsProperties — method (input)',
-    source:
-      'class Foo {\n  #foo() { }\n  #foo2() { }\n\n  test(other) {\n    return #foo in other;\n  }\n  test2(other) {\n    return #foo2 in other;\n  }\n}\n',
+    source: `class Foo {
+  #foo() { }
+  #foo2() { }
+
+  test(other) {
+    return #foo in other;
+  }
+  test2(other) {
+    return #foo2 in other;
+  }
+}
+`,
     filename: 'input.js',
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+  _checkInRHS = _checkInRHS2.checkInRHS;
+let Foo = (() => {
+  'use strict';
+  var _foo = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_foo');
+  var _foo2 = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_foo2');
+  var _privateMethod = function () {
+    if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+  };
+  var _privateMethod17 = function () {
+    if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+  };
+  function _initialize() {
+    Object.defineProperty(this, _foo, { value: _privateMethod });
+    Object.defineProperty(this, _foo2, { value: _privateMethod17 });
+  }
+  const Foo = function Foo() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    _initialize.call(this);
+  };
+  Object.defineProperty(Foo.prototype, 'test', {
+    value: Object.defineProperty(
+      function (other) {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return Object.prototype.hasOwnProperty.call(_checkInRHS(other), _foo);
+      },
+      'name',
+      {
+        value: 'test',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Foo.prototype, 'test2', {
+    value: Object.defineProperty(
+      function (other) {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return Object.prototype.hasOwnProperty.call(_checkInRHS(other), _foo2);
+      },
+      'name',
+      {
+        value: 'test2',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Foo, 'prototype', { writable: false });
+  return Foo;
+})();`,
     modes: [
       {
         title: 'loose',
@@ -153,15 +439,110 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[4],
       },
     ],
   },
   {
     title: 'assumption privateFieldsAsProperties — nested class other redeclared (input)',
-    source:
-      'class Foo {\n  #foo = 1;\n  #bar = 1;\n\n  test() {\n    class Nested {\n      #bar = 2;\n\n      test() {\n        #foo in this;\n        #bar in this;\n      }\n    }\n\n    #foo in this;\n    #bar in this;\n  }\n}\n',
+    source: `class Foo {
+  #foo = 1;
+  #bar = 1;
+
+  test() {
+    class Nested {
+      #bar = 2;
+
+      test() {
+        #foo in this;
+        #bar in this;
+      }
+    }
+
+    #foo in this;
+    #bar in this;
+  }
+}
+`,
     filename: 'input.js',
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+  _checkInRHS = _checkInRHS2.checkInRHS;
+let Foo = (() => {
+  'use strict';
+  var _foo = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_foo');
+  var _bar = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_bar');
+  function _initialize() {
+    Object.defineProperty(this, _foo, {
+      writable: true,
+      value: 1,
+    });
+    Object.defineProperty(this, _bar, {
+      writable: true,
+      value: 1,
+    });
+  }
+  const Foo = function Foo() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    _initialize.call(this);
+  };
+  Object.defineProperty(Foo.prototype, 'test', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        let Nested = (() => {
+          'use strict';
+          var _bar20 =
+            _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Nested_bar');
+          function _initialize22() {
+            Object.defineProperty(this, _bar20, {
+              writable: true,
+              value: 2,
+            });
+          }
+          const Nested = function Nested() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
+            _initialize22.call(this);
+          };
+          Object.defineProperty(Nested.prototype, 'test', {
+            value: Object.defineProperty(
+              function () {
+                if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+                Object.prototype.hasOwnProperty.call(_checkInRHS(this), _foo);
+                Object.prototype.hasOwnProperty.call(_checkInRHS(this), _bar20);
+              },
+              'name',
+              {
+                value: 'test',
+                configurable: true,
+              },
+            ),
+            writable: true,
+            configurable: true,
+          });
+          Object.defineProperty(Nested, 'prototype', { writable: false });
+          return Nested;
+        })();
+        Object.prototype.hasOwnProperty.call(_checkInRHS(this), _foo);
+        Object.prototype.hasOwnProperty.call(_checkInRHS(this), _bar);
+      },
+      'name',
+      {
+        value: 'test',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Foo, 'prototype', { writable: false });
+  return Foo;
+})();`,
     modes: [
       {
         title: 'loose',
@@ -179,15 +560,100 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[5],
       },
     ],
   },
   {
     title: 'assumption privateFieldsAsProperties — nested class redeclared (input)',
-    source:
-      'class Foo {\n  #foo = 1;\n\n  test() {\n    class Nested {\n      #foo = 2;\n\n      test() {\n        #foo in this;\n      }\n    }\n\n    #foo in this;\n  }\n}\n',
+    source: `class Foo {
+  #foo = 1;
+
+  test() {
+    class Nested {
+      #foo = 2;
+
+      test() {
+        #foo in this;
+      }
+    }
+
+    #foo in this;
+  }
+}
+`,
     filename: 'input.js',
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+  _checkInRHS = _checkInRHS2.checkInRHS;
+let Foo = (() => {
+  'use strict';
+  var _foo = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_foo');
+  function _initialize() {
+    Object.defineProperty(this, _foo, {
+      writable: true,
+      value: 1,
+    });
+  }
+  const Foo = function Foo() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    _initialize.call(this);
+  };
+  Object.defineProperty(Foo.prototype, 'test', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        let Nested = (() => {
+          'use strict';
+          var _foo18 =
+            _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Nested_foo');
+          function _initialize20() {
+            Object.defineProperty(this, _foo18, {
+              writable: true,
+              value: 2,
+            });
+          }
+          const Nested = function Nested() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
+            _initialize20.call(this);
+          };
+          Object.defineProperty(Nested.prototype, 'test', {
+            value: Object.defineProperty(
+              function () {
+                if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+                Object.prototype.hasOwnProperty.call(_checkInRHS(this), _foo18);
+              },
+              'name',
+              {
+                value: 'test',
+                configurable: true,
+              },
+            ),
+            writable: true,
+            configurable: true,
+          });
+          Object.defineProperty(Nested, 'prototype', { writable: false });
+          return Nested;
+        })();
+        Object.prototype.hasOwnProperty.call(_checkInRHS(this), _foo);
+      },
+      'name',
+      {
+        value: 'test',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Foo, 'prototype', { writable: false });
+  return Foo;
+})();`,
     modes: [
       {
         title: 'loose',
@@ -205,15 +671,89 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[6],
       },
     ],
   },
   {
     title: 'assumption privateFieldsAsProperties — nested class (input)',
-    source:
-      'class Foo {\n  #foo = 1;\n\n  test() {\n    class Nested {\n      test() {\n        #foo in this;\n      }\n    }\n\n    #foo in this;\n  }\n}\n',
+    source: `class Foo {
+  #foo = 1;
+
+  test() {
+    class Nested {
+      test() {
+        #foo in this;
+      }
+    }
+
+    #foo in this;
+  }
+}
+`,
     filename: 'input.js',
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+  _checkInRHS = _checkInRHS2.checkInRHS;
+let Foo = (() => {
+  'use strict';
+  var _foo = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_foo');
+  function _initialize() {
+    Object.defineProperty(this, _foo, {
+      writable: true,
+      value: 1,
+    });
+  }
+  const Foo = function Foo() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    _initialize.call(this);
+  };
+  Object.defineProperty(Foo.prototype, 'test', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        let Nested = (() => {
+          'use strict';
+          const Nested = function Nested() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
+          };
+          Object.defineProperty(Nested.prototype, 'test', {
+            value: Object.defineProperty(
+              function () {
+                if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+                Object.prototype.hasOwnProperty.call(_checkInRHS(this), _foo);
+              },
+              'name',
+              {
+                value: 'test',
+                configurable: true,
+              },
+            ),
+            writable: true,
+            configurable: true,
+          });
+          Object.defineProperty(Nested, 'prototype', { writable: false });
+          return Nested;
+        })();
+        Object.prototype.hasOwnProperty.call(_checkInRHS(this), _foo);
+      },
+      'name',
+      {
+        value: 'test',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Foo, 'prototype', { writable: false });
+  return Foo;
+})();`,
     modes: [
       {
         title: 'loose',
@@ -231,15 +771,613 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[7],
       },
     ],
   },
   {
     title: 'assumption privateFieldsAsProperties — rhs not object (exec)',
-    source:
-      "expect(() => class { static #p = #p in 0 }).toThrow(`right-hand side of 'in' should be an object, got number`);\nexpect(() => class { static #p = #p in \"\" }).toThrow(`right-hand side of 'in' should be an object, got string`);\nexpect(() => class { static #p = #p in true }).toThrow(`right-hand side of 'in' should be an object, got boolean`);\nexpect(() => class { static #p = #p in void 0 }).toThrow(`right-hand side of 'in' should be an object, got undefined`);\nexpect(() => class { static #p = #p in null }).toThrow(`right-hand side of 'in' should be an object, got null`);\nexpect(() => class { static #p = #p in Symbol.iterator }).toThrow(`right-hand side of 'in' should be an object, got symbol`);\nexpect(() => class { static #p = #p in 0n }).toThrow(`right-hand side of 'in' should be an object, got bigint`);\n\nexpect(() => class { static #p() {}; static q = #p in 0 }).toThrow(`right-hand side of 'in' should be an object, got number`);\nexpect(() => class { static #p() {}; static q = #p in \"\" }).toThrow(`right-hand side of 'in' should be an object, got string`);\nexpect(() => class { static #p() {}; static q = #p in true }).toThrow(`right-hand side of 'in' should be an object, got boolean`);\nexpect(() => class { static #p() {}; static q = #p in void 0 }).toThrow(`right-hand side of 'in' should be an object, got undefined`);\nexpect(() => class { static #p() {}; static q = #p in null }).toThrow(`right-hand side of 'in' should be an object, got null`);\nexpect(() => class { static #p() {}; static q = #p in Symbol.iterator }).toThrow(`right-hand side of 'in' should be an object, got symbol`);\nexpect(() => class { static #p() {}; static q = #p in 0n }).toThrow(`right-hand side of 'in' should be an object, got bigint`);\n\nexpect(() => new class { #p = #p in 0 }).toThrow(`right-hand side of 'in' should be an object, got number`);\nexpect(() => new class { #p = #p in \"\" }).toThrow(`right-hand side of 'in' should be an object, got string`);\nexpect(() => new class { #p = #p in true }).toThrow(`right-hand side of 'in' should be an object, got boolean`);\nexpect(() => new class { #p = #p in void 0 }).toThrow(`right-hand side of 'in' should be an object, got undefined`);\nexpect(() => new class { #p = #p in null }).toThrow(`right-hand side of 'in' should be an object, got null`);\nexpect(() => new class { #p = #p in Symbol.iterator }).toThrow(`right-hand side of 'in' should be an object, got symbol`);\nexpect(() => new class { #p = #p in 0n }).toThrow(`right-hand side of 'in' should be an object, got bigint`);\n\nexpect(() => new class { #p() {}; q = #p in 0 }).toThrow(`right-hand side of 'in' should be an object, got number`);\nexpect(() => new class { #p() {}; q = #p in \"\" }).toThrow(`right-hand side of 'in' should be an object, got string`);\nexpect(() => new class { #p() {}; q = #p in true }).toThrow(`right-hand side of 'in' should be an object, got boolean`);\nexpect(() => new class { #p() {}; q = #p in void 0 }).toThrow(`right-hand side of 'in' should be an object, got undefined`);\nexpect(() => new class { #p() {}; q = #p in null }).toThrow(`right-hand side of 'in' should be an object, got null`);\nexpect(() => new class { #p() {}; q = #p in Symbol.iterator }).toThrow(`right-hand side of 'in' should be an object, got symbol`);\nexpect(() => new class { #p() {}; q = #p in 0n }).toThrow(`right-hand side of 'in' should be an object, got bigint`);\n",
+    source: `expect(() => class { static #p = #p in 0 }).toThrow(\`right-hand side of 'in' should be an object, got number\`);
+expect(() => class { static #p = #p in "" }).toThrow(\`right-hand side of 'in' should be an object, got string\`);
+expect(() => class { static #p = #p in true }).toThrow(\`right-hand side of 'in' should be an object, got boolean\`);
+expect(() => class { static #p = #p in void 0 }).toThrow(\`right-hand side of 'in' should be an object, got undefined\`);
+expect(() => class { static #p = #p in null }).toThrow(\`right-hand side of 'in' should be an object, got null\`);
+expect(() => class { static #p = #p in Symbol.iterator }).toThrow(\`right-hand side of 'in' should be an object, got symbol\`);
+expect(() => class { static #p = #p in 0n }).toThrow(\`right-hand side of 'in' should be an object, got bigint\`);
+
+expect(() => class { static #p() {}; static q = #p in 0 }).toThrow(\`right-hand side of 'in' should be an object, got number\`);
+expect(() => class { static #p() {}; static q = #p in "" }).toThrow(\`right-hand side of 'in' should be an object, got string\`);
+expect(() => class { static #p() {}; static q = #p in true }).toThrow(\`right-hand side of 'in' should be an object, got boolean\`);
+expect(() => class { static #p() {}; static q = #p in void 0 }).toThrow(\`right-hand side of 'in' should be an object, got undefined\`);
+expect(() => class { static #p() {}; static q = #p in null }).toThrow(\`right-hand side of 'in' should be an object, got null\`);
+expect(() => class { static #p() {}; static q = #p in Symbol.iterator }).toThrow(\`right-hand side of 'in' should be an object, got symbol\`);
+expect(() => class { static #p() {}; static q = #p in 0n }).toThrow(\`right-hand side of 'in' should be an object, got bigint\`);
+
+expect(() => new class { #p = #p in 0 }).toThrow(\`right-hand side of 'in' should be an object, got number\`);
+expect(() => new class { #p = #p in "" }).toThrow(\`right-hand side of 'in' should be an object, got string\`);
+expect(() => new class { #p = #p in true }).toThrow(\`right-hand side of 'in' should be an object, got boolean\`);
+expect(() => new class { #p = #p in void 0 }).toThrow(\`right-hand side of 'in' should be an object, got undefined\`);
+expect(() => new class { #p = #p in null }).toThrow(\`right-hand side of 'in' should be an object, got null\`);
+expect(() => new class { #p = #p in Symbol.iterator }).toThrow(\`right-hand side of 'in' should be an object, got symbol\`);
+expect(() => new class { #p = #p in 0n }).toThrow(\`right-hand side of 'in' should be an object, got bigint\`);
+
+expect(() => new class { #p() {}; q = #p in 0 }).toThrow(\`right-hand side of 'in' should be an object, got number\`);
+expect(() => new class { #p() {}; q = #p in "" }).toThrow(\`right-hand side of 'in' should be an object, got string\`);
+expect(() => new class { #p() {}; q = #p in true }).toThrow(\`right-hand side of 'in' should be an object, got boolean\`);
+expect(() => new class { #p() {}; q = #p in void 0 }).toThrow(\`right-hand side of 'in' should be an object, got undefined\`);
+expect(() => new class { #p() {}; q = #p in null }).toThrow(\`right-hand side of 'in' should be an object, got null\`);
+expect(() => new class { #p() {}; q = #p in Symbol.iterator }).toThrow(\`right-hand side of 'in' should be an object, got symbol\`);
+expect(() => new class { #p() {}; q = #p in 0n }).toThrow(\`right-hand side of 'in' should be an object, got bigint\`);
+`,
     filename: 'exec.js',
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+  _checkInRHS = _checkInRHS2.checkInRHS;
+expect(() =>
+  (() => {
+    'use strict';
+    var _p = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private__Class_p');
+    const _Class = function _Class() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+    };
+    Object.defineProperty(_Class, 'prototype', { writable: false });
+    Object.defineProperty(_Class, _p, {
+      writable: true,
+      value: Object.prototype.hasOwnProperty.call(_checkInRHS(0), _p),
+    });
+    return _Class;
+  })(),
+).toThrow(\`right-hand side of 'in' should be an object, got number\`);
+expect(() =>
+  (() => {
+    'use strict';
+    var _p18 = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private__Class17_p');
+    const _Class17 = function _Class17() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+    };
+    Object.defineProperty(_Class17, 'prototype', { writable: false });
+    Object.defineProperty(_Class17, _p18, {
+      writable: true,
+      value: Object.prototype.hasOwnProperty.call(_checkInRHS(''), _p18),
+    });
+    return _Class17;
+  })(),
+).toThrow(\`right-hand side of 'in' should be an object, got string\`);
+expect(() =>
+  (() => {
+    'use strict';
+    var _p23 = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private__Class22_p');
+    const _Class22 = function _Class22() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+    };
+    Object.defineProperty(_Class22, 'prototype', { writable: false });
+    Object.defineProperty(_Class22, _p23, {
+      writable: true,
+      value: Object.prototype.hasOwnProperty.call(_checkInRHS(true), _p23),
+    });
+    return _Class22;
+  })(),
+).toThrow(\`right-hand side of 'in' should be an object, got boolean\`);
+expect(() =>
+  (() => {
+    'use strict';
+    var _p28 = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private__Class27_p');
+    const _Class27 = function _Class27() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+    };
+    Object.defineProperty(_Class27, 'prototype', { writable: false });
+    Object.defineProperty(_Class27, _p28, {
+      writable: true,
+      value: Object.prototype.hasOwnProperty.call(_checkInRHS(void 0), _p28),
+    });
+    return _Class27;
+  })(),
+).toThrow(\`right-hand side of 'in' should be an object, got undefined\`);
+expect(() =>
+  (() => {
+    'use strict';
+    var _p33 = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private__Class32_p');
+    const _Class32 = function _Class32() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+    };
+    Object.defineProperty(_Class32, 'prototype', { writable: false });
+    Object.defineProperty(_Class32, _p33, {
+      writable: true,
+      value: Object.prototype.hasOwnProperty.call(_checkInRHS(null), _p33),
+    });
+    return _Class32;
+  })(),
+).toThrow(\`right-hand side of 'in' should be an object, got null\`);
+expect(() =>
+  (() => {
+    'use strict';
+    var _p38 = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private__Class37_p');
+    const _Class37 = function _Class37() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+    };
+    Object.defineProperty(_Class37, 'prototype', { writable: false });
+    Object.defineProperty(_Class37, _p38, {
+      writable: true,
+      value: Object.prototype.hasOwnProperty.call(_checkInRHS(Symbol.iterator), _p38),
+    });
+    return _Class37;
+  })(),
+).toThrow(\`right-hand side of 'in' should be an object, got symbol\`);
+expect(() =>
+  (() => {
+    'use strict';
+    var _p43 = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private__Class42_p');
+    const _Class42 = function _Class42() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+    };
+    Object.defineProperty(_Class42, 'prototype', { writable: false });
+    Object.defineProperty(_Class42, _p43, {
+      writable: true,
+      value: Object.prototype.hasOwnProperty.call(_checkInRHS(0n), _p43),
+    });
+    return _Class42;
+  })(),
+).toThrow(\`right-hand side of 'in' should be an object, got bigint\`);
+expect(() =>
+  (() => {
+    'use strict';
+    var _p48 = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private__Class47_p');
+    var _privateMethod49 = function () {
+      if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+    };
+    const _Class47 = function _Class47() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+    };
+    Object.defineProperty(_Class47, 'prototype', { writable: false });
+    Object.defineProperty(_Class47, _p48, { value: _privateMethod49 });
+    Object.defineProperty(_Class47, 'q', {
+      value: Object.prototype.hasOwnProperty.call(_checkInRHS(0), _p48),
+      enumerable: true,
+      configurable: true,
+      writable: true,
+    });
+    return _Class47;
+  })(),
+).toThrow(\`right-hand side of 'in' should be an object, got number\`);
+expect(() =>
+  (() => {
+    'use strict';
+    var _p53 = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private__Class52_p');
+    var _privateMethod54 = function () {
+      if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+    };
+    const _Class52 = function _Class52() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+    };
+    Object.defineProperty(_Class52, 'prototype', { writable: false });
+    Object.defineProperty(_Class52, _p53, { value: _privateMethod54 });
+    Object.defineProperty(_Class52, 'q', {
+      value: Object.prototype.hasOwnProperty.call(_checkInRHS(''), _p53),
+      enumerable: true,
+      configurable: true,
+      writable: true,
+    });
+    return _Class52;
+  })(),
+).toThrow(\`right-hand side of 'in' should be an object, got string\`);
+expect(() =>
+  (() => {
+    'use strict';
+    var _p58 = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private__Class57_p');
+    var _privateMethod59 = function () {
+      if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+    };
+    const _Class57 = function _Class57() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+    };
+    Object.defineProperty(_Class57, 'prototype', { writable: false });
+    Object.defineProperty(_Class57, _p58, { value: _privateMethod59 });
+    Object.defineProperty(_Class57, 'q', {
+      value: Object.prototype.hasOwnProperty.call(_checkInRHS(true), _p58),
+      enumerable: true,
+      configurable: true,
+      writable: true,
+    });
+    return _Class57;
+  })(),
+).toThrow(\`right-hand side of 'in' should be an object, got boolean\`);
+expect(() =>
+  (() => {
+    'use strict';
+    var _p63 = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private__Class62_p');
+    var _privateMethod64 = function () {
+      if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+    };
+    const _Class62 = function _Class62() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+    };
+    Object.defineProperty(_Class62, 'prototype', { writable: false });
+    Object.defineProperty(_Class62, _p63, { value: _privateMethod64 });
+    Object.defineProperty(_Class62, 'q', {
+      value: Object.prototype.hasOwnProperty.call(_checkInRHS(void 0), _p63),
+      enumerable: true,
+      configurable: true,
+      writable: true,
+    });
+    return _Class62;
+  })(),
+).toThrow(\`right-hand side of 'in' should be an object, got undefined\`);
+expect(() =>
+  (() => {
+    'use strict';
+    var _p68 = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private__Class67_p');
+    var _privateMethod69 = function () {
+      if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+    };
+    const _Class67 = function _Class67() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+    };
+    Object.defineProperty(_Class67, 'prototype', { writable: false });
+    Object.defineProperty(_Class67, _p68, { value: _privateMethod69 });
+    Object.defineProperty(_Class67, 'q', {
+      value: Object.prototype.hasOwnProperty.call(_checkInRHS(null), _p68),
+      enumerable: true,
+      configurable: true,
+      writable: true,
+    });
+    return _Class67;
+  })(),
+).toThrow(\`right-hand side of 'in' should be an object, got null\`);
+expect(() =>
+  (() => {
+    'use strict';
+    var _p73 = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private__Class72_p');
+    var _privateMethod74 = function () {
+      if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+    };
+    const _Class72 = function _Class72() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+    };
+    Object.defineProperty(_Class72, 'prototype', { writable: false });
+    Object.defineProperty(_Class72, _p73, { value: _privateMethod74 });
+    Object.defineProperty(_Class72, 'q', {
+      value: Object.prototype.hasOwnProperty.call(_checkInRHS(Symbol.iterator), _p73),
+      enumerable: true,
+      configurable: true,
+      writable: true,
+    });
+    return _Class72;
+  })(),
+).toThrow(\`right-hand side of 'in' should be an object, got symbol\`);
+expect(() =>
+  (() => {
+    'use strict';
+    var _p78 = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private__Class77_p');
+    var _privateMethod79 = function () {
+      if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+    };
+    const _Class77 = function _Class77() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+    };
+    Object.defineProperty(_Class77, 'prototype', { writable: false });
+    Object.defineProperty(_Class77, _p78, { value: _privateMethod79 });
+    Object.defineProperty(_Class77, 'q', {
+      value: Object.prototype.hasOwnProperty.call(_checkInRHS(0n), _p78),
+      enumerable: true,
+      configurable: true,
+      writable: true,
+    });
+    return _Class77;
+  })(),
+).toThrow(\`right-hand side of 'in' should be an object, got bigint\`);
+expect(
+  () =>
+    new ((() => {
+      'use strict';
+      var _p83 = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private__Class82_p');
+      function _initialize85() {
+        Object.defineProperty(this, _p83, {
+          writable: true,
+          value: Object.prototype.hasOwnProperty.call(_checkInRHS(0), _p83),
+        });
+      }
+      const _Class82 = function _Class82() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+        _initialize85.call(this);
+      };
+      Object.defineProperty(_Class82, 'prototype', { writable: false });
+      return _Class82;
+    })())(),
+).toThrow(\`right-hand side of 'in' should be an object, got number\`);
+expect(
+  () =>
+    new ((() => {
+      'use strict';
+      var _p88 = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private__Class87_p');
+      function _initialize90() {
+        Object.defineProperty(this, _p88, {
+          writable: true,
+          value: Object.prototype.hasOwnProperty.call(_checkInRHS(''), _p88),
+        });
+      }
+      const _Class87 = function _Class87() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+        _initialize90.call(this);
+      };
+      Object.defineProperty(_Class87, 'prototype', { writable: false });
+      return _Class87;
+    })())(),
+).toThrow(\`right-hand side of 'in' should be an object, got string\`);
+expect(
+  () =>
+    new ((() => {
+      'use strict';
+      var _p93 = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private__Class92_p');
+      function _initialize95() {
+        Object.defineProperty(this, _p93, {
+          writable: true,
+          value: Object.prototype.hasOwnProperty.call(_checkInRHS(true), _p93),
+        });
+      }
+      const _Class92 = function _Class92() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+        _initialize95.call(this);
+      };
+      Object.defineProperty(_Class92, 'prototype', { writable: false });
+      return _Class92;
+    })())(),
+).toThrow(\`right-hand side of 'in' should be an object, got boolean\`);
+expect(
+  () =>
+    new ((() => {
+      'use strict';
+      var _p98 = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private__Class97_p');
+      function _initialize100() {
+        Object.defineProperty(this, _p98, {
+          writable: true,
+          value: Object.prototype.hasOwnProperty.call(_checkInRHS(void 0), _p98),
+        });
+      }
+      const _Class97 = function _Class97() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+        _initialize100.call(this);
+      };
+      Object.defineProperty(_Class97, 'prototype', { writable: false });
+      return _Class97;
+    })())(),
+).toThrow(\`right-hand side of 'in' should be an object, got undefined\`);
+expect(
+  () =>
+    new ((() => {
+      'use strict';
+      var _p103 = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private__Class102_p');
+      function _initialize105() {
+        Object.defineProperty(this, _p103, {
+          writable: true,
+          value: Object.prototype.hasOwnProperty.call(_checkInRHS(null), _p103),
+        });
+      }
+      const _Class102 = function _Class102() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+        _initialize105.call(this);
+      };
+      Object.defineProperty(_Class102, 'prototype', { writable: false });
+      return _Class102;
+    })())(),
+).toThrow(\`right-hand side of 'in' should be an object, got null\`);
+expect(
+  () =>
+    new ((() => {
+      'use strict';
+      var _p108 = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private__Class107_p');
+      function _initialize110() {
+        Object.defineProperty(this, _p108, {
+          writable: true,
+          value: Object.prototype.hasOwnProperty.call(_checkInRHS(Symbol.iterator), _p108),
+        });
+      }
+      const _Class107 = function _Class107() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+        _initialize110.call(this);
+      };
+      Object.defineProperty(_Class107, 'prototype', { writable: false });
+      return _Class107;
+    })())(),
+).toThrow(\`right-hand side of 'in' should be an object, got symbol\`);
+expect(
+  () =>
+    new ((() => {
+      'use strict';
+      var _p113 = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private__Class112_p');
+      function _initialize115() {
+        Object.defineProperty(this, _p113, {
+          writable: true,
+          value: Object.prototype.hasOwnProperty.call(_checkInRHS(0n), _p113),
+        });
+      }
+      const _Class112 = function _Class112() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+        _initialize115.call(this);
+      };
+      Object.defineProperty(_Class112, 'prototype', { writable: false });
+      return _Class112;
+    })())(),
+).toThrow(\`right-hand side of 'in' should be an object, got bigint\`);
+expect(
+  () =>
+    new ((() => {
+      'use strict';
+      var _p118 = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private__Class117_p');
+      var _privateMethod119 = function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      };
+      function _initialize120() {
+        Object.defineProperty(this, _p118, { value: _privateMethod119 });
+        Object.defineProperty(this, 'q', {
+          value: Object.prototype.hasOwnProperty.call(_checkInRHS(0), _p118),
+          enumerable: true,
+          configurable: true,
+          writable: true,
+        });
+      }
+      const _Class117 = function _Class117() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+        _initialize120.call(this);
+      };
+      Object.defineProperty(_Class117, 'prototype', { writable: false });
+      return _Class117;
+    })())(),
+).toThrow(\`right-hand side of 'in' should be an object, got number\`);
+expect(
+  () =>
+    new ((() => {
+      'use strict';
+      var _p123 = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private__Class122_p');
+      var _privateMethod124 = function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      };
+      function _initialize125() {
+        Object.defineProperty(this, _p123, { value: _privateMethod124 });
+        Object.defineProperty(this, 'q', {
+          value: Object.prototype.hasOwnProperty.call(_checkInRHS(''), _p123),
+          enumerable: true,
+          configurable: true,
+          writable: true,
+        });
+      }
+      const _Class122 = function _Class122() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+        _initialize125.call(this);
+      };
+      Object.defineProperty(_Class122, 'prototype', { writable: false });
+      return _Class122;
+    })())(),
+).toThrow(\`right-hand side of 'in' should be an object, got string\`);
+expect(
+  () =>
+    new ((() => {
+      'use strict';
+      var _p128 = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private__Class127_p');
+      var _privateMethod129 = function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      };
+      function _initialize130() {
+        Object.defineProperty(this, _p128, { value: _privateMethod129 });
+        Object.defineProperty(this, 'q', {
+          value: Object.prototype.hasOwnProperty.call(_checkInRHS(true), _p128),
+          enumerable: true,
+          configurable: true,
+          writable: true,
+        });
+      }
+      const _Class127 = function _Class127() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+        _initialize130.call(this);
+      };
+      Object.defineProperty(_Class127, 'prototype', { writable: false });
+      return _Class127;
+    })())(),
+).toThrow(\`right-hand side of 'in' should be an object, got boolean\`);
+expect(
+  () =>
+    new ((() => {
+      'use strict';
+      var _p133 = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private__Class132_p');
+      var _privateMethod134 = function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      };
+      function _initialize135() {
+        Object.defineProperty(this, _p133, { value: _privateMethod134 });
+        Object.defineProperty(this, 'q', {
+          value: Object.prototype.hasOwnProperty.call(_checkInRHS(void 0), _p133),
+          enumerable: true,
+          configurable: true,
+          writable: true,
+        });
+      }
+      const _Class132 = function _Class132() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+        _initialize135.call(this);
+      };
+      Object.defineProperty(_Class132, 'prototype', { writable: false });
+      return _Class132;
+    })())(),
+).toThrow(\`right-hand side of 'in' should be an object, got undefined\`);
+expect(
+  () =>
+    new ((() => {
+      'use strict';
+      var _p138 = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private__Class137_p');
+      var _privateMethod139 = function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      };
+      function _initialize140() {
+        Object.defineProperty(this, _p138, { value: _privateMethod139 });
+        Object.defineProperty(this, 'q', {
+          value: Object.prototype.hasOwnProperty.call(_checkInRHS(null), _p138),
+          enumerable: true,
+          configurable: true,
+          writable: true,
+        });
+      }
+      const _Class137 = function _Class137() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+        _initialize140.call(this);
+      };
+      Object.defineProperty(_Class137, 'prototype', { writable: false });
+      return _Class137;
+    })())(),
+).toThrow(\`right-hand side of 'in' should be an object, got null\`);
+expect(
+  () =>
+    new ((() => {
+      'use strict';
+      var _p143 = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private__Class142_p');
+      var _privateMethod144 = function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      };
+      function _initialize145() {
+        Object.defineProperty(this, _p143, { value: _privateMethod144 });
+        Object.defineProperty(this, 'q', {
+          value: Object.prototype.hasOwnProperty.call(_checkInRHS(Symbol.iterator), _p143),
+          enumerable: true,
+          configurable: true,
+          writable: true,
+        });
+      }
+      const _Class142 = function _Class142() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+        _initialize145.call(this);
+      };
+      Object.defineProperty(_Class142, 'prototype', { writable: false });
+      return _Class142;
+    })())(),
+).toThrow(\`right-hand side of 'in' should be an object, got symbol\`);
+expect(
+  () =>
+    new ((() => {
+      'use strict';
+      var _p148 = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private__Class147_p');
+      var _privateMethod149 = function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      };
+      function _initialize150() {
+        Object.defineProperty(this, _p148, { value: _privateMethod149 });
+        Object.defineProperty(this, 'q', {
+          value: Object.prototype.hasOwnProperty.call(_checkInRHS(0n), _p148),
+          enumerable: true,
+          configurable: true,
+          writable: true,
+        });
+      }
+      const _Class147 = function _Class147() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+        _initialize150.call(this);
+      };
+      Object.defineProperty(_Class147, 'prototype', { writable: false });
+      return _Class147;
+    })())(),
+).toThrow(\`right-hand side of 'in' should be an object, got bigint\`);`,
     modes: [
       {
         title: 'loose',
@@ -257,15 +1395,58 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[8],
       },
     ],
   },
   {
     title: 'assumption privateFieldsAsProperties — static accessor (input)',
-    source:
-      'class Foo {\n  static get #foo() {}\n\n  test(other) {\n    return #foo in other;\n  }\n}\n',
+    source: `class Foo {
+  static get #foo() {}
+
+  test(other) {
+    return #foo in other;
+  }
+}
+`,
     filename: 'input.js',
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+  _checkInRHS = _checkInRHS2.checkInRHS;
+let Foo = (() => {
+  'use strict';
+  var _foo = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_foo');
+  const Foo = function Foo() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Foo.prototype, 'test', {
+    value: Object.defineProperty(
+      function (other) {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return Object.prototype.hasOwnProperty.call(_checkInRHS(other), _foo);
+      },
+      'name',
+      {
+        value: 'test',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Foo, 'prototype', { writable: false });
+  Object.defineProperty(Foo, _foo, {
+    get: function () {
+      if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+    },
+  });
+  return Foo;
+})();`,
     modes: [
       {
         title: 'loose',
@@ -283,15 +1464,57 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[9],
       },
     ],
   },
   {
     title: 'assumption privateFieldsAsProperties — static field (input)',
-    source:
-      'class Foo {\n  static #foo = 1;\n\n  test(other) {\n    return #foo in other;\n  }\n}\n',
+    source: `class Foo {
+  static #foo = 1;
+
+  test(other) {
+    return #foo in other;
+  }
+}
+`,
     filename: 'input.js',
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+  _checkInRHS = _checkInRHS2.checkInRHS;
+let Foo = (() => {
+  'use strict';
+  var _foo = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_foo');
+  const Foo = function Foo() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Foo.prototype, 'test', {
+    value: Object.defineProperty(
+      function (other) {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return Object.prototype.hasOwnProperty.call(_checkInRHS(other), _foo);
+      },
+      'name',
+      {
+        value: 'test',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Foo, 'prototype', { writable: false });
+  Object.defineProperty(Foo, _foo, {
+    writable: true,
+    value: 1,
+  });
+  return Foo;
+})();`,
     modes: [
       {
         title: 'loose',
@@ -309,15 +1532,57 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[10],
       },
     ],
   },
   {
     title: 'assumption privateFieldsAsProperties — static method (input)',
-    source:
-      'class Foo {\n  static #foo() {}\n\n  test(other) {\n    return #foo in other;\n  }\n}\n',
+    source: `class Foo {
+  static #foo() {}
+
+  test(other) {
+    return #foo in other;
+  }
+}
+`,
     filename: 'input.js',
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+  _checkInRHS = _checkInRHS2.checkInRHS;
+let Foo = (() => {
+  'use strict';
+  var _foo = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_foo');
+  var _privateMethod = function () {
+    if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+  };
+  const Foo = function Foo() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Foo.prototype, 'test', {
+    value: Object.defineProperty(
+      function (other) {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return Object.prototype.hasOwnProperty.call(_checkInRHS(other), _foo);
+      },
+      'name',
+      {
+        value: 'test',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Foo, 'prototype', { writable: false });
+  Object.defineProperty(Foo, _foo, { value: _privateMethod });
+  return Foo;
+})();`,
     modes: [
       {
         title: 'loose',
@@ -335,15 +1600,84 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[11],
       },
     ],
   },
   {
     title: 'assumption privateFieldsAsSymbols — method (input)',
-    source:
-      'class Foo {\n  #foo() { }\n  #foo2() { }\n\n  test(other) {\n    return #foo in other;\n  }\n  test2(other) {\n    return #foo in other;\n  }\n}\n',
+    source: `class Foo {
+  #foo() { }
+  #foo2() { }
+
+  test(other) {
+    return #foo in other;
+  }
+  test2(other) {
+    return #foo in other;
+  }
+}
+`,
     filename: 'input.js',
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+  _checkInRHS = _checkInRHS2.checkInRHS;
+let Foo = (() => {
+  'use strict';
+  var _foo = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_foo');
+  var _foo2 = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_foo2');
+  var _privateMethod = function () {
+    if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+  };
+  var _privateMethod17 = function () {
+    if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+  };
+  function _initialize() {
+    Object.defineProperty(this, _foo, { value: _privateMethod });
+    Object.defineProperty(this, _foo2, { value: _privateMethod17 });
+  }
+  const Foo = function Foo() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    _initialize.call(this);
+  };
+  Object.defineProperty(Foo.prototype, 'test', {
+    value: Object.defineProperty(
+      function (other) {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return Object.prototype.hasOwnProperty.call(_checkInRHS(other), _foo);
+      },
+      'name',
+      {
+        value: 'test',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Foo.prototype, 'test2', {
+    value: Object.defineProperty(
+      function (other) {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return Object.prototype.hasOwnProperty.call(_checkInRHS(other), _foo);
+      },
+      'name',
+      {
+        value: 'test2',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Foo, 'prototype', { writable: false });
+  return Foo;
+})();`,
     modes: [
       {
         title: 'loose',
@@ -361,14 +1695,60 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[12],
       },
     ],
   },
   {
     title: 'private loose — method (input)',
-    source: 'class Foo {\n  #foo() {}\n\n  test(other) {\n    return #foo in other;\n  }\n}\n',
+    source: `class Foo {
+  #foo() {}
+
+  test(other) {
+    return #foo in other;
+  }
+}
+`,
     filename: 'input.js',
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+  _checkInRHS = _checkInRHS2.checkInRHS;
+let Foo = (() => {
+  'use strict';
+  var _foo = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_foo');
+  var _privateMethod = function () {
+    if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+  };
+  function _initialize() {
+    Object.defineProperty(this, _foo, { value: _privateMethod });
+  }
+  const Foo = function Foo() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    _initialize.call(this);
+  };
+  Object.defineProperty(Foo.prototype, 'test', {
+    value: Object.defineProperty(
+      function (other) {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return Object.prototype.hasOwnProperty.call(_checkInRHS(other), _foo);
+      },
+      'name',
+      {
+        value: 'test',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Foo, 'prototype', { writable: false });
+  return Foo;
+})();`,
     modes: [
       {
         title: 'loose',
@@ -386,15 +1766,75 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[13],
       },
     ],
   },
   {
     title: 'private loose — static shadow (exec)',
-    source:
-      'class Test {\n\n  static #x = 1\n\n  method(other) {\n    const Test = 2;\n    const func = () => {\n      const Test = 3;\n      return #x in other && Test;\n    }\n    return func() + Test;\n  }\n}\n\nconst t = new Test();\nconst t2 = new Test();\nexpect(t.method(Test)).toBe(5)\n',
+    source: `class Test {
+
+  static #x = 1
+
+  method(other) {
+    const Test = 2;
+    const func = () => {
+      const Test = 3;
+      return #x in other && Test;
+    }
+    return func() + Test;
+  }
+}
+
+const t = new Test();
+const t2 = new Test();
+expect(t.method(Test)).toBe(5)
+`,
     filename: 'exec.js',
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+  _checkInRHS = _checkInRHS2.checkInRHS;
+let Test = (() => {
+  'use strict';
+  var _x = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Test_x');
+  const Test = function Test() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Test.prototype, 'method', {
+    value: Object.defineProperty(
+      function (other) {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        const Test = 2;
+        const func = () => {
+          const Test = 3;
+          return Object.prototype.hasOwnProperty.call(_checkInRHS(other), _x) && Test;
+        };
+        return func() + Test;
+      },
+      'name',
+      {
+        value: 'method',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Test, 'prototype', { writable: false });
+  Object.defineProperty(Test, _x, {
+    writable: true,
+    value: 1,
+  });
+  return Test;
+})();
+const t = new Test();
+const t2 = new Test();
+expect(t.method(Test)).toBe(5);`,
     modes: [
       {
         title: 'loose',
@@ -412,15 +1852,68 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[14],
       },
     ],
   },
   {
     title: 'private loose — static shadow (input)',
-    source:
-      'class Test {\n\n  static #x = 1\n\n  method(other) {\n    const Test = 2;\n    const func = () => {\n      const Test = 3;\n      return #x in other && Test;\n    }\n    return func() + Test;\n  }\n}\n',
+    source: `class Test {
+
+  static #x = 1
+
+  method(other) {
+    const Test = 2;
+    const func = () => {
+      const Test = 3;
+      return #x in other && Test;
+    }
+    return func() + Test;
+  }
+}
+`,
     filename: 'input.js',
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+  _checkInRHS = _checkInRHS2.checkInRHS;
+let Test = (() => {
+  'use strict';
+  var _x = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Test_x');
+  const Test = function Test() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(Test.prototype, 'method', {
+    value: Object.defineProperty(
+      function (other) {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        const Test = 2;
+        const func = () => {
+          const Test = 3;
+          return Object.prototype.hasOwnProperty.call(_checkInRHS(other), _x) && Test;
+        };
+        return func() + Test;
+      },
+      'name',
+      {
+        value: 'method',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(Test, 'prototype', { writable: false });
+  Object.defineProperty(Test, _x, {
+    writable: true,
+    value: 1,
+  });
+  return Test;
+})();`,
     modes: [
       {
         title: 'loose',
@@ -438,14 +1931,63 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[15],
       },
     ],
   },
   {
     title: 'to native fields — class expression in default param (input)',
-    source: '(x = class {\n  #foo;\n  test(other) { return #foo in other }\n}) => {}\n',
+    source: `(x = class {
+  #foo;
+  test(other) { return #foo in other }
+}) => {}
+`,
     filename: 'input.js',
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+  _checkInRHS = _checkInRHS2.checkInRHS;
+(
+  x = (() => {
+    'use strict';
+    var _foo = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private__Class_foo');
+    function _initialize() {
+      Object.defineProperty(this, _foo, {
+        writable: true,
+        value: void 0,
+      });
+    }
+    const _Class = function _Class() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+      _initialize.call(this);
+    };
+    Object.defineProperty(_Class, 'name', {
+      value: 'x',
+      configurable: true,
+    });
+    Object.defineProperty(_Class.prototype, 'test', {
+      value: Object.defineProperty(
+        function (other) {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          return Object.prototype.hasOwnProperty.call(_checkInRHS(other), _foo);
+        },
+        'name',
+        {
+          value: 'test',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(_Class, 'prototype', { writable: false });
+    return _Class;
+  })(),
+) => {};`,
     modes: [
       {
         title: 'loose',
@@ -463,15 +2005,64 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[16],
       },
     ],
   },
   {
     title: 'to native fields — class expression instance (input)',
-    source:
-      'function fn() {\n  return new class {\n    #priv;\n\n    method(obj) {\n      return #priv in obj;\n    }\n  }\n}\n',
+    source: `function fn() {
+  return new class {
+    #priv;
+
+    method(obj) {
+      return #priv in obj;
+    }
+  }
+}
+`,
     filename: 'input.js',
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+  _checkInRHS = _checkInRHS2.checkInRHS;
+function fn() {
+  return new ((() => {
+    'use strict';
+    var _priv = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private__Class_priv');
+    function _initialize() {
+      Object.defineProperty(this, _priv, {
+        writable: true,
+        value: void 0,
+      });
+    }
+    const _Class = function _Class() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+      _initialize.call(this);
+    };
+    Object.defineProperty(_Class.prototype, 'method', {
+      value: Object.defineProperty(
+        function (obj) {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          return Object.prototype.hasOwnProperty.call(_checkInRHS(obj), _priv);
+        },
+        'name',
+        {
+          value: 'method',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(_Class, 'prototype', { writable: false });
+    return _Class;
+  })())();
+}`,
     modes: [
       {
         title: 'loose',
@@ -489,15 +2080,61 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[17],
       },
     ],
   },
   {
     title: 'to native fields — class expression static (input)',
-    source:
-      'function fn() {\n  return new class {\n    static #priv;\n\n    method(obj) {\n      return #priv in obj;\n    }\n  }\n}\n',
+    source: `function fn() {
+  return new class {
+    static #priv;
+
+    method(obj) {
+      return #priv in obj;
+    }
+  }
+}
+`,
     filename: 'input.js',
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+  _checkInRHS = _checkInRHS2.checkInRHS;
+function fn() {
+  return new ((() => {
+    'use strict';
+    var _priv = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private__Class_priv');
+    const _Class = function _Class() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+    };
+    Object.defineProperty(_Class.prototype, 'method', {
+      value: Object.defineProperty(
+        function (obj) {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          return Object.prototype.hasOwnProperty.call(_checkInRHS(obj), _priv);
+        },
+        'name',
+        {
+          value: 'method',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(_Class, 'prototype', { writable: false });
+    Object.defineProperty(_Class, _priv, {
+      writable: true,
+      value: void 0,
+    });
+    return _Class;
+  })())();
+}`,
     modes: [
       {
         title: 'loose',
@@ -515,15 +2152,113 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[18],
       },
     ],
   },
   {
     title: 'to native fields — half constructed instance (exec)',
-    source:
-      'let hasW, hasX, hasY, hasZ;\nlet halfConstructed;\n\nclass F {\n  m() {\n    hasW = #w in this;\n    hasX = #x in this;\n    hasY = #y in this;\n    hasZ = #z in this;\n  }\n  get #w() {}\n  #x = 0;\n  #y = (() => {\n    halfConstructed = this;\n    throw "error";\n  })();\n  #z() {}\n}\n\ntry {\n  new F();\n} catch {}\nhalfConstructed.m();\n\nexpect(hasW).toBe(true);\nexpect(hasX).toBe(true);\nexpect(hasY).toBe(false);\nexpect(hasZ).toBe(true);\n',
+    source: `let hasW, hasX, hasY, hasZ;
+let halfConstructed;
+
+class F {
+  m() {
+    hasW = #w in this;
+    hasX = #x in this;
+    hasY = #y in this;
+    hasZ = #z in this;
+  }
+  get #w() {}
+  #x = 0;
+  #y = (() => {
+    halfConstructed = this;
+    throw "error";
+  })();
+  #z() {}
+}
+
+try {
+  new F();
+} catch {}
+halfConstructed.m();
+
+expect(hasW).toBe(true);
+expect(hasX).toBe(true);
+expect(hasY).toBe(false);
+expect(hasZ).toBe(true);
+`,
     filename: 'exec.js',
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+  _checkInRHS = _checkInRHS2.checkInRHS;
+let hasW, hasX, hasY, hasZ;
+let halfConstructed;
+let F = (() => {
+  'use strict';
+  var _z = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_F_z');
+  var _y = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_F_y');
+  var _w = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_F_w');
+  var _x = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_F_x');
+  var _privateMethod = function () {
+    if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+  };
+  function _initialize() {
+    Object.defineProperty(this, _z, { value: _privateMethod });
+    Object.defineProperty(this, _w, {
+      get: function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      },
+    });
+    Object.defineProperty(this, _x, {
+      writable: true,
+      value: 0,
+    });
+    Object.defineProperty(this, _y, {
+      writable: true,
+      value: (() => {
+        halfConstructed = this;
+        throw 'error';
+      })(),
+    });
+  }
+  const F = function F() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    _initialize.call(this);
+  };
+  Object.defineProperty(F.prototype, 'm', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        hasW = Object.prototype.hasOwnProperty.call(_checkInRHS(this), _w);
+        hasX = Object.prototype.hasOwnProperty.call(_checkInRHS(this), _x);
+        hasY = Object.prototype.hasOwnProperty.call(_checkInRHS(this), _y);
+        hasZ = Object.prototype.hasOwnProperty.call(_checkInRHS(this), _z);
+      },
+      'name',
+      {
+        value: 'm',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(F, 'prototype', { writable: false });
+  return F;
+})();
+try {
+  new F();
+} catch {}
+halfConstructed.m();
+expect(hasW).toBe(true);
+expect(hasX).toBe(true);
+expect(hasY).toBe(false);
+expect(hasZ).toBe(true);`,
     modes: [
       {
         title: 'loose',
@@ -541,15 +2276,88 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[19],
       },
     ],
   },
   {
     title: 'to native fields — half constructed instance (input)',
-    source:
-      "class F {\n  m() {\n    #w in this;\n    #x in this;\n    #y in this;\n    #z in this;\n  }\n  get #w() {}\n  #x = 0;\n  #y = (() => {\n    throw 'error';\n  })();\n  #z() {}\n}\n",
+    source: `class F {
+  m() {
+    #w in this;
+    #x in this;
+    #y in this;
+    #z in this;
+  }
+  get #w() {}
+  #x = 0;
+  #y = (() => {
+    throw 'error';
+  })();
+  #z() {}
+}
+`,
     filename: 'input.js',
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+  _checkInRHS = _checkInRHS2.checkInRHS;
+let F = (() => {
+  'use strict';
+  var _z = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_F_z');
+  var _y = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_F_y');
+  var _w = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_F_w');
+  var _x = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_F_x');
+  var _privateMethod = function () {
+    if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+  };
+  function _initialize() {
+    Object.defineProperty(this, _z, { value: _privateMethod });
+    Object.defineProperty(this, _w, {
+      get: function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      },
+    });
+    Object.defineProperty(this, _x, {
+      writable: true,
+      value: 0,
+    });
+    Object.defineProperty(this, _y, {
+      writable: true,
+      value: (() => {
+        throw 'error';
+      })(),
+    });
+  }
+  const F = function F() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    _initialize.call(this);
+  };
+  Object.defineProperty(F.prototype, 'm', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        Object.prototype.hasOwnProperty.call(_checkInRHS(this), _w);
+        Object.prototype.hasOwnProperty.call(_checkInRHS(this), _x);
+        Object.prototype.hasOwnProperty.call(_checkInRHS(this), _y);
+        Object.prototype.hasOwnProperty.call(_checkInRHS(this), _z);
+      },
+      'name',
+      {
+        value: 'm',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(F, 'prototype', { writable: false });
+  return F;
+})();`,
     modes: [
       {
         title: 'loose',
@@ -567,15 +2375,108 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[20],
       },
     ],
   },
   {
     title: 'to native fields — half constructed static (exec)',
-    source:
-      'let hasW, hasX, hasY, hasZ;\nlet halfConstructed;\n\ntry {\n  class F {\n    static m() {\n      hasW = #w in this;\n      hasX = #x in this;\n      hasY = #y in this;\n      hasZ = #z in this;\n    }\n    static get #w() {}\n    static #x = 0;\n    static #y = (() => {\n      halfConstructed = this;\n      throw "error";\n    })();\n    static #z() {}\n  }\n} catch {}\n\nhalfConstructed.m();\n\nexpect(hasW).toBe(true);\nexpect(hasX).toBe(true);\nexpect(hasY).toBe(false);\nexpect(hasZ).toBe(true);\n',
+    source: `let hasW, hasX, hasY, hasZ;
+let halfConstructed;
+
+try {
+  class F {
+    static m() {
+      hasW = #w in this;
+      hasX = #x in this;
+      hasY = #y in this;
+      hasZ = #z in this;
+    }
+    static get #w() {}
+    static #x = 0;
+    static #y = (() => {
+      halfConstructed = this;
+      throw "error";
+    })();
+    static #z() {}
+  }
+} catch {}
+
+halfConstructed.m();
+
+expect(hasW).toBe(true);
+expect(hasX).toBe(true);
+expect(hasY).toBe(false);
+expect(hasZ).toBe(true);
+`,
     filename: 'exec.js',
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+  _checkInRHS = _checkInRHS2.checkInRHS;
+let hasW, hasX, hasY, hasZ;
+let halfConstructed;
+try {
+  let F = (() => {
+    'use strict';
+    var _z = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_F_z');
+    var _y = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_F_y');
+    var _w = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_F_w');
+    var _x = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_F_x');
+    var _privateMethod = function () {
+      if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+    };
+    const F = function F() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+    };
+    Object.defineProperty(F, 'm', {
+      value: Object.defineProperty(
+        function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          hasW = Object.prototype.hasOwnProperty.call(_checkInRHS(this), _w);
+          hasX = Object.prototype.hasOwnProperty.call(_checkInRHS(this), _x);
+          hasY = Object.prototype.hasOwnProperty.call(_checkInRHS(this), _y);
+          hasZ = Object.prototype.hasOwnProperty.call(_checkInRHS(this), _z);
+        },
+        'name',
+        {
+          value: 'm',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(F, 'prototype', { writable: false });
+    Object.defineProperty(F, _z, { value: _privateMethod });
+    Object.defineProperty(F, _w, {
+      get: function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      },
+    });
+    Object.defineProperty(F, _x, {
+      writable: true,
+      value: 0,
+    });
+    Object.defineProperty(F, _y, {
+      writable: true,
+      value: (() => {
+        halfConstructed = F;
+        throw 'error';
+      })(),
+    });
+    return F;
+  })();
+} catch {}
+halfConstructed.m();
+expect(hasW).toBe(true);
+expect(hasX).toBe(true);
+expect(hasY).toBe(false);
+expect(hasZ).toBe(true);`,
     modes: [
       {
         title: 'loose',
@@ -593,15 +2494,76 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[21],
       },
     ],
   },
   {
     title: 'to native fields — half constructed static (input)',
-    source:
-      "class F {\n  static m() {\n    #x in this;\n    #y in this;\n    #z in this;\n  }\n  static #x = 0;\n  static #y = (() => {\n    throw 'error';\n  })();\n  static #z() {}\n}\n",
+    source: `class F {
+  static m() {
+    #x in this;
+    #y in this;
+    #z in this;
+  }
+  static #x = 0;
+  static #y = (() => {
+    throw 'error';
+  })();
+  static #z() {}
+}
+`,
     filename: 'input.js',
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+  _checkInRHS = _checkInRHS2.checkInRHS;
+let F = (() => {
+  'use strict';
+  var _z = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_F_z');
+  var _x = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_F_x');
+  var _y = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_F_y');
+  var _privateMethod = function () {
+    if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+  };
+  const F = function F() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(F, 'm', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        Object.prototype.hasOwnProperty.call(_checkInRHS(this), _x);
+        Object.prototype.hasOwnProperty.call(_checkInRHS(this), _y);
+        Object.prototype.hasOwnProperty.call(_checkInRHS(this), _z);
+      },
+      'name',
+      {
+        value: 'm',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(F, 'prototype', { writable: false });
+  Object.defineProperty(F, _z, { value: _privateMethod });
+  Object.defineProperty(F, _x, {
+    writable: true,
+    value: 0,
+  });
+  Object.defineProperty(F, _y, {
+    writable: true,
+    value: (() => {
+      throw 'error';
+    })(),
+  });
+  return F;
+})();`,
     modes: [
       {
         title: 'loose',
@@ -619,15 +2581,72 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[22],
       },
     ],
   },
   {
     title: 'to native fields — multiple checks (input)',
-    source:
-      'class A {\n  #x;\n  #m() {}\n\n  test() {\n    #x in this;\n    #m in this;\n    #x in this;\n    #m in this;\n  }\n}\n',
+    source: `class A {
+  #x;
+  #m() {}
+
+  test() {
+    #x in this;
+    #m in this;
+    #x in this;
+    #m in this;
+  }
+}
+`,
     filename: 'input.js',
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+  _checkInRHS = _checkInRHS2.checkInRHS;
+let A = (() => {
+  'use strict';
+  var _m = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_A_m');
+  var _x = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_A_x');
+  var _privateMethod = function () {
+    if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+  };
+  function _initialize() {
+    Object.defineProperty(this, _m, { value: _privateMethod });
+    Object.defineProperty(this, _x, {
+      writable: true,
+      value: void 0,
+    });
+  }
+  const A = function A() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+    _initialize.call(this);
+  };
+  Object.defineProperty(A.prototype, 'test', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        Object.prototype.hasOwnProperty.call(_checkInRHS(this), _x);
+        Object.prototype.hasOwnProperty.call(_checkInRHS(this), _m);
+        Object.prototype.hasOwnProperty.call(_checkInRHS(this), _x);
+        Object.prototype.hasOwnProperty.call(_checkInRHS(this), _m);
+      },
+      'name',
+      {
+        value: 'test',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(A, 'prototype', { writable: false });
+  return A;
+})();`,
     modes: [
       {
         title: 'loose',
@@ -645,15 +2664,61 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[23],
       },
     ],
   },
   {
     title: 'to native fields — static shadowed binding (input)',
-    source:
-      'class A {\n  static #foo;\n\n  test() {\n    let A = function fn(A) {\n      return #foo in A;\n    };\n  }\n}\n',
+    source: `class A {
+  static #foo;
+
+  test() {
+    let A = function fn(A) {
+      return #foo in A;
+    };
+  }
+}
+`,
     filename: 'input.js',
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+  _checkInRHS = _checkInRHS2.checkInRHS;
+let A = (() => {
+  'use strict';
+  var _foo = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_A_foo');
+  const A = function A() {
+    if (!new.target) throw new TypeError('Cannot call a class as a function');
+  };
+  Object.defineProperty(A.prototype, 'test', {
+    value: Object.defineProperty(
+      function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        let A = function fn(A) {
+          return Object.prototype.hasOwnProperty.call(_checkInRHS(A), _foo);
+        };
+      },
+      'name',
+      {
+        value: 'test',
+        configurable: true,
+      },
+    ),
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(A, 'prototype', { writable: false });
+  Object.defineProperty(A, _foo, {
+    writable: true,
+    value: void 0,
+  });
+  return A;
+})();`,
     modes: [
       {
         title: 'loose',
@@ -671,7 +2736,6 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[24],
       },
     ],
   },

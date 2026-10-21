@@ -23,7 +23,11 @@ function alignClassPropertiesBehavior(
 test.each([false, true])('aligns class properties with Babel (loose=%s)', async loose => {
   await expect(
     alignClassPropertiesBehavior(
-      `class Counter { value = 2; static factor = 3; read() { return this.value * Counter.factor; } }
+      `class Counter {
+  value = 2;
+  static factor = 3;
+  read() { return this.value * Counter.factor; }
+}
 globalThis.__result = new Counter().read();`,
       loose,
       [/^\s*value\s*=/m, /^\s*static\s+factor\s*=/m],
@@ -70,7 +74,7 @@ class Child extends (heritageCalls++, Base) {
 }
 globalThis.__result = [heritageCalls, Child.value];`,
       true,
-      [],
+      [/^\s*static\s+(?:seed|value)\s*=/m],
     ),
   ).resolves.toEqual([1, 34]);
 });

@@ -10,13 +10,13 @@ const source =
 const declarations = ['function declared(){}', 'class Declared{}'];
 const expressions = ['function expression(){}', 'class Expression{}'];
 const cases = [
-  { route: 'Expression', expected: expressions, fails: true },
-  { route: 'Declaration', expected: declarations, fails: true },
-  { route: 'Statement', expected: declarations, fails: true },
-  { route: 'FunctionExpression', expected: [expressions[0]], fails: false },
-  { route: 'ClassExpression', expected: [expressions[1]], fails: false },
-  { route: 'FunctionDeclaration', expected: [declarations[0]], fails: false },
-  { route: 'ClassDeclaration', expected: [declarations[1]], fails: false },
+  { route: 'Expression', expected: expressions },
+  { route: 'Declaration', expected: declarations },
+  { route: 'Statement', expected: declarations },
+  { route: 'FunctionExpression', expected: [expressions[0]] },
+  { route: 'ClassExpression', expected: [expressions[1]] },
+  { route: 'FunctionDeclaration', expected: [declarations[0]] },
+  { route: 'ClassDeclaration', expected: [declarations[1]] },
 ] as const;
 
 describe.each(cases)('$route distinguishes declaration and expression instances', entry => {

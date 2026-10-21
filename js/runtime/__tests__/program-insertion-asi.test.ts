@@ -43,8 +43,6 @@ for (const method of ['prependToProgram', 'appendToProgram', 'ensureHelper'] as 
   });
 }
 
-test('separate statement control', () => expect(run(`${first};\n${second}`)).toBe(3));
-
 for (const method of ['prependToProgram', 'appendToProgram', 'ensureHelper'] as const) {
   describe.each([false, true])(`${method}, directive terminated=%s`, terminated => {
     let actual: unknown;

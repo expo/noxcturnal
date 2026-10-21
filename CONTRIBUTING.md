@@ -24,7 +24,7 @@ ask you to rebuild.
 pnpm build            # debug native addon and JavaScript
 pnpm build:release    # host release addon and JavaScript
 pnpm test             # JavaScript/runtime tests
-cargo test            # native tests
+cargo test --workspace # native addon and Hermes crate tests
 pnpm check:types      # TypeScript contracts
 pnpm format           # JavaScript, TypeScript, and Rust formatting
 nix fmt               # Nix formatting

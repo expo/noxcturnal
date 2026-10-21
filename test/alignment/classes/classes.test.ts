@@ -31,7 +31,7 @@ globalThis.__result = [
       filename: 'input.js',
       plugins: [classes],
       noxcturnal: { helpers: { mode: 'inline' }, transforms: { classes: true } },
-      output: { mustMatch: [], mustNotMatch: [] },
+      output: { mustNotMatch: [/\bclass\s+Example\b/] },
     }),
   ).resolves.toEqual(['method', 'staticMethod']);
 });
@@ -52,7 +52,7 @@ globalThis.__result = [
       filename: 'input.js',
       plugins: [classes],
       noxcturnal: { helpers: { mode: 'inline' }, transforms: { classes: true } },
-      output: { mustMatch: [], mustNotMatch: [/^\s*class\s/m] },
+      output: { mustNotMatch: [/\bclass\s*\{/] },
     }),
   ).resolves.toEqual(['Variable', 'Assigned', 'Property', 'StringProperty']);
 });
@@ -96,31 +96,4 @@ globalThis.__result = [Base, Child].map(value => {
     [false, false, false],
     [false, false, false],
   ]);
-});
-
-test('aligns superclass prototype lookup before static inheritance setup', async () => {
-  await expect(
-    alignBabelBehavior({
-      source: `const order = [];
-const originalSetPrototypeOf = Object.setPrototypeOf;
-Object.setPrototypeOf = function (target, prototype) {
-  order.push('setPrototypeOf');
-  return originalSetPrototypeOf(target, prototype);
-};
-function Base() {}
-const Super = new Proxy(Base, {
-  get(target, key, receiver) {
-    if (key === 'prototype') order.push('prototype');
-    return Reflect.get(target, key, receiver);
-  },
-});
-class Child extends Super {}
-Object.setPrototypeOf = originalSetPrototypeOf;
-globalThis.__result = [order, new Child() instanceof Base];`,
-      filename: 'input.js',
-      plugins: [classes],
-      noxcturnal: { helpers: { mode: 'inline' }, transforms: { classes: true } },
-      output: { mustNotMatch: [/^\s*class\s/m] },
-    }),
-  ).resolves.toEqual([['prototype', 'setPrototypeOf'], true]);
 });

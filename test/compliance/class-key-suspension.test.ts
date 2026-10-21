@@ -48,7 +48,6 @@ for (const mode of ['inline', 'runtime'] as const) {
         2,
         'TypeError',
       ];
-      expect(await run(source)).toEqual(expected);
       const code = compile(source, {
         transforms: { classes: true },
         helpers: { mode, moduleName: '@babel/runtime', version: '7.29.7' },
@@ -160,7 +159,6 @@ for (const mode of ['inline', 'runtime'] as const) {
         iterator.next(${suspendedPart === 'key' ? "'a'" : 'Object'});
         globalThis.result = iterator.next(${suspendedPart === 'key' ? "'b'" : 'Object'}).value;
       `;
-      expect(await run(source)).toEqual([0, 1]);
       const code = compile(source, {
         transforms: { classes: true },
         helpers: { mode, moduleName: '@babel/runtime', version: '7.29.7' },
@@ -204,7 +202,6 @@ for (const mode of ['inline', 'runtime'] as const) {
                globalThis.result = iterator.next(${location === 'key' ? "'b'" : 'Object'}).value;`
               : `async function make() { ${body} } globalThis.result = make();`;
           const expected = capture ? [0, 1] : [7, 7];
-          expect(await run(source)).toEqual(expected);
           const code = compile(source, {
             transforms: { privateMethods: true },
             helpers: { mode, moduleName: '@babel/runtime', version: '7.29.7' },
@@ -243,7 +240,6 @@ for (const mode of ['inline', 'runtime'] as const) {
             : 'globalThis.result = make();'
         }
       `;
-      expect(await run(source)).toEqual([3, 7]);
       const code = compile(source, {
         transforms: { privateMethods: true },
         helpers: { mode, moduleName: '@babel/runtime', version: '7.29.7' },
@@ -267,7 +263,6 @@ for (const mode of ['inline', 'runtime'] as const) {
       return new Holder().readOwn();
     }
     const iterator = make(); iterator.next(); globalThis.result = iterator.next('key').value;`;
-    expect(await run(source)).toBe(7);
     const code = compile(source, {
       transforms: { privateMethods: true },
       helpers: { mode, moduleName: '@babel/runtime', version: '7.29.7' },

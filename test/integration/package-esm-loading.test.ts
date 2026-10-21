@@ -17,7 +17,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { transformSync } from '@babel/core';
 import objectRest from '@babel/plugin-transform-object-rest-spread';
-import { beforeAll, describe, expect, test } from 'vitest';
+import { afterAll, beforeAll, expect, test } from 'vitest';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const observations = new Map<string, unknown>();
@@ -206,84 +206,104 @@ function observe(code: string): unknown {
   new Function('globalThis', code)(context);
   return context.result;
 }
-describe.each(configs)('array tail rest loose=$loose builtins=$useBuiltIns', config => {
-  describe.each(['inline', 'runtime'] as const)('%s helpers', mode => {
-    describe.each(['declaration', 'assignment', 'catch', 'loop', 'parameter'])(
-      '%s array tail',
-      form => {
-        let actual: unknown;
-        const expected = {
-          status: 'complete',
-          remainingRest: false,
-          value: [2, { '0': 1, '1': 2 }],
-        };
-        beforeAll(() => {
-          expect(require('@babel/runtime/package.json').version).toBe('7.29.7');
-          const source = {
-            declaration: 'const [...{length,...rest}]=[1,2];globalThis.result=[length,rest];',
-            assignment:
-              'let length,rest;([...{length,...rest}]=[1,2]);globalThis.result=[length,rest];',
-            catch: 'try{throw [1,2]}catch([...{length,...rest}]){globalThis.result=[length,rest]}',
-            loop: 'for(const [...{length,...rest}] of [[1,2]]){globalThis.result=[length,rest]}',
-            parameter:
-              'function f([...{length,...rest}]){return [length,rest]}globalThis.result=f([1,2]);',
-          }[form]!;
-          expect(observe(source)).toEqual(expected.value);
-          const reference = () =>
-            transformSync(source, {
-              configFile: false,
-              babelrc: false,
-              plugins: [[objectRest, config]],
-            })!.code!;
-          if (form === 'catch' || form === 'parameter') {
-            expect(reference).toThrow(
-              `Unexpected pattern parent type: ${form === 'catch' ? 'CatchClause' : 'FunctionDeclaration'}`,
-            );
-          } else {
-            const code = reference();
-            expect(code).not.toMatch(/\.\.\.rest/);
-            expect(observe(code)).toEqual(expected.value);
-          }
-          const plan = {
-            phases: [
-              {
-                name: 'audit',
-                native: {
-                  helpers: { mode, moduleName: '@babel/runtime', version: '7.29.7' },
-                  transforms: { objectRestSpread: config },
-                },
+const arrayTailForms = [
+  {
+    name: 'declaration',
+    source: 'const [...{length,...rest}]=[1,2];globalThis.result=[length,rest];',
+  },
+  {
+    name: 'assignment',
+    source: 'let length,rest;([...{length,...rest}]=[1,2]);globalThis.result=[length,rest];',
+  },
+  {
+    name: 'catch',
+    source: 'try{throw [1,2]}catch([...{length,...rest}]){globalThis.result=[length,rest]}',
+  },
+  {
+    name: 'loop',
+    source: 'for(const [...{length,...rest}] of [[1,2]]){globalThis.result=[length,rest]}',
+  },
+  {
+    name: 'parameter',
+    source: 'function f([...{length,...rest}]){return [length,rest]}globalThis.result=f([1,2]);',
+  },
+];
+
+test.each(arrayTailForms)(
+  'array tail rest in $name preserves length and indexed properties',
+  ({ name, source }) => {
+    const value = [2, { '0': 1, '1': 2 }];
+    expect(require('@babel/runtime/package.json').version).toBe('7.29.7');
+    expect(observe(source)).toEqual(value);
+    for (const config of configs) {
+      const reference = () =>
+        transformSync(source, {
+          configFile: false,
+          babelrc: false,
+          plugins: [[objectRest, config]],
+        })!.code!;
+      if (name === 'catch' || name === 'parameter') {
+        expect(reference).toThrow(
+          `Unexpected pattern parent type: ${name === 'catch' ? 'CatchClause' : 'FunctionDeclaration'}`,
+        );
+      } else {
+        const code = reference();
+        expect(code).not.toMatch(/\.\.\.rest/);
+        expect(observe(code)).toEqual(value);
+      }
+    }
+    const cases = configs.flatMap(config =>
+      ['inline', 'runtime'].map(mode => ({
+        label: `${name}: loose=${config.loose}, builtins=${config.useBuiltIns}, helpers=${mode}`,
+        pipeline: {
+          phases: [
+            {
+              name: 'audit',
+              native: {
+                helpers: { mode, moduleName: '@babel/runtime', version: '7.29.7' },
+                transforms: { objectRestSpread: config },
               },
-            ],
-          };
-          // A missing recursive tail branch crashes native traversal. Bound and
-          // isolate compilation so it cannot terminate Vitest or hang the suite.
-          const child = spawnSync(
-            process.execPath,
-            [
-              '-e',
-              `
-          const {transform,defineNativePipeline}=require(${JSON.stringify(packageEntry)});
-          const result=transform(${JSON.stringify(source)},'input.js',defineNativePipeline(${JSON.stringify(plan)}));
-          if(result.status!=='complete')throw new Error(JSON.stringify(result));
-          const context={};
-          new Function('require','globalThis',result.code)(require,context);
-          console.log(JSON.stringify({status:result.status,remainingRest:/\\.\\.\\.rest/.test(result.code),value:context.result}));
-        `,
-            ],
-            { encoding: 'utf8', timeout: 10_000 },
-          );
-          expect(child.error).toBeUndefined();
-          expect(child.signal).toBeNull();
-          expect(child.status, child.stderr).toBe(0);
-          actual = JSON.parse(child.stdout);
-        });
-        test('completes and removes selected object-rest syntax', () => {
-          expect(actual).toEqual(expected);
-        });
-      },
+            },
+          ],
+        },
+      })),
     );
-  });
-});
+    // Keep crash isolation while sharing process startup across option modes. Print
+    // the active case before entering native code so a crash identifies its mode.
+    const child = spawnSync(
+      process.execPath,
+      [
+        '-e',
+        `
+    const assert = require('node:assert/strict');
+    const {transform,defineNativePipeline}=require(${JSON.stringify(packageEntry)});
+    const observations = [];
+    for (const entry of ${JSON.stringify(cases)}) {
+      console.error(entry.label);
+      const result=transform(${JSON.stringify(source)},'input.js',defineNativePipeline(entry.pipeline));
+      assert.equal(result.status, 'complete', entry.label);
+      const context={};
+      new Function('require','globalThis',result.code)(require,context);
+      observations.push({label:entry.label,status:result.status,remainingRest:/\\.\\.\\.rest/.test(result.code),value:context.result});
+    }
+    console.log(JSON.stringify(observations));
+  `,
+      ],
+      { encoding: 'utf8', timeout: 10_000 },
+    );
+    expect(child.error, child.stderr).toBeUndefined();
+    expect(child.signal, child.stderr).toBeNull();
+    expect(child.status, child.stderr).toBe(0);
+    expect(JSON.parse(child.stdout)).toEqual(
+      cases.map(({ label }) => ({
+        label,
+        status: 'complete',
+        remainingRest: false,
+        value,
+      })),
+    );
+  },
+);
 
 test('runtime phase interning remains correct after its 1024-entry budget is exhausted', () => {
   const script = `
@@ -320,41 +340,47 @@ test('runtime phase interning remains correct after its 1024-entry budget is exh
   ).toBe('ok');
 });
 
-test('pnpm packs exact native dependency versions and published entry files', () => {
-  const source = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
-  const directory = mkdtempSync(join(tmpdir(), 'noxcturnal-pack-manifest-audit-'));
-  try {
-    execFileSync('pnpm', ['pack', '--pack-destination', directory], {
+let packDirectory: string | undefined;
+function packedArchive(): string {
+  if (packDirectory == null) {
+    packDirectory = mkdtempSync(join(tmpdir(), 'noxcturnal-pack-audit-'));
+    execFileSync('pnpm', ['pack', '--pack-destination', packDirectory], {
       cwd: root,
       stdio: 'pipe',
       timeout: 60_000,
     });
-    const archives = readdirSync(directory).filter(name => name.endsWith('.tgz'));
-    expect(archives).toHaveLength(1);
-    const archive = join(directory, archives[0]);
-    const packed = JSON.parse(
-      execFileSync('tar', ['-xOf', archive, 'package/package.json'], { encoding: 'utf8' }),
-    );
-    const files = new Set(
-      execFileSync('tar', ['-tf', archive], { encoding: 'utf8' }).trim().split('\n'),
-    );
-    expect(packed.version).toBe(source.version);
-    expect(Object.keys(packed.optionalDependencies).sort()).toEqual(
-      Object.keys(source.optionalDependencies).sort(),
-    );
-    expect(Object.keys(packed.optionalDependencies)).toHaveLength(8);
-    for (const version of Object.values(packed.optionalDependencies))
-      expect(version).toBe(source.version);
-    const entry = packed.exports['.'];
-    for (const condition of ['types', 'import', 'require']) {
-      expect(files.has(`package/${entry[condition].replace(/^\.\//, '')}`)).toBe(true);
-    }
-    expect(files.has('package/package.json')).toBe(true);
-    // The source condition is a repository build input, not shipped TypeScript.
-    expect(files.has('package/js/index.ts')).toBe(false);
-  } finally {
-    rmSync(directory, { recursive: true, force: true });
   }
+  const archives = readdirSync(packDirectory).filter(name => name.endsWith('.tgz'));
+  expect(archives).toHaveLength(1);
+  return join(packDirectory, archives[0]!);
+}
+afterAll(() => {
+  if (packDirectory != null) rmSync(packDirectory, { recursive: true, force: true });
+});
+
+test('pnpm packs exact native dependency versions and published entry files', () => {
+  const source = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
+  const archive = packedArchive();
+  const packed = JSON.parse(
+    execFileSync('tar', ['-xOf', archive, 'package/package.json'], { encoding: 'utf8' }),
+  );
+  const files = new Set(
+    execFileSync('tar', ['-tf', archive], { encoding: 'utf8' }).trim().split('\n'),
+  );
+  expect(packed.version).toBe(source.version);
+  expect(Object.keys(packed.optionalDependencies).sort()).toEqual(
+    Object.keys(source.optionalDependencies).sort(),
+  );
+  expect(Object.keys(packed.optionalDependencies)).toHaveLength(8);
+  for (const version of Object.values(packed.optionalDependencies))
+    expect(version).toBe(source.version);
+  const entry = packed.exports['.'];
+  for (const condition of ['types', 'import', 'require']) {
+    expect(files.has(`package/${entry[condition].replace(/^\.\//, '')}`)).toBe(true);
+  }
+  expect(files.has('package/package.json')).toBe(true);
+  // The source condition is a repository build input, not shipped TypeScript.
+  expect(files.has('package/js/index.ts')).toBe(false);
 }, 90_000);
 
 function runInstalledPackage(cwd: string, mode: 'import' | 'require') {
@@ -408,16 +434,10 @@ function runInstalledPackage(cwd: string, mode: 'import' | 'require') {
 test('installed tarball prefers a colocated addon and falls back to the optional package', () => {
   const directory = mkdtempSync(join(tmpdir(), 'noxcturnal-installed-loader-'));
   try {
-    execFileSync('pnpm', ['pack', '--pack-destination', directory], {
-      cwd: root,
-      stdio: 'pipe',
-      timeout: 60_000,
-    });
-    const archives = readdirSync(directory).filter(name => name.endsWith('.tgz'));
-    expect(archives).toHaveLength(1);
+    const archive = packedArchive();
     const consumer = join(directory, 'consumer');
     mkdirSync(join(consumer, 'node_modules'), { recursive: true });
-    execFileSync('tar', ['-xzf', join(directory, archives[0]!), '-C', consumer]);
+    execFileSync('tar', ['-xzf', archive, '-C', consumer]);
     const packageRoot = join(consumer, 'node_modules', 'noxcturnal');
     renameSync(join(consumer, 'package'), packageRoot);
     const localBinary = join(packageRoot, hostBinaryName);
