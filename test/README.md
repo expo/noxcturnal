@@ -2,7 +2,7 @@
 
 Every test under this directory is owned by this repository and may be maintained directly. In
 particular, the fixture and corpus cases under `transforms/` are freestanding tests: they are not
-generated from, synchronized with, or sourced from a Babel or Expo checkout. Use the normal Vitest
+generated from, synchronized with, or sourced from another checkout. Use the normal Vitest
 snapshot workflow when an intentional output change requires snapshot updates.
 
 ## Suite layers
@@ -42,9 +42,5 @@ or public-surface assertion merely to reduce test count. Record the surviving te
 change description when deleting coverage.
 
 Implementation constraints for a transform live in the feature README beside the code
-([`js/README.md`](../js/README.md), [`src/README.md`](../src/README.md)). A test records an
+(under [`js/`](../js/) and [`src/`](../src/README.md)). A test records an
 observable contract. It does not replace that note.
-
-`pnpm check` does not read `duplicate-allowlist.json` or `fallback-reason-allowlist.json`. The
-duplicate file is an empty list. The fallback file records Expo Metro reasons whose tests live in
-the Expo repository. Updating either file has no effect on this suite.

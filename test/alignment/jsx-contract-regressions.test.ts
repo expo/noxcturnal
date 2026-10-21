@@ -134,7 +134,7 @@ test.each(['\v', '\f', '\u0085', '\u2028', '\u2029', '\r', '\n', '\r\n'])(
 );
 
 // A visitor boundary exercises the resident native session in addition to the
-// native-only filename regressions in jsx-parser-filename-audit.test.ts.
+// native-only filename regressions in jsx-parser-filename.test.ts.
 test('retains original filename through a visitor/native boundary', () => {
   const observer = defineNativePlugin({ name: 'observe', visitors: [] });
   const result = transform(
