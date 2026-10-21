@@ -33,7 +33,7 @@
     "build:js": "rimraf dist && rollup -c scripts/rollup.config.mjs",
     "build:native": "node scripts/native.mjs build",
     "build:release": "node scripts/native.mjs build --release && pnpm build:js",
-    "check": "node scripts/check.mjs",
+    "check": "pnpm codegen:check && pnpm format:check && pnpm check:types && pnpm lint && pnpm build && pnpm test && cargo test --workspace && pnpm package:check",
     "check:types": "tsc --noEmit && pnpm test:types",
     "codegen": "node scripts/sync-oxc-event-schema.mjs && node scripts/generate-event-schema.mjs && node scripts/generate-inline-helpers.mjs && node scripts/generate-regexp-unicode-properties.mjs",
     "codegen:check": "node scripts/sync-oxc-event-schema.mjs --check && node scripts/generate-event-schema.mjs --check && node scripts/generate-inline-helpers.mjs --check && node scripts/generate-regexp-unicode-properties.mjs --check && pnpm codegen:estree:check",

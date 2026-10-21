@@ -4,6 +4,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import {
+  assertBuildInputs,
+  currentBuildInputs,
   currentTarget,
   nativeInputHash,
   nativeTargets,
@@ -174,12 +176,7 @@ function materialize() {
   if (directories.some(directory => typeof directory !== 'string'))
     throw new Error('artifact set does not contain every declared target');
 
-  const expected = {
-    flake: sha256File(path.join(workspace, 'flake.lock')),
-    cargo: sha256File(path.join(workspace, 'Cargo.lock')),
-    pnpm: sha256File(path.join(workspace, 'pnpm-lock.yaml')),
-    native: nativeInputHash(),
-  };
+  const expected = currentBuildInputs(workspace);
   const validated = nativeTargets.map((target, index) => ({
     target,
     directory: directories[index],
@@ -187,16 +184,7 @@ function materialize() {
   }));
   if (new Set(validated.map(entry => entry.manifest.sourceHash)).size !== 1)
     throw new Error('native outputs do not share one source hash');
-  for (const { target, manifest } of validated) {
-    if (manifest.nativeInputSha256 !== expected.native)
-      throw new Error(`${target.rustTarget} was built from stale native inputs`);
-    if (manifest.flakeLockHash !== expected.flake)
-      throw new Error(`${target.rustTarget} was built with another flake.lock`);
-    if (manifest.dependencies.cargoLockSha256 !== expected.cargo)
-      throw new Error(`${target.rustTarget} was built with another Cargo.lock`);
-    if (manifest.dependencies.pnpmLockSha256 !== expected.pnpm)
-      throw new Error(`${target.rustTarget} was built with another pnpm-lock.yaml`);
-  }
+  for (const { target, manifest } of validated) assertBuildInputs(target, manifest, expected);
 
   const manifest = {
     schema: 1,

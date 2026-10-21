@@ -55,7 +55,7 @@ pnpm changeset
 
 Keep the automation behind these existing surfaces:
 
-- `scripts/check.mjs` — complete repository verification
+- `package.json` scripts — repository verification through `pnpm check`
 - `scripts/native.mjs` — native build, smoke test, and materialization
 - `scripts/native-lib.mjs` — shared internal native metadata
 - `scripts/check-package.mjs` — package integrity and pack tests

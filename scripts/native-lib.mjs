@@ -87,6 +87,27 @@ export function readBuild(target, directory) {
   return { manifest, binaryPath, payloadHash };
 }
 
+// Capture once per validation operation; every artifact must match the same inputs.
+export function currentBuildInputs(workspace = root) {
+  return {
+    flake: sha256File(path.join(workspace, 'flake.lock')),
+    cargo: sha256File(path.join(workspace, 'Cargo.lock')),
+    pnpm: sha256File(path.join(workspace, 'pnpm-lock.yaml')),
+    native: nativeInputHash(),
+  };
+}
+
+export function assertBuildInputs(target, manifest, expected) {
+  if (manifest.nativeInputSha256 !== expected.native)
+    throw new Error(`${target.rustTarget} was built from stale native inputs`);
+  if (manifest.flakeLockHash !== expected.flake)
+    throw new Error(`${target.rustTarget} was built with another flake.lock`);
+  if (manifest.dependencies?.cargoLockSha256 !== expected.cargo)
+    throw new Error(`${target.rustTarget} was built with another Cargo.lock`);
+  if (manifest.dependencies?.pnpmLockSha256 !== expected.pnpm)
+    throw new Error(`${target.rustTarget} was built with another pnpm-lock.yaml`);
+}
+
 const nativeInputRoots = [
   'vendor',
   'Cargo.toml',

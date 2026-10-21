@@ -174,6 +174,9 @@
             ];
             dontUseCmakeConfigure = true;
             HERMES_SOURCE_DIR = hermes;
+            # Reuse native addon artifacts for Clippy and workspace tests in CI.
+            CARGO_TARGET_DIR = "target/dev";
+            CARGO_BUILD_TARGET = pkgs.stdenv.hostPlatform.rust.rustcTarget;
             LD_LIBRARY_PATH = linuxLibraryPath;
             pnpmInstallFlags = [
               "--child-concurrency=1"
@@ -181,7 +184,7 @@
             ];
             buildPhase = ''
               runHook preBuild
-              node scripts/check.mjs
+              pnpm check
               runHook postBuild
             '';
             installPhase = ''
