@@ -6,7 +6,7 @@ The definition scope closes first, so phases created at load stay outside the in
 
 Native phases and visitor phases then share one resident source. A native phase uses the same entry as a standalone preflight call. A visitor phase collects the nodes the surviving contracts asked for and delivers them. Edits commit together at the end of the phase. The next phase sees the printed result.
 
-The React Compiler after an adapter or an erasure map bails. The compiler reads the caller's original file, and that file is gone once an adapter or erasure has replaced it.
+The React Compiler bails once an adapter or Flow erasure has replaced the working source, because the compiler reads the caller's original file.
 
 A function map is collected from the input parse, before lowering, and that parse is reused.
 

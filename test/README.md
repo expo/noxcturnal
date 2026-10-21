@@ -16,7 +16,7 @@ snapshot workflow when an intentional output change requires snapshot updates.
   plus the larger freestanding fixture and corpus collections. A focused selection test should show
   that syntax owned by the selected transform changes. Name deliberate identity, unsupported, and
   bailout cases as boundaries instead of claiming that they lower syntax.
-- `integration/` tests the packaged public surface and fitment claims. Put export, package-loading,
+- `integration/` tests the packaged public surface and advertised capabilities. Put export, package-loading,
   pipeline-composition, and advertised-capability coverage here.
 
 `fixtures/flow-parser-update/` is the shared Hermes parser-update matrix. Alignment and public Flow
