@@ -86,9 +86,7 @@ export interface PreflightTransforms {
  * Declarative configuration for one native phase (`PipelinePhase.native`).
  *
  * An absent or empty plan disables that phase. `defineNativePipeline` validates
- * and freezes the plan; `src/preflight` executes it. `TransformOptions.preflight`
- * is declared and not applied by `transform`. The pipeline cache key still
- * serializes it. Put the plan on the phase.
+ * and freezes the plan; `src/preflight` executes it.
  */
 export interface PreflightPlan {
   transforms?: PreflightTransforms;
