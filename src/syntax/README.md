@@ -1,17 +1,9 @@
 # Syntax boundary
 
-Classification, fragment checks, and UID reservation sit at the edge of a parse.
+This directory classifies file syntax, validates generated code fragments, and reserves unique names. The [adapter layer](../../js/adapters/README.md) calls classification before the pipeline, and native transforms use the other checks while producing code.
 
-The extension decides the syntax. Declaration files, including the module and CommonJS declaration suffixes, are declaration files. TypeScript and JSX suffixes follow their names. A script, module, or CommonJS file is Flow when a leading comment, after an optional hashbang, contains `@flow` as a whole word. Flow and an unrecognized extension are unsupported here. Every other recognized extension is Oxc-supported. Classification is the extension plus that directive.
+Classification uses the filename and leading Flow directive. Later passes trust the syntax supplied by the runtime. Do not reclassify transformed source: an adapter or erasure pass may retain `@flow` in otherwise ordinary JavaScript.
 
-Classification runs once, at the public boundary. Later passes trust the source type they were given. After erasure or an adapter, the TypeScript runtime may replace that syntax. A Flow file that was erased is reclassified as JSX, because the `@flow` comment would otherwise classify it as Flow again.
+Validate generated fragments in the phase's parser mode before committing edits. Invalid generated code is a failure, rather than a compatibility fallback.
 
-An escaped regexp name that the parser rejects is the one parse case preflight returns as a decline. Other parse diagnostics throw.
-
-Expression and statement fragments are checked before generated code is inserted. The parser mode follows the phase's source type. A fragment that fails throws before the piece table sees it.
-
-UID reservations live on the session, separate from the source text. A reused session keeps names it has already issued, including across a phase that did not edit. A session that retained identifiers uses that index. Otherwise allocation scans the source and caches the names.
-
-Binding identifiers, references, identifier names (including static property names), and labels reserve a UID. Comments and string literals do not. A generated name may match text that appears only inside a string.
-
-Helper-name reservation is a separate scan, used when a preflight pass emits a helper. It decodes unicode escapes before it splits the source, and it may include strings and comments. An escaped spelling of a helper still counts as taken there. The two scans disagree on purpose: a UID is a new binding and must not collide with names the program can see, while a helper fragment is real source and must not collide with a name that source already spells.
+Name reservations live with the session so reused phases cannot issue the same generated name twice. Ordinary UID allocation avoids names the program can reference. Helper reservation also scans strings, comments, and escaped spellings in helper fragments. Do not merge those scans merely because both collect names.

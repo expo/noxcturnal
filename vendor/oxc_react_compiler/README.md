@@ -1,5 +1,7 @@
 # Oxc React Compiler
 
+This crate connects Oxc’s AST to the React Compiler. [Native preflight](../../src/preflight/README.md) uses it when a phase enables React compilation. It converts syntax and scope information, runs the compiler, and provides rewrites and diagnostics to the native phase.
+
 Noxcturnal vendors this crate from the Oxc `crates_v0.154.0` release (`d47efe5`), where it is
 versioned separately as 0.143.0, and selects it with `[patch.crates-io]`. Local repairs are listed in
 [NOXCTURNAL.md](./NOXCTURNAL.md). The guide below is upstream Oxc's.

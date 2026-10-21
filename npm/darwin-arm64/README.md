@@ -3,7 +3,4 @@
 Optional native binary for [`noxcturnal`](https://github.com/expo/noxcturnal) on macOS Apple
 Silicon (`darwin` / `arm64`, Rust target `aarch64-apple-darwin`).
 
-Application code depends on `noxcturnal`. This package is one of the eight optional dependencies
-that package selects, published in the same fixed version group. It has no JavaScript API. The
-loader tries a colocated `noxcturnal.darwin-arm64.node`, then requires this package. Node.js 18
-or later. The `os` and `cpu` fields limit installation to this target.
+Application code depends on `noxcturnal`; its loader selects the matching native package. The JavaScript package and all eight native packages are released at the same version so the binding and binary stay compatible. This package has no JavaScript API.

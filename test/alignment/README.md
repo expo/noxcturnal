@@ -27,11 +27,6 @@ Keep alignment where the canonical comparison is still the useful contract.
 Established behavior can move to a direct compliance regression with explicit
 expected results. Preserve unique native observations and output assertions;
 the historical Babel/source controls need not remain after that replacement.
-The class and private helper fallback matrices now live in
-`test/compliance/class-helper-fallback.test.ts` and
-`test/compliance/private-helper-fallback.test.ts`. They retain every declared
-helper version, both module formats, and helper import/fallback assertions
-without executing the old reference controls.
 
 ## Comparison modes
 
@@ -43,12 +38,10 @@ without executing the old reference controls.
   preserves `undefined`, special numbers, BigInt, collections, and object
   properties across VM realms. A thrown error is compared by `name` and
   `message`. Every behavioral fixture must also declare syntax that must be
-  absent from (or present in) Noxcturnal's output, so a no-op transform cannot
-  pass merely because Node supports the input.
-  At least one syntax assertion must reject the original source: forbidden
-  syntax must occur in the input, or required output syntax must be absent from
-  it. This prevents an identity transform from satisfying the fixture. Regex
-  checks preserve the caller's `lastIndex`. The helper also rejects successful
+  absent from (or present in) Noxcturnal's output. At least one syntax assertion
+  must reject the original source: forbidden syntax must occur in the input, or
+  required output syntax must be absent from it. Regex checks preserve the caller's
+  `lastIndex`. The helper also rejects successful
   executions that never assign `globalThis.__result`; explicitly assigning
   `undefined` is valid.
 - `alignHermesFlowTransform` uses the transforms exported by the pinned

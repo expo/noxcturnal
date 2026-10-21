@@ -1,11 +1,7 @@
 # Semantic facts
 
-This holds facts from Oxc's semantic analysis, and two string conversions that stay apart.
+This directory derives node, scope, and reference facts from Oxc's semantic analysis. The [engine](../engine/README.md) retains the facts requested by visitor contracts and uses them to answer queries.
 
-Constant evaluation serves the optimizer. Values are null, boolean, number, and string. Truthiness follows JavaScript: a non-empty string is truthy, including a string of the digit zero. Numeric conversion is a separate step. A lone surrogate is refused. The optimizer will not fold a value JavaScript would not produce. Binary, octal, and hex integers whose significant digits exceed what an IEEE double can round once are left as written. Wider values can double-round.
+Constant evaluation may refuse a fold when it cannot reproduce JavaScript's value exactly, including cases involving lone surrogates or rounding of large numeric literals. Transport must preserve those values across the Rust/JavaScript boundary, including lone surrogates and negative zero.
 
-Host transport is the other conversion. Most strings cross as UTF-8. A leading escape plus a JSON string is used when the value contains an isolated surrogate, or when the value itself starts with that escape. Oxc stores an isolated surrogate as a replacement character plus four hex digits. The encoder turns that marker back into the scalar the AST stored. Lone surrogates and negative zero survive the crossing. Folding and transport stay separate so a refusal in the optimizer is not also a lossy crossing.
-
-The session index remembers where each node sits, who owns it, and which scope it belongs to. Scope ancestry is remembered once per scope. The indexes for types, calls, children, and traversal are built the first time something asks. A missing parent is distinguishable from the first node.
-
-The index contains only what the route manifest requested. A new semantic field needs a key in the semantic field list, a generated field id, and a declaration on the visitor. A write is filled for identifier references, from the reference flags, and for member expressions. Declaring it on another node does not produce a value.
+Adding a visitor-visible fact requires agreement between semantic collection, the generated protocol field, and the visitor declaration. A field's existence in the schema does not mean it has a meaningful value on every node type.

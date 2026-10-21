@@ -1,13 +1,11 @@
 # JavaScript protocol
 
-This packs the buffers that cross into Rust and unpacks the tape Rust sends back. The layout is shared with the Rust decoder. The protocol tests run both sides. Change a tag, a limit, or a generated id on both sides in the same change.
+This directory encodes collection plans and edits for the [Rust protocol](../../src/protocol/README.md), then decodes visitor data for the runtime.
 
-Three buffers matter. A route manifest says which nodes, fields, and children to collect. A routed tape is what Rust sends back. An edit buffer is the commit for a visitor phase. Ids for node types, fields, child roles, and predicates come from the event schema. Change the schema, then run `pnpm codegen`.
+Three kinds of buffer cross the boundary: a manifest describing data to collect, a tape of matching node records, and an edit batch. Sending declared facts together avoids a native call for each node or field.
 
-The manifest is bounded. A route, its predicates, the values on one predicate, and the payload fields all have a cap, and so does the manifest's size. The packer does not apply the per-predicate value cap. The pipeline rejects a list past that cap, and a value that is not a scalar, when the phase is prepared. Alias routes expand to concrete types. A child role a variant does not declare contributes nothing. A wildcard role replaces the role list and asks Rust to retain heterogeneous structure. Prefer a named role.
+The layout is private to a release. Update both sides together when changing tags, limits, or layouts. Node and field IDs come from the event schema; change the schema and run `pnpm codegen` rather than maintaining separate tables.
 
-Edit offsets are UTF-16 indexes into the original source. A move stores its destination where a replacement would store new text, and Rust drops any parts on a move, because a move relocates a range rather than inserting content. An omitted destination means the move is incomplete. A plain string stays one string. A parts list collapses to one string only when every part is sourceless, unlabeled text. Anything else stays a parts table, so provenance can survive. Consecutive repeated source-map names share one entry.
+Edit coordinates use UTF-16 to match JavaScript string offsets. Structured edit parts preserve source provenance, so flatten them only when they contain no mapping information.
 
-The tape carries a string slab and records. Each record identifies the node and its span. Parent and scope are added only when the manifest asked for them, so a walk does not take another native call, and a phase that did not ask does not pay for them. A short buffer or a bad magic is rejected.
-
-Host strings stay UTF-8. A value that contains an isolated surrogate, or that itself starts with the escape used to mark one, is sent as a tagged JSON string. Constants use a small set of tags, so lone surrogates and signed zeroes survive the round trip. Constant folding has its own rules and leaves a lone surrogate unfolded.
+String transport must preserve JavaScript values that ordinary UTF-8 cannot represent, including lone surrogates. Its encoding is separate from constant evaluation, which may intentionally refuse to fold those values.
