@@ -1,7 +1,7 @@
 # Oxc React Compiler
 
-Noxcturnal vendors this crate at 0.143.0 (`UPSTREAM_REVISION`: `crates_v0.154.0`,
-`d47efe5`) and selects it with `[patch.crates-io]`. Local repairs are listed in
+Noxcturnal vendors this crate from the Oxc `crates_v0.154.0` release (`d47efe5`), where it is
+versioned separately as 0.143.0, and selects it with `[patch.crates-io]`. Local repairs are listed in
 [NOXCTURNAL.md](./NOXCTURNAL.md). The guide below is upstream Oxc's.
 
 oxc integration for the Rust port of the [React Compiler](https://github.com/react/react/tree/main/compiler).
