@@ -5,7 +5,6 @@ import type {
   NativeRouteFields,
   NativeRouteTypes,
 } from './generated/event-schema';
-import type { PreflightPlan } from './preflight/types';
 
 export type { NativeFieldKey, NativeNodeType } from './generated/event-schema';
 /** Alias route names, derived from the generated expansion table. */
@@ -244,11 +243,6 @@ export interface InspectRequest {
 export interface TransformOptions {
   /** Base directory for absolute diagnostic filenames. Defaults to process.cwd(). */
   projectRoot?: string;
-  /**
-   * Declared, and not applied by `transform`. The pipeline cache key still
-   * serializes it. Native configuration belongs on `PipelinePhase.native`.
-   */
-  preflight?: PreflightPlan;
   sourceMapMode?: SourceMapMode;
   parser?: 'auto' | 'js' | 'jsx' | 'ts' | 'tsx' | 'dts';
   allowBroadVisitors?: boolean;
