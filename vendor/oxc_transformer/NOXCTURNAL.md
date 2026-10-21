@@ -8,11 +8,8 @@ Original MIT license retained.
 
 Noxcturnal patches this tree to repair constructor initialization, exponentiation assignment, logical assignment, optional chaining, legacy decorator lowering, async lowering, TypeScript import and enum preservation, resource-management scope and module ordering, and Compiler/Refresh integration.
 
-The repair list below was first written against crates.io 0.141.0
-(archive SHA-256 `3481b17ea50d4866901de759f736aa2c63bfca1fb6a20a67faa423f5361429e9`,
-upstream commit `14533a3dc118bea73e755426aaf35f71dbe81eb8`). `aab6d77` moved the
-tree to 0.154.0. LICENSE for that original drop was taken from the
-0.141 commit's repository root because the published crate archive omits it.
+`LICENSE` is taken from the Oxc repository root because the published crate
+archive omits it.
 
 Local patches:
 
@@ -25,8 +22,7 @@ Local patches:
 - `es2021/logical_assignment_operators.rs`: lower private targets in the same
   traversal as ordinary targets. Semantic receiver duplication reserves unresolved
   names and captures mutable bindings; the following nullish pass sees generated
-  coalescing expressions when selected. This replaces Noxcturnal's separate
-  post-transform private completion pass.
+  coalescing expressions when selected.
 - `common/duplicate.rs`: regexp literals are identity-bearing allocations, so
   repeated uses share a temporary rather than cloning the literal. The shared
   utility also serves private class operations and legacy decorator computed keys.
