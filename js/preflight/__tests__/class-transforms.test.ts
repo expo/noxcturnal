@@ -259,10 +259,10 @@ test('native classes skip bodiless TypeScript methods', () => {
   }
 });
 
-// An ambient class emits nothing at all. Lowering one turned `declare class A {}`
-// into a real `var A`, because the TypeScript strip pass that would have deleted
-// it no longer saw a class — wrong independently of bodiless methods, and true
-// for `declare class Value { x: number }` with no methods at all.
+// An ambient class emits nothing at all. Lowering one would turn
+// `declare class A {}` into a real `var A`, because the TypeScript strip pass that
+// deletes it would no longer see a class. This holds with or without bodiless
+// methods, e.g. for `declare class Value { x: number }`.
 test('native classes leave ambient declarations to the TypeScript strip pass', () => {
   const lowering = pipeline({ classes: true, classProperties: { loose: true } });
   for (const source of [

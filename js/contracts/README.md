@@ -6,7 +6,7 @@ Path capabilities are opt-in. Scope, ancestry, children, comments, and control f
 
 A visitor needs a route and at least one of enter or exit. Comments, when requested, are the comments inside the node. Child contracts are depth-bounded so a nested declaration cannot grow the route without limit. Ancestry is either a fixed walk or a small set of named walks, and an ancestry route cannot also carry predicates. A bare function is an enter callback.
 
-`Function` and `Class` each arrive as one node type. A kind distinguishes a declaration, an expression, and a TypeScript ambient function. A route written for the declaration does not see the expression. A statement or declaration route asks for the declaration kind, so an ambient function is delivered only to a route that names it. A predicate that asks whether a node is a statement still answers yes for that ambient function. An identifier route that means "a reference" requires the identifier to be global.
+`Function` and `Class` each arrive as one node type. A kind distinguishes a declaration, an expression, and a TypeScript ambient function. A route written for the declaration does not see the expression. A statement or declaration route asks for the declaration kind, so an ambient function is delivered only to a route that names it. A predicate that asks whether a node is a statement still answers yes for that ambient function. The referenced-identifier route matches identifiers that are references, bound or global. It does this by requiring the `global` fact, which only references carry.
 
 ## When a plugin runs
 

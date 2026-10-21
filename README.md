@@ -79,9 +79,6 @@ Every plugin in a phase observes the same immutable input. Its edits become visi
 phase boundary, after validation and an optional reparse. Split dependent transforms into separate
 phases when a later transform must observe an earlier transform's output.
 
-Define pipelines, phases, and plugins once at module scope and reuse them across files. Definitions
-are validated, frozen, and cached by identity.
-
 ### Visitors
 
 `defineVisitor(route, contract, handler)` subscribes a handler to one node type. The contract
@@ -97,15 +94,15 @@ Reading a capability or child role the contract did not declare throws. The hand
 function, which runs on enter, or an `{ enter, exit }` object.
 
 `Function` and `Class` each arrive as one route, with a kind that distinguishes declarations,
-expressions, and TypeScript ambient declarations. An `Identifier` route that should match only
-references must declare and check `global`.
+expressions, and TypeScript ambient declarations. The `ReferencedIdentifier` route matches only
+identifiers that are references, bound or global; `Identifier` matches every identifier.
 
 A visitor on every node disables route planning and bails unless the transform is called with
 `allowBroadVisitors: true`.
 
 ### Plugin lifecycle
 
-A plugin may define these hooks. Each hook runs once per file, in this order:
+A plugin may define these hooks. For each file they run in this order:
 
 - `createState(context)` creates per-file state passed to the other hooks.
 - `pre(context, state)` runs before analysis.
@@ -140,8 +137,9 @@ A plugin declares the metadata keys it writes and reads in `contract.metadata`. 
 write the same key, and an undeclared write or read throws. Written metadata is returned on
 `result.metadata`.
 
-Import and export queries are enabled through `contract.queries`. A plugin cannot use a query that
-only a sibling plugin declared.
+Scope and module queries (`globals`, `imports`, `exports`, `constants`, `calls`, `captures`, and
+`bindings`) must be declared in `contract.queries`. An undeclared query throws, and a sibling
+plugin's declaration does not authorize it.
 
 ### Matching member expressions
 
