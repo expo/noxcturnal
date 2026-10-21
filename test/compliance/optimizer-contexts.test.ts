@@ -41,7 +41,6 @@ describe.each([
     ],
   ])('%s', (_context, expression, expected) => {
     const source = `let reads=0; const object={method(){'use strict';return this===undefined},get value(){reads++;return 7}};globalThis.result=${expression};`;
-    expect(observe(source)).toEqual(expected);
     const code = compile(source, folding);
     expect(observe(code)).toEqual(expected);
   });
@@ -54,7 +53,6 @@ test.each([
   `if(false){{function hidden(){}}}return hidden;`,
 ])('unselected nested declarations retain their outer binding: %s', body => {
   const source = `function inspect(){${body}}globalThis.result=inspect();`;
-  expect(observe(source)).toBeUndefined();
   expect(observe(compile(source, folding))).toBeUndefined();
 });
 
@@ -65,7 +63,6 @@ test.each([
   `var value; const events=[]; const target=new Proxy({value:0},{set(o,k,v){events.push(typeof v);return true}}); with(target){var value=function(){}} return events.join();`,
 ])('DCE retains implicit writes: %s', body => {
   const source = `function inspect(){${body}}globalThis.result=inspect();`;
-  expect(observe(source)).toBe('function');
   expect(observe(compile(source, elimination))).toBe('function');
 });
 
@@ -84,51 +81,61 @@ test.each([String.raw`(\u0065val)`, String.raw`((ev\u0061l))`])(
   'escaped parenthesized eval %s',
   callee => {
     const source = `function inspect(){const hidden=()=>42;return ${callee}('hidden()')}globalThis.result=inspect();`;
-    expect(observe(source)).toBe(42);
     expect(observe(compile(source, elimination))).toBe(42);
   },
 );
 
-test('UTF16 ordering, replacement characters, and isolated-surrogate arithmetic retain native values', () => {
-  const expressions = [
-    String.raw`'\u{10000}' < '\uE000'`,
-    String.raw`'\u{10000}' > '\uFFFF'`,
-    String.raw`'\uD800' < '\uE000'`,
-    String.raw`'\uDFFF' >= '\u{10000}'`,
-    String.raw`'\uFFFDd800' === '\uD800'`,
-    String.raw`'\uD800' + '\uDC00'`,
-    String.raw`'\uDC00' + 'tail'`,
-    String.raw`+'\uD800'`,
-    String.raw`'\uD800' == 0`,
-    String.raw`'\uFFFDd800' + 'tail'`,
+test('UTF16 ordering, replacement characters, and isolated-surrogate arithmetic retain values', () => {
+  const cases = [
+    { expression: String.raw`'\u{10000}' < '\uE000'`, expected: true },
+    { expression: String.raw`'\u{10000}' > '\uFFFF'`, expected: false },
+    { expression: String.raw`'\uD800' < '\uE000'`, expected: true },
+    { expression: String.raw`'\uDFFF' >= '\u{10000}'`, expected: true },
+    { expression: String.raw`'\uFFFDd800' === '\uD800'`, expected: false },
+    { expression: String.raw`'\uD800' + '\uDC00'`, expected: '\u{10000}' },
+    { expression: String.raw`'\uDC00' + 'tail'`, expected: '\uDC00tail' },
+    { expression: String.raw`+'\uD800'`, expected: NaN },
+    { expression: String.raw`'\uD800' == 0`, expected: false },
+    { expression: String.raw`'\uFFFDd800' + 'tail'`, expected: '\uFFFDd800tail' },
   ];
-  const source = `globalThis.result=[${expressions.join(',')}];`;
-  expect(observe(compile(source, folding))).toEqual(observe(source));
+  const source = `globalThis.result=[${cases.map(entry => entry.expression).join(',')}];`;
+  expect(observe(compile(source, folding))).toEqual(cases.map(entry => entry.expected));
 });
 
 test('numeric string formatting and exponentiation exceptional values compose with comparisons', () => {
-  const expressions = [
-    ...[
-      '1000000000000000.25',
-      '-1000000000000000.25',
-      '1e21',
-      '1e-7',
-      '1e-6',
-      '5e-324',
-      '-0',
-      '1/0',
-      '-1/0',
-      '0/0',
-    ].map(value => `''+(${value})`),
-    ...['1', '-1', 'true'].flatMap(base =>
-      ['1/0', '-1/0', '0/0', "'x'"].map(power => `((${base})**(${power}))===1`),
-    ),
-    `(0/0)**0`,
-    `(-0)**3`,
-    `(-0)**-3`,
-    `(-1/0)**3`,
-    `(-1/0)**-3`,
+  const formatting = [
+    { literal: '1000000000000000.25', expected: '1000000000000000.2' },
+    { literal: '-1000000000000000.25', expected: '-1000000000000000.2' },
+    { literal: '1e21', expected: '1e+21' },
+    { literal: '1e-7', expected: '1e-7' },
+    { literal: '1e-6', expected: '0.000001' },
+    { literal: '5e-324', expected: '5e-324' },
+    { literal: '-0', expected: '0' },
+    { literal: '1/0', expected: 'Infinity' },
+    { literal: '-1/0', expected: '-Infinity' },
+    { literal: '0/0', expected: 'NaN' },
   ];
-  const source = `globalThis.result=[${expressions.join(',')}];`;
-  expect(observe(compile(source, folding))).toEqual(observe(source));
+  // Each of these powers is NaN, including 1 raised to a non-finite exponent.
+  const comparisons = ['1', '-1', 'true'].flatMap(base =>
+    ['1/0', '-1/0', '0/0', "'x'"].map(power => ({
+      expression: `((${base})**(${power}))===1`,
+      expected: false,
+    })),
+  );
+  const powers = [
+    { expression: `(0/0)**0`, expected: 1 },
+    { expression: `(-0)**3`, expected: -0 },
+    { expression: `(-0)**-3`, expected: -Infinity },
+    { expression: `(-1/0)**3`, expected: -Infinity },
+    { expression: `(-1/0)**-3`, expected: -0 },
+  ];
+  const cases = [
+    ...formatting.map(({ literal, expected }) => ({ expression: `''+(${literal})`, expected })),
+    ...comparisons,
+    ...powers,
+  ];
+  const source = `globalThis.result=[${cases.map(entry => entry.expression).join(',')}];`;
+  const code = compile(source, folding);
+  expect(code).not.toContain(' + ');
+  expect(observe(code)).toEqual(cases.map(entry => entry.expected));
 });

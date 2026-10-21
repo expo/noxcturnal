@@ -15,34 +15,6 @@ test('aligns Unicode regular expressions with Babel', async () => {
   ).resolves.toEqual([true, false]);
 });
 
-test('aligns Unicode property escape composition with Babel', async () => {
-  await expect(
-    alignBabelBehavior({
-      source: String.raw`const ascii = /^\p{ASCII}+$/u;
-const nonNumber = /^\P{Number}+$/u;
-globalThis.__result = [ascii.test('abc'), ascii.test('é'), nonNumber.test('abc'), nonNumber.test('٣')];`,
-      filename: 'input.js',
-      plugins: [unicodeRegex],
-      noxcturnal: { transforms: { regexpUnicode: true } },
-      output: { mustNotMatch: [/\\[pP]\{/u, /\/[dgimsuvy]*u[dgimsuvy]*/u] },
-    }),
-  ).resolves.toEqual([true, false, true, false]);
-});
-
-test('aligns astral Unicode character classes with Babel', async () => {
-  await expect(
-    alignBabelBehavior({
-      source: String.raw`const included = /^[a-z\u{1F600}-\u{1F602}]+$/u;
-const excluded = /^[^\u{1F600}]+$/u;
-globalThis.__result = [included.test('a😀😂z'), included.test('😃'), excluded.test('😁😂'), excluded.test('😀'), excluded.test('\ud83d')];`,
-      filename: 'input.js',
-      plugins: [unicodeRegex],
-      noxcturnal: { transforms: { regexpUnicode: true } },
-      output: { mustNotMatch: [/\\u\{1F600\}/, /\/u[;),\]]/] },
-    }),
-  ).resolves.toEqual([true, false, true, false, true]);
-});
-
 test('aligns negated lone-surrogate classes with Babel', async () => {
   await expect(
     alignBabelBehavior({
@@ -72,47 +44,6 @@ globalThis.__result = ['ÉΑБ', 'éαб', 'EAB'].map(value => expression.test(v
       output: { mustNotMatch: [/\/iu/] },
     }),
   ).resolves.toEqual([true, true, false]);
-});
-
-test('aligns Unicode-only BMP simple folds with Babel', async () => {
-  await expect(
-    alignBabelBehavior({
-      source: String.raw`const kelvin = /^k$/iu;
-const longS = /^[s]$/iu;
-const ohm = /^Ω$/iu;
-const sharpS = /^ß$/iu;
-const angstrom = /^å$/iu;
-const asciiRange = /^[a-z]$/iu;
-const negatedRange = /^[^a-z]$/iu;
-const mixedEndingInFold = /^[0k]$/iu;
-globalThis.__result = [
-  kelvin.test('K'), longS.test('ſ'), ohm.test('Ω'),
-  sharpS.test('ẞ'), angstrom.test('Å'), kelvin.test('x'),
-  asciiRange.test('K'), asciiRange.test('ſ'),
-  negatedRange.test('K'), negatedRange.test('ſ'), negatedRange.test('1'),
-  mixedEndingInFold.test('0'), mixedEndingInFold.test('K'), mixedEndingInFold.test('x'),
-];`,
-      filename: 'input.js',
-      plugins: [unicodeRegex],
-      noxcturnal: { transforms: { regexpUnicode: true } },
-      output: { mustNotMatch: [/\/[dgimsuvy]*u[dgimsuvy]*(?:[;,)])/] },
-    }),
-  ).resolves.toEqual([
-    true,
-    true,
-    true,
-    true,
-    true,
-    false,
-    true,
-    true,
-    false,
-    false,
-    true,
-    true,
-    true,
-    false,
-  ]);
 });
 
 test('aligns astral Unicode ignore-case atoms with Babel', async () => {

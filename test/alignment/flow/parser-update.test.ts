@@ -1,5 +1,4 @@
 import { createRequire } from 'node:module';
-import path from 'node:path';
 import { expect, test } from 'vitest';
 import flowStripTypes from '@babel/plugin-transform-flow-strip-types';
 import explicitResourceManagement from '@babel/plugin-transform-explicit-resource-management';
@@ -14,21 +13,7 @@ import {
 
 const require = createRequire(import.meta.url);
 type Parser = NonNullable<Parameters<typeof alignHermesFlowTransform>[2]>;
-const references: { name: string; parser: Parser; exact: boolean }[] = [
-  { name: 'hermes-parser 0.36.0', parser: require('hermes-parser'), exact: false },
-];
-// The supplemental source-built suite is run by the documented step-2 command.
-// Normal checks retain the published pinned-reference suite.
-if (process.env.HERMES_UPDATE_REFERENCE) {
-  const directory = path.resolve(process.env.HERMES_UPDATE_REFERENCE);
-  const identity = require(path.join(directory, 'identity.json'));
-  expect(identity.revision).toBe('17b37301da5da4a2cd55d78f9697c46c0fd96123');
-  references.push({
-    name: `Hermes ${identity.revision}`,
-    exact: true,
-    parser: await require(path.join(directory, 'initialize.cjs'))(),
-  });
-}
+const parser: Parser = require('hermes-parser');
 
 test('Hermes 0.36.0 and native variance fields execute with equivalent initialization and descriptors', async () => {
   await expect(
@@ -80,15 +65,13 @@ test('Hermes 0.36.0 resource-loop ASTs and native Flow lowering preserve synchro
   ).resolves.toEqual(['body', 'sync']);
 });
 
-for (const reference of references) {
-  test(`${reference.name} wraps resource-loop bindings in VariableDeclarators`, () => {
-    for (const [source, declaration] of [
-      ['for (using x of y);', 'using'],
-      ['for (using x in y);', 'using'],
-    ]) {
-      expect(
-        reference.parser.parse(source, { babel: false, flow: 'all', sourceType: 'module' }),
-      ).toMatchObject({
+test(`hermes-parser 0.36.0 wraps resource-loop bindings in VariableDeclarators`, () => {
+  for (const [source, declaration] of [
+    ['for (using x of y);', 'using'],
+    ['for (using x in y);', 'using'],
+  ]) {
+    expect(parser.parse(source, { babel: false, flow: 'all', sourceType: 'module' })).toMatchObject(
+      {
         body: [
           {
             left: {
@@ -99,55 +82,52 @@ for (const reference of references) {
             },
           },
         ],
-      });
-    }
-  });
+      },
+    );
+  }
+});
 
-  test.each(cases)(`${reference.name} parses $id`, row => {
-    const parse = () =>
-      reference.parser.parse(row.source, {
-        babel: false,
-        flow: 'all',
-        sourceType: 'module',
-        enableExperimentalComponentSyntax: true,
-        enableExperimentalFlowMatchSyntax: true,
-        enableExperimentalFlowRecordSyntax: true,
-      });
-    const accepts = reference.exact ? row.outcome !== 'ParseFailed' : row.pinnedAccepted;
-    if (accepts) {
-      const ast = parse();
-      expect(ast).toBeDefined();
-      if (row.provenance === 'decorators') {
-        expect(ast).toMatchObject({
-          body: [
-            {
-              body: {
-                body: [
-                  { decorators: [{ type: 'Decorator' }] },
-                  { decorators: [{ type: 'Decorator' }] },
-                ],
-              },
-            },
-          ],
-        });
-      }
-    } else expect(parse).toThrow(SyntaxError);
-  });
-
-  test.each(
-    cases.filter(
-      row =>
-        row.outcome === 'erased' &&
-        row.public !== 'syntax-error' &&
-        (reference.exact || row.pinnedAccepted),
-    ),
-  )(`${reference.name} aligns $id`, row => {
+test.each(cases)(`hermes-parser 0.36.0 parses $id`, row => {
+  const parse = () =>
+    parser.parse(row.source, {
+      babel: false,
+      flow: 'all',
+      sourceType: 'module',
+      enableExperimentalComponentSyntax: true,
+      enableExperimentalFlowMatchSyntax: true,
+      enableExperimentalFlowRecordSyntax: true,
+    });
+  const accepts = row.pinnedAccepted;
+  if (accepts) {
+    const ast = parse();
+    expect(ast).toBeDefined();
     if (row.provenance === 'decorators') {
-      // Both reference versions parse decorators in ESTree, but their Babel
-      // adapters discard them. Compare preservation with Babel's Flow stripper.
-      alignFlowDecoratorTransform(`// @flow\n${row.source}`);
-    } else {
-      alignHermesFlowTransform(`// @flow\n${row.source}`, 'input.js', reference.parser);
+      expect(ast).toMatchObject({
+        body: [
+          {
+            body: {
+              body: [
+                { decorators: [{ type: 'Decorator' }] },
+                { decorators: [{ type: 'Decorator' }] },
+              ],
+            },
+          },
+        ],
+      });
     }
-  });
-}
+  } else expect(parse).toThrow(SyntaxError);
+});
+
+test.each(
+  cases.filter(
+    row => row.outcome === 'erased' && row.public !== 'syntax-error' && row.pinnedAccepted,
+  ),
+)(`hermes-parser 0.36.0 aligns $id`, row => {
+  if (row.provenance === 'decorators') {
+    // Hermes parses decorators in ESTree, but its Babel adapter
+    // discards them. Compare preservation with Babel's Flow stripper.
+    alignFlowDecoratorTransform(`// @flow\n${row.source}`);
+  } else {
+    alignHermesFlowTransform(`// @flow\n${row.source}`, 'input.js', parser);
+  }
+});

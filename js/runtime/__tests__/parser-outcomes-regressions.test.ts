@@ -75,6 +75,26 @@ for (const mode of [
   });
 }
 
+test('native parse failure prevents the following visitor phase from running', () => {
+  let visits = 0;
+  const observer = defineNativePlugin({
+    name: 'observer',
+    visitors: [
+      defineVisitor('Program', {}, () => {
+        visits++;
+      }),
+    ],
+  });
+  const pipeline = defineNativePipeline({
+    phases: [
+      { name: 'native', native: { transforms: { parameters: true } } },
+      { name: 'visit', plugins: [observer] },
+    ],
+  });
+  expect(() => transform('const =;', 'input.js', pipeline)).toThrow(TransformSyntaxError);
+  expect(visits).toBe(0);
+});
+
 test.each([
   '0); extra(); (0',
   '0) + (0',

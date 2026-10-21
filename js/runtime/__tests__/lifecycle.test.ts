@@ -654,19 +654,6 @@ test('builds deterministic cache keys and returns pristine bailout source', () =
   assert.equal(result.source, 'const pristine = true');
 });
 
-test('keeps the absent preflight seam disabled and cache-visible only when declared', () => {
-  const pipeline = defineNativePipeline({ phases: [{ name: 'source', plugins: [] }] });
-  const source = 'const untouched = true;';
-  const defaultKey = pipelineCacheKey(pipeline, 'fixture.js');
-
-  assert.equal(defaultKey, pipelineCacheKey(pipeline, 'fixture.js', {}));
-  assert.notEqual(defaultKey, pipelineCacheKey(pipeline, 'fixture.js', { preflight: {} }));
-  assert.deepEqual(
-    transform(source, 'fixture.js', pipeline),
-    transform(source, 'fixture.js', pipeline, { preflight: {} }),
-  );
-});
-
 test('creates immutable pipelines and reusable option-bound plugin definitions', () => {
   let observed: string | undefined;
   const definition = defineNativePlugin<undefined, { value: string }>({

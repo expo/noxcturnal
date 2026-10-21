@@ -72,7 +72,7 @@ test('classic JSX preserves prop, spread, child, and fragment semantics', () => 
   });
 });
 
-test('classic JSX spread uses Babel assignment semantics for __proto__', () => {
+test('classic JSX spread uses assignment semantics for __proto__', () => {
   const React = {
     createElement(_type: unknown, props: object) {
       return {
@@ -234,7 +234,7 @@ test('automatic JSX preserves key, props, and child semantics', async () => {
   });
 });
 
-test('automatic JSX preserves Babel key/spread evaluation and createElement fallback', async () => {
+test('automatic JSX preserves key/spread evaluation and createElement fallback', async () => {
   const jsxRuntimeUrl =
     'data:text/javascript,export%20function%20jsx(type,props,key)%7Breturn%20%7Btype,props,key%7D%7D';
   const reactUrl =

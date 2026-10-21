@@ -62,7 +62,6 @@ impl MapBuilder {
                     vlq::encode(name - prev_name, &mut output);
                     prev_name = name;
                 }
-                prev_generated = segment.generated_column;
                 prev_source = segment.source;
                 prev_line = segment.original_line;
                 prev_column = segment.original_column;
@@ -455,19 +454,11 @@ impl<S: SegmentSink> StreamingMap<S> {
                 if byte == b'\n' {
                     self.newline();
                     if bytes.get(index + 1).is_some_and(|next| *next != b'\n') {
-                        self.original_line = anchor_line;
-                        self.original_column = anchor_column;
-                        self.mark_anchor(name);
-                        self.original_line = resume.0;
-                        self.original_column = resume.1;
+                        self.mark_generated_anchor(anchor_line, anchor_column, name, resume);
                     }
                 } else {
                     if bytes.get(index + 1).is_none_or(|next| *next == b'\n') {
-                        self.original_line = anchor_line;
-                        self.original_column = anchor_column;
-                        self.mark_anchor(name);
-                        self.original_line = resume.0;
-                        self.original_column = resume.1;
+                        self.mark_generated_anchor(anchor_line, anchor_column, name, resume);
                     }
                     self.generated_column += 1;
                 }
@@ -479,23 +470,29 @@ impl<S: SegmentSink> StreamingMap<S> {
             if character == '\n' {
                 self.newline();
                 if characters.peek().is_some_and(|next| *next != '\n') {
-                    self.original_line = anchor_line;
-                    self.original_column = anchor_column;
-                    self.mark_anchor(name);
-                    self.original_line = resume.0;
-                    self.original_column = resume.1;
+                    self.mark_generated_anchor(anchor_line, anchor_column, name, resume);
                 }
             } else {
                 if characters.peek().is_none_or(|next| *next == '\n') {
-                    self.original_line = anchor_line;
-                    self.original_column = anchor_column;
-                    self.mark_anchor(name);
-                    self.original_line = resume.0;
-                    self.original_column = resume.1;
+                    self.mark_generated_anchor(anchor_line, anchor_column, name, resume);
                 }
                 self.generated_column += character.len_utf16() as i64;
             }
         }
+    }
+
+    fn mark_generated_anchor(
+        &mut self,
+        anchor_line: i64,
+        anchor_column: i64,
+        name: Option<i64>,
+        resume: (i64, i64),
+    ) {
+        self.original_line = anchor_line;
+        self.original_column = anchor_column;
+        self.mark_anchor(name);
+        self.original_line = resume.0;
+        self.original_column = resume.1;
     }
 }
 
@@ -508,6 +505,22 @@ fn intern(names: &mut Vec<Rc<str>>, name_ids: &mut FxHashMap<Rc<str>, i64>, name
     names.push(Rc::clone(&name));
     name_ids.insert(name, index);
     index
+}
+
+/// Byte offset to UTF-16 offset, one entry per byte plus the end of source.
+///
+/// Every byte of a multi-byte character maps to that character's starting UTF-16
+/// offset, so the table is filled in one forward pass: each character appends its
+/// own start offset once per byte it occupies.
+pub(crate) fn fill_utf16_offsets(source: &str, mut push: impl FnMut(u32)) {
+    let mut utf16 = 0u32;
+    for character in source.chars() {
+        for _ in 0..character.len_utf8() {
+            push(utf16);
+        }
+        utf16 += character.len_utf16() as u32;
+    }
+    push(utf16);
 }
 
 /// Line/column (UTF-16 columns) of a byte offset, for repositioning inside copies.
@@ -524,12 +537,7 @@ fn position_at(
     } else {
         let offsets = utf16_offsets.get_or_insert_with(|| {
             let mut offsets = Vec::with_capacity(source.len() + 1);
-            let mut utf16 = 0;
-            for character in source.chars() {
-                offsets.extend(std::iter::repeat_n(utf16, character.len_utf8()));
-                utf16 += character.len_utf16();
-            }
-            offsets.push(utf16);
+            fill_utf16_offsets(source, |offset| offsets.push(offset as usize));
             offsets
         });
         (offsets[offset] - offsets[line_start]) as i64
@@ -722,10 +730,6 @@ impl<S: SegmentSink> Renderer<'_, S> {
                     if !text.is_empty() {
                         self.identity_tail = false;
                     }
-                    // The closing boundary belongs to this piece's text. With no text
-                    // there is none to close, and emitting one here would leave the
-                    // removal describing a boundary where every other policy leaves an
-                    // identity span for composition to project through.
                     // The closing boundary belongs to this piece's text. With no text
                     // there is none to close, and emitting one here would leave the
                     // removal describing a boundary where every other policy leaves an

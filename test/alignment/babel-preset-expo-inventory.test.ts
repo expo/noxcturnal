@@ -14,7 +14,7 @@ type InventoryEntry = {
   reason?: string;
 };
 
-// Reviewed against babel-preset-expo 56.0.13 at Expo commit 17aeb68d6bd.
+// Reviewed against babel-preset-expo 56.0.13.
 // The preset is an inventory source only: alignment invokes each transform directly.
 const inventory: InventoryEntry[] = [
   {

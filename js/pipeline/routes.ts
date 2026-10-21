@@ -155,31 +155,12 @@ function synthesizeVisitorPlan(
       );
       if (applicable.length > 0) mergeFieldRequests(fields, { [concrete]: applicable });
     }
-    const attachChildren = (
-      parentTypes: readonly string[],
-      declared: Readonly<Record<string, ChildContract>> | undefined,
-    ) => {
-      if (declared == null) return;
-      for (const parentType of parentTypes) {
-        const roles = (children[parentType] ??= []);
-        for (const role of Object.keys(declared)) {
-          if ((role === '*' || CHILD_ROLES[parentType]?.[role] != null) && !roles.includes(role))
-            roles.push(role);
-        }
-        attachChildProjectionDependencies(children, parentType, declared);
-      }
-      for (const child of Object.values(declared)) {
-        const childTypes = concreteRouteTypes(child.route);
-        for (const concrete of childTypes) {
-          const applicable = bodyEditFields(concrete, child.fields ?? []).filter(field =>
-            PREDICATE_FIELDS[concrete]?.includes(field),
-          );
-          if (applicable.length > 0) mergeFieldRequests(fields, { [concrete]: applicable });
-        }
-        attachChildren(childTypes, child.children);
-      }
-    };
-    attachChildren(concreteRouteTypes(definition.route), contract.children);
+    attachDeclaredChildren(
+      children,
+      fields,
+      concreteRouteTypes(definition.route),
+      contract.children,
+    );
     for (const capability of contract.controlFlow) controlFlow.add(capability);
     if (
       contract.controlFlow.some(
@@ -200,35 +181,12 @@ function synthesizeVisitorPlan(
           );
           if (applicable.length > 0) mergeFieldRequests(ancestryFields, { [concrete]: applicable });
         }
-        const attachAncestorChildren = (
-          parentTypes: readonly string[],
-          declared: Readonly<Record<string, ChildContract>> | undefined,
-        ) => {
-          if (declared == null) return;
-          for (const parentType of parentTypes) {
-            const roles = (ancestryChildren[parentType] ??= []);
-            for (const role of Object.keys(declared)) {
-              if (
-                (role === '*' || CHILD_ROLES[parentType]?.[role] != null) &&
-                !roles.includes(role)
-              )
-                roles.push(role);
-            }
-            attachChildProjectionDependencies(ancestryChildren, parentType, declared);
-          }
-          for (const child of Object.values(declared)) {
-            const childTypes = concreteRouteTypes(child.route);
-            for (const concrete of childTypes) {
-              const applicable = bodyEditFields(concrete, child.fields ?? []).filter(field =>
-                PREDICATE_FIELDS[concrete]?.includes(field),
-              );
-              if (applicable.length > 0)
-                mergeFieldRequests(ancestryFields, { [concrete]: applicable });
-            }
-            attachAncestorChildren(childTypes, child.children);
-          }
-        };
-        attachAncestorChildren(ancestorTypes, requirement.children);
+        attachDeclaredChildren(
+          ancestryChildren,
+          ancestryFields,
+          ancestorTypes,
+          requirement.children,
+        );
       }
     }
   }
@@ -265,6 +223,33 @@ function attachChildProjectionDependencies(
   if (needsFormalParameters) {
     const dependencies = (target.FormalParameters ??= []);
     if (!dependencies.includes('*')) dependencies.push('*');
+  }
+}
+
+function attachDeclaredChildren(
+  roles: Record<string, string[]>,
+  fields: Record<string, NativeFieldKey[]>,
+  parentTypes: readonly string[],
+  declared: Readonly<Record<string, ChildContract>> | undefined,
+): void {
+  if (declared == null) return;
+  for (const parentType of parentTypes) {
+    const collected = (roles[parentType] ??= []);
+    for (const role of Object.keys(declared)) {
+      if ((role === '*' || CHILD_ROLES[parentType]?.[role] != null) && !collected.includes(role))
+        collected.push(role);
+    }
+    attachChildProjectionDependencies(roles, parentType, declared);
+  }
+  for (const child of Object.values(declared)) {
+    const childTypes = concreteRouteTypes(child.route);
+    for (const concrete of childTypes) {
+      const applicable = bodyEditFields(concrete, child.fields ?? []).filter(field =>
+        PREDICATE_FIELDS[concrete]?.includes(field),
+      );
+      if (applicable.length > 0) mergeFieldRequests(fields, { [concrete]: applicable });
+    }
+    attachDeclaredChildren(roles, fields, childTypes, child.children);
   }
 }
 
@@ -461,6 +446,55 @@ function mergeChildRoleRequests(
   }
 }
 
+interface RetentionFacts {
+  childRoles: Record<string, string[]>;
+  fields: Record<string, string[]>;
+  ancestorFields: Record<string, string[]>;
+  ancestorTypes: Set<string>;
+  ancestorChildParentTypes: Set<string>;
+  ancestryDepth: number;
+}
+
+export function createRetentionFacts(): RetentionFacts {
+  return {
+    childRoles: {},
+    fields: {},
+    ancestorFields: {},
+    ancestorTypes: new Set(),
+    ancestorChildParentTypes: new Set(),
+    ancestryDepth: 0,
+  };
+}
+
+export function accumulateRetention(
+  facts: RetentionFacts,
+  plugins: readonly NativePlugin<any, any>[],
+  plans: ReadonlyMap<NativePlugin<any, any>, PreparedPluginPlan>,
+): void {
+  for (const plugin of plugins) {
+    const plan = plans.get(plugin);
+    mergeChildRoleRequests(facts.childRoles, plan?.children);
+    mergeChildRoleRequests(facts.childRoles, plan?.ancestryChildren);
+  }
+  for (const plugin of plugins) {
+    const fields = plans.get(plugin)?.fields;
+    if (fields != null) mergeFieldRequests(facts.fields, fields);
+  }
+  for (const plugin of plugins) {
+    const plan = plans.get(plugin);
+    if (plan == null) continue;
+    if (plan.ancestryFields != null) {
+      mergeFieldRequests(facts.fields, plan.ancestryFields);
+      mergeFieldRequests(facts.ancestorFields, plan.ancestryFields);
+    }
+    for (const type of plan.ancestryTypes ?? []) facts.ancestorTypes.add(type);
+    for (const type of Object.keys(plan.ancestryChildren ?? {}))
+      facts.ancestorChildParentTypes.add(type);
+    if (plan.ancestry != null)
+      facts.ancestryDepth = Math.max(facts.ancestryDepth, ancestryReach(plan.ancestry.mode));
+  }
+}
+
 /** The plan a plugin's definition implies, synthesized once per plugin. */
 function pluginPlan(plugin: NativePlugin<any, any>): PreparedPluginPlan {
   let plan = pluginPlans.get(plugin);
@@ -597,19 +631,6 @@ export function preparePhase(phase: PipelinePhase): PreparedPhase {
   const structuralParentTypes = [
     ...new Set(activePlugins.flatMap(plugin => Object.keys(plans.get(plugin)?.children ?? {}))),
   ];
-  const ancestorChildParentTypes = [
-    ...new Set(
-      activePlugins.flatMap(plugin => Object.keys(plans.get(plugin)?.ancestryChildren ?? {})),
-    ),
-  ];
-  const ancestryDepth = activePlugins.reduce(
-    (depth, plugin) =>
-      Math.max(
-        depth,
-        plans.get(plugin)?.ancestry == null ? 0 : ancestryReach(plans.get(plugin)!.ancestry!.mode),
-      ),
-    0,
-  );
   const prepared: PreparedPhase = {
     activePlugins,
     plans,
@@ -623,15 +644,9 @@ export function preparePhase(phase: PipelinePhase): PreparedPhase {
       (retentionCapabilities & (RETAIN_CHILDREN | RETAIN_INSPECTION)) !== 0 ||
       activePlugins.some(plugin => Object.keys(plans.get(plugin)?.ancestryFields ?? {}).length > 0),
     structuralParentTypes,
-    ancestorChildParentTypes,
-    ancestryDepth,
     runtimeEditEffect:
       phase.editEffect ??
-      maxEditEffect(
-        activePlugins.map(
-          plugin => plans.get(plugin)?.editEffect ?? plugin.editEffect ?? 'whole-program',
-        ),
-      ),
+      maxEditEffect(activePlugins.map(plugin => plugin.editEffect ?? 'whole-program')),
     compiledRoutes: routed.routes,
     dispatchRoutes: routed.dispatchRoutes,
     manifest: routed.manifest,
@@ -648,12 +663,8 @@ export function inspectPreparedPhaseRetention(phase: PipelinePhase) {
   const childRoles: Record<string, string[]> = {};
   for (const plugin of prepared.activePlugins) {
     const plan = prepared.plans.get(plugin);
-    for (const requests of [plan?.children, plan?.ancestryChildren]) {
-      for (const [type, roles] of Object.entries(requests ?? {})) {
-        const collected = (childRoles[type] ??= []);
-        for (const role of roles ?? []) if (!collected.includes(role)) collected.push(role);
-      }
-    }
+    mergeChildRoleRequests(childRoles, plan?.children);
+    mergeChildRoleRequests(childRoles, plan?.ancestryChildren);
   }
   for (const roles of Object.values(childRoles)) roles.sort();
   const concreteTypes = NODE_TYPES.filter(type => type !== '');
@@ -662,25 +673,12 @@ export function inspectPreparedPhaseRetention(phase: PipelinePhase) {
     .filter(([, roles]) => roles.includes('*'))
     .map(([type]) => type)
     .sort();
-  const effectivelyAllDirectRoleParents = Object.entries(childRoles)
-    .filter(([type, roles]) => {
-      const available = Object.keys(CHILD_ROLES[type] ?? {});
-      return (
-        roles.includes('*') ||
-        (available.length > 0 && available.every(role => roles.includes(role)))
-      );
-    })
-    .map(([type]) => type)
-    .sort();
   return Object.freeze({
     structuralParentTypeCount: structural.size,
     includesEveryConcreteType: concreteTypes.every(type => structural.has(type)),
     structuralParentTypes: Object.freeze([...structural].sort()),
     childRoles: Object.freeze(childRoles),
-    requestedRolesByParentType: Object.freeze(childRoles),
     wildcardParents: Object.freeze(wildcardParents),
-    effectivelyAllDirectRoleParents: Object.freeze(effectivelyAllDirectRoleParents),
-    selectorDependencyFields: Object.freeze({}),
     scalarFields: Object.freeze(
       Object.fromEntries(
         Object.entries(prepared.fieldRequests).map(([type, fields]) => [
@@ -778,43 +776,19 @@ function compilePhaseRoutes(
     openGroups.set(bucket, grouped);
     dispatchRoutes.push(grouped);
   }
-  const childRetention: Record<string, string[]> = {};
-  for (const plugin of plugins) {
-    mergeChildRoleRequests(childRetention, plans.get(plugin)?.children);
-    mergeChildRoleRequests(childRetention, plans.get(plugin)?.ancestryChildren);
-  }
-  const retainedFields: Record<string, string[]> = {};
-  const ancestorRetainedFields: Record<string, string[]> = {};
-  const ancestorTypes = new Set<string>();
-  const ancestorChildParentTypes = new Set<string>();
-  for (const plugin of plugins) mergeFieldRequests(retainedFields, plans.get(plugin)?.fields ?? {});
-  for (const plugin of plugins) {
-    mergeFieldRequests(retainedFields, plans.get(plugin)?.ancestryFields ?? {});
-    mergeFieldRequests(ancestorRetainedFields, plans.get(plugin)?.ancestryFields ?? {});
-    for (const type of plans.get(plugin)?.ancestryTypes ?? []) ancestorTypes.add(type);
-    for (const type of Object.keys(plans.get(plugin)?.ancestryChildren ?? {}))
-      ancestorChildParentTypes.add(type);
-  }
+  const retained = createRetentionFacts();
+  accumulateRetention(retained, plugins, plans);
   const manifest = packRouteManifest(
     dispatchRoutes,
     includeParent,
     includeScope,
     retentionCapabilities,
-    childRetention,
-    retainedFields,
-    ancestorRetainedFields,
-    [...ancestorTypes],
-    [...ancestorChildParentTypes],
-    plugins.reduce(
-      (depth, plugin) =>
-        Math.max(
-          depth,
-          plans.get(plugin)?.ancestry == null
-            ? 0
-            : ancestryReach(plans.get(plugin)!.ancestry!.mode),
-        ),
-      0,
-    ),
+    retained.childRoles,
+    retained.fields,
+    retained.ancestorFields,
+    [...retained.ancestorTypes],
+    [...retained.ancestorChildParentTypes],
+    retained.ancestryDepth,
   );
   return { routes, dispatchRoutes, manifest };
 }
@@ -970,7 +944,6 @@ export function compileNestedVisitor(visitor: NestedVisitor): CompiledNestedRout
     callbacks: variants.map(variant => variant.callbacks),
     routes,
     capabilities,
-    ancestorChildParentTypes: [...ancestorChildParentTypes],
   };
   nestedRouteCaches.set(visitor as object, compiled);
   return compiled;

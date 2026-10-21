@@ -881,3 +881,55 @@ test('generator captured headers yield with the containing arguments object', ()
     { value: [0, 1, 2], done: true },
   ]);
 });
+
+test.each([
+  {
+    name: 'arrow parameter',
+    callback: '([name, value]) => () => [name, value]',
+    expected: [
+      ['first', { value: 1, extra: 2 }],
+      ['second', { value: 3, extra: 4 }],
+    ],
+  },
+  {
+    name: 'ordinary parameter',
+    callback: 'function ([name, value]) { return () => [name, value]; }',
+    expected: [
+      ['first', { value: 1, extra: 2 }],
+      ['second', { value: 3, extra: 4 }],
+    ],
+  },
+  {
+    name: 'object-rest parameter',
+    callback: '([name, { value, ...rest }]) => () => [name, value, rest]',
+    expected: [
+      ['first', 1, { extra: 2 }],
+      ['second', 3, { extra: 4 }],
+    ],
+  },
+])(
+  'captures bindings introduced by parameter lowering in a loop: $name',
+  ({ callback, expected }) => {
+    const source = `
+    const reads = [];
+    for (const key in { a: true, b: true }) {
+      reads.push(...[['first', { value: 1, extra: 2 }], ['second', { value: 3, extra: 4 }]]
+        .map(${callback}));
+    }
+    globalThis.result = reads.map(read => read());
+  `;
+    expect(runInNewContext(source)).toEqual([...expected, ...expected]);
+    const code = compile(source, {
+      transforms: {
+        blockScoping: true,
+        parameters: true,
+        destructuring: true,
+        objectRestSpread: { loose: true, useBuiltIns: true },
+      },
+    });
+    expect(code).not.toMatch(/\b(?:let|const)\b/);
+    const context: Record<string, unknown> = {};
+    new Function('globalThis', code)(context);
+    expect(context.result).toEqual([...expected, ...expected]);
+  },
+);

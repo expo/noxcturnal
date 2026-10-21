@@ -129,11 +129,22 @@ test('matches a Babel preset when language transforms interact in one program', 
     noxcturnalCode,
     /\?\.|\?\?|\?\?=|for await|async function\*|#value|\.\.\.rest/,
   );
-  assert.deepEqual(await execute(noxcturnalCode), await execute(babelCode));
+  await expectBehavior(noxcturnalCode, babelCode, [
+    'counter!',
+    true,
+    [2, 3, 3],
+    true,
+    'a',
+    true,
+    true,
+    true,
+  ]);
 });
 
 test.each([
   {
+    expected: [4, true, ['assign-key', 'assign-value']],
+    forbiddenSyntax: /\?\.|\?\?=/,
     name: 'short-circuits computed optional and logical assignment keys exactly once',
     source: `
       const log = [];
@@ -146,6 +157,11 @@ test.each([
     `,
   },
   {
+    expected: [
+      [0, 'a'],
+      [1, 'b'],
+    ],
+    forbiddenSyntax: /\blet\b|for \(.* of /,
     name: 'preserves per-iteration bindings through destructuring and closures',
     source: `
       const readers = [];
@@ -156,6 +172,8 @@ test.each([
     `,
   },
   {
+    expected: [6, ['before-super', 'super', 'field', 'after-private']],
+    forbiddenSyntax: /\bclass Derived\b|#value/,
     name: 'orders derived construction, parameter defaults, fields, and private state',
     source: `
       const log = [];
@@ -175,10 +193,11 @@ test.each([
       globalThis.__result = [instance.read(), log];
     `,
   },
-])('adversarially matches Babel: $name', async ({ source }) => {
+])('adversarially matches Babel: $name', async ({ source, expected, forbiddenSyntax }) => {
   const babelCode = transformWithBabel(source, 'adversarial.js', babelLanguagePreset);
   const noxcturnalCode = transformWithNoxcturnal(source, 'adversarial.js', nativeLanguagePreset);
-  assert.deepEqual(await execute(noxcturnalCode), await execute(babelCode));
+  assert.doesNotMatch(noxcturnalCode, forbiddenSyntax);
+  await expectBehavior(noxcturnalCode, babelCode, expected);
 });
 
 test('matches a Babel preset when TypeScript, JSX, decorators, and class transforms interact', async () => {
@@ -222,7 +241,12 @@ test('matches a Babel preset when TypeScript, JSX, decorators, and class transfo
   };
   assert.doesNotMatch(noxcturnalCode, /: number|: any|<Item|@mark|\?\.|\?\?/);
   assert.match(noxcturnalCode, /@__PURE__/);
-  assert.deepEqual(await execute(noxcturnalCode, globals), await execute(babelCode, globals));
+  await expectBehavior(
+    noxcturnalCode,
+    babelCode,
+    [true, { type: 'Item', props: { value: 3 } }],
+    globals,
+  );
 });
 
 test('matches Babel when JSX development metadata composes with user props', async () => {
@@ -244,7 +268,7 @@ test('matches Babel when JSX development metadata composes with user props', asy
   assert.doesNotMatch(noxcturnalCode, /<Item/);
   assert.match(noxcturnalCode, /__source/);
   assert.match(noxcturnalCode, /__self/);
-  assert.deepEqual(await execute(noxcturnalCode, globals), await execute(babelCode, globals));
+  await expectBehavior(noxcturnalCode, babelCode, ['Item', 2, true, true], globals);
 });
 
 test('matches Babel when Flow erasure composes with the language preset', async () => {
@@ -279,7 +303,7 @@ test('matches Babel when Flow erasure composes with the language preset', async 
       return flowEnumRuntime;
     },
   };
-  assert.deepEqual(await execute(noxcturnalCode, globals), await execute(babelCode, globals));
+  await expectBehavior(noxcturnalCode, babelCode, ['Ready', 'Done', '4', 'missing'], globals);
 });
 
 test('matches Babel when export namespace lowering shares a module with language syntax', () => {
@@ -322,7 +346,7 @@ test('matches Babel when explicit resource management composes with block scopin
     helpers: { mode: 'inline' },
   });
   assert.doesNotMatch(noxcturnalCode, /using resource/);
-  assert.deepEqual(await execute(noxcturnalCode), await execute(babelCode));
+  await expectBehavior(noxcturnalCode, babelCode, ['body', 'dispose']);
 });
 
 function transformWithBabel(
@@ -387,4 +411,16 @@ async function execute(source: string, globals: Record<string, unknown> = {}): P
   context.globalThis = context;
   new vm.Script(source).runInContext(context, { timeout: 1_000 });
   return JSON.parse(JSON.stringify(await context.__result));
+}
+
+// State the semantic contract independently of either implementation. A matching
+// Babel result alone could otherwise hide a shared error in the test setup.
+async function expectBehavior(
+  nativeCode: string,
+  babelCode: string,
+  expected: unknown,
+  globals: Record<string, unknown> = {},
+): Promise<void> {
+  assert.deepEqual(await execute(babelCode, globals), expected, 'Babel reference behavior');
+  assert.deepEqual(await execute(nativeCode, globals), expected, 'Noxcturnal behavior');
 }

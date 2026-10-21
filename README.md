@@ -16,8 +16,20 @@ dependencies, rewrite modules, or wrap output for a particular framework.
 pnpm add noxcturnal
 ```
 
-Noxcturnal requires Node.js 18 or later. The package selects a prebuilt native binary for supported
-macOS, Linux, and Windows targets.
+Noxcturnal requires Node.js 18 or later. Native code ships as optional dependencies, one prebuilt
+binary per supported platform. A platform without a prebuilt binary fails to load; there is no
+JavaScript fallback.
+
+| OS      | Architecture | libc  | Package                                   |
+| ------- | ------------ | ----- | ----------------------------------------- |
+| macOS   | arm64        |       | `@noxcturnal/noxcturnal-darwin-arm64`     |
+| macOS   | x64          |       | `@noxcturnal/noxcturnal-darwin-x64`       |
+| Linux   | arm64        | glibc | `@noxcturnal/noxcturnal-linux-arm64-gnu`  |
+| Linux   | x64          | glibc | `@noxcturnal/noxcturnal-linux-x64-gnu`    |
+| Linux   | arm64        | musl  | `@noxcturnal/noxcturnal-linux-arm64-musl` |
+| Linux   | x64          | musl  | `@noxcturnal/noxcturnal-linux-x64-musl`   |
+| Windows | arm64        |       | `@noxcturnal/noxcturnal-win32-arm64-msvc` |
+| Windows | x64          |       | `@noxcturnal/noxcturnal-win32-x64-msvc`   |
 
 ## Usage
 
@@ -59,38 +71,90 @@ if (result.status === 'complete') {
 }
 ```
 
+### Phases
+
+A pipeline is a list of phases. A phase holds either plugins or a native plan, never both.
+
 Every plugin in a phase observes the same immutable input. Its edits become visible together at the
 phase boundary, after validation and an optional reparse. Split dependent transforms into separate
 phases when a later transform must observe an earlier transform's output.
 
-Plugins that only apply to particular syntax can declare a necessary condition:
+### Visitors
+
+`defineVisitor(route, contract, handler)` subscribes a handler to one node type. The contract
+declares everything the handler may read:
+
+- `fields` lists the scalar properties copied onto `path.node`.
+- `where` holds native match predicates. Nodes that fail them never reach JavaScript.
+- `children`, `ancestry`, `scope`, `comments`, and `controlFlow` opt in to the matching `path`
+  capabilities.
+- `nested` lists visitors the handler may run with `path.traverse`.
+
+Reading a capability or child role the contract did not declare throws. The handler is either a
+function, which runs on enter, or an `{ enter, exit }` object.
+
+`Function` and `Class` each arrive as one route, with a kind that distinguishes declarations,
+expressions, and TypeScript ambient declarations. The `ReferencedIdentifier` route matches only
+identifiers that are references, bound or global; `Identifier` matches every identifier.
+
+A visitor on every node disables route planning and bails unless the transform is called with
+`allowBroadVisitors: true`.
+
+### Plugin lifecycle
+
+A plugin may define these hooks. For each file they run in this order:
+
+- `createState(context)` creates per-file state passed to the other hooks.
+- `pre(context, state)` runs before analysis.
+- `analyze(context, state)` may return `{ status: 'irrelevant' }` to skip this plugin's visitors
+  and `apply`, `{ status: 'unsupported', reason }` to bail out of the whole transform, or
+  `{ status: 'supported', analysis }`.
+- `apply(context, analysis, state)` runs when `analyze` returned `supported`.
+- `visitors` run during the phase traversal.
+- `post(context, state)` runs after the traversal, including when `analyze` returned `irrelevant`.
+- `cleanup(reason, state)` runs once for every plugin that was prepared, on success, bailout, and
+  failure. The first cleanup error is reported. It turns a bailout into a fatal error and does not
+  replace an earlier fatal error.
+
+Plugins that apply only to particular syntax can declare a necessary condition:
 
 ```ts
 contract: {
-  syntax: {
-    anyOf: ['AsyncFunction', 'Super'];
-  }
+  syntax: { anyOf: ['AsyncFunction', 'Super'] },
 }
 ```
 
-The plugin runs only when at least one listed feature occurs in the current phase's input.
-Features are concrete AST node kinds, plus `AsyncFunction` (including async arrows and methods)
-and `GeneratorFunction` (including generator methods). Comments, strings, and property names do
-not count as the syntax they mention. Choose a conservative condition: use `analyze` for further
-semantic checks. A rejected plugin skips all lifecycle hooks, including state creation and cleanup,
-and adds no retention or child hydration requirements. Native syntax selection shares the input
-parse with active visitors and is reevaluated when earlier phases change the source. Pipelines
-without syntax requirements keep their existing execution path.
+The plugin runs only when at least one listed feature occurs in the current phase's input. Features
+are concrete AST node kinds, plus `AsyncFunction` (including async arrows and methods) and
+`GeneratorFunction` (including generator methods). Comments, strings, and property names do not
+count as the syntax they mention. A plugin rejected here skips every hook, including `createState`
+and `cleanup`. The list must be nonempty and contain only known features. Keep the condition
+conservative, and use `analyze` for semantic checks.
+
+### Metadata and queries
+
+A plugin declares the metadata keys it writes and reads in `contract.metadata`. Two plugins cannot
+write the same key, and an undeclared write or read throws. Written metadata is returned on
+`result.metadata`.
+
+Scope and module queries (`globals`, `imports`, `exports`, `constants`, `calls`, `captures`, and
+`bindings`) must be declared in `contract.queries`. An undeclared query throws, and a sibling
+plugin's declaration does not authorize it.
+
+### Matching member expressions
 
 `path.matchesPattern()` uses native AST facts. Declare `fields: ['memberPath']` for static or
 computed member expressions or `fields: ['name']` for identifiers, including in child contracts.
-Missing declarations throw. An identifier reached through a `memberPath` declaration returns false,
-as do other nodes such as a `super()` callee or a spread argument. Matching never reparses source
-in JavaScript. For fixed patterns, prefer a native
-`where: { memberPath: { equals: 'process.env.NODE_ENV' } }` predicate. Predicates share chain
-prefixes without transferring full paths for every nested member.
+Missing declarations throw. Patterns separate properties with dots; a backslash escapes a dot or a
+backslash. A computed member has a path only when its key is a string literal. An identifier
+reached through a `memberPath` declaration does not match, and neither do nodes such as a `super()`
+callee or a spread argument.
 
-Generated UIDs avoid decoded AST identifier names and names already reserved in the phase. Text
+For a fixed pattern, prefer a native predicate such as
+`where: { memberPath: { equals: 'process.env.NODE_ENV' } }`. It filters nodes before they reach
+JavaScript.
+
+Generated UIDs avoid identifier names in the AST and names already reserved in the phase. Text
 inside comments and string literals does not reserve names.
 
 ### Configuration and per-file data
@@ -108,8 +172,8 @@ const result = transform(source, filename, pipeline, {
 ```
 
 Do not close over per-file data in a reusable plugin definition. Read it from `pluginData` instead.
-If that data affects output, include it in the consumer's transform-result cache key;
-`pipelineCacheKey` intentionally covers only Noxcturnal-owned configuration.
+If that data affects output, include it in your transform-result cache key. `pipelineCacheKey`
+covers only Noxcturnal-owned configuration.
 
 ### Native transforms
 
@@ -132,26 +196,120 @@ const pipeline = defineNativePipeline({
 });
 ```
 
-The native surface includes TypeScript and Flow erasure, JSX modes, React Compiler and React
-Refresh integration, common ES syntax lowering, constant folding, and dead-code elimination.
+Native plans are validated when the pipeline is defined. Option objects are closed: a missing,
+extra, or invalid key throws. False and omitted switches are ignored, and a phase with nothing
+left to do is dropped. The Babel column names the closest Babel equivalent. Compatibility is
+assessed per option, and known differences are listed in the notes.
+
+#### `transforms`
+
+| Option                         | Babel equivalent                                       | Value                                               | Notes                                                                           |
+| ------------------------------ | ------------------------------------------------------ | --------------------------------------------------- | ------------------------------------------------------------------------------- |
+| `asyncFunctions`               | `@babel/plugin-transform-async-to-generator`           | `boolean`                                           |                                                                                 |
+| `asyncGeneratorFunctions`      | `@babel/plugin-transform-async-generator-functions`    | `boolean`                                           |                                                                                 |
+| `blockScoping`                 | `@babel/plugin-transform-block-scoping`                | `boolean`                                           |                                                                                 |
+| `classes`                      | `@babel/plugin-transform-classes`                      | `boolean`                                           | Class lowering also lowers fields and private state in the same file.           |
+| `classProperties`              | `@babel/plugin-transform-class-properties`             | `{ loose: boolean } \| false`                       |                                                                                 |
+| `classStaticBlock`             | `@babel/plugin-transform-class-static-block`           | `boolean`                                           |                                                                                 |
+| `destructuring`                | `@babel/plugin-transform-destructuring`                | `boolean`                                           |                                                                                 |
+| `explicitResourceManagement`   | `@babel/plugin-transform-explicit-resource-management` | `boolean`                                           |                                                                                 |
+| `exponentiationOperator`       | `@babel/plugin-transform-exponentiation-operator`      | `boolean`                                           |                                                                                 |
+| `exportNamespaceFrom`          | `@babel/plugin-transform-export-namespace-from`        | `boolean`                                           |                                                                                 |
+| `forOf`                        | `@babel/plugin-transform-for-of`                       | `boolean`                                           |                                                                                 |
+| `legacyDecorators`             | `@babel/plugin-proposal-decorators` (`legacy`)         | `boolean`                                           | TypeScript-style legacy decorator semantics.                                    |
+| `logicalAssignmentOperators`   | `@babel/plugin-transform-logical-assignment-operators` | `boolean`                                           |                                                                                 |
+| `nullishCoalescingOperator`    | `@babel/plugin-transform-nullish-coalescing-operator`  | `{ loose: boolean } \| false`                       | When `optionalChaining` is also set, both `loose` values must match.            |
+| `objectRestSpread`             | `@babel/plugin-transform-object-rest-spread`           | `{ loose: boolean; useBuiltIns: boolean } \| false` |                                                                                 |
+| `optionalCatchBinding`         | `@babel/plugin-transform-optional-catch-binding`       | `boolean`                                           |                                                                                 |
+| `optionalChaining`             | `@babel/plugin-transform-optional-chaining`            | `{ loose: boolean } \| false`                       | `loose` also treats `document.all` as an ordinary value for nullish coalescing. |
+| `parameters`                   | `@babel/plugin-transform-parameters`                   | `boolean`                                           |                                                                                 |
+| `privateMethods`               | `@babel/plugin-transform-private-methods`              | `boolean`                                           | Always uses a loose representation.                                             |
+| `privatePropertyInObject`      | `@babel/plugin-transform-private-property-in-object`   | `boolean`                                           | Always uses a loose representation.                                             |
+| `regexpDotAll`                 | `@babel/plugin-transform-dotall-regex`                 | `boolean`                                           |                                                                                 |
+| `regexpLookBehind`             | none                                                   | `boolean`                                           | Recognized and left as written.                                                 |
+| `regexpMatchIndices`           | none                                                   | `boolean`                                           | Recognized and left as written.                                                 |
+| `regexpNamedCaptureGroups`     | `@babel/plugin-transform-named-capturing-groups-regex` | `boolean`                                           |                                                                                 |
+| `regexpSticky`                 | `@babel/plugin-transform-sticky-regex`                 | `boolean`                                           |                                                                                 |
+| `regexpUnicode`                | `@babel/plugin-transform-unicode-regex`                | `boolean`                                           | Also expands Unicode property escapes.                                          |
+| `regexpUnicodePropertyEscapes` | `@babel/plugin-transform-unicode-property-regex`       | `boolean`                                           |                                                                                 |
+| `regexpUnicodeSets`            | `@babel/plugin-transform-unicode-sets-regex`           | `boolean`                                           |                                                                                 |
+
+#### Language, JSX, and output
+
+| Option                | Babel equivalent                     | Value                                                                                                                  | Notes                                                                                                                                                                                                                             |
+| --------------------- | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `typescript`          | `@babel/plugin-transform-typescript` | `'strip'`                                                                                                              | Removes type syntax.                                                                                                                                                                                                              |
+| `jsx`                 | `@babel/plugin-transform-react-jsx`  | `'preserve'`, `'classic'`, `'classic-development'`, `'automatic'`, `'automatic-development'`, `'automatic-if-present'` | Development modes match `@babel/plugin-transform-react-jsx-development`. `'automatic-if-present'` returns files without JSX unchanged. Its phase may only add `blockScoping`, and `comments: false` together with `blockScoping`. |
+| `jsxImportSource`     | `importSource`                       | `string`                                                                                                               | Requires `jsx`.                                                                                                                                                                                                                   |
+| `jsxPragma`           | `pragma`                             | `string`                                                                                                               | Requires `jsx`.                                                                                                                                                                                                                   |
+| `jsxPragmaFrag`       | `pragmaFrag`                         | `string`                                                                                                               | Requires `jsx`.                                                                                                                                                                                                                   |
+| `jsxPure`             | `pure`                               | `boolean`                                                                                                              | Requires `jsx`. Defaults to `false` in development modes.                                                                                                                                                                         |
+| `jsxThrowIfNamespace` | `throwIfNamespace`                   | `boolean`                                                                                                              | Requires `jsx`. Defaults to `true`.                                                                                                                                                                                               |
+| `helpers`             | `@babel/plugin-transform-runtime`    | `{ mode: 'runtime' \| 'inline'; moduleName?: string; version?: string }`                                               | `runtime` imports helpers from `@babel/runtime`, the only supported module. `inline` emits them into the file.                                                                                                                    |
+| `compact`             | `compact`                            | `boolean`                                                                                                              | Prints output without formatting whitespace.                                                                                                                                                                                      |
+| `comments`            | `comments`                           | `boolean`                                                                                                              | `false` removes comments. Defaults to `true`.                                                                                                                                                                                     |
+
+#### `optimize`
+
+| Option                | Value     | Notes                                                                                                                                                         |
+| --------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `constantFolding`     | `boolean` | Folds constant expressions, following Metro's conservative rules.                                                                                             |
+| `deadCodeElimination` | `boolean` | Removes unreachable branches and unused bindings, following Metro's conservative rules.                                                                       |
+| `moduleContext`       | `boolean` | Treats top-level bindings as private to a module wrapper, so dead-code elimination may remove unused top-level functions in scripts. Does not change parsing. |
+
+#### `reactCompiler`
+
+Runs the React Compiler, vendored from Oxc. All required fields must be set.
+
+| Option                                | Value                                          | Notes                                                                                                                                                                                                       |
+| ------------------------------------- | ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `compilationMode`                     | `'infer' \| 'syntax' \| 'annotation' \| 'all'` | Required. Selects which functions are compiled.                                                                                                                                                             |
+| `panicThreshold`                      | `'none' \| 'critical_errors' \| 'all_errors'`  | Required. `'none'` leaves a function the compiler cannot handle as written. `'critical_errors'` and `'all_errors'` throw a transform error for critical errors or for every diagnostic, including warnings. |
+| `target`                              | `'17' \| '18' \| '19'`                         | Required. React version the output targets.                                                                                                                                                                 |
+| `enableResetCacheOnSourceFileChanges` | `boolean`                                      | Required. Resets memoization caches when the source file changes during development.                                                                                                                        |
+| `customOptOutDirectives`              | `string[]`                                     | Directives that opt a function out, in addition to `'use no memo'` and `'use no forget'`.                                                                                                                   |
+
+The React Compiler needs the original source. A file that was rewritten by Flow erasure or a parser
+adapter before this phase bails out instead.
+
+#### `reactRefresh`
+
+Emits React Fast Refresh registrations and signatures.
+
+| Option               | Value     | Notes                                                   |
+| -------------------- | --------- | ------------------------------------------------------- |
+| `refreshReg`         | `string`  | Registration function name. Defaults to `$RefreshReg$`. |
+| `refreshSig`         | `string`  | Signature function name. Defaults to `$RefreshSig$`.    |
+| `emitFullSignatures` | `boolean` | Emits full hook signatures instead of hashes.           |
+
+#### Combining options
+
+`helpers` and the JSX companion options configure a phase but do not make it active on their own.
+JSX companion options without `jsx` are rejected.
+
+Flow files are erased automatically before the first phase runs.
 
 ### Transform outcomes
 
 `transform` has three outcomes:
 
-- A successful transform returns a `NativeTransformResult`.
-- An intentional compatibility boundary returns a `NativeBailoutResult` with the pristine input in
-  `source`.
+- A successful transform returns `{ status: 'complete', code, map, functionMap, metadata, diagnostics }`.
+- An intentional compatibility boundary returns `{ status: 'bailout', reason, source, diagnostics }`.
+  `source` is the string passed to `transform`, even when Flow erasure or a parser adapter had
+  already rewritten it internally.
 - Invalid input or configuration and internal failures throw.
 
-Run a compatibility transformer only for a returned bailout. Thrown failures should propagate.
-Syntax failures use `TransformSyntaxError`; fatal native failures use `NativeTransformError` with
-the stable code `NOXCTURNAL_TRANSFORM_ERROR`.
+Run a compatibility transformer only for a returned bailout. Let thrown errors propagate. A syntax
+failure throws `TransformSyntaxError`; other fatal failures throw `NativeTransformError`.
+
+`functionMap: true` collects function ranges from the original input, before any lowering.
 
 ## Development
 
-The reproducible development environment includes Node.js, pnpm, Rust, CMake, Ninja, Python, and
-the C++ tools needed to build the optional Hermes-backed Flow parser.
+The Nix development shell supplies Node.js 22, pnpm 10, Rust 1.97, CMake, Ninja, and Python.
+`flow_parser` and `react_compiler` are default Cargo features, so a normal build includes Hermes
+Flow erasure and the React Compiler. A binary built without `flow_parser` reports Flow erasure as
+`unsupported` and leaves the file to a parser adapter.
 
 ```sh
 nix develop
@@ -163,10 +321,26 @@ pnpm benchmark
 
 Use `pnpm format` to format the TypeScript and Rust sources. User-visible changes should include a
 changeset because the main package and its native platform packages are released as one fixed
-version group.
+version group. See [CONTRIBUTING.md](CONTRIBUTING.md) for the full workflow.
 
-The test suite is organized by ownership and purpose; see [test/README.md](test/README.md) before
-adding, moving, or deleting coverage.
+## Repository
+
+Noxcturnal is one npm package and one N-API crate. Each folder under `js/` and `src/` has a README
+describing its internals.
+
+- [`js/`](js/) is the TypeScript package: the public API, pipelines, visitors, and the JavaScript
+  side of the native protocol.
+- [`src/`](src/README.md) is the Rust addon: parsing, native transforms, edit commits, and source
+  maps.
+- `protocol/event-schema.json` is the shared AST schema. `pnpm codegen` generates both sides from
+  it.
+- `crates/hermes-flow` erases Flow from Hermes' serialized AST. `crates/hermes-parser-sys` links
+  the Hermes parser.
+- `vendor/oxc_transformer` and `vendor/oxc_react_compiler` are patched Oxc crates, selected with
+  `[patch.crates-io]`. Each crate's `NOXCTURNAL.md` lists the local changes. Oxc crates and
+  `@oxc-project/types` stay on the same exact version.
+- [`test/`](test/README.md) holds the alignment, compliance, transform, and integration suites.
+- `npm/` holds the per-platform binary packages.
 
 ## License
 

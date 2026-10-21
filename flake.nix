@@ -31,6 +31,8 @@
       targetManifest = builtins.fromJSON (builtins.readFile ./scripts/native-targets.json);
       rustToolchainConfig = (builtins.fromTOML (builtins.readFile ./rust-toolchain.toml)).toolchain;
       rustManifestHash = "sha256-A1abGIbOtcBSdrUMhDGrER3pRM1hQP4fp9gh3Y4PKc8=";
+      pnpmStoreHash = "sha256-7LHeuW1FuFDJ/c8ITHOu8T8zbweHXVK0hrTuSTt8r8g=";
+      cargoVendorHash = "sha256-4gJAEabt5SIHzqofSTZ5OH/O83n5L2bbyGkPvO6HgyI=";
       cleanSource = builtins.path {
         name = "noxcturnal-source";
         path = ./.;
@@ -52,30 +54,27 @@
       };
       nativeSource = nixpkgs.lib.fileset.toSource {
         root = ./.;
-        fileset = nixpkgs.lib.fileset.unions [
-          ./vendor
-          ./Cargo.lock
-          ./Cargo.toml
-          ./build.rs
-          ./crates
-          ./flake.lock
-          ./flake.nix
-          ./src
-          ./package.json
-          ./pnpm-lock.yaml
-          ./pnpm-workspace.yaml
-          ./npm/darwin-arm64/package.json
-          ./npm/darwin-x64/package.json
-          ./npm/linux-arm64-gnu/package.json
-          ./npm/linux-arm64-musl/package.json
-          ./npm/linux-x64-gnu/package.json
-          ./npm/linux-x64-musl/package.json
-          ./npm/win32-arm64-msvc/package.json
-          ./npm/win32-x64-msvc/package.json
-          ./scripts/native-lib.mjs
-          ./scripts/native.mjs
-          ./scripts/native-targets.json
-        ];
+        fileset = nixpkgs.lib.fileset.unions (
+          [
+            ./vendor
+            ./Cargo.lock
+            ./Cargo.toml
+            ./build.rs
+            ./crates
+            ./flake.lock
+            ./flake.nix
+            ./src
+            ./package.json
+            ./pnpm-lock.yaml
+            ./pnpm-workspace.yaml
+          ]
+          ++ map (target: ./. + "/${target.workspace}/package.json") targetManifest
+          ++ [
+            ./scripts/native-lib.mjs
+            ./scripts/native.mjs
+            ./scripts/native-targets.json
+          ]
+        );
       };
       sourceHash = builtins.hashString "sha256" (toString nativeSource);
       mkSystem =
@@ -141,12 +140,12 @@
             src = nativeSource;
             inherit pnpm;
             fetcherVersion = 3;
-            hash = "sha256-7LHeuW1FuFDJ/c8ITHOu8T8zbweHXVK0hrTuSTt8r8g=";
+            hash = pnpmStoreHash;
           };
           cargoDeps = pkgs.rustPlatform.fetchCargoVendor {
             name = "noxcturnal-cargo-deps";
             src = nativeSource;
-            hash = "sha256-4gJAEabt5SIHzqofSTZ5OH/O83n5L2bbyGkPvO6HgyI=";
+            hash = cargoVendorHash;
           };
           pnpmStoreKey = builtins.hashString "sha256" (toString pnpmDeps);
           pnpmStoreShellHook = ''
@@ -174,6 +173,9 @@
             ];
             dontUseCmakeConfigure = true;
             HERMES_SOURCE_DIR = hermes;
+            # Reuse native addon artifacts for Clippy and workspace tests in CI.
+            CARGO_TARGET_DIR = "target/dev";
+            CARGO_BUILD_TARGET = pkgs.stdenv.hostPlatform.rust.rustcTarget;
             LD_LIBRARY_PATH = linuxLibraryPath;
             pnpmInstallFlags = [
               "--child-concurrency=1"
@@ -181,7 +183,7 @@
             ];
             buildPhase = ''
               runHook preBuild
-              node scripts/check.mjs
+              pnpm check
               runHook postBuild
             '';
             installPhase = ''
@@ -312,8 +314,8 @@
                 export NOXCTURNAL_TARGET_DIR="$TMPDIR/native-target"
                 export NOXCTURNAL_SOURCE_HASH=${nixpkgs.lib.escapeShellArg sourceHash}
                 export NOXCTURNAL_NATIVE_INPUT_HASH="$(cat ${nativeInputFingerprint})"
-                export NOXCTURNAL_CARGO_VENDOR_HASH=sha256-4gJAEabt5SIHzqofSTZ5OH/O83n5L2bbyGkPvO6HgyI=
-                export NOXCTURNAL_PNPM_STORE_HASH=sha256-7LHeuW1FuFDJ/c8ITHOu8T8zbweHXVK0hrTuSTt8r8g=
+                export NOXCTURNAL_CARGO_VENDOR_HASH=${nixpkgs.lib.escapeShellArg cargoVendorHash}
+                export NOXCTURNAL_PNPM_STORE_HASH=${nixpkgs.lib.escapeShellArg pnpmStoreHash}
                 export RUSTFLAGS="''${RUSTFLAGS:+$RUSTFLAGS }--remap-path-prefix=$NIX_BUILD_TOP=/build"
                 export CFLAGS="''${CFLAGS:+$CFLAGS }-ffile-prefix-map=$NIX_BUILD_TOP=/build -fdebug-prefix-map=$NIX_BUILD_TOP=/build"
                 export CXXFLAGS="''${CXXFLAGS:+$CXXFLAGS }-ffile-prefix-map=$NIX_BUILD_TOP=/build -fdebug-prefix-map=$NIX_BUILD_TOP=/build"
@@ -330,61 +332,9 @@
               value = mkNative target;
             }) targetManifest
           );
-          mkNativeArtifacts =
-            name: targets:
-            releaseSystem.pkgs.linkFarm name (
-              map (target: {
-                name = target.rustTarget;
-                path = nativePackages."native-${target.rustTarget}";
-              }) targets
-            );
-          nativeArtifacts = mkNativeArtifacts "noxcturnal-native-artifacts" targetManifest;
-          nativeArtifactShards = builtins.listToAttrs (
-            map
-              (
-                architecture:
-                let
-                  targets = builtins.filter (
-                    target: nixpkgs.lib.hasPrefix "${architecture}-" target.rustTarget
-                  ) targetManifest;
-                in
-                {
-                  name = "native-artifacts-${architecture}";
-                  value = mkNativeArtifacts "noxcturnal-native-artifacts-${architecture}" targets;
-                }
-              )
-              [
-                "aarch64"
-                "x86_64"
-              ]
-          );
-          outputsFile = releaseSystem.pkgs.writeText "noxcturnal-native-outputs.json" (
-            builtins.toJSON (
-              builtins.listToAttrs (
-                map (target: {
-                  name = target.rustTarget;
-                  value = toString nativePackages."native-${target.rustTarget}";
-                }) targetManifest
-              )
-            )
-          );
-          prepareReleaseProgram = releaseSystem.pkgs.writeShellApplication {
-            name = "prepare-release-packages";
-            runtimeInputs = [ releaseSystem.pkgs.nodejs_22 ];
-            text = ''
-              node ${cleanSource}/scripts/native.mjs materialize \
-                --workspace-root "$PWD" \
-                --outputs-file ${outputsFile}
-            '';
-          };
         in
         {
-          inherit
-            nativeArtifacts
-            nativeArtifactShards
-            nativePackages
-            prepareReleaseProgram
-            ;
+          inherit nativePackages;
         };
       releaseGraphs = nixpkgs.lib.genAttrs [ "aarch64-darwin" "x86_64-linux" ] mkRelease;
     in
@@ -401,17 +351,9 @@
           system: release:
           {
             check = perSystem.${system}.verify;
-            native-artifacts = release.nativeArtifacts;
           }
-          // release.nativeArtifactShards
           // release.nativePackages
         ) releaseGraphs;
-      apps = nixpkgs.lib.mapAttrs (_: release: {
-        prepare-release-packages = {
-          type = "app";
-          program = "${release.prepareReleaseProgram}/bin/prepare-release-packages";
-        };
-      }) releaseGraphs;
       formatter = forAllSystems (system: perSystem.${system}.pkgs.nixfmt);
     };
 }

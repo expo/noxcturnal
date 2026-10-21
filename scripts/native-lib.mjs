@@ -87,6 +87,27 @@ export function readBuild(target, directory) {
   return { manifest, binaryPath, payloadHash };
 }
 
+// Capture once per validation operation; every artifact must match the same inputs.
+export function currentBuildInputs(workspace = root) {
+  return {
+    flake: sha256File(path.join(workspace, 'flake.lock')),
+    cargo: sha256File(path.join(workspace, 'Cargo.lock')),
+    pnpm: sha256File(path.join(workspace, 'pnpm-lock.yaml')),
+    native: nativeInputHash(),
+  };
+}
+
+export function assertBuildInputs(target, manifest, expected) {
+  if (manifest.nativeInputSha256 !== expected.native)
+    throw new Error(`${target.rustTarget} was built from stale native inputs`);
+  if (manifest.flakeLockHash !== expected.flake)
+    throw new Error(`${target.rustTarget} was built with another flake.lock`);
+  if (manifest.dependencies?.cargoLockSha256 !== expected.cargo)
+    throw new Error(`${target.rustTarget} was built with another Cargo.lock`);
+  if (manifest.dependencies?.pnpmLockSha256 !== expected.pnpm)
+    throw new Error(`${target.rustTarget} was built with another pnpm-lock.yaml`);
+}
+
 const nativeInputRoots = [
   'vendor',
   'Cargo.toml',
@@ -135,4 +156,26 @@ function walkInputs() {
   };
   for (const entry of nativeInputRoots) visit(entry);
   return files.sort();
+}
+
+// Platform package manifests are derived on both sides. The remaining roots must stay the same set.
+export function assertNativeSourceRoots() {
+  const flake = fs.readFileSync(path.join(root, 'flake.nix'), 'utf8');
+  const start = flake.indexOf('nativeSource = ');
+  const end = flake.indexOf('sourceHash = ', start);
+  if (start < 0 || end < 0) throw new Error('flake.nix nativeSource fileset is unreadable');
+  const flakeRoots = new Set(
+    [...flake.slice(start, end).matchAll(/(?:^|[^A-Za-z0-9_.-])\.\/(?!\.)([A-Za-z0-9_./-]+)/g)].map(
+      match => match[1].replace(/\/$/, ''),
+    ),
+  );
+  const packageRoots = new Set(nativeTargets.map(target => `${target.workspace}/package.json`));
+  const scriptRoots = new Set(nativeInputRoots.filter(entry => !packageRoots.has(entry)));
+  for (const entry of packageRoots) flakeRoots.delete(entry);
+  const onlyScript = [...scriptRoots].filter(entry => !flakeRoots.has(entry)).sort();
+  const onlyFlake = [...flakeRoots].filter(entry => !scriptRoots.has(entry)).sort();
+  if (onlyScript.length || onlyFlake.length)
+    throw new Error(
+      `native input roots differ from flake.nix nativeSource: missing in flake [${onlyScript.join(', ')}]; missing in nativeInputRoots [${onlyFlake.join(', ')}]`,
+    );
 }

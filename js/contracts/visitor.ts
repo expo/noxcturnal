@@ -355,8 +355,6 @@ export type AncestryCapability =
   | 'programParent'
   | number;
 
-export type AncestryMode = AncestryCapability;
-
 /** A visitor route: one route name or a `|`-joined composite. */
 export type VisitorRouteSpec = NativeVisitorRoute | `${NativeVisitorRoute}|${string}`;
 
@@ -474,7 +472,7 @@ export type AncestorRouteMap = Readonly<
 >;
 
 export interface AncestryContract<Routes extends AncestorRouteMap = {}> {
-  mode: AncestryMode;
+  mode: AncestryCapability;
   routes?: Routes;
 }
 
@@ -854,7 +852,7 @@ export interface StoredVisitorContract {
   readonly scope: boolean;
   readonly ancestry:
     | Readonly<{
-        mode: AncestryMode;
+        mode: AncestryCapability;
         routes: Readonly<
           Record<
             string,

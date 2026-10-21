@@ -2,10 +2,8 @@ import type {
   NativeFieldKey,
   NativeNodeFields,
   NativeNodeType,
-  NativeRouteFields,
   NativeRouteTypes,
 } from './generated/event-schema';
-import type { PreflightPlan } from './preflight/types';
 
 export type { NativeFieldKey, NativeNodeType } from './generated/event-schema';
 /** Alias route names, derived from the generated expansion table. */
@@ -135,18 +133,6 @@ export type NodeOfType<T extends string> = T extends KnownNodeType
   ? NativeNodeMap[T]
   : NodeView & { readonly type: T };
 
-export type IdentifierView = NativeNodeMap['Identifier'];
-export type StringLiteralView = NativeNodeMap['StringLiteral'];
-export type NumericLiteralView = NativeNodeMap['NumericLiteral'];
-export type BooleanLiteralView = NativeNodeMap['BooleanLiteral'];
-export type CallExpressionView = NativeNodeMap['CallExpression'];
-/** Function and arrow-function events, as the `Function` alias route sees them. */
-export type FunctionView = NodeView & {
-  readonly type: NativeRouteTypes['Function'];
-} & NativeRouteFields['Function'];
-export type ImportDeclarationView = NativeNodeMap['ImportDeclaration'];
-export type ExportNamedDeclarationView = NativeNodeMap['ExportNamedDeclaration'];
-
 export interface NodeSummary {
   id: NodeId;
   type: string;
@@ -244,8 +230,6 @@ export interface InspectRequest {
 export interface TransformOptions {
   /** Base directory for absolute diagnostic filenames. Defaults to process.cwd(). */
   projectRoot?: string;
-  /** Reserved declarative configuration for native preflight phases. */
-  preflight?: PreflightPlan;
   sourceMapMode?: SourceMapMode;
   parser?: 'auto' | 'js' | 'jsx' | 'ts' | 'tsx' | 'dts';
   allowBroadVisitors?: boolean;

@@ -1,16 +1,14 @@
 import { runFixtures, type FixtureCase } from '../fixture';
 
-const expectedOutputs = [
-  'var a = /./;\nvar b = /[^]/;',
-  'var a = /./u;\nvar b = /[^]/u;',
-  'var a = /\\p{Unified_Ideograph}./u;\nvar b = /\\p{Unified_Ideograph}[^]/u;',
-] as const;
-
 export const fixtureCases = [
   {
     title: 'dotall regex — simple (input)',
-    source: 'var a = /./;\nvar b = /./s;\n',
+    source: `var a = /./;
+var b = /./s;
+`,
     filename: 'input.js',
+    output: `var a = /./;
+var b = /[^]/;`,
     modes: [
       {
         title: 'default',
@@ -19,14 +17,17 @@ export const fixtureCases = [
             regexpDotAll: true,
           },
         },
-        output: expectedOutputs[0],
       },
     ],
   },
   {
     title: 'dotall regex — with unicode flag (input)',
-    source: 'var a = /./u;\nvar b = /./su;\n',
+    source: `var a = /./u;
+var b = /./su;
+`,
     filename: 'input.js',
+    output: `var a = /./u;
+var b = /[^]/u;`,
     modes: [
       {
         title: 'default',
@@ -35,14 +36,17 @@ export const fixtureCases = [
             regexpDotAll: true,
           },
         },
-        output: expectedOutputs[1],
       },
     ],
   },
   {
     title: 'dotall regex — with unicode property escape (input)',
-    source: 'var a = /\\p{Unified_Ideograph}./u;\nvar b = /\\p{Unified_Ideograph}./su;\n',
+    source: `var a = /\\p{Unified_Ideograph}./u;
+var b = /\\p{Unified_Ideograph}./su;
+`,
     filename: 'input.js',
+    output: `var a = /\\p{Unified_Ideograph}./u;
+var b = /\\p{Unified_Ideograph}[^]/u;`,
     modes: [
       {
         title: 'default',
@@ -51,7 +55,6 @@ export const fixtureCases = [
             regexpDotAll: true,
           },
         },
-        output: expectedOutputs[2],
       },
     ],
   },

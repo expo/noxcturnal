@@ -13,6 +13,7 @@ use rustc_hash::FxHashMap;
 use crate::event_types::NodeField;
 use crate::generated::event_schema::{field_ids, node_type_name};
 use crate::protocol::constants::FieldMask;
+use crate::protocol::manifest::CompiledScalar;
 use crate::semantic::value_transport::{
     constant, literal_string, module_export_name, number_literal,
 };
@@ -21,63 +22,10 @@ use super::member::{
     MemberPathInterner, static_member_path, static_member_path_with, static_member_root,
 };
 
-/// Byte offset to UTF-16 offset, one entry per byte plus the end of source.
-///
-/// Every byte of a multi-byte character maps to that character's starting UTF-16
-/// offset, so the table is filled in one forward pass: each character appends its
-/// own start offset once per byte it occupies.
 pub(crate) fn utf16_index<'a>(source: &str, allocator: &'a Allocator) -> ArenaVec<'a, u32> {
     let mut offsets = ArenaVec::with_capacity_in(source.len() + 1, &allocator);
-    let mut utf16 = 0u32;
-    for ch in source.chars() {
-        for _ in 0..ch.len_utf8() {
-            offsets.push(utf16);
-        }
-        utf16 += ch.len_utf16() as u32;
-    }
-    offsets.push(utf16);
+    crate::sourcemap::fill_utf16_offsets(source, |offset| offsets.push(offset));
     offsets
-}
-
-pub(crate) fn packed_scalar(key: &str, value: &str) -> Option<u32> {
-    if matches!(
-        key,
-        "global"
-            | "read"
-            | "write"
-            | "binding"
-            | "optional"
-            | "calleeGlobal"
-            | "computed"
-            | "rootGlobal"
-            | "async"
-            | "generator"
-            | "expression"
-            | "hasInitializer"
-            | "method"
-            | "shorthand"
-            | "prefix"
-            | "delegate"
-    ) {
-        return Some(0x8000_0000 | u32::from(value == "true"));
-    }
-    if matches!(
-        key,
-        "bindingScopeId"
-            | "argumentCount"
-            | "bodyStart"
-            | "bodyEnd"
-            | "specifierCount"
-            | "declarationCount"
-            | "parameterCount"
-    ) {
-        return value
-            .parse::<u32>()
-            .ok()
-            .filter(|value| *value < 0x4000_0000)
-            .map(|value| 0x4000_0000 | value);
-    }
-    None
 }
 
 pub(crate) fn intern_packed(strings: &mut FxHashMap<String, u32>, value: &str) -> u32 {
@@ -1445,5 +1393,25 @@ pub(crate) fn predicate_scalar_type(field: &str, node_type_id: u32, value: &str)
         crate::semantic::value_transport::scalar(value).0
     } else {
         0
+    }
+}
+
+pub(crate) fn compiled_scalar_matches(
+    expected: &CompiledScalar,
+    scalar_type: u8,
+    value: &str,
+) -> bool {
+    match expected {
+        CompiledScalar::String(expected) => scalar_type == 0 && value == expected,
+        CompiledScalar::Number(expected) => {
+            scalar_type == 1 && value.parse::<f64>().is_ok_and(|actual| actual == *expected)
+        }
+        CompiledScalar::Boolean(expected) => {
+            scalar_type == 2
+                && value
+                    .parse::<bool>()
+                    .is_ok_and(|actual| actual == *expected)
+        }
+        CompiledScalar::Null => scalar_type == 3,
     }
 }

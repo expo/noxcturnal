@@ -1,5 +1,11 @@
 # Oxc transformer
 
+This is the local copy of Oxc’s JavaScript and TypeScript transformer used by [native preflight](../../src/preflight/README.md). It performs AST rewrites during native phases. Some compatibility fixes must run inside its traversal so later transforms can see the nodes they produce.
+
+Noxcturnal vendors this crate at 0.154.0 (`UPSTREAM_REVISION`: `crates_v0.154.0`,
+`d47efe5`) and selects it with `[patch.crates-io]`. Local repairs are listed in
+[NOXCTURNAL.md](./NOXCTURNAL.md). The guide below is upstream Oxc's.
+
 We mostly model Oxc's transforms on [Babel](https://babeljs.io/)'s implementations.
 
 First iteration of a transform will usually be as straight a port from Babel as possible. We may then

@@ -1,5 +1,7 @@
 # Changesets
 
+This directory records release notes and version changes for the JavaScript package and its native binaries.
+
 Add a changeset for every user-visible change:
 
 ```sh
@@ -11,5 +13,4 @@ any package therefore versions all nine packages together so that optional nativ
 cannot drift from the JavaScript loader.
 
 On `main`, the release workflow maintains a version PR. Merging that PR builds every native target
-and publishes the complete workspace through npm trusted publishing. Provenance remains disabled
-while the source repository is private.
+and publishes the complete workspace.

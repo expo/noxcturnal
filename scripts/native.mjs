@@ -4,6 +4,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import {
+  assertBuildInputs,
+  assertNativeSourceRoots,
+  currentBuildInputs,
   currentTarget,
   nativeInputHash,
   nativeTargets,
@@ -18,11 +21,13 @@ const command = process.argv[2];
 if (command === 'build') buildDevelopment();
 else if (command === 'build-target') buildTarget();
 else if (command === 'materialize') materialize();
-else if (command === 'check') checkDevelopment();
-else if (command === 'smoke') smoke();
+else if (command === 'check') {
+  assertNativeSourceRoots();
+  checkDevelopment();
+} else if (command === 'smoke') smoke();
 else
   throw new Error(
-    'use native.mjs build [--release] | build-target | materialize (--artifact-root <directory> | --outputs-file <json>) | check | smoke <artifact> <target>',
+    'use native.mjs build [--release] | build-target | materialize --artifact-root <directory> | check | smoke <artifact> <target>',
   );
 
 function buildDevelopment() {
@@ -154,32 +159,11 @@ function materialize() {
   const workspaceIndex = arguments_.indexOf('--workspace-root');
   const workspace = path.resolve(workspaceIndex >= 0 ? arguments_[workspaceIndex + 1] : root);
   const artifactRootIndex = arguments_.indexOf('--artifact-root');
-  const outputsIndex = arguments_.indexOf('--outputs-file');
-  let directories;
-  if (artifactRootIndex >= 0) {
-    const artifactRoot = path.resolve(arguments_[artifactRootIndex + 1]);
-    directories = nativeTargets.map(target => {
-      const direct = path.join(artifactRoot, target.rustTarget);
-      const plain = path.join(direct, 'build');
-      const prefixed = path.join(artifactRoot, `native-${target.rustTarget}`, 'build');
-      if (fs.existsSync(path.join(direct, 'build-manifest.json'))) return direct;
-      return fs.existsSync(plain) ? plain : prefixed;
-    });
-  } else if (outputsIndex >= 0) {
-    const outputs = JSON.parse(fs.readFileSync(arguments_[outputsIndex + 1], 'utf8'));
-    directories = nativeTargets.map(target => outputs[target.rustTarget]);
-  } else {
-    throw new Error('materialize requires --artifact-root <directory> or --outputs-file <json>');
-  }
-  if (directories.some(directory => typeof directory !== 'string'))
-    throw new Error('artifact set does not contain every declared target');
+  if (artifactRootIndex < 0) throw new Error('materialize requires --artifact-root <directory>');
+  const artifactRoot = path.resolve(arguments_[artifactRootIndex + 1]);
+  const directories = nativeTargets.map(target => path.join(artifactRoot, target.rustTarget));
 
-  const expected = {
-    flake: sha256File(path.join(workspace, 'flake.lock')),
-    cargo: sha256File(path.join(workspace, 'Cargo.lock')),
-    pnpm: sha256File(path.join(workspace, 'pnpm-lock.yaml')),
-    native: nativeInputHash(),
-  };
+  const expected = currentBuildInputs(workspace);
   const validated = nativeTargets.map((target, index) => ({
     target,
     directory: directories[index],
@@ -187,16 +171,7 @@ function materialize() {
   }));
   if (new Set(validated.map(entry => entry.manifest.sourceHash)).size !== 1)
     throw new Error('native outputs do not share one source hash');
-  for (const { target, manifest } of validated) {
-    if (manifest.nativeInputSha256 !== expected.native)
-      throw new Error(`${target.rustTarget} was built from stale native inputs`);
-    if (manifest.flakeLockHash !== expected.flake)
-      throw new Error(`${target.rustTarget} was built with another flake.lock`);
-    if (manifest.dependencies.cargoLockSha256 !== expected.cargo)
-      throw new Error(`${target.rustTarget} was built with another Cargo.lock`);
-    if (manifest.dependencies.pnpmLockSha256 !== expected.pnpm)
-      throw new Error(`${target.rustTarget} was built with another pnpm-lock.yaml`);
-  }
+  for (const { target, manifest } of validated) assertBuildInputs(target, manifest, expected);
 
   const manifest = {
     schema: 1,

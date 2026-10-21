@@ -407,12 +407,7 @@ impl<'a> OrdinaryParameterLowerer<'a> {
     }
 
     fn undefined(&self, span: Span) -> Expression<'a> {
-        oxc_ast::ast::Expression::new_unary_expression(
-            span,
-            UnaryOperator::Void,
-            self.number(span, 0),
-            self.ast().builder(),
-        )
+        super::void_zero(&self.ast(), span)
     }
 
     fn parameter_statement(
@@ -497,10 +492,8 @@ impl<'a> OrdinaryParameterLowerer<'a> {
         let rest_pattern = rest.rest.argument;
 
         let target_name = match (&rest_pattern, array_name.as_ref()) {
-            (BindingPattern::BindingIdentifier(identifier), None) => {
-                Some(identifier.name.to_string())
-            }
-            (_, Some(name)) => Some(name.clone()),
+            (BindingPattern::BindingIdentifier(identifier), None) => identifier.name.to_string(),
+            (_, Some(name)) => name.clone(),
             _ => unreachable!("rest planning reserves a temporary for binding patterns"),
         };
         let length = self.id(anchor, &length_name);
@@ -528,15 +521,11 @@ impl<'a> OrdinaryParameterLowerer<'a> {
         ));
         declarations.push(oxc_ast::ast::VariableDeclarator::new(
             anchor,
-            if target_name.is_some() {
-                oxc_ast::ast::BindingPattern::new_binding_identifier(
-                    anchor,
-                    self.allocator.alloc_str(target_name.as_deref().unwrap()),
-                    ast.builder(),
-                )
-            } else {
-                rest_pattern.clone_in(self.allocator)
-            },
+            oxc_ast::ast::BindingPattern::new_binding_identifier(
+                anchor,
+                self.allocator.alloc_str(&target_name),
+                ast.builder(),
+            ),
             None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
             Some(array),
             false,
@@ -580,10 +569,7 @@ impl<'a> OrdinaryParameterLowerer<'a> {
             update_target,
             ast.builder(),
         );
-        let target_object = self.id(
-            anchor,
-            target_name.as_deref().expect("rest target reserved"),
-        );
+        let target_object = self.id(anchor, &target_name);
         let target_index = oxc_ast::ast::Expression::new_binary_expression(
             anchor,
             key.clone_in(self.allocator),
@@ -628,13 +614,13 @@ impl<'a> OrdinaryParameterLowerer<'a> {
             body,
             ast.builder(),
         ));
-        if !matches!(&rest_pattern, BindingPattern::BindingIdentifier(_)) && target_name.is_some() {
+        if !matches!(&rest_pattern, BindingPattern::BindingIdentifier(_)) {
             let mut declarations = ArenaVec::new_in(&ast);
             declarations.push(oxc_ast::ast::VariableDeclarator::new(
                 anchor,
                 rest_pattern,
                 None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
-                Some(self.id(anchor, target_name.as_deref().unwrap())),
+                Some(self.id(anchor, &target_name)),
                 false,
                 ast.builder(),
             ));
@@ -710,7 +696,7 @@ impl<'a> OrdinaryParameterLowerer<'a> {
                 unreachable!()
             };
             let mut expression = statement.unbox().expression;
-            clear_leading_pure_annotation(&mut expression);
+            super::clear_leading_pure_annotation(&mut expression);
             prologue.push(oxc_ast::ast::Statement::new_return_statement(
                 plan.anchor,
                 Some(expression),
@@ -1165,17 +1151,6 @@ impl<'a> VisitMut<'a> for OrdinaryParameterLowerer<'a> {
     }
 }
 
-fn clear_leading_pure_annotation(expression: &mut Expression<'_>) {
-    match expression {
-        Expression::CallExpression(call) => call.pure = false,
-        Expression::NewExpression(new) => new.pure = false,
-        Expression::ParenthesizedExpression(parenthesized) => {
-            clear_leading_pure_annotation(&mut parenthesized.expression);
-        }
-        _ => {}
-    }
-}
-
 fn parse_wrapper_statement<'a>(
     allocator: &'a Allocator,
     r#async: bool,
@@ -1615,17 +1590,7 @@ fn plan_arrow_capture(facts: &ArrowFacts, reserved: &mut FxHashSet<String>) -> A
 }
 
 fn reserve_name(base: &str, used: &mut FxHashSet<String>) -> String {
-    if used.insert(base.to_owned()) {
-        return base.to_owned();
-    }
-    let mut suffix = used.len().max(2);
-    loop {
-        let name = format!("{base}{suffix}");
-        if used.insert(name.clone()) {
-            return name;
-        }
-        suffix += 1;
-    }
+    super::reserve_generated_name(base, used)
 }
 
 fn non_simple(params: &FormalParameters<'_>) -> Option<usize> {

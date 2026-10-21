@@ -9,7 +9,7 @@ use crate::protocol::routed::{PackedWords, encode_routed_envelope};
 use crate::semantic::retained_index::{RetainedFieldValue, RetainedIndex};
 
 use super::RoutedCounts;
-use super::fields::{intern_packed, predicate_scalar_type};
+use super::fields::{compiled_scalar_matches, intern_packed, predicate_scalar_type};
 
 pub(crate) fn routed_buffer_from_index(
     manifest: &CompiledManifest,
@@ -439,20 +439,10 @@ fn retained_predicate_matches(
             } else {
                 (predicate_scalar_type(field_name, node_type_id, actual), actual)
             };
-            predicate.values.iter().any(|expected| match expected {
-                CompiledScalar::String(value) => scalar_type == 0 && actual == value,
-                CompiledScalar::Number(value) => {
-                    scalar_type == 1
-                        && actual
-                            .parse::<f64>()
-                            .is_ok_and(|actual| actual == *value)
-                }
-                CompiledScalar::Boolean(value) => {
-                    scalar_type == 2
-                        && actual.parse::<bool>().is_ok_and(|actual| actual == *value)
-                }
-                CompiledScalar::Null => scalar_type == 3,
-            })
+            predicate
+                .values
+                .iter()
+                .any(|expected| compiled_scalar_matches(expected, scalar_type, actual))
         }
     }
 }

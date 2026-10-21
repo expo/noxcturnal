@@ -16,7 +16,6 @@ describe.each(['inline', 'runtime'] as const)('%s async lowering', mode => {
     async generator => {
       const source = `const owner = { async ${generator ? '*' : ''}read(a) { a = 4; ${generator ? 'yield' : 'return'} arguments[0]; } };
       globalThis.result = ${generator ? 'owner.read(1).next().then(result => result.value)' : 'owner.read(1)'};`;
-      expect(await run(source)).toBe(4);
       expect(
         await run(
           compile(source, {
@@ -37,7 +36,6 @@ describe.each(['inline', 'runtime'] as const)('%s async lowering', mode => {
       try { const promise = owner.read(null); log.push('promise'); promise.catch(() => log.push('rejected')); } catch { log.push('wrong-sync'); }
       try { owner.values(null); } catch { log.push('sync'); }
       globalThis.result = Promise.resolve().then(() => log);`;
-    expect(await run(source)).toEqual(['promise', 'sync', 'rejected']);
     expect(
       await run(
         compile(source, {
@@ -68,7 +66,6 @@ describe.each(['inline', 'runtime'] as const)('%s async lowering', mode => {
     const source = `let arguments = 7;
       const before = arguments;
       globalThis.result = (async () => [before, arguments])();`;
-    expect(await run(source)).toEqual([7, 7]);
     expect(await run(compile(source, { helpers, transforms: { asyncFunctions: true } }))).toEqual([
       7, 7,
     ]);
@@ -82,7 +79,6 @@ describe.each(['inline', 'runtime'] as const)('%s async lowering', mode => {
       };
     }
     globalThis.result = new Outer().read();`;
-    expect(await run(source)).toEqual([true, true]);
     expect(await run(compile(source, { helpers, transforms: { asyncFunctions: true } }))).toEqual([
       true,
       true,
@@ -93,7 +89,6 @@ describe.each(['inline', 'runtime'] as const)('%s async lowering', mode => {
     const source = `const owner = { value: 3, async *read(a) { await 0; yield [this.value, arguments[0]]; } };
       async function call() { return (await owner.read(7).next()).value; }
       globalThis.result = call();`;
-    expect(await run(source)).toEqual([3, 7]);
     const code = compile(source, { helpers, transforms: { asyncFunctions: true } });
     expect(code).toMatch(/async\s*\*read/);
     expect(await run(code)).toEqual([3, 7]);
@@ -168,7 +163,6 @@ describe.each(['inline', 'runtime'] as const)('%s async lowering', mode => {
     }
     const C = new Factory(); const instance = new C();
     globalThis.result = Promise.all([instance.field(), C.field(), C.block(), instance.nested.read()]).then(values => values.map(value => value?.name));`;
-    expect(await run(source)).toEqual([undefined, undefined, undefined, 'Nested']);
     expect(await run(compile(source, { helpers, transforms: { asyncFunctions: true } }))).toEqual(
       await run(source),
     );
@@ -185,7 +179,6 @@ describe.each(['inline', 'runtime'] as const)('%s async lowering', mode => {
       this.reads = reads;
     }
     globalThis.result = Promise.all(new Factory().reads.map(read => read())).then(values => values.map(value => value === Factory));`;
-    expect(await run(source)).toEqual([true, true, true, true]);
     expect(await run(compile(source, { helpers, transforms: { asyncFunctions: true } }))).toEqual(
       await run(source),
     );
@@ -206,7 +199,6 @@ describe.each(['inline', 'runtime'] as const)('%s async lowering', mode => {
   test('keeps top-level class new.target captures defined', async () => {
     const source = `class C { field = async () => new.target; static field = async () => new.target; static { this.block = async () => new.target; } }
       globalThis.result = Promise.all([new C().field(), C.field(), C.block()]);`;
-    expect(await run(source)).toEqual([undefined, undefined, undefined]);
     expect(await run(compile(source, { helpers, transforms: { asyncFunctions: true } }))).toEqual(
       await run(source),
     );
@@ -219,7 +211,6 @@ describe.each(['inline', 'runtime'] as const)('%s async lowering', mode => {
     } }
     const Inner = new C().Inner; const instance = new Inner();
     globalThis.result = Promise.all([instance.field(), Inner.field()]).then(([a,b]) => [a[0] === instance, a[1], b[0] === Inner, b[1]]);`;
-    expect(await run(source)).toEqual([true, undefined, true, undefined]);
     expect(await run(compile(source, { helpers, transforms: { asyncFunctions: true } }))).toEqual(
       await run(source),
     );

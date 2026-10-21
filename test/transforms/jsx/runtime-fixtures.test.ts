@@ -1,152 +1,20 @@
 import { runFixtures, type FixtureCase } from '../fixture';
 
-const expectedOutputs = [
-  "// https://github.com/babel/babel/issues/12522\nReactDOM.render(\n  /* @__PURE__ */ React.createElement('p', null, 'Hello, World!'),\n  document.getElementById('root'),\n);\n// Imports are hoisted, so this is still ok\nimport 'react-app-polyfill/ie11';\nimport 'react-app-polyfill/stable';\nimport ReactDOM from 'react-dom';",
-  "import { jsx as _jsx } from 'react/jsx-runtime';\n// https://github.com/babel/babel/issues/12522\nReactDOM.render(\n  /* @__PURE__ */ _jsx('p', { children: 'Hello, World!' }),\n  document.getElementById('root'),\n);\n// Imports are hoisted, so this is still ok\nimport 'react-app-polyfill/ie11';\nimport 'react-app-polyfill/stable';\nimport ReactDOM from 'react-dom';",
-  "// https://github.com/babel/babel/issues/12522\nimport 'react-app-polyfill/ie11';\nimport 'react-app-polyfill/stable';\nimport ReactDOM from 'react-dom';\nReactDOM.render(\n  /* @__PURE__ */ React.createElement('p', null, 'Hello, World!'),\n  document.getElementById('root'),\n);",
-  "// https://github.com/babel/babel/issues/12522\nimport 'react-app-polyfill/ie11';\nimport 'react-app-polyfill/stable';\nimport ReactDOM from 'react-dom';\nimport { jsx as _jsx } from 'react/jsx-runtime';\nReactDOM.render(\n  /* @__PURE__ */ _jsx('p', { children: 'Hello, World!' }),\n  document.getElementById('root'),\n);",
-  "// https://github.com/babel/babel/issues/12522\nrequire('react-app-polyfill/ie11');\nrequire('react-app-polyfill/stable');\nconst ReactDOM = require('react-dom');\nReactDOM.render(\n  /* @__PURE__ */ React.createElement('p', null, 'Hello, World!'),\n  document.getElementById('root'),\n);",
-  "var _reactJsxRuntime = require('react/jsx-runtime');\n// https://github.com/babel/babel/issues/12522\nrequire('react-app-polyfill/ie11');\nrequire('react-app-polyfill/stable');\nconst ReactDOM = require('react-dom');\nReactDOM.render(\n  /* @__PURE__ */ _reactJsxRuntime.jsx('p', { children: 'Hello, World!' }),\n  document.getElementById('root'),\n);",
-  "function _extends() {\n  return (\n    (_extends = Object.assign\n      ? Object.assign.bind()\n      : function (n) {\n          for (var e = 1; e < arguments.length; e++) {\n            var t = arguments[e];\n            for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]);\n          }\n          return n;\n        }),\n    _extends.apply(null, arguments)\n  );\n}\nvar x = /* @__PURE__ */ React.createElement(\n  React.Fragment,\n  null,\n  /* @__PURE__ */ React.createElement(\n    'div',\n    null,\n    /* @__PURE__ */ React.createElement('div', { key: '1' }),\n    /* @__PURE__ */ React.createElement('div', {\n      key: '2',\n      meow: 'wolf',\n    }),\n    /* @__PURE__ */ React.createElement('div', { key: '3' }),\n    /* @__PURE__ */ React.createElement('div', _extends({}, props, { key: '4' })),\n  ),\n);",
-  "var _react = require('react');\nvar _reactJsxRuntime = require('react/jsx-runtime');\nvar x = /* @__PURE__ */ _reactJsxRuntime.jsx(_reactJsxRuntime.Fragment, {\n  children: /* @__PURE__ */ _reactJsxRuntime.jsxs('div', {\n    children: [\n      /* @__PURE__ */ _reactJsxRuntime.jsx('div', {}, '1'),\n      /* @__PURE__ */ _reactJsxRuntime.jsx('div', { meow: 'wolf' }, '2'),\n      /* @__PURE__ */ _reactJsxRuntime.jsx('div', {}, '3'),\n      /* @__PURE__ */ _react.createElement('div', {\n        ...props,\n        key: '4',\n      }),\n    ],\n  }),\n});",
-  "const Bar = () => {\n  const Foo = () => {\n    const Component = ({ thing, ..._react }) => {\n      if (!thing) {\n        var _react2 = 'something useless';\n        var b = _react3();\n        var c = _react5();\n        var jsx = 1;\n        var _jsx = 2;\n        return /* @__PURE__ */ React.createElement('div', null);\n      }\n      return /* @__PURE__ */ React.createElement('span', null);\n    };\n  };\n};",
-  "var _reactJsxRuntime = require('react/jsx-runtime');\nconst Bar = () => {\n  const Foo = () => {\n    const Component = ({ thing, ..._react }) => {\n      if (!thing) {\n        var _react2 = 'something useless';\n        var b = _react3();\n        var c = _react5();\n        var jsx = 1;\n        var _jsx = 2;\n        return /* @__PURE__ */ _reactJsxRuntime.jsx('div', {});\n      }\n      return /* @__PURE__ */ _reactJsxRuntime.jsx('span', {});\n    };\n  };\n};",
-  '[error] preflight:transform-error',
-  "var _reactJsxRuntime = require('baz/jsx-runtime');\n/** @jsxImportSource baz */\nvar x = /* @__PURE__ */ _reactJsxRuntime.jsx('div', {\n  children: /* @__PURE__ */ _reactJsxRuntime.jsx('span', {}),\n});",
-  "var foo = '<div></div>';",
-  "function _extends() {\n  return (\n    (_extends = Object.assign\n      ? Object.assign.bind()\n      : function (n) {\n          for (var e = 1; e < arguments.length; e++) {\n            var t = arguments[e];\n            for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]);\n          }\n          return n;\n        }),\n    _extends.apply(null, arguments)\n  );\n}\nimport * as react from 'react';\nvar y = react.createElement('div', { foo: 1 });\nvar x = /* @__PURE__ */ React.createElement(\n  'div',\n  null,\n  /* @__PURE__ */ React.createElement('div', { key: '1' }),\n  /* @__PURE__ */ React.createElement('div', {\n    key: '2',\n    meow: 'wolf',\n  }),\n  /* @__PURE__ */ React.createElement('div', { key: '3' }),\n  /* @__PURE__ */ React.createElement('div', _extends({}, props, { key: '4' })),\n);",
-  "import * as react from 'react';\nimport { jsx as _jsx, jsxs as _jsxs } from 'react/jsx-runtime';\nimport { createElement as _createElement } from 'react';\nvar y = react.createElement('div', { foo: 1 });\nvar x = /* @__PURE__ */ _jsxs('div', {\n  children: [\n    /* @__PURE__ */ _jsx('div', {}, '1'),\n    /* @__PURE__ */ _jsx('div', { meow: 'wolf' }, '2'),\n    /* @__PURE__ */ _jsx('div', {}, '3'),\n    /* @__PURE__ */ _createElement('div', {\n      ...props,\n      key: '4',\n    }),\n  ],\n});",
-  "/* @__PURE__ */ React.createElement('div', null);",
-  "var _reactJsxRuntime = require('react/jsx-runtime');\n/* @__PURE__ */ _reactJsxRuntime.jsx('div', {});",
-  "var x = /* @__PURE__ */ React.createElement(\n  'div',\n  null,\n  /* @__PURE__ */ React.createElement('span', null),\n  /* @__PURE__ */ React.createElement('br', null),\n);",
-  "var _reactJsxRuntime = require('react/jsx-runtime');\nvar x = /* @__PURE__ */ _reactJsxRuntime.jsxs('div', {\n  children: [\n    /* @__PURE__ */ _reactJsxRuntime.jsx('span', {}),\n    /* @__PURE__ */ _reactJsxRuntime.jsx('br', {}),\n  ],\n});",
-  "function _extends() {\n  return (\n    (_extends = Object.assign\n      ? Object.assign.bind()\n      : function (n) {\n          for (var e = 1; e < arguments.length; e++) {\n            var t = arguments[e];\n            for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]);\n          }\n          return n;\n        }),\n    _extends.apply(null, arguments)\n  );\n}\n/* @__PURE__ */ React.createElement(Component, _extends({}, props, { sound: 'moo' }));",
-  "var _reactJsxRuntime = require('react/jsx-runtime');\n/* @__PURE__ */ _reactJsxRuntime.jsx(Component, {\n  ...props,\n  sound: 'moo',\n});",
-  'var foo = function () {\n  return () => /* @__PURE__ */ React.createElement(this, null);\n};\nvar bar = function () {\n  return () => /* @__PURE__ */ React.createElement(this.foo, null);\n};',
-  "var _reactJsxRuntime = require('react/jsx-runtime');\nvar foo = function () {\n  return () => /* @__PURE__ */ _reactJsxRuntime.jsx(this, {});\n};\nvar bar = function () {\n  return () => /* @__PURE__ */ _reactJsxRuntime.jsx(this.foo, {});\n};",
-  "function _extends() {\n  return (\n    (_extends = Object.assign\n      ? Object.assign.bind()\n      : function (n) {\n          for (var e = 1; e < arguments.length; e++) {\n            var t = arguments[e];\n            for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]);\n          }\n          return n;\n        }),\n    _extends.apply(null, arguments)\n  );\n}\nvar div = /* @__PURE__ */ React.createElement(Component, _extends({}, props, { foo: 'bar' }));",
-  "var _reactJsxRuntime = require('react/jsx-runtime');\nvar div = /* @__PURE__ */ _reactJsxRuntime.jsx(Component, {\n  ...props,\n  foo: 'bar',\n});",
-  "{\n  /* @__PURE__ */ React.createElement(\n    'div',\n    /*i18n*/\n    { id: 'hello' },\n  );\n}\n{\n  /* @__PURE__ */ React.createElement(\n    'div',\n    null,\n    /* @__PURE__ */ React.createElement(\n      Trans,\n      /*i18n*/\n      { a: 1 },\n    ),\n  );\n}\n{\n  /* @__PURE__ */ React.createElement('div', { id: 'hello' });\n}\n{\n  /* @__PURE__ */ React.createElement(\n    'div',\n    null,\n    /* @__PURE__ */ React.createElement(Trans, { a: 1 }),\n  );\n}\n{\n  /* @__PURE__ */ React.createElement(\n    'div',\n    null,\n    /* @__PURE__ */ React.createElement(Trans, {\n      /*test1 */ a: '1',\n      /**test2 */ b: '2',\n    }),\n  );\n}\n{\n  /* @__PURE__ */ React.createElement(\n    'div',\n    null,\n    /* @__PURE__ */ React.createElement(Trans, {\n      a: 1,\n      /**test2 */ b: '2',\n    }),\n  );\n}",
-  "var _reactJsxRuntime = require('react/jsx-runtime');\n{\n  /* @__PURE__ */ _reactJsxRuntime.jsx('div', { id: 'hello' });\n}\n{\n  /* @__PURE__ */ _reactJsxRuntime.jsx('div', {\n    children: /* @__PURE__ */ _reactJsxRuntime.jsx(Trans, { a: 1 }),\n  });\n}\n{\n  /* @__PURE__ */ _reactJsxRuntime.jsx('div', { id: 'hello' });\n}\n{\n  /* @__PURE__ */ _reactJsxRuntime.jsx('div', {\n    children: /* @__PURE__ */ _reactJsxRuntime.jsx(Trans, { a: 1 }),\n  });\n}\n{\n  /* @__PURE__ */ _reactJsxRuntime.jsx('div', {\n    children: /* @__PURE__ */ _reactJsxRuntime.jsx(Trans, {\n      /*test1 */ a: '1',\n      /**test2 */ b: '2',\n    }),\n  });\n}\n{\n  /* @__PURE__ */ _reactJsxRuntime.jsx('div', {\n    children: /* @__PURE__ */ _reactJsxRuntime.jsx(Trans, {\n      a: 1,\n      /**test2 */ b: '2',\n    }),\n  });\n}",
-  "var x = /* @__PURE__ */ React.createElement(\n  'div',\n  null,\n  'foo',\n  'bar',\n  'baz',\n  /* @__PURE__ */ React.createElement('div', null, 'buz bang'),\n  'qux',\n  null,\n  'quack',\n);",
-  "var _reactJsxRuntime = require('react/jsx-runtime');\nvar x = /* @__PURE__ */ _reactJsxRuntime.jsxs('div', {\n  children: [\n    'foo',\n    'bar',\n    'baz',\n    /* @__PURE__ */ _reactJsxRuntime.jsx('div', { children: 'buz bang' }),\n    'qux',\n    null,\n    'quack',\n  ],\n});",
-  "/* @__PURE__ */ React.createElement(\n  Text,\n  null,\n  'To get started, edit index.ios.js!!!',\n  '\\n',\n  'Press Cmd+R to reload',\n);",
-  "var _reactJsxRuntime = require('react/jsx-runtime');\n/* @__PURE__ */ _reactJsxRuntime.jsxs(Text, {\n  children: ['To get started, edit index.ios.js!!!', '\\n', 'Press Cmd+R to reload'],\n});",
-  "/* @__PURE__ */ React.createElement(\n  'p',\n  {\n    prop: true,\n    prop: true,\n  },\n  'text',\n);\n/* @__PURE__ */ React.createElement(\n  'p',\n  {\n    prop,\n    prop,\n  },\n  'text',\n);\n/* @__PURE__ */ React.createElement(\n  'p',\n  {\n    prop: true,\n    prop,\n  },\n  'text',\n);\n/* @__PURE__ */ React.createElement(\n  'p',\n  {\n    prop,\n    prop: true,\n  },\n  'text',\n);",
-  "var _reactJsxRuntime = require('react/jsx-runtime');\n/* @__PURE__ */ _reactJsxRuntime.jsx('p', {\n  prop: true,\n  prop: true,\n  children: 'text',\n});\n/* @__PURE__ */ _reactJsxRuntime.jsx('p', {\n  prop,\n  prop,\n  children: 'text',\n});\n/* @__PURE__ */ _reactJsxRuntime.jsx('p', {\n  prop: true,\n  prop,\n  children: 'text',\n});\n/* @__PURE__ */ _reactJsxRuntime.jsx('p', {\n  prop,\n  prop: true,\n  children: 'text',\n});",
-  "/* @__PURE__ */ React.createElement('p', props, 'text');\n/* @__PURE__ */ React.createElement('div', props, contents);\n/* @__PURE__ */ React.createElement('img', {\n  alt: '',\n  src,\n  title,\n  __proto__,\n});\n/* @__PURE__ */ React.createElement('blockquote', { cite }, items);\n/* @__PURE__ */ React.createElement('pre', { ['__proto__']: null });\n/* @__PURE__ */ React.createElement('code', { [__proto__]: null });",
-  "var _reactJsxRuntime = require('react/jsx-runtime');\n/* @__PURE__ */ _reactJsxRuntime.jsx('p', {\n  ...props,\n  children: 'text',\n});\n/* @__PURE__ */ _reactJsxRuntime.jsx('div', {\n  ...props,\n  children: contents,\n});\n/* @__PURE__ */ _reactJsxRuntime.jsx('img', {\n  alt: '',\n  src,\n  title,\n  __proto__,\n});\n/* @__PURE__ */ _reactJsxRuntime.jsx('blockquote', {\n  cite,\n  children: items,\n});\n/* @__PURE__ */ _reactJsxRuntime.jsx('pre', { ['__proto__']: null });\n/* @__PURE__ */ _reactJsxRuntime.jsx('code', { [__proto__]: null });",
-  "import * as React from 'react';\nvar x = /* @__PURE__ */ React.createElement(React.Fragment, { key: 'foo' });",
-  "import * as React from 'react';\nimport { jsx as _jsx } from 'react/jsx-runtime';\nvar x = /* @__PURE__ */ _jsx(React.Fragment, {}, 'foo');",
-  'var x = /* @__PURE__ */ React.createElement(React.Fragment, null);',
-  "var _reactJsxRuntime = require('react/jsx-runtime');\nvar x = /* @__PURE__ */ _reactJsxRuntime.jsx(_reactJsxRuntime.Fragment, {});",
-  "var x = /* @__PURE__ */ React.createElement(\n  React.Fragment,\n  null,\n  /* @__PURE__ */ React.createElement('div', null),\n);",
-  "var _reactJsxRuntime = require('react/jsx-runtime');\nvar x = /* @__PURE__ */ _reactJsxRuntime.jsx(_reactJsxRuntime.Fragment, {\n  children: /* @__PURE__ */ _reactJsxRuntime.jsx('div', {}),\n});",
-  "var x = /* @__PURE__ */ React.createElement('div', null, [\n  /* @__PURE__ */ React.createElement('span', { key: '0' }),\n  /* @__PURE__ */ React.createElement('span', { key: '1' }),\n]);",
-  "var _reactJsxRuntime = require('react/jsx-runtime');\nvar x = /* @__PURE__ */ _reactJsxRuntime.jsx('div', {\n  children: [\n    /* @__PURE__ */ _reactJsxRuntime.jsx('span', {}, '0'),\n    /* @__PURE__ */ _reactJsxRuntime.jsx('span', {}, '1'),\n  ],\n});",
-  "/* @__PURE__ */ React.createElement('p', { __proto__: null }, 'text');\n/* @__PURE__ */ React.createElement('div', { __proto__: null }, contents);",
-  "var _reactJsxRuntime = require('react/jsx-runtime');\n/* @__PURE__ */ _reactJsxRuntime.jsx('p', {\n  ...{ __proto__: null },\n  children: 'text',\n});\n/* @__PURE__ */ _reactJsxRuntime.jsx('div', {\n  ...{ __proto__: null },\n  children: contents,\n});",
-  "var x = /* @__PURE__ */ React.createElement(\n  'div',\n  null,\n  /* @__PURE__ */ React.createElement('span', null),\n  [\n    /* @__PURE__ */ React.createElement('span', { key: '0' }),\n    /* @__PURE__ */ React.createElement('span', { key: '1' }),\n  ],\n);",
-  "var _reactJsxRuntime = require('react/jsx-runtime');\nvar x = /* @__PURE__ */ _reactJsxRuntime.jsxs('div', {\n  children: [\n    /* @__PURE__ */ _reactJsxRuntime.jsx('span', {}),\n    [\n      /* @__PURE__ */ _reactJsxRuntime.jsx('span', {}, '0'),\n      /* @__PURE__ */ _reactJsxRuntime.jsx('span', {}, '1'),\n    ],\n  ],\n});",
-  "var div = /* @__PURE__ */ React.createElement('div', null, 'test');",
-  "var _reactJsxRuntime = require('react/jsx-runtime');\nvar div = /* @__PURE__ */ _reactJsxRuntime.jsx('div', { children: 'test' });",
-  "function _extends() {\n  return (\n    (_extends = Object.assign\n      ? Object.assign.bind()\n      : function (n) {\n          for (var e = 1; e < arguments.length; e++) {\n            var t = arguments[e];\n            for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]);\n          }\n          return n;\n        }),\n    _extends.apply(null, arguments)\n  );\n}\nconst props = { foo: true };\nvar x = /* @__PURE__ */ React.createElement('div', _extends({}, props, { key: undefined }));",
-  "var _react = require('react');\nconst props = { foo: true };\nvar x = /* @__PURE__ */ _react.createElement('div', {\n  ...props,\n  key: undefined,\n});",
-  "class App extends React.Component {\n  render() {\n    const navbarHeader = /* @__PURE__ */ React.createElement(\n      'div',\n      { className: 'navbar-header' },\n      /* @__PURE__ */ React.createElement(\n        'a',\n        {\n          className: 'navbar-brand',\n          href: '/',\n        },\n        /* @__PURE__ */ React.createElement('img', { src: '/img/logo/logo-96x36.png' }),\n      ),\n    );\n    return /* @__PURE__ */ React.createElement(\n      'div',\n      null,\n      /* @__PURE__ */ React.createElement(\n        'nav',\n        { className: 'navbar navbar-default' },\n        /* @__PURE__ */ React.createElement('div', { className: 'container' }, navbarHeader),\n      ),\n    );\n  }\n}",
-  "var _reactJsxRuntime = require('react/jsx-runtime');\nclass App extends React.Component {\n  render() {\n    const navbarHeader = /* @__PURE__ */ _reactJsxRuntime.jsx('div', {\n      className: 'navbar-header',\n      children: /* @__PURE__ */ _reactJsxRuntime.jsx('a', {\n        className: 'navbar-brand',\n        href: '/',\n        children: /* @__PURE__ */ _reactJsxRuntime.jsx('img', { src: '/img/logo/logo-96x36.png' }),\n      }),\n    });\n    return /* @__PURE__ */ _reactJsxRuntime.jsx('div', {\n      children: /* @__PURE__ */ _reactJsxRuntime.jsx('nav', {\n        className: 'navbar navbar-default',\n        children: /* @__PURE__ */ _reactJsxRuntime.jsx('div', {\n          className: 'container',\n          children: navbarHeader,\n        }),\n      }),\n    });\n  }\n}",
-  '[error] preflight:transform-error',
-  "var _reactJsxRuntime = require('foo/jsx-runtime');\n/* @jsxImportSource foo*/\n/* @__PURE__ */ _reactJsxRuntime.jsx('div', { children: 'Hi' });",
-  "var es3 = /* @__PURE__ */ React.createElement(F, {\n  aaa: true,\n  new: true,\n  const: true,\n  var: true,\n  default: true,\n  'foo-bar': true,\n});",
-  "var _reactJsxRuntime = require('react/jsx-runtime');\nvar es3 = /* @__PURE__ */ _reactJsxRuntime.jsx(F, {\n  aaa: true,\n  new: true,\n  const: true,\n  var: true,\n  default: true,\n  'foo-bar': true,\n});",
-  "/* @__PURE__ */ React.createElement(Component, { constructor: 'foo' });",
-  "var _reactJsxRuntime = require('react/jsx-runtime');\n/* @__PURE__ */ _reactJsxRuntime.jsx(Component, { constructor: 'foo' });",
-  '/* @__PURE__ */ React.createElement(Namespace.DeepNamespace.Component, null);',
-  "var _reactJsxRuntime = require('react/jsx-runtime');\n/* @__PURE__ */ _reactJsxRuntime.jsx(Namespace.DeepNamespace.Component, {});",
-  "/* @__PURE__ */ React.createElement('div', {\n  attr: /* @__PURE__ */ React.createElement('div', null),\n});",
-  "var _reactJsxRuntime = require('react/jsx-runtime');\n/* @__PURE__ */ _reactJsxRuntime.jsx('div', {\n  attr: /* @__PURE__ */ _reactJsxRuntime.jsx('div', {}),\n});",
-  '/* @__PURE__ */ React.createElement(Namespace.Component, null);',
-  "var _reactJsxRuntime = require('react/jsx-runtime');\n/* @__PURE__ */ _reactJsxRuntime.jsx(Namespace.Component, {});",
-  "/* @__PURE__ */ React.createElement(\n  'div',\n  null,\n  /* @__PURE__ */ React.createElement(\n    React.Fragment,\n    null,\n    /* @__PURE__ */ React.createElement(\n      React.Fragment,\n      null,\n      /* @__PURE__ */ React.createElement('span', null, 'Hello'),\n      /* @__PURE__ */ React.createElement('span', null, 'world'),\n    ),\n    /* @__PURE__ */ React.createElement(\n      React.Fragment,\n      null,\n      /* @__PURE__ */ React.createElement('span', null, 'Goodbye'),\n      /* @__PURE__ */ React.createElement('span', null, 'world'),\n    ),\n  ),\n);",
-  "var _reactJsxRuntime = require('react/jsx-runtime');\n/* @__PURE__ */ _reactJsxRuntime.jsx('div', {\n  children: /* @__PURE__ */ _reactJsxRuntime.jsxs(_reactJsxRuntime.Fragment, {\n    children: [\n      /* @__PURE__ */ _reactJsxRuntime.jsxs(_reactJsxRuntime.Fragment, {\n        children: [\n          /* @__PURE__ */ _reactJsxRuntime.jsx('span', { children: 'Hello' }),\n          /* @__PURE__ */ _reactJsxRuntime.jsx('span', { children: 'world' }),\n        ],\n      }),\n      /* @__PURE__ */ _reactJsxRuntime.jsxs(_reactJsxRuntime.Fragment, {\n        children: [\n          /* @__PURE__ */ _reactJsxRuntime.jsx('span', { children: 'Goodbye' }),\n          /* @__PURE__ */ _reactJsxRuntime.jsx('span', { children: 'world' }),\n        ],\n      }),\n    ],\n  }),\n});",
-  "var x = /* @__PURE__ */ React.createElement(\n  'div',\n  null,\n  /* @__PURE__ */ React.createElement(Component, null),\n);\nvar x = /* @__PURE__ */ React.createElement('div', null, props.children);\nvar x = /* @__PURE__ */ React.createElement(Composite, null, props.children);\nvar x = /* @__PURE__ */ React.createElement(\n  Composite,\n  null,\n  /* @__PURE__ */ React.createElement(Composite2, null),\n);",
-  "var _reactJsxRuntime = require('react/jsx-runtime');\nvar x = /* @__PURE__ */ _reactJsxRuntime.jsx('div', {\n  children: /* @__PURE__ */ _reactJsxRuntime.jsx(Component, {}),\n});\nvar x = /* @__PURE__ */ _reactJsxRuntime.jsx('div', { children: props.children });\nvar x = /* @__PURE__ */ _reactJsxRuntime.jsx(Composite, { children: props.children });\nvar x = /* @__PURE__ */ _reactJsxRuntime.jsx(Composite, {\n  children: /* @__PURE__ */ _reactJsxRuntime.jsx(Composite2, {}),\n});",
-  "var x = /* @__PURE__ */ React.createElement('div', null);",
-  "var _reactJsxRuntime = require('react/jsx-runtime');\nvar x = /* @__PURE__ */ _reactJsxRuntime.jsx('div', {});",
-  "var x = /* @__PURE__ */ React.createElement('div', null, 'text');",
-  "var _reactJsxRuntime = require('react/jsx-runtime');\nvar x = /* @__PURE__ */ _reactJsxRuntime.jsx('div', { children: 'text' });",
-  "/* @__PURE__ */ React.createElement('div', null, ...children);",
-  "var _reactJsxRuntime = require('react/jsx-runtime');\n/* @__PURE__ */ _reactJsxRuntime.jsx('div', { children: [...children] });",
-  '[error] preflight:transform-error',
-  "/* @__PURE__ */ React.createElement('div', { id: 'wôw' });\n/* @__PURE__ */ React.createElement('div', { id: '\\\\w' });\n/* @__PURE__ */ React.createElement('div', { id: 'w < w' });",
-  "var _reactJsxRuntime = require('react/jsx-runtime');\n/* @__PURE__ */ _reactJsxRuntime.jsx('div', { id: 'wôw' });\n/* @__PURE__ */ _reactJsxRuntime.jsx('div', { id: '\\\\w' });\n/* @__PURE__ */ _reactJsxRuntime.jsx('div', { id: 'w < w' });",
-  "/* @__PURE__ */ React.createElement('div', null, 'wow');\n/* @__PURE__ */ React.createElement('div', null, 'wôw');\n/* @__PURE__ */ React.createElement('div', null, 'w & w');\n/* @__PURE__ */ React.createElement('div', null, 'w & w');\n/* @__PURE__ */ React.createElement('div', null, 'w \\xA0 w');\n/* @__PURE__ */ React.createElement('div', null, 'this should not parse as unicode: \\\\u00a0');\n/* @__PURE__ */ React.createElement('div', null, 'this should parse as nbsp: \\xA0 ');\n/* @__PURE__ */ React.createElement('div', null, 'this should parse as unicode: ', '\\xA0\\xA0');\n/* @__PURE__ */ React.createElement('div', null, 'w < w');",
-  "var _reactJsxRuntime = require('react/jsx-runtime');\n/* @__PURE__ */ _reactJsxRuntime.jsx('div', { children: 'wow' });\n/* @__PURE__ */ _reactJsxRuntime.jsx('div', { children: 'wôw' });\n/* @__PURE__ */ _reactJsxRuntime.jsx('div', { children: 'w & w' });\n/* @__PURE__ */ _reactJsxRuntime.jsx('div', { children: 'w & w' });\n/* @__PURE__ */ _reactJsxRuntime.jsx('div', { children: 'w \\xA0 w' });\n/* @__PURE__ */ _reactJsxRuntime.jsx('div', {\n  children: 'this should not parse as unicode: \\\\u00a0',\n});\n/* @__PURE__ */ _reactJsxRuntime.jsx('div', { children: 'this should parse as nbsp: \\xA0 ' });\n/* @__PURE__ */ _reactJsxRuntime.jsxs('div', {\n  children: ['this should parse as unicode: ', '\\xA0\\xA0'],\n});\n/* @__PURE__ */ _reactJsxRuntime.jsx('div', { children: 'w < w' });",
-  "var HelloMessage = React.createClass({\n  displayName: 'HelloMessage',\n  render: function () {\n    return /* @__PURE__ */ React.createElement('div', null, 'Hello ', this.props.name);\n  },\n});\nReact.render(\n  /* @__PURE__ */ React.createElement(HelloMessage, {\n    name: /* @__PURE__ */ React.createElement('span', null, 'Sebastian'),\n  }),\n  mountNode,\n);",
-  "var _reactJsxRuntime = require('react/jsx-runtime');\nvar HelloMessage = React.createClass({\n  displayName: 'HelloMessage',\n  render: function () {\n    return /* @__PURE__ */ _reactJsxRuntime.jsxs('div', { children: ['Hello ', this.props.name] });\n  },\n});\nReact.render(\n  /* @__PURE__ */ _reactJsxRuntime.jsx(HelloMessage, {\n    name: /* @__PURE__ */ _reactJsxRuntime.jsx('span', { children: 'Sebastian' }),\n  }),\n  mountNode,\n);",
-  "/* @__PURE__ */ React.createElement('hasOwnProperty', null, 'testing');",
-  "var _reactJsxRuntime = require('react/jsx-runtime');\n/* @__PURE__ */ _reactJsxRuntime.jsx('hasOwnProperty', { children: 'testing' });",
-  "var x = /* @__PURE__ */ React.createElement(\n  'div',\n  null,\n  /* @__PURE__ */ React.createElement('div', null, /* @__PURE__ */ React.createElement('br', null)),\n  /* @__PURE__ */ React.createElement(\n    Component,\n    null,\n    foo,\n    /* @__PURE__ */ React.createElement('br', null),\n    bar,\n  ),\n  /* @__PURE__ */ React.createElement('br', null),\n);",
-  "var _reactJsxRuntime = require('react/jsx-runtime');\nvar x = /* @__PURE__ */ _reactJsxRuntime.jsxs('div', {\n  children: [\n    /* @__PURE__ */ _reactJsxRuntime.jsx('div', {\n      children: /* @__PURE__ */ _reactJsxRuntime.jsx('br', {}),\n    }),\n    /* @__PURE__ */ _reactJsxRuntime.jsxs(Component, {\n      children: [foo, /* @__PURE__ */ _reactJsxRuntime.jsx('br', {}), bar],\n    }),\n    /* @__PURE__ */ _reactJsxRuntime.jsx('br', {}),\n  ],\n});",
-  "var x = /* @__PURE__ */ React.createElement('div', {\n  attr1: 'foo' + 'bar',\n  attr2: 'foo' + 'bar' + 'baz' + 'bug',\n  attr3: 'foo' + 'bar' + 'baz' + 'bug',\n  attr4: 'baz',\n});",
-  "var _reactJsxRuntime = require('react/jsx-runtime');\nvar x = /* @__PURE__ */ _reactJsxRuntime.jsx('div', {\n  attr1: 'foo' + 'bar',\n  attr2: 'foo' + 'bar' + 'baz' + 'bug',\n  attr3: 'foo' + 'bar' + 'baz' + 'bug',\n  attr4: 'baz',\n});",
-  "var e = /* @__PURE__ */ React.createElement(F, {\n  aaa: true,\n  new: true,\n  const: true,\n  var: true,\n  default: true,\n  'foo-bar': true,\n});",
-  "var _reactJsxRuntime = require('react/jsx-runtime');\nvar e = /* @__PURE__ */ _reactJsxRuntime.jsx(F, {\n  aaa: true,\n  new: true,\n  const: true,\n  var: true,\n  default: true,\n  'foo-bar': true,\n});",
-  "/* @__PURE__ */ React.createElement(\n  'button',\n  { 'data-value': 'a value\\n  with\\nnewlines\\n   and spaces' },\n  'Button',\n);",
-  "var _reactJsxRuntime = require('react/jsx-runtime');\n/* @__PURE__ */ _reactJsxRuntime.jsx('button', {\n  'data-value': 'a value\\n  with\\nnewlines\\n   and spaces',\n  children: 'Button',\n});",
-  "/* @__PURE__ */ React.createElement('div', null, '\\xA0 ');",
-  "var _reactJsxRuntime = require('react/jsx-runtime');\n/* @__PURE__ */ _reactJsxRuntime.jsx('div', { children: '\\xA0 ' });",
-  "/* @__PURE__ */ React.createElement('div', null, '\\xA0');",
-  "var _reactJsxRuntime = require('react/jsx-runtime');\n/* @__PURE__ */ _reactJsxRuntime.jsx('div', { children: '\\xA0' });",
-  "var x = /* @__PURE__ */ React.createElement(\n  'div',\n  {\n    /* a multi-line\ncomment */\n    attr1: 'foo',\n  },\n  /* @__PURE__ */ React.createElement('span', { attr2: 'bar' }),\n);",
-  "var _reactJsxRuntime = require('react/jsx-runtime');\nvar x = /* @__PURE__ */ _reactJsxRuntime.jsx('div', {\n  /* a multi-line\n\tcomment */\n  attr1: 'foo',\n  children: /* @__PURE__ */ _reactJsxRuntime.jsx('span', { attr2: 'bar' }),\n});",
-  "var x = /* @__PURE__ */ React.createElement(\n  'div',\n  null,\n  /* @__PURE__ */ React.createElement('div', { key: '1' }),\n  /* @__PURE__ */ React.createElement('div', {\n    key: '2',\n    meow: 'wolf',\n  }),\n  /* @__PURE__ */ React.createElement('div', { key: '3' }),\n);",
-  "var _reactJsxRuntime = require('react/jsx-runtime');\nvar x = /* @__PURE__ */ _reactJsxRuntime.jsxs('div', {\n  children: [\n    /* @__PURE__ */ _reactJsxRuntime.jsx('div', {}, '1'),\n    /* @__PURE__ */ _reactJsxRuntime.jsx('div', { meow: 'wolf' }, '2'),\n    /* @__PURE__ */ _reactJsxRuntime.jsx('div', {}, '3'),\n  ],\n});",
-  "var foo = null;\nvar x = /* @__PURE__ */ React.createElement('div', foo);",
-  "var _reactJsxRuntime = require('react/jsx-runtime');\nvar foo = null;\nvar x = /* @__PURE__ */ _reactJsxRuntime.jsx('div', { ...foo });",
-  "/* @__PURE__ */ React.createElement('button', { 'data-value': 'a value' }, 'Button');",
-  "var _reactJsxRuntime = require('react/jsx-runtime');\n/* @__PURE__ */ _reactJsxRuntime.jsx('button', {\n  'data-value': 'a value',\n  children: 'Button',\n});",
-  "/* @__PURE__ */ React.createElement('f:image', { 'n:attr': true });",
-  "var _reactJsxRuntime = require('react/jsx-runtime');\n/* @__PURE__ */ _reactJsxRuntime.jsx('f:image', { 'n:attr': true });",
-  '/* @__PURE__ */ React.createElement(React.Fragment, null);',
-  "var _reactJsxRuntime = require('react/jsx-runtime');\n/* @__PURE__ */ _reactJsxRuntime.jsx(_reactJsxRuntime.Fragment, {});",
-  "/* @__PURE__ */ React.createElement('font-face', null);",
-  "var _reactJsxRuntime = require('react/jsx-runtime');\n/* @__PURE__ */ _reactJsxRuntime.jsx('font-face', {});",
-  "function _extends() {\n  return (\n    (_extends = Object.assign\n      ? Object.assign.bind()\n      : function (n) {\n          for (var e = 1; e < arguments.length; e++) {\n            var t = arguments[e];\n            for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]);\n          }\n          return n;\n        }),\n    _extends.apply(null, arguments)\n  );\n}\nvar x = /* @__PURE__ */ React.createElement(\n  'div',\n  _extends({}, props, {\n    key: '1',\n    foo: 'bar',\n  }),\n);",
-  "var _react = require('react');\nvar x = /* @__PURE__ */ _react.createElement('div', {\n  ...props,\n  key: '1',\n  foo: 'bar',\n});",
-  "function _extends() {\n  return (\n    (_extends = Object.assign\n      ? Object.assign.bind()\n      : function (n) {\n          for (var e = 1; e < arguments.length; e++) {\n            var t = arguments[e];\n            for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]);\n          }\n          return n;\n        }),\n    _extends.apply(null, arguments)\n  );\n}\nvar x = /* @__PURE__ */ React.createElement('div', _extends({ key: '1' }, props, { foo: 'bar' }));",
-  "var _reactJsxRuntime = require('react/jsx-runtime');\nvar x = /* @__PURE__ */ _reactJsxRuntime.jsx(\n  'div',\n  {\n    ...props,\n    foo: 'bar',\n  },\n  '1',\n);",
-  "var div = /* @__PURE__ */ React.createElement(this.foo, null, 'test');",
-  "var _reactJsxRuntime = require('react/jsx-runtime');\nvar div = /* @__PURE__ */ _reactJsxRuntime.jsx(this.foo, { children: 'test' });",
-  "class MobileHomeActivityTaskPriorityIcon extends React.PureComponent {\n  render() {\n    return /* @__PURE__ */ React.createElement(Text, null, '\\xA0', this.props.value, '\\xA0');\n  }\n}",
-  "var _reactJsxRuntime = require('react/jsx-runtime');\nclass MobileHomeActivityTaskPriorityIcon extends React.PureComponent {\n  render() {\n    return /* @__PURE__ */ _reactJsxRuntime.jsxs(Text, {\n      children: ['\\xA0', this.props.value, '\\xA0'],\n    });\n  }\n}",
-  'function _extends() {\n  return (\n    (_extends = Object.assign\n      ? Object.assign.bind()\n      : function (n) {\n          for (var e = 1; e < arguments.length; e++) {\n            var t = arguments[e];\n            for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]);\n          }\n          return n;\n        }),\n    _extends.apply(null, arguments)\n  );\n}\n/* @__PURE__ */ React.createElement(\n  Component,\n  _extends(\n    {\n      y: 2,\n      z: true,\n    },\n    x,\n  ),\n);',
-  "var _reactJsxRuntime = require('react/jsx-runtime');\n/* @__PURE__ */ _reactJsxRuntime.jsx(Component, {\n  y: 2,\n  z: true,\n  ...x,\n});",
-  'function _extends() {\n  return (\n    (_extends = Object.assign\n      ? Object.assign.bind()\n      : function (n) {\n          for (var e = 1; e < arguments.length; e++) {\n            var t = arguments[e];\n            for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]);\n          }\n          return n;\n        }),\n    _extends.apply(null, arguments)\n  );\n}\n/* @__PURE__ */ React.createElement(Component, _extends({ y: 2 }, x, { z: true }));',
-  "var _reactJsxRuntime = require('react/jsx-runtime');\n/* @__PURE__ */ _reactJsxRuntime.jsx(Component, {\n  y: 2,\n  ...x,\n  z: true,\n});",
-  "/** @jsx dom */\n/* @__PURE__ */ dom(Foo, null);\nvar profile = /* @__PURE__ */ dom(\n  'div',\n  null,\n  /* @__PURE__ */ dom('img', {\n    src: 'avatar.png',\n    className: 'profile',\n  }),\n  /* @__PURE__ */ dom('h3', null, [user.firstName, user.lastName].join(' ')),\n);",
-  '[error] preflight:transform-error',
-  "/* @__PURE__ */ React.createElement(\n  'p',\n  {\n    __proto__: null,\n    class: 'bar',\n  },\n  'text',\n);",
-  "var _reactJsxRuntime = require('react/jsx-runtime');\n/* @__PURE__ */ _reactJsxRuntime.jsx('p', {\n  __proto__: null,\n  class: 'bar',\n  children: 'text',\n});",
-  "/**\n * @jsx jsx\n */\n/* @__PURE__ */ jsx('foo', null);",
-  '[error] preflight:transform-error',
-  "/** @jsx dom */\n/* @__PURE__ */ dom('div', null, 'no fragment is used');",
-  '[error] preflight:transform-error',
-  '// Make sure not to use a jsx pragma here (like "@jsx Something"), we need this to be React.createElement!\n/* @__PURE__ */ React.createElement(\'blah\', null);',
-  "var _reactJsxRuntime = require('react/jsx-runtime');\n// Make sure not to use a jsx pragma here (like \"@jsx Something\"), we need this to be React.createElement!\n/* @__PURE__ */ _reactJsxRuntime.jsx('blah', {});",
-  'function _extends() {\n  return (\n    (_extends = Object.assign\n      ? Object.assign.bind()\n      : function (n) {\n          for (var e = 1; e < arguments.length; e++) {\n            var t = arguments[e];\n            for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]);\n          }\n          return n;\n        }),\n    _extends.apply(null, arguments)\n  );\n}\n/* @__PURE__ */ React.createElement(\n  Component,\n  _extends({}, x, {\n    y: 2,\n    z: true,\n  }),\n);',
-  "var _reactJsxRuntime = require('react/jsx-runtime');\n/* @__PURE__ */ _reactJsxRuntime.jsx(Component, {\n  ...x,\n  y: 2,\n  z: true,\n});",
-  'const foo = 2;',
-  "/* @jsxFrag React.Fragment */\n/* @jsx h */\n/* @__PURE__ */ h(React.Fragment, null, 'Test');",
-  '[error] preflight:transform-error',
-  "import React from 'react';\nexport default function App() {\n  return /* @__PURE__ */ React.createElement(\n    'div',\n    { className: 'App' },\n    /* @__PURE__ */ React.createElement('h1', null, 'Welcome to my application!'),\n    'This is my app!',\n    /* @__PURE__ */ React.createElement('strong', null, 'MINE.'),\n  );\n}",
-  "import React from 'react';\nimport { jsx as _jsx, jsxs as _jsxs } from 'react/jsx-runtime';\nexport default function App() {\n  return /* @__PURE__ */ _jsxs('div', {\n    className: 'App',\n    children: [\n      /* @__PURE__ */ _jsx('h1', { children: 'Welcome to my application!' }),\n      'This is my app!',\n      /* @__PURE__ */ _jsx('strong', { children: 'MINE.' }),\n    ],\n  });\n}",
-] as const;
-
 export const fixtureCases = [
   {
     title: 'autoImport — after polyfills 2 (input)',
-    source:
-      "// https://github.com/babel/babel/issues/12522\n\nReactDOM.render(\n    <p>Hello, World!</p>,\n    document.getElementById('root')\n);\n\n// Imports are hoisted, so this is still ok\nimport 'react-app-polyfill/ie11';\nimport 'react-app-polyfill/stable';\nimport ReactDOM from 'react-dom';\n",
+    source: `// https://github.com/babel/babel/issues/12522
+
+ReactDOM.render(
+    <p>Hello, World!</p>,
+    document.getElementById('root')
+);
+
+// Imports are hoisted, so this is still ok
+import 'react-app-polyfill/ie11';
+import 'react-app-polyfill/stable';
+import ReactDOM from 'react-dom';
+`,
     filename: 'input.jsx',
     modes: [
       {
@@ -154,21 +22,47 @@ export const fixtureCases = [
         options: {
           jsx: 'classic',
         },
-        output: expectedOutputs[0],
+        output: `// https://github.com/babel/babel/issues/12522
+ReactDOM.render(
+  /* @__PURE__ */ React.createElement('p', null, 'Hello, World!'),
+  document.getElementById('root'),
+);
+// Imports are hoisted, so this is still ok
+import 'react-app-polyfill/ie11';
+import 'react-app-polyfill/stable';
+import ReactDOM from 'react-dom';`,
       },
       {
         title: 'automatic',
         options: {
           jsx: 'automatic',
         },
-        output: expectedOutputs[1],
+        output: `import { jsx as _jsx } from 'react/jsx-runtime';
+// https://github.com/babel/babel/issues/12522
+ReactDOM.render(
+  /* @__PURE__ */ _jsx('p', { children: 'Hello, World!' }),
+  document.getElementById('root'),
+);
+// Imports are hoisted, so this is still ok
+import 'react-app-polyfill/ie11';
+import 'react-app-polyfill/stable';
+import ReactDOM from 'react-dom';`,
       },
     ],
   },
   {
     title: 'autoImport — after polyfills compiled to cjs (input)',
-    source:
-      "// https://github.com/babel/babel/issues/12522\n\nimport 'react-app-polyfill/ie11';\nimport 'react-app-polyfill/stable';\nimport ReactDOM from 'react-dom';\n\nReactDOM.render(\n    <p>Hello, World!</p>,\n    document.getElementById('root')\n);\n",
+    source: `// https://github.com/babel/babel/issues/12522
+
+import 'react-app-polyfill/ie11';
+import 'react-app-polyfill/stable';
+import ReactDOM from 'react-dom';
+
+ReactDOM.render(
+    <p>Hello, World!</p>,
+    document.getElementById('root')
+);
+`,
     filename: 'input.jsx',
     modes: [
       {
@@ -176,21 +70,45 @@ export const fixtureCases = [
         options: {
           jsx: 'classic',
         },
-        output: expectedOutputs[2],
+        output: `// https://github.com/babel/babel/issues/12522
+import 'react-app-polyfill/ie11';
+import 'react-app-polyfill/stable';
+import ReactDOM from 'react-dom';
+ReactDOM.render(
+  /* @__PURE__ */ React.createElement('p', null, 'Hello, World!'),
+  document.getElementById('root'),
+);`,
       },
       {
         title: 'automatic',
         options: {
           jsx: 'automatic',
         },
-        output: expectedOutputs[3],
+        output: `// https://github.com/babel/babel/issues/12522
+import 'react-app-polyfill/ie11';
+import 'react-app-polyfill/stable';
+import ReactDOM from 'react-dom';
+import { jsx as _jsx } from 'react/jsx-runtime';
+ReactDOM.render(
+  /* @__PURE__ */ _jsx('p', { children: 'Hello, World!' }),
+  document.getElementById('root'),
+);`,
       },
     ],
   },
   {
     title: 'autoImport — after polyfills script not supported (input)',
-    source:
-      "// https://github.com/babel/babel/issues/12522\n\nrequire('react-app-polyfill/ie11');\nrequire('react-app-polyfill/stable');\nconst ReactDOM = require('react-dom');\n\nReactDOM.render(\n    <p>Hello, World!</p>,\n    document.getElementById('root')\n);\n",
+    source: `// https://github.com/babel/babel/issues/12522
+
+require('react-app-polyfill/ie11');
+require('react-app-polyfill/stable');
+const ReactDOM = require('react-dom');
+
+ReactDOM.render(
+    <p>Hello, World!</p>,
+    document.getElementById('root')
+);
+`,
     filename: 'input.jsx',
     modes: [
       {
@@ -198,21 +116,44 @@ export const fixtureCases = [
         options: {
           jsx: 'classic',
         },
-        output: expectedOutputs[4],
+        output: `// https://github.com/babel/babel/issues/12522
+require('react-app-polyfill/ie11');
+require('react-app-polyfill/stable');
+const ReactDOM = require('react-dom');
+ReactDOM.render(
+  /* @__PURE__ */ React.createElement('p', null, 'Hello, World!'),
+  document.getElementById('root'),
+);`,
       },
       {
         title: 'automatic',
         options: {
           jsx: 'automatic',
         },
-        output: expectedOutputs[5],
+        output: `var _reactJsxRuntime = require('react/jsx-runtime');
+// https://github.com/babel/babel/issues/12522
+require('react-app-polyfill/ie11');
+require('react-app-polyfill/stable');
+const ReactDOM = require('react-dom');
+ReactDOM.render(
+  /* @__PURE__ */ _reactJsxRuntime.jsx('p', { children: 'Hello, World!' }),
+  document.getElementById('root'),
+);`,
       },
     ],
   },
   {
     title: 'autoImport — auto import react source type module (input)',
-    source:
-      'var x = (\n    <>\n    <div>\n        <div key="1" />\n        <div key="2" meow="wolf" />\n        <div key="3" />\n        <div {...props} key="4" />\n    </div>\n    </>\n);',
+    source: `var x = (
+    <>
+    <div>
+        <div key="1" />
+        <div key="2" meow="wolf" />
+        <div key="3" />
+        <div {...props} key="4" />
+    </div>
+    </>
+);`,
     filename: 'input.jsx',
     modes: [
       {
@@ -220,21 +161,76 @@ export const fixtureCases = [
         options: {
           jsx: 'classic',
         },
-        output: expectedOutputs[6],
+        output: `function _extends() {
+  return (
+    (_extends = Object.assign
+      ? Object.assign.bind()
+      : function (n) {
+          for (var e = 1; e < arguments.length; e++) {
+            var t = arguments[e];
+            for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]);
+          }
+          return n;
+        }),
+    _extends.apply(null, arguments)
+  );
+}
+var x = /* @__PURE__ */ React.createElement(
+  React.Fragment,
+  null,
+  /* @__PURE__ */ React.createElement(
+    'div',
+    null,
+    /* @__PURE__ */ React.createElement('div', { key: '1' }),
+    /* @__PURE__ */ React.createElement('div', {
+      key: '2',
+      meow: 'wolf',
+    }),
+    /* @__PURE__ */ React.createElement('div', { key: '3' }),
+    /* @__PURE__ */ React.createElement('div', _extends({}, props, { key: '4' })),
+  ),
+);`,
       },
       {
         title: 'automatic',
         options: {
           jsx: 'automatic',
         },
-        output: expectedOutputs[7],
+        output: `var _react = require('react');
+var _reactJsxRuntime = require('react/jsx-runtime');
+var x = /* @__PURE__ */ _reactJsxRuntime.jsx(_reactJsxRuntime.Fragment, {
+  children: /* @__PURE__ */ _reactJsxRuntime.jsxs('div', {
+    children: [
+      /* @__PURE__ */ _reactJsxRuntime.jsx('div', {}, '1'),
+      /* @__PURE__ */ _reactJsxRuntime.jsx('div', { meow: 'wolf' }, '2'),
+      /* @__PURE__ */ _reactJsxRuntime.jsx('div', {}, '3'),
+      /* @__PURE__ */ _react.createElement('div', {
+        ...props,
+        key: '4',
+      }),
+    ],
+  }),
+});`,
       },
     ],
   },
   {
     title: 'autoImport — complicated scope module (input)',
-    source:
-      'const Bar = () => {\n    const Foo = () => {\n    const Component = ({thing, ..._react}) => {\n        if (!thing) {\n        var _react2 = "something useless";\n        var b = _react3();\n        var c = _react5();\n        var jsx = 1;\n        var _jsx = 2;\n        return <div />;\n        };\n        return <span />;\n    };\n    }\n}',
+    source: `const Bar = () => {
+    const Foo = () => {
+    const Component = ({thing, ..._react}) => {
+        if (!thing) {
+        var _react2 = "something useless";
+        var b = _react3();
+        var c = _react5();
+        var jsx = 1;
+        var _jsx = 2;
+        return <div />;
+        };
+        return <span />;
+    };
+    }
+}`,
     filename: 'input.jsx',
     modes: [
       {
@@ -242,20 +238,50 @@ export const fixtureCases = [
         options: {
           jsx: 'classic',
         },
-        output: expectedOutputs[8],
+        output: `const Bar = () => {
+  const Foo = () => {
+    const Component = ({ thing, ..._react }) => {
+      if (!thing) {
+        var _react2 = 'something useless';
+        var b = _react3();
+        var c = _react5();
+        var jsx = 1;
+        var _jsx = 2;
+        return /* @__PURE__ */ React.createElement('div', null);
+      }
+      return /* @__PURE__ */ React.createElement('span', null);
+    };
+  };
+};`,
       },
       {
         title: 'automatic',
         options: {
           jsx: 'automatic',
         },
-        output: expectedOutputs[9],
+        output: `var _reactJsxRuntime = require('react/jsx-runtime');
+const Bar = () => {
+  const Foo = () => {
+    const Component = ({ thing, ..._react }) => {
+      if (!thing) {
+        var _react2 = 'something useless';
+        var b = _react3();
+        var c = _react5();
+        var jsx = 1;
+        var _jsx = 2;
+        return /* @__PURE__ */ _reactJsxRuntime.jsx('div', {});
+      }
+      return /* @__PURE__ */ _reactJsxRuntime.jsx('span', {});
+    };
+  };
+};`,
       },
     ],
   },
   {
     title: 'autoImport — import source pragma (input)',
-    source: '/** @jsxImportSource baz */\nvar x = (<div><span /></div>);',
+    source: `/** @jsxImportSource baz */
+var x = (<div><span /></div>);`,
     filename: 'input.jsx',
     modes: [
       {
@@ -263,14 +289,18 @@ export const fixtureCases = [
         options: {
           jsx: 'classic',
         },
-        output: expectedOutputs[10],
+        output: '[error] preflight:transform-error',
       },
       {
         title: 'automatic',
         options: {
           jsx: 'automatic',
         },
-        output: expectedOutputs[11],
+        output: `var _reactJsxRuntime = require('baz/jsx-runtime');
+/** @jsxImportSource baz */
+var x = /* @__PURE__ */ _reactJsxRuntime.jsx('div', {
+  children: /* @__PURE__ */ _reactJsxRuntime.jsx('span', {}),
+});`,
       },
     ],
   },
@@ -278,27 +308,34 @@ export const fixtureCases = [
     title: 'autoImport — no jsx (input)',
     source: 'var foo = "<div></div>";',
     filename: 'input.jsx',
+    output: "var foo = '<div></div>';",
     modes: [
       {
         title: 'classic',
         options: {
           jsx: 'classic',
         },
-        output: expectedOutputs[12],
       },
       {
         title: 'automatic',
         options: {
           jsx: 'automatic',
         },
-        output: expectedOutputs[12],
       },
     ],
   },
   {
     title: 'autoImport — react defined (input)',
-    source:
-      'import * as react from "react";\nvar y = react.createElement("div", {foo: 1});\nvar x = (\n    <div>\n        <div key="1" />\n        <div key="2" meow="wolf" />\n        <div key="3" />\n        <div {...props} key="4" />\n    </div>\n);',
+    source: `import * as react from "react";
+var y = react.createElement("div", {foo: 1});
+var x = (
+    <div>
+        <div key="1" />
+        <div key="2" meow="wolf" />
+        <div key="3" />
+        <div {...props} key="4" />
+    </div>
+);`,
     filename: 'input.jsx',
     modes: [
       {
@@ -306,20 +343,61 @@ export const fixtureCases = [
         options: {
           jsx: 'classic',
         },
-        output: expectedOutputs[13],
+        output: `function _extends() {
+  return (
+    (_extends = Object.assign
+      ? Object.assign.bind()
+      : function (n) {
+          for (var e = 1; e < arguments.length; e++) {
+            var t = arguments[e];
+            for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]);
+          }
+          return n;
+        }),
+    _extends.apply(null, arguments)
+  );
+}
+import * as react from 'react';
+var y = react.createElement('div', { foo: 1 });
+var x = /* @__PURE__ */ React.createElement(
+  'div',
+  null,
+  /* @__PURE__ */ React.createElement('div', { key: '1' }),
+  /* @__PURE__ */ React.createElement('div', {
+    key: '2',
+    meow: 'wolf',
+  }),
+  /* @__PURE__ */ React.createElement('div', { key: '3' }),
+  /* @__PURE__ */ React.createElement('div', _extends({}, props, { key: '4' })),
+);`,
       },
       {
         title: 'automatic',
         options: {
           jsx: 'automatic',
         },
-        output: expectedOutputs[14],
+        output: `import * as react from 'react';
+import { jsx as _jsx, jsxs as _jsxs } from 'react/jsx-runtime';
+import { createElement as _createElement } from 'react';
+var y = react.createElement('div', { foo: 1 });
+var x = /* @__PURE__ */ _jsxs('div', {
+  children: [
+    /* @__PURE__ */ _jsx('div', {}, '1'),
+    /* @__PURE__ */ _jsx('div', { meow: 'wolf' }, '2'),
+    /* @__PURE__ */ _jsx('div', {}, '3'),
+    /* @__PURE__ */ _createElement('div', {
+      ...props,
+      key: '4',
+    }),
+  ],
+});`,
       },
     ],
   },
   {
     title: 'pure — false default pragma automatic runtime (input)',
-    source: '<div />;\n',
+    source: `<div />;
+`,
     filename: 'input.jsx',
     modes: [
       {
@@ -327,21 +405,34 @@ export const fixtureCases = [
         options: {
           jsx: 'classic',
         },
-        output: expectedOutputs[15],
+        output: "/* @__PURE__ */ React.createElement('div', null);",
       },
       {
         title: 'automatic',
         options: {
           jsx: 'automatic',
         },
-        output: expectedOutputs[16],
+        output: `var _reactJsxRuntime = require('react/jsx-runtime');
+/* @__PURE__ */ _reactJsxRuntime.jsx('div', {});`,
       },
     ],
   },
   {
     title: 'react automatic — .should properly handle comments adjacent to children (input)',
-    source:
-      'var x = (\n  <div>\n    {/* A comment at the beginning */}\n    {/* A second comment at the beginning */}\n    <span>\n      {/* A nested comment */}\n    </span>\n    {/* A sandwiched comment */}\n    <br />\n    {/* A comment at the end */}\n    {/* A second comment at the end */}\n  </div>\n);\n',
+    source: `var x = (
+  <div>
+    {/* A comment at the beginning */}
+    {/* A second comment at the beginning */}
+    <span>
+      {/* A nested comment */}
+    </span>
+    {/* A sandwiched comment */}
+    <br />
+    {/* A comment at the end */}
+    {/* A second comment at the end */}
+  </div>
+);
+`,
     filename: 'input.jsx',
     modes: [
       {
@@ -349,20 +440,34 @@ export const fixtureCases = [
         options: {
           jsx: 'classic',
         },
-        output: expectedOutputs[17],
+        output: `var x = /* @__PURE__ */ React.createElement(
+  'div',
+  null,
+  /* @__PURE__ */ React.createElement('span', null),
+  /* @__PURE__ */ React.createElement('br', null),
+);`,
       },
       {
         title: 'automatic',
         options: {
           jsx: 'automatic',
         },
-        output: expectedOutputs[18],
+        output: `var _reactJsxRuntime = require('react/jsx-runtime');
+var x = /* @__PURE__ */ _reactJsxRuntime.jsxs('div', {
+  children: [
+    /* @__PURE__ */ _reactJsxRuntime.jsx('span', {}),
+    /* @__PURE__ */ _reactJsxRuntime.jsx('br', {}),
+  ],
+});`,
       },
     ],
   },
   {
     title: 'react automatic — adds appropriate newlines when using spread attribute (input)',
-    source: '<Component\n  {...props}\n  sound="moo" />\n',
+    source: `<Component
+  {...props}
+  sound="moo" />
+`,
     filename: 'input.jsx',
     modes: [
       {
@@ -370,21 +475,45 @@ export const fixtureCases = [
         options: {
           jsx: 'classic',
         },
-        output: expectedOutputs[19],
+        output: `function _extends() {
+  return (
+    (_extends = Object.assign
+      ? Object.assign.bind()
+      : function (n) {
+          for (var e = 1; e < arguments.length; e++) {
+            var t = arguments[e];
+            for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]);
+          }
+          return n;
+        }),
+    _extends.apply(null, arguments)
+  );
+}
+/* @__PURE__ */ React.createElement(Component, _extends({}, props, { sound: 'moo' }));`,
       },
       {
         title: 'automatic',
         options: {
           jsx: 'automatic',
         },
-        output: expectedOutputs[20],
+        output: `var _reactJsxRuntime = require('react/jsx-runtime');
+/* @__PURE__ */ _reactJsxRuntime.jsx(Component, {
+  ...props,
+  sound: 'moo',
+});`,
       },
     ],
   },
   {
     title: 'react automatic — arrow functions (input)',
-    source:
-      'var foo = function () {\n  return () => <this />;\n};\n\nvar bar = function () {\n  return () => <this.foo />;\n};\n',
+    source: `var foo = function () {
+  return () => <this />;
+};
+
+var bar = function () {
+  return () => <this.foo />;
+};
+`,
     filename: 'input.jsx',
     modes: [
       {
@@ -392,20 +521,32 @@ export const fixtureCases = [
         options: {
           jsx: 'classic',
         },
-        output: expectedOutputs[21],
+        output: `var foo = function () {
+  return () => /* @__PURE__ */ React.createElement(this, null);
+};
+var bar = function () {
+  return () => /* @__PURE__ */ React.createElement(this.foo, null);
+};`,
       },
       {
         title: 'automatic',
         options: {
           jsx: 'automatic',
         },
-        output: expectedOutputs[22],
+        output: `var _reactJsxRuntime = require('react/jsx-runtime');
+var foo = function () {
+  return () => /* @__PURE__ */ _reactJsxRuntime.jsx(this, {});
+};
+var bar = function () {
+  return () => /* @__PURE__ */ _reactJsxRuntime.jsx(this.foo, {});
+};`,
       },
     ],
   },
   {
     title: 'react automatic — assignment (input)',
-    source: 'var div = <Component {...props} foo="bar" />\n',
+    source: `var div = <Component {...props} foo="bar" />
+`,
     filename: 'input.jsx',
     modes: [
       {
@@ -413,21 +554,45 @@ export const fixtureCases = [
         options: {
           jsx: 'classic',
         },
-        output: expectedOutputs[23],
+        output: `function _extends() {
+  return (
+    (_extends = Object.assign
+      ? Object.assign.bind()
+      : function (n) {
+          for (var e = 1; e < arguments.length; e++) {
+            var t = arguments[e];
+            for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]);
+          }
+          return n;
+        }),
+    _extends.apply(null, arguments)
+  );
+}
+var div = /* @__PURE__ */ React.createElement(Component, _extends({}, props, { foo: 'bar' }));`,
       },
       {
         title: 'automatic',
         options: {
           jsx: 'automatic',
         },
-        output: expectedOutputs[24],
+        output: `var _reactJsxRuntime = require('react/jsx-runtime');
+var div = /* @__PURE__ */ _reactJsxRuntime.jsx(Component, {
+  ...props,
+  foo: 'bar',
+});`,
       },
     ],
   },
   {
     title: 'react automatic — comments (input)',
-    source:
-      '{ <div {.../*i18n*/{ id: \'hello\' }} /> }\n{ <div><Trans {.../*i18n*/{ a: 1 }} /></div> }\n{ <div {...{ id: \'hello\' }/* comments */} /> }\n{ <div><Trans {...{ a: 1 }/* comments */} /></div> }\n\n{ <div><Trans /*test1 */a="1"/**test2 */b="2"/**test3 */ /></div> }\n{ <div><Trans {.../*test1*/{ a: 1}} /**test2 */ b = "2" /*test3 */ /></div> }\n',
+    source: `{ <div {.../*i18n*/{ id: 'hello' }} /> }
+{ <div><Trans {.../*i18n*/{ a: 1 }} /></div> }
+{ <div {...{ id: 'hello' }/* comments */} /> }
+{ <div><Trans {...{ a: 1 }/* comments */} /></div> }
+
+{ <div><Trans /*test1 */a="1"/**test2 */b="2"/**test3 */ /></div> }
+{ <div><Trans {.../*test1*/{ a: 1}} /**test2 */ b = "2" /*test3 */ /></div> }
+`,
     filename: 'input.jsx',
     modes: [
       {
@@ -435,21 +600,112 @@ export const fixtureCases = [
         options: {
           jsx: 'classic',
         },
-        output: expectedOutputs[25],
+        output: `{
+  /* @__PURE__ */ React.createElement(
+    'div',
+    /*i18n*/
+    { id: 'hello' },
+  );
+}
+{
+  /* @__PURE__ */ React.createElement(
+    'div',
+    null,
+    /* @__PURE__ */ React.createElement(
+      Trans,
+      /*i18n*/
+      { a: 1 },
+    ),
+  );
+}
+{
+  /* @__PURE__ */ React.createElement('div', { id: 'hello' });
+}
+{
+  /* @__PURE__ */ React.createElement(
+    'div',
+    null,
+    /* @__PURE__ */ React.createElement(Trans, { a: 1 }),
+  );
+}
+{
+  /* @__PURE__ */ React.createElement(
+    'div',
+    null,
+    /* @__PURE__ */ React.createElement(Trans, {
+      /*test1 */ a: '1',
+      /**test2 */ b: '2',
+    }),
+  );
+}
+{
+  /* @__PURE__ */ React.createElement(
+    'div',
+    null,
+    /* @__PURE__ */ React.createElement(Trans, {
+      a: 1,
+      /**test2 */ b: '2',
+    }),
+  );
+}`,
       },
       {
         title: 'automatic',
         options: {
           jsx: 'automatic',
         },
-        output: expectedOutputs[26],
+        output: `var _reactJsxRuntime = require('react/jsx-runtime');
+{
+  /* @__PURE__ */ _reactJsxRuntime.jsx('div', { id: 'hello' });
+}
+{
+  /* @__PURE__ */ _reactJsxRuntime.jsx('div', {
+    children: /* @__PURE__ */ _reactJsxRuntime.jsx(Trans, { a: 1 }),
+  });
+}
+{
+  /* @__PURE__ */ _reactJsxRuntime.jsx('div', { id: 'hello' });
+}
+{
+  /* @__PURE__ */ _reactJsxRuntime.jsx('div', {
+    children: /* @__PURE__ */ _reactJsxRuntime.jsx(Trans, { a: 1 }),
+  });
+}
+{
+  /* @__PURE__ */ _reactJsxRuntime.jsx('div', {
+    children: /* @__PURE__ */ _reactJsxRuntime.jsx(Trans, {
+      /*test1 */ a: '1',
+      /**test2 */ b: '2',
+    }),
+  });
+}
+{
+  /* @__PURE__ */ _reactJsxRuntime.jsx('div', {
+    children: /* @__PURE__ */ _reactJsxRuntime.jsx(Trans, {
+      a: 1,
+      /**test2 */ b: '2',
+    }),
+  });
+}`,
       },
     ],
   },
   {
     title: 'react automatic — concatenates adjacent string literals (input)',
-    source:
-      'var x =\n  <div>\n    foo\n    {"bar"}\n    baz\n    <div>\n      buz\n      bang\n    </div>\n    qux\n    {null}\n    quack\n  </div>\n',
+    source: `var x =
+  <div>
+    foo
+    {"bar"}
+    baz
+    <div>
+      buz
+      bang
+    </div>
+    qux
+    {null}
+    quack
+  </div>
+`,
     filename: 'input.jsx',
     modes: [
       {
@@ -457,21 +713,51 @@ export const fixtureCases = [
         options: {
           jsx: 'classic',
         },
-        output: expectedOutputs[27],
+        output: `var x = /* @__PURE__ */ React.createElement(
+  'div',
+  null,
+  'foo',
+  'bar',
+  'baz',
+  /* @__PURE__ */ React.createElement('div', null, 'buz bang'),
+  'qux',
+  null,
+  'quack',
+);`,
       },
       {
         title: 'automatic',
         options: {
           jsx: 'automatic',
         },
-        output: expectedOutputs[28],
+        output: `var _reactJsxRuntime = require('react/jsx-runtime');
+var x = /* @__PURE__ */ _reactJsxRuntime.jsxs('div', {
+  children: [
+    'foo',
+    'bar',
+    'baz',
+    /* @__PURE__ */ _reactJsxRuntime.jsx('div', { children: 'buz bang' }),
+    'qux',
+    null,
+    'quack',
+  ],
+});`,
       },
     ],
   },
   {
     title: 'react automatic — does not add source self automatic (input)',
-    source:
-      'var x = (\n  <>\n  <div>\n      <div key="1" />\n      <div key="2" meow="wolf" />\n      <div key="3" />\n      <div {...props} key="4" />\n  </div>\n  </>\n);\n',
+    source: `var x = (
+  <>
+  <div>
+      <div key="1" />
+      <div key="2" meow="wolf" />
+      <div key="3" />
+      <div {...props} key="4" />
+  </div>
+  </>
+);
+`,
     filename: 'input.jsx',
     modes: [
       {
@@ -479,21 +765,66 @@ export const fixtureCases = [
         options: {
           jsx: 'classic',
         },
-        output: expectedOutputs[6],
+        output: `function _extends() {
+  return (
+    (_extends = Object.assign
+      ? Object.assign.bind()
+      : function (n) {
+          for (var e = 1; e < arguments.length; e++) {
+            var t = arguments[e];
+            for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]);
+          }
+          return n;
+        }),
+    _extends.apply(null, arguments)
+  );
+}
+var x = /* @__PURE__ */ React.createElement(
+  React.Fragment,
+  null,
+  /* @__PURE__ */ React.createElement(
+    'div',
+    null,
+    /* @__PURE__ */ React.createElement('div', { key: '1' }),
+    /* @__PURE__ */ React.createElement('div', {
+      key: '2',
+      meow: 'wolf',
+    }),
+    /* @__PURE__ */ React.createElement('div', { key: '3' }),
+    /* @__PURE__ */ React.createElement('div', _extends({}, props, { key: '4' })),
+  ),
+);`,
       },
       {
         title: 'automatic',
         options: {
           jsx: 'automatic',
         },
-        output: expectedOutputs[7],
+        output: `var _react = require('react');
+var _reactJsxRuntime = require('react/jsx-runtime');
+var x = /* @__PURE__ */ _reactJsxRuntime.jsx(_reactJsxRuntime.Fragment, {
+  children: /* @__PURE__ */ _reactJsxRuntime.jsxs('div', {
+    children: [
+      /* @__PURE__ */ _reactJsxRuntime.jsx('div', {}, '1'),
+      /* @__PURE__ */ _reactJsxRuntime.jsx('div', { meow: 'wolf' }, '2'),
+      /* @__PURE__ */ _reactJsxRuntime.jsx('div', {}, '3'),
+      /* @__PURE__ */ _react.createElement('div', {
+        ...props,
+        key: '4',
+      }),
+    ],
+  }),
+});`,
       },
     ],
   },
   {
     title: 'react automatic — dont coerce expression containers (input)',
-    source:
-      '<Text>\n  To get started, edit index.ios.js!!!{"\\n"}\n  Press Cmd+R to reload\n</Text>\n',
+    source: `<Text>
+  To get started, edit index.ios.js!!!{"\\n"}
+  Press Cmd+R to reload
+</Text>
+`,
     filename: 'input.jsx',
     modes: [
       {
@@ -501,21 +832,36 @@ export const fixtureCases = [
         options: {
           jsx: 'classic',
         },
-        output: expectedOutputs[29],
+        output: `/* @__PURE__ */ React.createElement(
+  Text,
+  null,
+  'To get started, edit index.ios.js!!!',
+  '\\n',
+  'Press Cmd+R to reload',
+);`,
       },
       {
         title: 'automatic',
         options: {
           jsx: 'automatic',
         },
-        output: expectedOutputs[30],
+        output: `var _reactJsxRuntime = require('react/jsx-runtime');
+/* @__PURE__ */ _reactJsxRuntime.jsxs(Text, {
+  children: ['To get started, edit index.ios.js!!!', '\\n', 'Press Cmd+R to reload'],
+});`,
       },
     ],
   },
   {
     title: 'react automatic — duplicate props (input)',
-    source:
-      '<p prop prop>text</p>;\n\n<p {...{prop, prop}}>text</p>;\n\n<p prop {...{prop}}>text</p>;\n\n<p {...{prop}} prop>text</p>;\n',
+    source: `<p prop prop>text</p>;
+
+<p {...{prop, prop}}>text</p>;
+
+<p prop {...{prop}}>text</p>;
+
+<p {...{prop}} prop>text</p>;
+`,
     filename: 'input.jsx',
     modes: [
       {
@@ -523,21 +869,82 @@ export const fixtureCases = [
         options: {
           jsx: 'classic',
         },
-        output: expectedOutputs[31],
+        output: `/* @__PURE__ */ React.createElement(
+  'p',
+  {
+    prop: true,
+    prop: true,
+  },
+  'text',
+);
+/* @__PURE__ */ React.createElement(
+  'p',
+  {
+    prop,
+    prop,
+  },
+  'text',
+);
+/* @__PURE__ */ React.createElement(
+  'p',
+  {
+    prop: true,
+    prop,
+  },
+  'text',
+);
+/* @__PURE__ */ React.createElement(
+  'p',
+  {
+    prop,
+    prop: true,
+  },
+  'text',
+);`,
       },
       {
         title: 'automatic',
         options: {
           jsx: 'automatic',
         },
-        output: expectedOutputs[32],
+        output: `var _reactJsxRuntime = require('react/jsx-runtime');
+/* @__PURE__ */ _reactJsxRuntime.jsx('p', {
+  prop: true,
+  prop: true,
+  children: 'text',
+});
+/* @__PURE__ */ _reactJsxRuntime.jsx('p', {
+  prop,
+  prop,
+  children: 'text',
+});
+/* @__PURE__ */ _reactJsxRuntime.jsx('p', {
+  prop: true,
+  prop,
+  children: 'text',
+});
+/* @__PURE__ */ _reactJsxRuntime.jsx('p', {
+  prop,
+  prop: true,
+  children: 'text',
+});`,
       },
     ],
   },
   {
     title: 'react automatic — flattens spread (input)',
-    source:
-      '<p {...props}>text</p>;\n\n<div {...props}>{contents}</div>;\n\n<img alt="" {...{src, title, __proto__}} />;\n\n<blockquote {...{cite}}>{items}</blockquote>;\n\n<pre {...{["__proto__"]: null }}></pre>;\n\n<code {...{[__proto__]: null }}></code>;\n',
+    source: `<p {...props}>text</p>;
+
+<div {...props}>{contents}</div>;
+
+<img alt="" {...{src, title, __proto__}} />;
+
+<blockquote {...{cite}}>{items}</blockquote>;
+
+<pre {...{["__proto__"]: null }}></pre>;
+
+<code {...{[__proto__]: null }}></code>;
+`,
     filename: 'input.jsx',
     modes: [
       {
@@ -545,21 +952,52 @@ export const fixtureCases = [
         options: {
           jsx: 'classic',
         },
-        output: expectedOutputs[33],
+        output: `/* @__PURE__ */ React.createElement('p', props, 'text');
+/* @__PURE__ */ React.createElement('div', props, contents);
+/* @__PURE__ */ React.createElement('img', {
+  alt: '',
+  src,
+  title,
+  __proto__,
+});
+/* @__PURE__ */ React.createElement('blockquote', { cite }, items);
+/* @__PURE__ */ React.createElement('pre', { ['__proto__']: null });
+/* @__PURE__ */ React.createElement('code', { [__proto__]: null });`,
       },
       {
         title: 'automatic',
         options: {
           jsx: 'automatic',
         },
-        output: expectedOutputs[34],
+        output: `var _reactJsxRuntime = require('react/jsx-runtime');
+/* @__PURE__ */ _reactJsxRuntime.jsx('p', {
+  ...props,
+  children: 'text',
+});
+/* @__PURE__ */ _reactJsxRuntime.jsx('div', {
+  ...props,
+  children: contents,
+});
+/* @__PURE__ */ _reactJsxRuntime.jsx('img', {
+  alt: '',
+  src,
+  title,
+  __proto__,
+});
+/* @__PURE__ */ _reactJsxRuntime.jsx('blockquote', {
+  cite,
+  children: items,
+});
+/* @__PURE__ */ _reactJsxRuntime.jsx('pre', { ['__proto__']: null });
+/* @__PURE__ */ _reactJsxRuntime.jsx('code', { [__proto__]: null });`,
       },
     ],
   },
   {
     title: 'react automatic — handle fragments with key (input)',
-    source:
-      'import * as React from "react";\n\nvar x = <React.Fragment key="foo"></React.Fragment>;',
+    source: `import * as React from "react";
+
+var x = <React.Fragment key="foo"></React.Fragment>;`,
     filename: 'input.jsx',
     modes: [
       {
@@ -567,14 +1005,17 @@ export const fixtureCases = [
         options: {
           jsx: 'classic',
         },
-        output: expectedOutputs[35],
+        output: `import * as React from 'react';
+var x = /* @__PURE__ */ React.createElement(React.Fragment, { key: 'foo' });`,
       },
       {
         title: 'automatic',
         options: {
           jsx: 'automatic',
         },
-        output: expectedOutputs[36],
+        output: `import * as React from 'react';
+import { jsx as _jsx } from 'react/jsx-runtime';
+var x = /* @__PURE__ */ _jsx(React.Fragment, {}, 'foo');`,
       },
     ],
   },
@@ -588,14 +1029,15 @@ export const fixtureCases = [
         options: {
           jsx: 'classic',
         },
-        output: expectedOutputs[37],
+        output: 'var x = /* @__PURE__ */ React.createElement(React.Fragment, null);',
       },
       {
         title: 'automatic',
         options: {
           jsx: 'automatic',
         },
-        output: expectedOutputs[38],
+        output: `var _reactJsxRuntime = require('react/jsx-runtime');
+var x = /* @__PURE__ */ _reactJsxRuntime.jsx(_reactJsxRuntime.Fragment, {});`,
       },
     ],
   },
@@ -609,21 +1051,31 @@ export const fixtureCases = [
         options: {
           jsx: 'classic',
         },
-        output: expectedOutputs[39],
+        output: `var x = /* @__PURE__ */ React.createElement(
+  React.Fragment,
+  null,
+  /* @__PURE__ */ React.createElement('div', null),
+);`,
       },
       {
         title: 'automatic',
         options: {
           jsx: 'automatic',
         },
-        output: expectedOutputs[40],
+        output: `var _reactJsxRuntime = require('react/jsx-runtime');
+var x = /* @__PURE__ */ _reactJsxRuntime.jsx(_reactJsxRuntime.Fragment, {
+  children: /* @__PURE__ */ _reactJsxRuntime.jsx('div', {}),
+});`,
       },
     ],
   },
   {
     title: 'react automatic — handle nonstatic children (input)',
-    source:
-      "var x = (\n        <div>\n            {[<span key={'0'} />, <span key={'1'} />]}\n        </div>\n);",
+    source: `var x = (
+        <div>
+            {[<span key={'0'} />, <span key={'1'} />]}
+        </div>
+);`,
     filename: 'input.jsx',
     modes: [
       {
@@ -631,21 +1083,32 @@ export const fixtureCases = [
         options: {
           jsx: 'classic',
         },
-        output: expectedOutputs[41],
+        output: `var x = /* @__PURE__ */ React.createElement('div', null, [
+  /* @__PURE__ */ React.createElement('span', { key: '0' }),
+  /* @__PURE__ */ React.createElement('span', { key: '1' }),
+]);`,
       },
       {
         title: 'automatic',
         options: {
           jsx: 'automatic',
         },
-        output: expectedOutputs[42],
+        output: `var _reactJsxRuntime = require('react/jsx-runtime');
+var x = /* @__PURE__ */ _reactJsxRuntime.jsx('div', {
+  children: [
+    /* @__PURE__ */ _reactJsxRuntime.jsx('span', {}, '0'),
+    /* @__PURE__ */ _reactJsxRuntime.jsx('span', {}, '1'),
+  ],
+});`,
       },
     ],
   },
   {
     title: 'react automatic — handle spread with proto (input)',
-    source:
-      '<p {...{__proto__: null}}>text</p>;\n\n<div {...{"__proto__": null}}>{contents}</div>;\n',
+    source: `<p {...{__proto__: null}}>text</p>;
+
+<div {...{"__proto__": null}}>{contents}</div>;
+`,
     filename: 'input.jsx',
     modes: [
       {
@@ -653,21 +1116,35 @@ export const fixtureCases = [
         options: {
           jsx: 'classic',
         },
-        output: expectedOutputs[43],
+        output: `/* @__PURE__ */ React.createElement('p', { __proto__: null }, 'text');
+/* @__PURE__ */ React.createElement('div', { __proto__: null }, contents);`,
       },
       {
         title: 'automatic',
         options: {
           jsx: 'automatic',
         },
-        output: expectedOutputs[44],
+        output: `var _reactJsxRuntime = require('react/jsx-runtime');
+/* @__PURE__ */ _reactJsxRuntime.jsx('p', {
+  ...{ __proto__: null },
+  children: 'text',
+});
+/* @__PURE__ */ _reactJsxRuntime.jsx('div', {
+  ...{ __proto__: null },
+  children: contents,
+});`,
       },
     ],
   },
   {
     title: 'react automatic — handle static children (input)',
-    source:
-      "var x = (\n    <div>\n        <span />\n        {[<span key={'0'} />, <span key={'1'} />]}\n    </div>\n);\n",
+    source: `var x = (
+    <div>
+        <span />
+        {[<span key={'0'} />, <span key={'1'} />]}
+    </div>
+);
+`,
     filename: 'input.jsx',
     modes: [
       {
@@ -675,20 +1152,38 @@ export const fixtureCases = [
         options: {
           jsx: 'classic',
         },
-        output: expectedOutputs[45],
+        output: `var x = /* @__PURE__ */ React.createElement(
+  'div',
+  null,
+  /* @__PURE__ */ React.createElement('span', null),
+  [
+    /* @__PURE__ */ React.createElement('span', { key: '0' }),
+    /* @__PURE__ */ React.createElement('span', { key: '1' }),
+  ],
+);`,
       },
       {
         title: 'automatic',
         options: {
           jsx: 'automatic',
         },
-        output: expectedOutputs[46],
+        output: `var _reactJsxRuntime = require('react/jsx-runtime');
+var x = /* @__PURE__ */ _reactJsxRuntime.jsxs('div', {
+  children: [
+    /* @__PURE__ */ _reactJsxRuntime.jsx('span', {}),
+    [
+      /* @__PURE__ */ _reactJsxRuntime.jsx('span', {}, '0'),
+      /* @__PURE__ */ _reactJsxRuntime.jsx('span', {}, '1'),
+    ],
+  ],
+});`,
       },
     ],
   },
   {
     title: 'react automatic — jsx with retainlines option (input)',
-    source: 'var div = <div>test</div>;\n',
+    source: `var div = <div>test</div>;
+`,
     filename: 'input.jsx',
     modes: [
       {
@@ -696,20 +1191,23 @@ export const fixtureCases = [
         options: {
           jsx: 'classic',
         },
-        output: expectedOutputs[47],
+        output: "var div = /* @__PURE__ */ React.createElement('div', null, 'test');",
       },
       {
         title: 'automatic',
         options: {
           jsx: 'automatic',
         },
-        output: expectedOutputs[48],
+        output: `var _reactJsxRuntime = require('react/jsx-runtime');
+var div = /* @__PURE__ */ _reactJsxRuntime.jsx('div', { children: 'test' });`,
       },
     ],
   },
   {
     title: 'react automatic — key undefined works (input)',
-    source: 'const props = {foo: true};\nvar x = (<div {...props} key={undefined}></div>)\n',
+    source: `const props = {foo: true};
+var x = (<div {...props} key={undefined}></div>)
+`,
     filename: 'input.jsx',
     modes: [
       {
@@ -717,21 +1215,57 @@ export const fixtureCases = [
         options: {
           jsx: 'classic',
         },
-        output: expectedOutputs[49],
+        output: `function _extends() {
+  return (
+    (_extends = Object.assign
+      ? Object.assign.bind()
+      : function (n) {
+          for (var e = 1; e < arguments.length; e++) {
+            var t = arguments[e];
+            for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]);
+          }
+          return n;
+        }),
+    _extends.apply(null, arguments)
+  );
+}
+const props = { foo: true };
+var x = /* @__PURE__ */ React.createElement('div', _extends({}, props, { key: undefined }));`,
       },
       {
         title: 'automatic',
         options: {
           jsx: 'automatic',
         },
-        output: expectedOutputs[50],
+        output: `var _react = require('react');
+const props = { foo: true };
+var x = /* @__PURE__ */ _react.createElement('div', {
+  ...props,
+  key: undefined,
+});`,
       },
     ],
   },
   {
     title: 'react automatic — optimisation.react.constant elements (input)',
-    source:
-      'class App extends React.Component {\n  render() {\n    const navbarHeader = <div className="navbar-header">\n      <a className="navbar-brand" href="/">\n        <img src="/img/logo/logo-96x36.png" />\n      </a>\n    </div>;\n\n    return <div>\n      <nav className="navbar navbar-default">\n        <div className="container">\n          {navbarHeader}\n        </div>\n      </nav>\n    </div>;\n  }\n}\n',
+    source: `class App extends React.Component {
+  render() {
+    const navbarHeader = <div className="navbar-header">
+      <a className="navbar-brand" href="/">
+        <img src="/img/logo/logo-96x36.png" />
+      </a>
+    </div>;
+
+    return <div>
+      <nav className="navbar navbar-default">
+        <div className="container">
+          {navbarHeader}
+        </div>
+      </nav>
+    </div>;
+  }
+}
+`,
     filename: 'input.jsx',
     modes: [
       {
@@ -739,20 +1273,66 @@ export const fixtureCases = [
         options: {
           jsx: 'classic',
         },
-        output: expectedOutputs[51],
+        output: `class App extends React.Component {
+  render() {
+    const navbarHeader = /* @__PURE__ */ React.createElement(
+      'div',
+      { className: 'navbar-header' },
+      /* @__PURE__ */ React.createElement(
+        'a',
+        {
+          className: 'navbar-brand',
+          href: '/',
+        },
+        /* @__PURE__ */ React.createElement('img', { src: '/img/logo/logo-96x36.png' }),
+      ),
+    );
+    return /* @__PURE__ */ React.createElement(
+      'div',
+      null,
+      /* @__PURE__ */ React.createElement(
+        'nav',
+        { className: 'navbar navbar-default' },
+        /* @__PURE__ */ React.createElement('div', { className: 'container' }, navbarHeader),
+      ),
+    );
+  }
+}`,
       },
       {
         title: 'automatic',
         options: {
           jsx: 'automatic',
         },
-        output: expectedOutputs[52],
+        output: `var _reactJsxRuntime = require('react/jsx-runtime');
+class App extends React.Component {
+  render() {
+    const navbarHeader = /* @__PURE__ */ _reactJsxRuntime.jsx('div', {
+      className: 'navbar-header',
+      children: /* @__PURE__ */ _reactJsxRuntime.jsx('a', {
+        className: 'navbar-brand',
+        href: '/',
+        children: /* @__PURE__ */ _reactJsxRuntime.jsx('img', { src: '/img/logo/logo-96x36.png' }),
+      }),
+    });
+    return /* @__PURE__ */ _reactJsxRuntime.jsx('div', {
+      children: /* @__PURE__ */ _reactJsxRuntime.jsx('nav', {
+        className: 'navbar navbar-default',
+        children: /* @__PURE__ */ _reactJsxRuntime.jsx('div', {
+          className: 'container',
+          children: navbarHeader,
+        }),
+      }),
+    });
+  }
+}`,
       },
     ],
   },
   {
     title: 'react automatic — pragma works with no space at the end (input)',
-    source: '/* @jsxImportSource foo*/\n<div>Hi</div>;',
+    source: `/* @jsxImportSource foo*/
+<div>Hi</div>;`,
     filename: 'input.jsx',
     modes: [
       {
@@ -760,20 +1340,23 @@ export const fixtureCases = [
         options: {
           jsx: 'classic',
         },
-        output: expectedOutputs[53],
+        output: '[error] preflight:transform-error',
       },
       {
         title: 'automatic',
         options: {
           jsx: 'automatic',
         },
-        output: expectedOutputs[54],
+        output: `var _reactJsxRuntime = require('foo/jsx-runtime');
+/* @jsxImportSource foo*/
+/* @__PURE__ */ _reactJsxRuntime.jsx('div', { children: 'Hi' });`,
       },
     ],
   },
   {
     title: 'react automatic — should add quotes es3 (input)',
-    source: 'var es3 = <F aaa new const var default foo-bar/>;\n',
+    source: `var es3 = <F aaa new const var default foo-bar/>;
+`,
     filename: 'input.jsx',
     modes: [
       {
@@ -781,20 +1364,36 @@ export const fixtureCases = [
         options: {
           jsx: 'classic',
         },
-        output: expectedOutputs[55],
+        output: `var es3 = /* @__PURE__ */ React.createElement(F, {
+  aaa: true,
+  new: true,
+  const: true,
+  var: true,
+  default: true,
+  'foo-bar': true,
+});`,
       },
       {
         title: 'automatic',
         options: {
           jsx: 'automatic',
         },
-        output: expectedOutputs[56],
+        output: `var _reactJsxRuntime = require('react/jsx-runtime');
+var es3 = /* @__PURE__ */ _reactJsxRuntime.jsx(F, {
+  aaa: true,
+  new: true,
+  const: true,
+  var: true,
+  default: true,
+  'foo-bar': true,
+});`,
       },
     ],
   },
   {
     title: 'react automatic — should allow constructor as prop (input)',
-    source: '<Component constructor="foo" />;\n',
+    source: `<Component constructor="foo" />;
+`,
     filename: 'input.jsx',
     modes: [
       {
@@ -802,20 +1401,22 @@ export const fixtureCases = [
         options: {
           jsx: 'classic',
         },
-        output: expectedOutputs[57],
+        output: "/* @__PURE__ */ React.createElement(Component, { constructor: 'foo' });",
       },
       {
         title: 'automatic',
         options: {
           jsx: 'automatic',
         },
-        output: expectedOutputs[58],
+        output: `var _reactJsxRuntime = require('react/jsx-runtime');
+/* @__PURE__ */ _reactJsxRuntime.jsx(Component, { constructor: 'foo' });`,
       },
     ],
   },
   {
     title: 'react automatic — should allow deeper js namespacing (input)',
-    source: '<Namespace.DeepNamespace.Component />;\n',
+    source: `<Namespace.DeepNamespace.Component />;
+`,
     filename: 'input.jsx',
     modes: [
       {
@@ -823,20 +1424,22 @@ export const fixtureCases = [
         options: {
           jsx: 'classic',
         },
-        output: expectedOutputs[59],
+        output: '/* @__PURE__ */ React.createElement(Namespace.DeepNamespace.Component, null);',
       },
       {
         title: 'automatic',
         options: {
           jsx: 'automatic',
         },
-        output: expectedOutputs[60],
+        output: `var _reactJsxRuntime = require('react/jsx-runtime');
+/* @__PURE__ */ _reactJsxRuntime.jsx(Namespace.DeepNamespace.Component, {});`,
       },
     ],
   },
   {
     title: 'react automatic — should allow elements as attributes (input)',
-    source: '<div attr=<div /> />\n',
+    source: `<div attr=<div /> />
+`,
     filename: 'input.jsx',
     modes: [
       {
@@ -844,20 +1447,26 @@ export const fixtureCases = [
         options: {
           jsx: 'classic',
         },
-        output: expectedOutputs[61],
+        output: `/* @__PURE__ */ React.createElement('div', {
+  attr: /* @__PURE__ */ React.createElement('div', null),
+});`,
       },
       {
         title: 'automatic',
         options: {
           jsx: 'automatic',
         },
-        output: expectedOutputs[62],
+        output: `var _reactJsxRuntime = require('react/jsx-runtime');
+/* @__PURE__ */ _reactJsxRuntime.jsx('div', {
+  attr: /* @__PURE__ */ _reactJsxRuntime.jsx('div', {}),
+});`,
       },
     ],
   },
   {
     title: 'react automatic — should allow js namespacing (input)',
-    source: '<Namespace.Component />;\n',
+    source: `<Namespace.Component />;
+`,
     filename: 'input.jsx',
     modes: [
       {
@@ -865,21 +1474,33 @@ export const fixtureCases = [
         options: {
           jsx: 'classic',
         },
-        output: expectedOutputs[63],
+        output: '/* @__PURE__ */ React.createElement(Namespace.Component, null);',
       },
       {
         title: 'automatic',
         options: {
           jsx: 'automatic',
         },
-        output: expectedOutputs[64],
+        output: `var _reactJsxRuntime = require('react/jsx-runtime');
+/* @__PURE__ */ _reactJsxRuntime.jsx(Namespace.Component, {});`,
       },
     ],
   },
   {
     title: 'react automatic — should allow nested fragments (input)',
-    source:
-      '<div>\n  <  >\n    <>\n      <span>Hello</span>\n      <span>world</span>\n    </>\n    <>\n      <span>Goodbye</span>\n      <span>world</span>\n    </>\n  </>\n</div>\n',
+    source: `<div>
+  <  >
+    <>
+      <span>Hello</span>
+      <span>world</span>
+    </>
+    <>
+      <span>Goodbye</span>
+      <span>world</span>
+    </>
+  </>
+</div>
+`,
     filename: 'input.jsx',
     modes: [
       {
@@ -887,21 +1508,72 @@ export const fixtureCases = [
         options: {
           jsx: 'classic',
         },
-        output: expectedOutputs[65],
+        output: `/* @__PURE__ */ React.createElement(
+  'div',
+  null,
+  /* @__PURE__ */ React.createElement(
+    React.Fragment,
+    null,
+    /* @__PURE__ */ React.createElement(
+      React.Fragment,
+      null,
+      /* @__PURE__ */ React.createElement('span', null, 'Hello'),
+      /* @__PURE__ */ React.createElement('span', null, 'world'),
+    ),
+    /* @__PURE__ */ React.createElement(
+      React.Fragment,
+      null,
+      /* @__PURE__ */ React.createElement('span', null, 'Goodbye'),
+      /* @__PURE__ */ React.createElement('span', null, 'world'),
+    ),
+  ),
+);`,
       },
       {
         title: 'automatic',
         options: {
           jsx: 'automatic',
         },
-        output: expectedOutputs[66],
+        output: `var _reactJsxRuntime = require('react/jsx-runtime');
+/* @__PURE__ */ _reactJsxRuntime.jsx('div', {
+  children: /* @__PURE__ */ _reactJsxRuntime.jsxs(_reactJsxRuntime.Fragment, {
+    children: [
+      /* @__PURE__ */ _reactJsxRuntime.jsxs(_reactJsxRuntime.Fragment, {
+        children: [
+          /* @__PURE__ */ _reactJsxRuntime.jsx('span', { children: 'Hello' }),
+          /* @__PURE__ */ _reactJsxRuntime.jsx('span', { children: 'world' }),
+        ],
+      }),
+      /* @__PURE__ */ _reactJsxRuntime.jsxs(_reactJsxRuntime.Fragment, {
+        children: [
+          /* @__PURE__ */ _reactJsxRuntime.jsx('span', { children: 'Goodbye' }),
+          /* @__PURE__ */ _reactJsxRuntime.jsx('span', { children: 'world' }),
+        ],
+      }),
+    ],
+  }),
+});`,
       },
     ],
   },
   {
     title: 'react automatic — should avoid wrapping in extra parens if not needed (input)',
-    source:
-      'var x = <div>\n  <Component />\n</div>;\n\nvar x = <div>\n  {props.children}\n</div>;\n\nvar x = <Composite>\n  {props.children}\n</Composite>;\n\nvar x = <Composite>\n  <Composite2 />\n</Composite>;\n',
+    source: `var x = <div>
+  <Component />
+</div>;
+
+var x = <div>
+  {props.children}
+</div>;
+
+var x = <Composite>
+  {props.children}
+</Composite>;
+
+var x = <Composite>
+  <Composite2 />
+</Composite>;
+`,
     filename: 'input.jsx',
     modes: [
       {
@@ -909,20 +1581,40 @@ export const fixtureCases = [
         options: {
           jsx: 'classic',
         },
-        output: expectedOutputs[67],
+        output: `var x = /* @__PURE__ */ React.createElement(
+  'div',
+  null,
+  /* @__PURE__ */ React.createElement(Component, null),
+);
+var x = /* @__PURE__ */ React.createElement('div', null, props.children);
+var x = /* @__PURE__ */ React.createElement(Composite, null, props.children);
+var x = /* @__PURE__ */ React.createElement(
+  Composite,
+  null,
+  /* @__PURE__ */ React.createElement(Composite2, null),
+);`,
       },
       {
         title: 'automatic',
         options: {
           jsx: 'automatic',
         },
-        output: expectedOutputs[68],
+        output: `var _reactJsxRuntime = require('react/jsx-runtime');
+var x = /* @__PURE__ */ _reactJsxRuntime.jsx('div', {
+  children: /* @__PURE__ */ _reactJsxRuntime.jsx(Component, {}),
+});
+var x = /* @__PURE__ */ _reactJsxRuntime.jsx('div', { children: props.children });
+var x = /* @__PURE__ */ _reactJsxRuntime.jsx(Composite, { children: props.children });
+var x = /* @__PURE__ */ _reactJsxRuntime.jsx(Composite, {
+  children: /* @__PURE__ */ _reactJsxRuntime.jsx(Composite2, {}),
+});`,
       },
     ],
   },
   {
     title: 'react automatic — should convert simple tags (input)',
-    source: 'var x = <div></div>;\n',
+    source: `var x = <div></div>;
+`,
     filename: 'input.jsx',
     modes: [
       {
@@ -930,20 +1622,22 @@ export const fixtureCases = [
         options: {
           jsx: 'classic',
         },
-        output: expectedOutputs[69],
+        output: "var x = /* @__PURE__ */ React.createElement('div', null);",
       },
       {
         title: 'automatic',
         options: {
           jsx: 'automatic',
         },
-        output: expectedOutputs[70],
+        output: `var _reactJsxRuntime = require('react/jsx-runtime');
+var x = /* @__PURE__ */ _reactJsxRuntime.jsx('div', {});`,
       },
     ],
   },
   {
     title: 'react automatic — should convert simple text (input)',
-    source: 'var x = <div>text</div>;\n',
+    source: `var x = <div>text</div>;
+`,
     filename: 'input.jsx',
     modes: [
       {
@@ -951,20 +1645,22 @@ export const fixtureCases = [
         options: {
           jsx: 'classic',
         },
-        output: expectedOutputs[71],
+        output: "var x = /* @__PURE__ */ React.createElement('div', null, 'text');",
       },
       {
         title: 'automatic',
         options: {
           jsx: 'automatic',
         },
-        output: expectedOutputs[72],
+        output: `var _reactJsxRuntime = require('react/jsx-runtime');
+var x = /* @__PURE__ */ _reactJsxRuntime.jsx('div', { children: 'text' });`,
       },
     ],
   },
   {
     title: 'react automatic — should disallow spread children (input)',
-    source: '<div>{...children}</div>;\n',
+    source: `<div>{...children}</div>;
+`,
     filename: 'input.jsx',
     modes: [
       {
@@ -972,62 +1668,67 @@ export const fixtureCases = [
         options: {
           jsx: 'classic',
         },
-        output: expectedOutputs[73],
+        output: "/* @__PURE__ */ React.createElement('div', null, ...children);",
       },
       {
         title: 'automatic',
         options: {
           jsx: 'automatic',
         },
-        output: expectedOutputs[74],
+        output: `var _reactJsxRuntime = require('react/jsx-runtime');
+/* @__PURE__ */ _reactJsxRuntime.jsx('div', { children: [...children] });`,
       },
     ],
   },
   {
     title: 'react automatic — should disallow valueless key (input)',
-    source: '\nvar x = [<div key></div>];\n',
+    source: `
+var x = [<div key></div>];
+`,
     filename: 'input.jsx',
+    output: '[error] preflight:transform-error',
     modes: [
       {
         title: 'classic',
         options: {
           jsx: 'classic',
         },
-        output: expectedOutputs[75],
       },
       {
         title: 'automatic',
         options: {
           jsx: 'automatic',
         },
-        output: expectedOutputs[75],
       },
     ],
   },
   {
     title: 'react automatic — should disallow xml namespacing (input)',
-    source: '<Namespace:Component />;\n',
+    source: `<Namespace:Component />;
+`,
     filename: 'input.jsx',
+    output: '[error] preflight:transform-error',
     modes: [
       {
         title: 'classic',
         options: {
           jsx: 'classic',
         },
-        output: expectedOutputs[75],
       },
       {
         title: 'automatic',
         options: {
           jsx: 'automatic',
         },
-        output: expectedOutputs[75],
       },
     ],
   },
   {
     title: 'react automatic — should escape xhtml jsxattribute (input)',
-    source: '<div id="wôw" />;\n<div id="\\w" />;\n<div id="w &lt; w" />;\n',
+    source: `<div id="wôw" />;
+<div id="\\w" />;
+<div id="w &lt; w" />;
+`,
     filename: 'input.jsx',
     modes: [
       {
@@ -1035,21 +1736,37 @@ export const fixtureCases = [
         options: {
           jsx: 'classic',
         },
-        output: expectedOutputs[76],
+        output: `/* @__PURE__ */ React.createElement('div', { id: 'wôw' });
+/* @__PURE__ */ React.createElement('div', { id: '\\\\w' });
+/* @__PURE__ */ React.createElement('div', { id: 'w < w' });`,
       },
       {
         title: 'automatic',
         options: {
           jsx: 'automatic',
         },
-        output: expectedOutputs[77],
+        output: `var _reactJsxRuntime = require('react/jsx-runtime');
+/* @__PURE__ */ _reactJsxRuntime.jsx('div', { id: 'wôw' });
+/* @__PURE__ */ _reactJsxRuntime.jsx('div', { id: '\\\\w' });
+/* @__PURE__ */ _reactJsxRuntime.jsx('div', { id: 'w < w' });`,
       },
     ],
   },
   {
     title: 'react automatic — should escape xhtml jsxtext (input)',
-    source:
-      "<div>wow</div>;\n<div>wôw</div>;\n\n<div>w & w</div>;\n<div>w &amp; w</div>;\n\n<div>w &nbsp; w</div>;\n<div>this should not parse as unicode: \\u00a0</div>;\n<div>this should parse as nbsp:   </div>;\n<div>this should parse as unicode: {'\\u00a0 '}</div>;\n\n<div>w &lt; w</div>;\n",
+    source: `<div>wow</div>;
+<div>wôw</div>;
+
+<div>w & w</div>;
+<div>w &amp; w</div>;
+
+<div>w &nbsp; w</div>;
+<div>this should not parse as unicode: \\u00a0</div>;
+<div>this should parse as nbsp:   </div>;
+<div>this should parse as unicode: {'\\u00a0 '}</div>;
+
+<div>w &lt; w</div>;
+`,
     filename: 'input.jsx',
     modes: [
       {
@@ -1057,21 +1774,52 @@ export const fixtureCases = [
         options: {
           jsx: 'classic',
         },
-        output: expectedOutputs[78],
+        output: `/* @__PURE__ */ React.createElement('div', null, 'wow');
+/* @__PURE__ */ React.createElement('div', null, 'wôw');
+/* @__PURE__ */ React.createElement('div', null, 'w & w');
+/* @__PURE__ */ React.createElement('div', null, 'w & w');
+/* @__PURE__ */ React.createElement('div', null, 'w \\xA0 w');
+/* @__PURE__ */ React.createElement('div', null, 'this should not parse as unicode: \\\\u00a0');
+/* @__PURE__ */ React.createElement('div', null, 'this should parse as nbsp: \\xA0 ');
+/* @__PURE__ */ React.createElement('div', null, 'this should parse as unicode: ', '\\xA0\\xA0');
+/* @__PURE__ */ React.createElement('div', null, 'w < w');`,
       },
       {
         title: 'automatic',
         options: {
           jsx: 'automatic',
         },
-        output: expectedOutputs[79],
+        output: `var _reactJsxRuntime = require('react/jsx-runtime');
+/* @__PURE__ */ _reactJsxRuntime.jsx('div', { children: 'wow' });
+/* @__PURE__ */ _reactJsxRuntime.jsx('div', { children: 'wôw' });
+/* @__PURE__ */ _reactJsxRuntime.jsx('div', { children: 'w & w' });
+/* @__PURE__ */ _reactJsxRuntime.jsx('div', { children: 'w & w' });
+/* @__PURE__ */ _reactJsxRuntime.jsx('div', { children: 'w \\xA0 w' });
+/* @__PURE__ */ _reactJsxRuntime.jsx('div', {
+  children: 'this should not parse as unicode: \\\\u00a0',
+});
+/* @__PURE__ */ _reactJsxRuntime.jsx('div', { children: 'this should parse as nbsp: \\xA0 ' });
+/* @__PURE__ */ _reactJsxRuntime.jsxs('div', {
+  children: ['this should parse as unicode: ', '\\xA0\\xA0'],
+});
+/* @__PURE__ */ _reactJsxRuntime.jsx('div', { children: 'w < w' });`,
       },
     ],
   },
   {
     title: 'react automatic — should handle attributed elements (input)',
-    source:
-      'var HelloMessage = React.createClass({\n  render: function() {\n    return <div>Hello {this.props.name}</div>;\n  }\n});\n\nReact.render(<HelloMessage name={\n  <span>\n    Sebastian\n  </span>\n} />, mountNode);\n',
+    source: `var HelloMessage = React.createClass({
+  render: function() {
+    return <div>Hello {this.props.name}</div>;
+  }
+});
+
+React.render(<HelloMessage name={
+  <span>
+    Sebastian
+  </span>
+} />, mountNode);
+`,
     filename: 'input.jsx',
     modes: [
       {
@@ -1079,20 +1827,44 @@ export const fixtureCases = [
         options: {
           jsx: 'classic',
         },
-        output: expectedOutputs[80],
+        output: `var HelloMessage = React.createClass({
+  displayName: 'HelloMessage',
+  render: function () {
+    return /* @__PURE__ */ React.createElement('div', null, 'Hello ', this.props.name);
+  },
+});
+React.render(
+  /* @__PURE__ */ React.createElement(HelloMessage, {
+    name: /* @__PURE__ */ React.createElement('span', null, 'Sebastian'),
+  }),
+  mountNode,
+);`,
       },
       {
         title: 'automatic',
         options: {
           jsx: 'automatic',
         },
-        output: expectedOutputs[81],
+        output: `var _reactJsxRuntime = require('react/jsx-runtime');
+var HelloMessage = React.createClass({
+  displayName: 'HelloMessage',
+  render: function () {
+    return /* @__PURE__ */ _reactJsxRuntime.jsxs('div', { children: ['Hello ', this.props.name] });
+  },
+});
+React.render(
+  /* @__PURE__ */ _reactJsxRuntime.jsx(HelloMessage, {
+    name: /* @__PURE__ */ _reactJsxRuntime.jsx('span', { children: 'Sebastian' }),
+  }),
+  mountNode,
+);`,
       },
     ],
   },
   {
     title: 'react automatic — should handle has own property correctly (input)',
-    source: '<hasOwnProperty>testing</hasOwnProperty>;\n',
+    source: `<hasOwnProperty>testing</hasOwnProperty>;
+`,
     filename: 'input.jsx',
     modes: [
       {
@@ -1100,21 +1872,26 @@ export const fixtureCases = [
         options: {
           jsx: 'classic',
         },
-        output: expectedOutputs[82],
+        output: "/* @__PURE__ */ React.createElement('hasOwnProperty', null, 'testing');",
       },
       {
         title: 'automatic',
         options: {
           jsx: 'automatic',
         },
-        output: expectedOutputs[83],
+        output: `var _reactJsxRuntime = require('react/jsx-runtime');
+/* @__PURE__ */ _reactJsxRuntime.jsx('hasOwnProperty', { children: 'testing' });`,
       },
     ],
   },
   {
     title: 'react automatic — should have correct comma in nested children (input)',
-    source:
-      'var x = <div>\n  <div><br /></div>\n  <Component>{foo}<br />{bar}</Component>\n  <br />\n</div>;\n',
+    source: `var x = <div>
+  <div><br /></div>
+  <Component>{foo}<br />{bar}</Component>
+  <br />
+</div>;
+`,
     filename: 'input.jsx',
     modes: [
       {
@@ -1122,21 +1899,59 @@ export const fixtureCases = [
         options: {
           jsx: 'classic',
         },
-        output: expectedOutputs[84],
+        output: `var x = /* @__PURE__ */ React.createElement(
+  'div',
+  null,
+  /* @__PURE__ */ React.createElement('div', null, /* @__PURE__ */ React.createElement('br', null)),
+  /* @__PURE__ */ React.createElement(
+    Component,
+    null,
+    foo,
+    /* @__PURE__ */ React.createElement('br', null),
+    bar,
+  ),
+  /* @__PURE__ */ React.createElement('br', null),
+);`,
       },
       {
         title: 'automatic',
         options: {
           jsx: 'automatic',
         },
-        output: expectedOutputs[85],
+        output: `var _reactJsxRuntime = require('react/jsx-runtime');
+var x = /* @__PURE__ */ _reactJsxRuntime.jsxs('div', {
+  children: [
+    /* @__PURE__ */ _reactJsxRuntime.jsx('div', {
+      children: /* @__PURE__ */ _reactJsxRuntime.jsx('br', {}),
+    }),
+    /* @__PURE__ */ _reactJsxRuntime.jsxs(Component, {
+      children: [foo, /* @__PURE__ */ _reactJsxRuntime.jsx('br', {}), bar],
+    }),
+    /* @__PURE__ */ _reactJsxRuntime.jsx('br', {}),
+  ],
+});`,
       },
     ],
   },
   {
     title: 'react automatic — should insert commas after expressions before whitespace (input)',
-    source:
-      'var x =\n  <div\n    attr1={\n      "foo" + "bar"\n    }\n    attr2={\n      "foo" + "bar" +\n\n      "baz" + "bug"\n    }\n    attr3={\n      "foo" + "bar" +\n      "baz" + "bug"\n    }\n    attr4="baz">\n  </div>\n',
+    source: `var x =
+  <div
+    attr1={
+      "foo" + "bar"
+    }
+    attr2={
+      "foo" + "bar" +
+
+      "baz" + "bug"
+    }
+    attr3={
+      "foo" + "bar" +
+      "baz" + "bug"
+    }
+    attr4="baz">
+  </div>
+`,
     filename: 'input.jsx',
     modes: [
       {
@@ -1144,20 +1959,32 @@ export const fixtureCases = [
         options: {
           jsx: 'classic',
         },
-        output: expectedOutputs[86],
+        output: `var x = /* @__PURE__ */ React.createElement('div', {
+  attr1: 'foo' + 'bar',
+  attr2: 'foo' + 'bar' + 'baz' + 'bug',
+  attr3: 'foo' + 'bar' + 'baz' + 'bug',
+  attr4: 'baz',
+});`,
       },
       {
         title: 'automatic',
         options: {
           jsx: 'automatic',
         },
-        output: expectedOutputs[87],
+        output: `var _reactJsxRuntime = require('react/jsx-runtime');
+var x = /* @__PURE__ */ _reactJsxRuntime.jsx('div', {
+  attr1: 'foo' + 'bar',
+  attr2: 'foo' + 'bar' + 'baz' + 'bug',
+  attr3: 'foo' + 'bar' + 'baz' + 'bug',
+  attr4: 'baz',
+});`,
       },
     ],
   },
   {
     title: 'react automatic — should not add quotes to identifier names (input)',
-    source: 'var e = <F aaa new const var default foo-bar/>;\n',
+    source: `var e = <F aaa new const var default foo-bar/>;
+`,
     filename: 'input.jsx',
     modes: [
       {
@@ -1165,20 +1992,36 @@ export const fixtureCases = [
         options: {
           jsx: 'classic',
         },
-        output: expectedOutputs[88],
+        output: `var e = /* @__PURE__ */ React.createElement(F, {
+  aaa: true,
+  new: true,
+  const: true,
+  var: true,
+  default: true,
+  'foo-bar': true,
+});`,
       },
       {
         title: 'automatic',
         options: {
           jsx: 'automatic',
         },
-        output: expectedOutputs[89],
+        output: `var _reactJsxRuntime = require('react/jsx-runtime');
+var e = /* @__PURE__ */ _reactJsxRuntime.jsx(F, {
+  aaa: true,
+  new: true,
+  const: true,
+  var: true,
+  default: true,
+  'foo-bar': true,
+});`,
       },
     ],
   },
   {
     title: 'react automatic — should not mangle expressioncontainer attribute values (input)',
-    source: '<button data-value={"a value\\n  with\\nnewlines\\n   and spaces"}>Button</button>;\n',
+    source: `<button data-value={"a value\\n  with\\nnewlines\\n   and spaces"}>Button</button>;
+`,
     filename: 'input.jsx',
     modes: [
       {
@@ -1186,20 +2029,29 @@ export const fixtureCases = [
         options: {
           jsx: 'classic',
         },
-        output: expectedOutputs[90],
+        output: `/* @__PURE__ */ React.createElement(
+  'button',
+  { 'data-value': 'a value\\n  with\\nnewlines\\n   and spaces' },
+  'Button',
+);`,
       },
       {
         title: 'automatic',
         options: {
           jsx: 'automatic',
         },
-        output: expectedOutputs[91],
+        output: `var _reactJsxRuntime = require('react/jsx-runtime');
+/* @__PURE__ */ _reactJsxRuntime.jsx('button', {
+  'data-value': 'a value\\n  with\\nnewlines\\n   and spaces',
+  children: 'Button',
+});`,
       },
     ],
   },
   {
     title: 'react automatic — should not strip nbsp even coupled with other whitespace (input)',
-    source: '<div>&nbsp; </div>;\n',
+    source: `<div>&nbsp; </div>;
+`,
     filename: 'input.jsx',
     modes: [
       {
@@ -1207,20 +2059,22 @@ export const fixtureCases = [
         options: {
           jsx: 'classic',
         },
-        output: expectedOutputs[92],
+        output: "/* @__PURE__ */ React.createElement('div', null, '\\xA0 ');",
       },
       {
         title: 'automatic',
         options: {
           jsx: 'automatic',
         },
-        output: expectedOutputs[93],
+        output: `var _reactJsxRuntime = require('react/jsx-runtime');
+/* @__PURE__ */ _reactJsxRuntime.jsx('div', { children: '\\xA0 ' });`,
       },
     ],
   },
   {
     title: 'react automatic — should not strip tags with a single child of nbsp (input)',
-    source: '<div>&nbsp;</div>;\n',
+    source: `<div>&nbsp;</div>;
+`,
     filename: 'input.jsx',
     modes: [
       {
@@ -1228,21 +2082,31 @@ export const fixtureCases = [
         options: {
           jsx: 'classic',
         },
-        output: expectedOutputs[94],
+        output: "/* @__PURE__ */ React.createElement('div', null, '\\xA0');",
       },
       {
         title: 'automatic',
         options: {
           jsx: 'automatic',
         },
-        output: expectedOutputs[95],
+        output: `var _reactJsxRuntime = require('react/jsx-runtime');
+/* @__PURE__ */ _reactJsxRuntime.jsx('div', { children: '\\xA0' });`,
       },
     ],
   },
   {
     title: 'react automatic — should properly handle comments between props (input)',
-    source:
-      'var x = (\n  <div\n    /* a multi-line\n       comment */\n    attr1="foo">\n    <span // a double-slash comment\n      attr2="bar"\n    />\n  </div>\n);\n',
+    source: `var x = (
+  <div
+    /* a multi-line
+       comment */
+    attr1="foo">
+    <span // a double-slash comment
+      attr2="bar"
+    />
+  </div>
+);
+`,
     filename: 'input.jsx',
     modes: [
       {
@@ -1250,21 +2114,40 @@ export const fixtureCases = [
         options: {
           jsx: 'classic',
         },
-        output: expectedOutputs[96],
+        output: `var x = /* @__PURE__ */ React.createElement(
+  'div',
+  {
+    /* a multi-line
+comment */
+    attr1: 'foo',
+  },
+  /* @__PURE__ */ React.createElement('span', { attr2: 'bar' }),
+);`,
       },
       {
         title: 'automatic',
         options: {
           jsx: 'automatic',
         },
-        output: expectedOutputs[97],
+        output: `var _reactJsxRuntime = require('react/jsx-runtime');
+var x = /* @__PURE__ */ _reactJsxRuntime.jsx('div', {
+  /* a multi-line
+\tcomment */
+  attr1: 'foo',
+  children: /* @__PURE__ */ _reactJsxRuntime.jsx('span', { attr2: 'bar' }),
+});`,
       },
     ],
   },
   {
     title: 'react automatic — should properly handle keys (input)',
-    source:
-      'var x = (\n    <div>\n        <div key="1" />\n        <div key="2" meow="wolf" />\n        <div key="3" />\n    </div>\n);',
+    source: `var x = (
+    <div>
+        <div key="1" />
+        <div key="2" meow="wolf" />
+        <div key="3" />
+    </div>
+);`,
     filename: 'input.jsx',
     modes: [
       {
@@ -1272,20 +2155,38 @@ export const fixtureCases = [
         options: {
           jsx: 'classic',
         },
-        output: expectedOutputs[98],
+        output: `var x = /* @__PURE__ */ React.createElement(
+  'div',
+  null,
+  /* @__PURE__ */ React.createElement('div', { key: '1' }),
+  /* @__PURE__ */ React.createElement('div', {
+    key: '2',
+    meow: 'wolf',
+  }),
+  /* @__PURE__ */ React.createElement('div', { key: '3' }),
+);`,
       },
       {
         title: 'automatic',
         options: {
           jsx: 'automatic',
         },
-        output: expectedOutputs[99],
+        output: `var _reactJsxRuntime = require('react/jsx-runtime');
+var x = /* @__PURE__ */ _reactJsxRuntime.jsxs('div', {
+  children: [
+    /* @__PURE__ */ _reactJsxRuntime.jsx('div', {}, '1'),
+    /* @__PURE__ */ _reactJsxRuntime.jsx('div', { meow: 'wolf' }, '2'),
+    /* @__PURE__ */ _reactJsxRuntime.jsx('div', {}, '3'),
+  ],
+});`,
       },
     ],
   },
   {
     title: 'react automatic — should properly handle null prop spread (input)',
-    source: 'var foo = null;\nvar x = <div {...foo} />;\n',
+    source: `var foo = null;
+var x = <div {...foo} />;
+`,
     filename: 'input.jsx',
     modes: [
       {
@@ -1293,20 +2194,24 @@ export const fixtureCases = [
         options: {
           jsx: 'classic',
         },
-        output: expectedOutputs[100],
+        output: `var foo = null;
+var x = /* @__PURE__ */ React.createElement('div', foo);`,
       },
       {
         title: 'automatic',
         options: {
           jsx: 'automatic',
         },
-        output: expectedOutputs[101],
+        output: `var _reactJsxRuntime = require('react/jsx-runtime');
+var foo = null;
+var x = /* @__PURE__ */ _reactJsxRuntime.jsx('div', { ...foo });`,
       },
     ],
   },
   {
     title: 'react automatic — should quote jsx attributes (input)',
-    source: "<button data-value='a value'>Button</button>;\n",
+    source: `<button data-value='a value'>Button</button>;
+`,
     filename: 'input.jsx',
     modes: [
       {
@@ -1314,20 +2219,26 @@ export const fixtureCases = [
         options: {
           jsx: 'classic',
         },
-        output: expectedOutputs[102],
+        output:
+          "/* @__PURE__ */ React.createElement('button', { 'data-value': 'a value' }, 'Button');",
       },
       {
         title: 'automatic',
         options: {
           jsx: 'automatic',
         },
-        output: expectedOutputs[103],
+        output: `var _reactJsxRuntime = require('react/jsx-runtime');
+/* @__PURE__ */ _reactJsxRuntime.jsx('button', {
+  'data-value': 'a value',
+  children: 'Button',
+});`,
       },
     ],
   },
   {
     title: 'react automatic — should support xml namespaces if flag (input)',
-    source: '<f:image n:attr />;\n',
+    source: `<f:image n:attr />;
+`,
     filename: 'input.jsx',
     modes: [
       {
@@ -1336,7 +2247,7 @@ export const fixtureCases = [
           jsx: 'classic',
           jsxThrowIfNamespace: false,
         },
-        output: expectedOutputs[104],
+        output: "/* @__PURE__ */ React.createElement('f:image', { 'n:attr': true });",
       },
       {
         title: 'automatic',
@@ -1344,34 +2255,36 @@ export const fixtureCases = [
           jsx: 'automatic',
           jsxThrowIfNamespace: false,
         },
-        output: expectedOutputs[105],
+        output: `var _reactJsxRuntime = require('react/jsx-runtime');
+/* @__PURE__ */ _reactJsxRuntime.jsx('f:image', { 'n:attr': true });`,
       },
     ],
   },
   {
     title: 'react automatic — should throw error namespaces if not flag (input)',
-    source: '<f:image />;\n',
+    source: `<f:image />;
+`,
     filename: 'input.jsx',
+    output: '[error] preflight:transform-error',
     modes: [
       {
         title: 'classic',
         options: {
           jsx: 'classic',
         },
-        output: expectedOutputs[75],
       },
       {
         title: 'automatic',
         options: {
           jsx: 'automatic',
         },
-        output: expectedOutputs[75],
       },
     ],
   },
   {
     title: 'react automatic — should throw when filter is specified (input)',
-    source: '<></>\n',
+    source: `<></>
+`,
     filename: 'input.jsx',
     modes: [
       {
@@ -1379,20 +2292,22 @@ export const fixtureCases = [
         options: {
           jsx: 'classic',
         },
-        output: expectedOutputs[106],
+        output: '/* @__PURE__ */ React.createElement(React.Fragment, null);',
       },
       {
         title: 'automatic',
         options: {
           jsx: 'automatic',
         },
-        output: expectedOutputs[107],
+        output: `var _reactJsxRuntime = require('react/jsx-runtime');
+/* @__PURE__ */ _reactJsxRuntime.jsx(_reactJsxRuntime.Fragment, {});`,
       },
     ],
   },
   {
     title: 'react automatic — should transform known hyphenated tags (input)',
-    source: '<font-face />;\n',
+    source: `<font-face />;
+`,
     filename: 'input.jsx',
     modes: [
       {
@@ -1400,20 +2315,23 @@ export const fixtureCases = [
         options: {
           jsx: 'classic',
         },
-        output: expectedOutputs[108],
+        output: "/* @__PURE__ */ React.createElement('font-face', null);",
       },
       {
         title: 'automatic',
         options: {
           jsx: 'automatic',
         },
-        output: expectedOutputs[109],
+        output: `var _reactJsxRuntime = require('react/jsx-runtime');
+/* @__PURE__ */ _reactJsxRuntime.jsx('font-face', {});`,
       },
     ],
   },
   {
     title: 'react automatic — should use createElement when key comes after spread (input)',
-    source: 'var x = (\n    <div {...props} key="1" foo="bar" />\n);',
+    source: `var x = (
+    <div {...props} key="1" foo="bar" />
+);`,
     filename: 'input.jsx',
     modes: [
       {
@@ -1421,20 +2339,47 @@ export const fixtureCases = [
         options: {
           jsx: 'classic',
         },
-        output: expectedOutputs[110],
+        output: `function _extends() {
+  return (
+    (_extends = Object.assign
+      ? Object.assign.bind()
+      : function (n) {
+          for (var e = 1; e < arguments.length; e++) {
+            var t = arguments[e];
+            for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]);
+          }
+          return n;
+        }),
+    _extends.apply(null, arguments)
+  );
+}
+var x = /* @__PURE__ */ React.createElement(
+  'div',
+  _extends({}, props, {
+    key: '1',
+    foo: 'bar',
+  }),
+);`,
       },
       {
         title: 'automatic',
         options: {
           jsx: 'automatic',
         },
-        output: expectedOutputs[111],
+        output: `var _react = require('react');
+var x = /* @__PURE__ */ _react.createElement('div', {
+  ...props,
+  key: '1',
+  foo: 'bar',
+});`,
       },
     ],
   },
   {
     title: 'react automatic — should use jsx when key comes before spread (input)',
-    source: 'var x = (\n    <div key="1" {...props} foo="bar" />\n);',
+    source: `var x = (
+    <div key="1" {...props} foo="bar" />
+);`,
     filename: 'input.jsx',
     modes: [
       {
@@ -1442,20 +2387,43 @@ export const fixtureCases = [
         options: {
           jsx: 'classic',
         },
-        output: expectedOutputs[112],
+        output: `function _extends() {
+  return (
+    (_extends = Object.assign
+      ? Object.assign.bind()
+      : function (n) {
+          for (var e = 1; e < arguments.length; e++) {
+            var t = arguments[e];
+            for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]);
+          }
+          return n;
+        }),
+    _extends.apply(null, arguments)
+  );
+}
+var x = /* @__PURE__ */ React.createElement('div', _extends({ key: '1' }, props, { foo: 'bar' }));`,
       },
       {
         title: 'automatic',
         options: {
           jsx: 'automatic',
         },
-        output: expectedOutputs[113],
+        output: `var _reactJsxRuntime = require('react/jsx-runtime');
+var x = /* @__PURE__ */ _reactJsxRuntime.jsx(
+  'div',
+  {
+    ...props,
+    foo: 'bar',
+  },
+  '1',
+);`,
       },
     ],
   },
   {
     title: 'react automatic — this tag name (input)',
-    source: 'var div = <this.foo>test</this.foo>;\n',
+    source: `var div = <this.foo>test</this.foo>;
+`,
     filename: 'input.jsx',
     modes: [
       {
@@ -1463,21 +2431,26 @@ export const fixtureCases = [
         options: {
           jsx: 'classic',
         },
-        output: expectedOutputs[114],
+        output: "var div = /* @__PURE__ */ React.createElement(this.foo, null, 'test');",
       },
       {
         title: 'automatic',
         options: {
           jsx: 'automatic',
         },
-        output: expectedOutputs[115],
+        output: `var _reactJsxRuntime = require('react/jsx-runtime');
+var div = /* @__PURE__ */ _reactJsxRuntime.jsx(this.foo, { children: 'test' });`,
       },
     ],
   },
   {
     title: 'react automatic — weird symbols (input)',
-    source:
-      'class MobileHomeActivityTaskPriorityIcon extends React.PureComponent {\n  render() {\n    return <Text>&nbsp;{this.props.value}&nbsp;</Text>;\n  }\n}\n',
+    source: `class MobileHomeActivityTaskPriorityIcon extends React.PureComponent {
+  render() {
+    return <Text>&nbsp;{this.props.value}&nbsp;</Text>;
+  }
+}
+`,
     filename: 'input.jsx',
     modes: [
       {
@@ -1485,20 +2458,32 @@ export const fixtureCases = [
         options: {
           jsx: 'classic',
         },
-        output: expectedOutputs[116],
+        output: `class MobileHomeActivityTaskPriorityIcon extends React.PureComponent {
+  render() {
+    return /* @__PURE__ */ React.createElement(Text, null, '\\xA0', this.props.value, '\\xA0');
+  }
+}`,
       },
       {
         title: 'automatic',
         options: {
           jsx: 'automatic',
         },
-        output: expectedOutputs[117],
+        output: `var _reactJsxRuntime = require('react/jsx-runtime');
+class MobileHomeActivityTaskPriorityIcon extends React.PureComponent {
+  render() {
+    return /* @__PURE__ */ _reactJsxRuntime.jsxs(Text, {
+      children: ['\\xA0', this.props.value, '\\xA0'],
+    });
+  }
+}`,
       },
     ],
   },
   {
     title: 'react automatic — wraps props in react spread for last spread attributes (input)',
-    source: '<Component y={2} z { ... x } />\n',
+    source: `<Component y={2} z { ... x } />
+`,
     filename: 'input.jsx',
     modes: [
       {
@@ -1506,20 +2491,49 @@ export const fixtureCases = [
         options: {
           jsx: 'classic',
         },
-        output: expectedOutputs[118],
+        output: `function _extends() {
+  return (
+    (_extends = Object.assign
+      ? Object.assign.bind()
+      : function (n) {
+          for (var e = 1; e < arguments.length; e++) {
+            var t = arguments[e];
+            for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]);
+          }
+          return n;
+        }),
+    _extends.apply(null, arguments)
+  );
+}
+/* @__PURE__ */ React.createElement(
+  Component,
+  _extends(
+    {
+      y: 2,
+      z: true,
+    },
+    x,
+  ),
+);`,
       },
       {
         title: 'automatic',
         options: {
           jsx: 'automatic',
         },
-        output: expectedOutputs[119],
+        output: `var _reactJsxRuntime = require('react/jsx-runtime');
+/* @__PURE__ */ _reactJsxRuntime.jsx(Component, {
+  y: 2,
+  z: true,
+  ...x,
+});`,
       },
     ],
   },
   {
     title: 'react automatic — wraps props in react spread for middle spread attributes (input)',
-    source: '<Component y={2} { ... x } z />\n',
+    source: `<Component y={2} { ... x } z />
+`,
     filename: 'input.jsx',
     modes: [
       {
@@ -1527,21 +2541,46 @@ export const fixtureCases = [
         options: {
           jsx: 'classic',
         },
-        output: expectedOutputs[120],
+        output: `function _extends() {
+  return (
+    (_extends = Object.assign
+      ? Object.assign.bind()
+      : function (n) {
+          for (var e = 1; e < arguments.length; e++) {
+            var t = arguments[e];
+            for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]);
+          }
+          return n;
+        }),
+    _extends.apply(null, arguments)
+  );
+}
+/* @__PURE__ */ React.createElement(Component, _extends({ y: 2 }, x, { z: true }));`,
       },
       {
         title: 'automatic',
         options: {
           jsx: 'automatic',
         },
-        output: expectedOutputs[121],
+        output: `var _reactJsxRuntime = require('react/jsx-runtime');
+/* @__PURE__ */ _reactJsxRuntime.jsx(Component, {
+  y: 2,
+  ...x,
+  z: true,
+});`,
       },
     ],
   },
   {
     title: 'react — honor custom jsx comment if jsx pragma option set (input)',
-    source:
-      '/** @jsx dom */\n\n<Foo></Foo>;\n\nvar profile = <div>\n  <img src="avatar.png" className="profile" />\n  <h3>{[user.firstName, user.lastName].join(" ")}</h3>\n</div>;',
+    source: `/** @jsx dom */
+
+<Foo></Foo>;
+
+var profile = <div>
+  <img src="avatar.png" className="profile" />
+  <h3>{[user.firstName, user.lastName].join(" ")}</h3>
+</div>;`,
     filename: 'input.jsx',
     modes: [
       {
@@ -1549,20 +2588,31 @@ export const fixtureCases = [
         options: {
           jsx: 'classic',
         },
-        output: expectedOutputs[122],
+        output: `/** @jsx dom */
+/* @__PURE__ */ dom(Foo, null);
+var profile = /* @__PURE__ */ dom(
+  'div',
+  null,
+  /* @__PURE__ */ dom('img', {
+    src: 'avatar.png',
+    className: 'profile',
+  }),
+  /* @__PURE__ */ dom('h3', null, [user.firstName, user.lastName].join(' ')),
+);`,
       },
       {
         title: 'automatic',
         options: {
           jsx: 'automatic',
         },
-        output: expectedOutputs[123],
+        output: '[error] preflight:transform-error',
       },
     ],
   },
   {
     title: 'react — proto in jsx attribute (input)',
-    source: '<p __proto__={null} class="bar">text</p>;\n',
+    source: `<p __proto__={null} class="bar">text</p>;
+`,
     filename: 'input.jsx',
     modes: [
       {
@@ -1570,20 +2620,36 @@ export const fixtureCases = [
         options: {
           jsx: 'classic',
         },
-        output: expectedOutputs[124],
+        output: `/* @__PURE__ */ React.createElement(
+  'p',
+  {
+    __proto__: null,
+    class: 'bar',
+  },
+  'text',
+);`,
       },
       {
         title: 'automatic',
         options: {
           jsx: 'automatic',
         },
-        output: expectedOutputs[125],
+        output: `var _reactJsxRuntime = require('react/jsx-runtime');
+/* @__PURE__ */ _reactJsxRuntime.jsx('p', {
+  __proto__: null,
+  class: 'bar',
+  children: 'text',
+});`,
       },
     ],
   },
   {
     title: 'react — should allow jsx docs comment with pragma (input)',
-    source: '/**\n * @jsx jsx\n */\n\n<foo />',
+    source: `/**
+ * @jsx jsx
+ */
+
+<foo />`,
     filename: 'input.jsx',
     modes: [
       {
@@ -1591,20 +2657,26 @@ export const fixtureCases = [
         options: {
           jsx: 'classic',
         },
-        output: expectedOutputs[126],
+        output: `/**
+ * @jsx jsx
+ */
+/* @__PURE__ */ jsx('foo', null);`,
       },
       {
         title: 'automatic',
         options: {
           jsx: 'automatic',
         },
-        output: expectedOutputs[127],
+        output: '[error] preflight:transform-error',
       },
     ],
   },
   {
     title: 'react — should allow no pragmafrag if frag unused (input)',
-    source: '/** @jsx dom */\n\n<div>no fragment is used</div>\n',
+    source: `/** @jsx dom */
+
+<div>no fragment is used</div>
+`,
     filename: 'input.jsx',
     modes: [
       {
@@ -1612,21 +2684,23 @@ export const fixtureCases = [
         options: {
           jsx: 'classic',
         },
-        output: expectedOutputs[128],
+        output: `/** @jsx dom */
+/* @__PURE__ */ dom('div', null, 'no fragment is used');`,
       },
       {
         title: 'automatic',
         options: {
           jsx: 'automatic',
         },
-        output: expectedOutputs[129],
+        output: '[error] preflight:transform-error',
       },
     ],
   },
   {
     title: 'react — should not allow jsx pragma to be anywhere in comment (input)',
-    source:
-      '// Make sure not to use a jsx pragma here (like "@jsx Something"), we need this to be React.createElement!\n<blah/>\n',
+    source: `// Make sure not to use a jsx pragma here (like "@jsx Something"), we need this to be React.createElement!
+<blah/>
+`,
     filename: 'input.jsx',
     modes: [
       {
@@ -1634,20 +2708,25 @@ export const fixtureCases = [
         options: {
           jsx: 'classic',
         },
-        output: expectedOutputs[130],
+        output: `// Make sure not to use a jsx pragma here (like "@jsx Something"), we need this to be React.createElement!
+/* @__PURE__ */ React.createElement('blah', null);`,
       },
       {
         title: 'automatic',
         options: {
           jsx: 'automatic',
         },
-        output: expectedOutputs[131],
+        output: `var _reactJsxRuntime = require('react/jsx-runtime');
+// Make sure not to use a jsx pragma here (like "@jsx Something"), we need this to be React.createElement!
+/* @__PURE__ */ _reactJsxRuntime.jsx('blah', {});`,
       },
     ],
   },
   {
     title: 'react — wraps props in react spread for first spread attributes (input)',
-    source: '<Component { ... x } y\n={2 } z />\n',
+    source: `<Component { ... x } y
+={2 } z />
+`,
     filename: 'input.jsx',
     modes: [
       {
@@ -1655,41 +2734,69 @@ export const fixtureCases = [
         options: {
           jsx: 'classic',
         },
-        output: expectedOutputs[132],
+        output: `function _extends() {
+  return (
+    (_extends = Object.assign
+      ? Object.assign.bind()
+      : function (n) {
+          for (var e = 1; e < arguments.length; e++) {
+            var t = arguments[e];
+            for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]);
+          }
+          return n;
+        }),
+    _extends.apply(null, arguments)
+  );
+}
+/* @__PURE__ */ React.createElement(
+  Component,
+  _extends({}, x, {
+    y: 2,
+    z: true,
+  }),
+);`,
       },
       {
         title: 'automatic',
         options: {
           jsx: 'automatic',
         },
-        output: expectedOutputs[133],
+        output: `var _reactJsxRuntime = require('react/jsx-runtime');
+/* @__PURE__ */ _reactJsxRuntime.jsx(Component, {
+  ...x,
+  y: 2,
+  z: true,
+});`,
       },
     ],
   },
   {
     title: 'regression — issue 12478 automatic (input)',
-    source: 'const foo = 2;\n',
+    source: `const foo = 2;
+`,
     filename: 'input.jsx',
+    output: 'const foo = 2;',
     modes: [
       {
         title: 'classic',
         options: {
           jsx: 'classic',
         },
-        output: expectedOutputs[134],
       },
       {
         title: 'automatic',
         options: {
           jsx: 'automatic',
         },
-        output: expectedOutputs[134],
       },
     ],
   },
   {
     title: 'regression — pragma frag set default classic runtime (input)',
-    source: '/* @jsxFrag React.Fragment */\n/* @jsx h */\n<>Test</>;\n',
+    source: `/* @jsxFrag React.Fragment */
+/* @jsx h */
+<>Test</>;
+`,
     filename: 'input.jsx',
     modes: [
       {
@@ -1697,21 +2804,33 @@ export const fixtureCases = [
         options: {
           jsx: 'classic',
         },
-        output: expectedOutputs[135],
+        output: `/* @jsxFrag React.Fragment */
+/* @jsx h */
+/* @__PURE__ */ h(React.Fragment, null, 'Test');`,
       },
       {
         title: 'automatic',
         options: {
           jsx: 'automatic',
         },
-        output: expectedOutputs[136],
+        output: '[error] preflight:transform-error',
       },
     ],
   },
   {
     title: 'sourcemaps — JSXText (input)',
-    source:
-      'import React from \'react\';\n\nexport default function App() {\n  return (\n    <div className="App">\n      <h1>Welcome to my application!</h1>\n      This is my app!\n      <strong>MINE.</strong>\n    </div>\n  )\n}\n',
+    source: `import React from 'react';
+
+export default function App() {
+  return (
+    <div className="App">
+      <h1>Welcome to my application!</h1>
+      This is my app!
+      <strong>MINE.</strong>
+    </div>
+  )
+}
+`,
     filename: 'input.jsx',
     modes: [
       {
@@ -1719,14 +2838,34 @@ export const fixtureCases = [
         options: {
           jsx: 'classic',
         },
-        output: expectedOutputs[137],
+        output: `import React from 'react';
+export default function App() {
+  return /* @__PURE__ */ React.createElement(
+    'div',
+    { className: 'App' },
+    /* @__PURE__ */ React.createElement('h1', null, 'Welcome to my application!'),
+    'This is my app!',
+    /* @__PURE__ */ React.createElement('strong', null, 'MINE.'),
+  );
+}`,
       },
       {
         title: 'automatic',
         options: {
           jsx: 'automatic',
         },
-        output: expectedOutputs[138],
+        output: `import React from 'react';
+import { jsx as _jsx, jsxs as _jsxs } from 'react/jsx-runtime';
+export default function App() {
+  return /* @__PURE__ */ _jsxs('div', {
+    className: 'App',
+    children: [
+      /* @__PURE__ */ _jsx('h1', { children: 'Welcome to my application!' }),
+      'This is my app!',
+      /* @__PURE__ */ _jsx('strong', { children: 'MINE.' }),
+    ],
+  });
+}`,
       },
     ],
   },

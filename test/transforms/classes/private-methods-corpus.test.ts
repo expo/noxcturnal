@@ -12,391 +12,4758 @@ export const corpusConfig = {
       privateMethods: true,
     },
   },
-  assertionKind: 'transform snapshot',
-  sourceIndentation: 6,
 } as const satisfies CorpusConfig;
 
 export const cases = [
-  [
-    'private instance methods > private method can be called from constructor',
-    '() => {\n  class Foo {\n    #bar() {\n      return 42;\n    }\n    constructor() {\n      this.result = this.#bar();\n    }\n  }\n  const foo = new Foo();\n  expect(foo.result).toBe(42);\n}',
-    "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\n() => {\n  let Foo = (() => {\n    'use strict';\n    var _bar = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_bar');\n    var _privateMethod = function () {\n      if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      return 42;\n    };\n    function _initialize() {\n      Object.defineProperty(this, _bar, { value: _privateMethod });\n    }\n    const Foo = function Foo() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n      _initialize.call(this);\n      this.result = _classPrivateFieldLooseBase(this, _bar)[_bar]();\n    };\n    Object.defineProperty(Foo, 'prototype', { writable: false });\n    return Foo;\n  })();\n  const foo = new Foo();\n  expect(foo.result).toBe(42);\n};",
-  ],
-  [
-    'private instance methods > private method preserves this context',
-    "() => {\n  class Foo {\n    #name = 'foo';\n    #bar() {\n      return this.#name;\n    }\n    test() {\n      return this.#bar();\n    }\n  }\n  const foo = new Foo();\n  expect(foo.test()).toBe('foo');\n}",
-    "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\n() => {\n  let Foo = (() => {\n    'use strict';\n    var _name = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_name');\n    var _bar = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_bar');\n    var _privateMethod17 = function () {\n      if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      return _classPrivateFieldLooseBase(this, _name)[_name];\n    };\n    function _initialize() {\n      Object.defineProperty(this, _bar, { value: _privateMethod17 });\n      Object.defineProperty(this, _name, {\n        writable: true,\n        value: 'foo',\n      });\n    }\n    const Foo = function Foo() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n      _initialize.call(this);\n    };\n    Object.defineProperty(Foo.prototype, 'test', {\n      value: Object.defineProperty(\n        function () {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          return _classPrivateFieldLooseBase(this, _bar)[_bar]();\n        },\n        'name',\n        {\n          value: 'test',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(Foo, 'prototype', { writable: false });\n    return Foo;\n  })();\n  const foo = new Foo();\n  expect(foo.test()).toBe('foo');\n};",
-  ],
-  [
-    'private instance methods > private method called with different this via call/apply',
-    '() => {\n  class Foo {\n    x = 1;\n    #bar() {\n      return this.x;\n    }\n    getBar() {\n      return this.#bar;\n    }\n  }\n  const foo = new Foo();\n  const bar = foo.getBar();\n  // Private method extracted — calling with original receiver\n  expect(bar.call(foo)).toBe(1);\n}',
-    "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\n() => {\n  let Foo = (() => {\n    'use strict';\n    var _bar = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_bar');\n    var _privateMethod = function () {\n      if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      return this.x;\n    };\n    function _initialize() {\n      Object.defineProperty(this, _bar, { value: _privateMethod });\n      this.x = 1;\n    }\n    const Foo = function Foo() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n      _initialize.call(this);\n    };\n    Object.defineProperty(Foo.prototype, 'getBar', {\n      value: Object.defineProperty(\n        function () {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          return _classPrivateFieldLooseBase(this, _bar)[_bar];\n        },\n        'name',\n        {\n          value: 'getBar',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(Foo, 'prototype', { writable: false });\n    return Foo;\n  })();\n  const foo = new Foo();\n  const bar = foo.getBar();\n  // Private method extracted — calling with original receiver\n  expect(bar.call(foo)).toBe(1);\n};",
-  ],
-  [
-    'private instance methods > exfiltrated private method has stable identity',
-    "() => {\n  class Foo {\n    #bar() {\n      return 'bar';\n    }\n    getBar() {\n      return this.#bar;\n    }\n  }\n  const foo = new Foo();\n  expect(foo.getBar()).toBe(foo.getBar());\n}",
-    "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\n() => {\n  let Foo = (() => {\n    'use strict';\n    var _bar = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_bar');\n    var _privateMethod = function () {\n      if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      return 'bar';\n    };\n    function _initialize() {\n      Object.defineProperty(this, _bar, { value: _privateMethod });\n    }\n    const Foo = function Foo() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n      _initialize.call(this);\n    };\n    Object.defineProperty(Foo.prototype, 'getBar', {\n      value: Object.defineProperty(\n        function () {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          return _classPrivateFieldLooseBase(this, _bar)[_bar];\n        },\n        'name',\n        {\n          value: 'getBar',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(Foo, 'prototype', { writable: false });\n    return Foo;\n  })();\n  const foo = new Foo();\n  expect(foo.getBar()).toBe(foo.getBar());\n};",
-  ],
-  [
-    'private instance methods > private method available during field initialization',
-    "() => {\n  class Foo {\n    #bar() {\n      return 'bar';\n    }\n    foo = this.#bar();\n  }\n  const foo = new Foo();\n  expect(foo.foo).toBe('bar');\n}",
-    "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\n() => {\n  let Foo = (() => {\n    'use strict';\n    var _bar = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_bar');\n    var _privateMethod = function () {\n      if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      return 'bar';\n    };\n    function _initialize() {\n      Object.defineProperty(this, _bar, { value: _privateMethod });\n      this.foo = _classPrivateFieldLooseBase(this, _bar)[_bar]();\n    }\n    const Foo = function Foo() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n      _initialize.call(this);\n    };\n    Object.defineProperty(Foo, 'prototype', { writable: false });\n    return Foo;\n  })();\n  const foo = new Foo();\n  expect(foo.foo).toBe('bar');\n};",
-  ],
-  [
-    'private instance methods > multiple private methods in same class',
-    "() => {\n  class Foo {\n    #bar() {\n      return 'bar';\n    }\n    #baz() {\n      return 'baz';\n    }\n    test() {\n      return this.#bar() + this.#baz();\n    }\n  }\n  const foo = new Foo();\n  expect(foo.test()).toBe('barbaz');\n}",
-    "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\n() => {\n  let Foo = (() => {\n    'use strict';\n    var _baz = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_baz');\n    var _bar = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_bar');\n    var _privateMethod17 = function () {\n      if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      return 'bar';\n    };\n    var _privateMethod = function () {\n      if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      return 'baz';\n    };\n    function _initialize() {\n      Object.defineProperty(this, _bar, { value: _privateMethod17 });\n      Object.defineProperty(this, _baz, { value: _privateMethod });\n    }\n    const Foo = function Foo() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n      _initialize.call(this);\n    };\n    Object.defineProperty(Foo.prototype, 'test', {\n      value: Object.defineProperty(\n        function () {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          return (\n            _classPrivateFieldLooseBase(this, _bar)[_bar]() +\n            _classPrivateFieldLooseBase(this, _baz)[_baz]()\n          );\n        },\n        'name',\n        {\n          value: 'test',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(Foo, 'prototype', { writable: false });\n    return Foo;\n  })();\n  const foo = new Foo();\n  expect(foo.test()).toBe('barbaz');\n};",
-  ],
-  [
-    'private instance methods > private method is read-only (assignment throws)',
-    '() => {\n    expect(() => {\n      class Foo {\n        #bar() {}\n        constructor() {\n          this.#bar = 1;\n        }\n      }\n      new Foo();\n    }).toThrow();\n  }',
-    "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\n() => {\n  expect(() => {\n    let Foo = (() => {\n      'use strict';\n      var _bar = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_bar');\n      var _privateMethod = function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      };\n      function _initialize() {\n        Object.defineProperty(this, _bar, { value: _privateMethod });\n      }\n      const Foo = function Foo() {\n        if (!new.target) throw new TypeError('Cannot call a class as a function');\n        _initialize.call(this);\n        _classPrivateFieldLooseBase(this, _bar)[_bar] = 1;\n      };\n      Object.defineProperty(Foo, 'prototype', { writable: false });\n      return Foo;\n    })();\n    new Foo();\n  }).toThrow();\n};",
-  ],
-  [
-    'private instance methods > private method compound assignment throws',
-    '() => {\n    expect(() => {\n      class Foo {\n        #bar() {}\n        constructor() {\n          this.#bar += 1;\n        }\n      }\n      new Foo();\n    }).toThrow();\n  }',
-    "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\n() => {\n  expect(() => {\n    let Foo = (() => {\n      'use strict';\n      var _bar = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_bar');\n      var _privateMethod = function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      };\n      function _initialize() {\n        Object.defineProperty(this, _bar, { value: _privateMethod });\n      }\n      const Foo = function Foo() {\n        if (!new.target) throw new TypeError('Cannot call a class as a function');\n        _initialize.call(this);\n        _classPrivateFieldLooseBase(this, _bar)[_bar] += 1;\n      };\n      Object.defineProperty(Foo, 'prototype', { writable: false });\n      return Foo;\n    })();\n    new Foo();\n  }).toThrow();\n};",
-  ],
-  [
-    'private instance methods > private method increment throws',
-    '() => {\n    expect(() => {\n      class Foo {\n        #bar() {}\n        constructor() {\n          this.#bar++;\n        }\n      }\n      new Foo();\n    }).toThrow();\n  }',
-    "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\n() => {\n  expect(() => {\n    let Foo = (() => {\n      'use strict';\n      var _bar = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_bar');\n      var _privateMethod = function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      };\n      function _initialize() {\n        Object.defineProperty(this, _bar, { value: _privateMethod });\n      }\n      const Foo = function Foo() {\n        if (!new.target) throw new TypeError('Cannot call a class as a function');\n        _initialize.call(this);\n        _classPrivateFieldLooseBase(this, _bar)[_bar]++;\n      };\n      Object.defineProperty(Foo, 'prototype', { writable: false });\n      return Foo;\n    })();\n    new Foo();\n  }).toThrow();\n};",
-  ],
-  [
-    'private instance methods > class name binding preserved inside private method',
-    '() => {\n  class Foo {\n    #bar() {\n      return Foo;\n    }\n    test() {\n      return this.#bar();\n    }\n  }\n  const foo = new Foo();\n  expect(foo.test()).toBe(Foo);\n}',
-    "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\n() => {\n  let Foo = (() => {\n    'use strict';\n    var _bar = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_bar');\n    var _privateMethod = function () {\n      if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      return Foo;\n    };\n    function _initialize() {\n      Object.defineProperty(this, _bar, { value: _privateMethod });\n    }\n    const Foo = function Foo() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n      _initialize.call(this);\n    };\n    Object.defineProperty(Foo.prototype, 'test', {\n      value: Object.defineProperty(\n        function () {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          return _classPrivateFieldLooseBase(this, _bar)[_bar]();\n        },\n        'name',\n        {\n          value: 'test',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(Foo, 'prototype', { writable: false });\n    return Foo;\n  })();\n  const foo = new Foo();\n  expect(foo.test()).toBe(Foo);\n};",
-  ],
-  [
-    'private instance methods > super method access from private method',
-    "() => {\n  class Base {\n    greet() {\n      return 'hello';\n    }\n  }\n  class Derived extends Base {\n    #bar() {\n      return super.greet();\n    }\n    test() {\n      return this.#bar();\n    }\n  }\n  const d = new Derived();\n  expect(d.test()).toBe('hello');\n}",
-    "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\nvar _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nvar _get2 = { get: require('@babel/runtime/helpers/get') };\nfunction _get(e, t, r) {\n  return _get2.get(e, t, r);\n}\n() => {\n  class Base {\n    greet() {\n      return 'hello';\n    }\n  }\n  let Derived = (__nox_super_107_273 => {\n    'use strict';\n    var _bar = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Derived_bar');\n    var _privateMethod = function () {\n      if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      return _get(Object.getPrototypeOf(Derived.prototype), 'greet', this).call(this);\n    };\n    function _initialize() {\n      Object.defineProperty(this, _bar, { value: _privateMethod });\n    }\n    const Derived = function Derived() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n      var _this = _construct(Object.getPrototypeOf(Derived), arguments, new.target || Derived);\n      (function () {\n        _initialize.call(this);\n      }).call(_this);\n      return _this;\n    };\n    if (__nox_super_107_273 !== null && typeof __nox_super_107_273 !== 'function')\n      throw new TypeError('Super expression must either be null or a function');\n    Derived.prototype = Object.create(__nox_super_107_273 && __nox_super_107_273.prototype, {\n      constructor: {\n        value: Derived,\n        writable: true,\n        configurable: true,\n      },\n    });\n    if (Object.setPrototypeOf) Object.setPrototypeOf(Derived, __nox_super_107_273);\n    else Derived.__proto__ = __nox_super_107_273;\n    Object.defineProperty(Derived.prototype, 'test', {\n      value: Object.defineProperty(\n        function () {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          return _classPrivateFieldLooseBase(this, _bar)[_bar]();\n        },\n        'name',\n        {\n          value: 'test',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(Derived, 'prototype', { writable: false });\n    return Derived;\n  })(Base);\n  const d = new Derived();\n  expect(d.test()).toBe('hello');\n};",
-  ],
-  [
-    'private instance methods > private method as tagged template',
-    "() => {\n  class Foo {\n    #tag(strings, ...values) {\n      return { strings: Array.from(strings), values };\n    }\n    test() {\n      return this.#tag`hello ${'world'}`;\n    }\n  }\n  const foo = new Foo();\n  const result = foo.test();\n  expect(result.strings).toEqual(['hello ', '']);\n  expect(result.values).toEqual(['world']);\n}",
-    "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\n() => {\n  let Foo = (() => {\n    'use strict';\n    var _tag = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_tag');\n    var _privateMethod = function (strings, ...values) {\n      if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      return {\n        strings: Array.from(strings),\n        values,\n      };\n    };\n    function _initialize() {\n      Object.defineProperty(this, _tag, { value: _privateMethod });\n    }\n    const Foo = function Foo() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n      _initialize.call(this);\n    };\n    Object.defineProperty(Foo.prototype, 'test', {\n      value: Object.defineProperty(\n        function () {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          return _classPrivateFieldLooseBase(this, _tag)[_tag]`hello ${'world'}`;\n        },\n        'name',\n        {\n          value: 'test',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(Foo, 'prototype', { writable: false });\n    return Foo;\n  })();\n  const foo = new Foo();\n  const result = foo.test();\n  expect(result.strings).toEqual(['hello ', '']);\n  expect(result.values).toEqual(['world']);\n};",
-  ],
-  [
-    'private instance methods > private method with parameters',
-    '() => {\n  class Calc {\n    #add(a, b) {\n      return a + b;\n    }\n    sum(a, b) {\n      return this.#add(a, b);\n    }\n  }\n  const calc = new Calc();\n  expect(calc.sum(3, 4)).toBe(7);\n}',
-    "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\n() => {\n  let Calc = (() => {\n    'use strict';\n    var _add = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Calc_add');\n    var _privateMethod = function (a, b) {\n      if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      return a + b;\n    };\n    function _initialize() {\n      Object.defineProperty(this, _add, { value: _privateMethod });\n    }\n    const Calc = function Calc() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n      _initialize.call(this);\n    };\n    Object.defineProperty(Calc.prototype, 'sum', {\n      value: Object.defineProperty(\n        function (a, b) {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          return _classPrivateFieldLooseBase(this, _add)[_add](a, b);\n        },\n        'name',\n        {\n          value: 'sum',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(Calc, 'prototype', { writable: false });\n    return Calc;\n  })();\n  const calc = new Calc();\n  expect(calc.sum(3, 4)).toBe(7);\n};",
-  ],
-  [
-    'private instance methods > private method with default parameters',
-    "() => {\n  class Foo {\n    #greet(name = 'world') {\n      return `hello ${name}`;\n    }\n    test(n) {\n      return this.#greet(n);\n    }\n  }\n  const foo = new Foo();\n  expect(foo.test()).toBe('hello world');\n  expect(foo.test('bar')).toBe('hello bar');\n}",
-    "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\n() => {\n  let Foo = (() => {\n    'use strict';\n    var _greet = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_greet');\n    var _privateMethod = function (name = 'world') {\n      if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      return `hello ${name}`;\n    };\n    function _initialize() {\n      Object.defineProperty(this, _greet, { value: _privateMethod });\n    }\n    const Foo = function Foo() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n      _initialize.call(this);\n    };\n    Object.defineProperty(Foo.prototype, 'test', {\n      value: Object.defineProperty(\n        function (n) {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          return _classPrivateFieldLooseBase(this, _greet)[_greet](n);\n        },\n        'name',\n        {\n          value: 'test',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(Foo, 'prototype', { writable: false });\n    return Foo;\n  })();\n  const foo = new Foo();\n  expect(foo.test()).toBe('hello world');\n  expect(foo.test('bar')).toBe('hello bar');\n};",
-  ],
-  [
-    'private instance methods > private method with rest parameters',
-    '() => {\n  class Foo {\n    #sum(...args) {\n      return args.reduce((a, b) => a + b, 0);\n    }\n    test(...args) {\n      return this.#sum(...args);\n    }\n  }\n  const foo = new Foo();\n  expect(foo.test(1, 2, 3)).toBe(6);\n}',
-    "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\n() => {\n  let Foo = (() => {\n    'use strict';\n    var _sum = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_sum');\n    var _privateMethod = function (...args) {\n      if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      return args.reduce((a, b) => a + b, 0);\n    };\n    function _initialize() {\n      Object.defineProperty(this, _sum, { value: _privateMethod });\n    }\n    const Foo = function Foo() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n      _initialize.call(this);\n    };\n    Object.defineProperty(Foo.prototype, 'test', {\n      value: Object.defineProperty(\n        function (...args) {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          return _classPrivateFieldLooseBase(this, _sum)[_sum](...args);\n        },\n        'name',\n        {\n          value: 'test',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(Foo, 'prototype', { writable: false });\n    return Foo;\n  })();\n  const foo = new Foo();\n  expect(foo.test(1, 2, 3)).toBe(6);\n};",
-  ],
-  [
-    'private instance methods > private method with destructured parameters',
-    '() => {\n  class Foo {\n    #extract({ x, y }) {\n      return x + y;\n    }\n    test(obj) {\n      return this.#extract(obj);\n    }\n  }\n  const foo = new Foo();\n  expect(foo.test({ x: 10, y: 20 })).toBe(30);\n}',
-    "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\n() => {\n  let Foo = (() => {\n    'use strict';\n    var _extract = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_extract');\n    var _privateMethod = function ({ x, y }) {\n      if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      return x + y;\n    };\n    function _initialize() {\n      Object.defineProperty(this, _extract, { value: _privateMethod });\n    }\n    const Foo = function Foo() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n      _initialize.call(this);\n    };\n    Object.defineProperty(Foo.prototype, 'test', {\n      value: Object.defineProperty(\n        function (obj) {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          return _classPrivateFieldLooseBase(this, _extract)[_extract](obj);\n        },\n        'name',\n        {\n          value: 'test',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(Foo, 'prototype', { writable: false });\n    return Foo;\n  })();\n  const foo = new Foo();\n  expect(\n    foo.test({\n      x: 10,\n      y: 20,\n    }),\n  ).toBe(30);\n};",
-  ],
-  [
-    'private instance methods > private method not accessible from outside',
-    "() => {\n  class Foo {\n    #secret() {\n      return 42;\n    }\n  }\n  const foo = new Foo();\n  expect(foo['#secret']).toBeUndefined();\n  expect(typeof foo['#secret']).toBe('undefined');\n}",
-    "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\n() => {\n  let Foo = (() => {\n    'use strict';\n    var _secret = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_secret');\n    var _privateMethod = function () {\n      if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      return 42;\n    };\n    function _initialize() {\n      Object.defineProperty(this, _secret, { value: _privateMethod });\n    }\n    const Foo = function Foo() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n      _initialize.call(this);\n    };\n    Object.defineProperty(Foo, 'prototype', { writable: false });\n    return Foo;\n  })();\n  const foo = new Foo();\n  expect(foo['#secret']).toBeUndefined();\n  expect(typeof foo['#secret']).toBe('undefined');\n};",
-  ],
-  [
-    'private instance methods > private method not accessible from subclass',
-    '() => {\n  class Base {\n    #secret() {\n      return 42;\n    }\n    callSecret() {\n      return this.#secret();\n    }\n  }\n  class Child extends Base {}\n  const child = new Child();\n  // Can only call through inherited public method\n  expect(child.callSecret()).toBe(42);\n}',
-    "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\n() => {\n  let Base = (() => {\n    'use strict';\n    var _secret = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Base_secret');\n    var _privateMethod = function () {\n      if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      return 42;\n    };\n    function _initialize() {\n      Object.defineProperty(this, _secret, { value: _privateMethod });\n    }\n    const Base = function Base() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n      _initialize.call(this);\n    };\n    Object.defineProperty(Base.prototype, 'callSecret', {\n      value: Object.defineProperty(\n        function () {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          return _classPrivateFieldLooseBase(this, _secret)[_secret]();\n        },\n        'name',\n        {\n          value: 'callSecret',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(Base, 'prototype', { writable: false });\n    return Base;\n  })();\n  class Child extends Base {}\n  const child = new Child();\n  // Can only call through inherited public method\n  expect(child.callSecret()).toBe(42);\n};",
-  ],
-  [
-    'private instance methods > private method calling another private method',
-    '() => {\n  class Foo {\n    #a() {\n      return 1;\n    }\n    #b() {\n      return this.#a() + 2;\n    }\n    test() {\n      return this.#b();\n    }\n  }\n  const foo = new Foo();\n  expect(foo.test()).toBe(3);\n}',
-    "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\n() => {\n  let Foo = (() => {\n    'use strict';\n    var _a = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_a');\n    var _b = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_b');\n    var _privateMethod = function () {\n      if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      return 1;\n    };\n    var _privateMethod17 = function () {\n      if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      return _classPrivateFieldLooseBase(this, _a)[_a]() + 2;\n    };\n    function _initialize() {\n      Object.defineProperty(this, _a, { value: _privateMethod });\n      Object.defineProperty(this, _b, { value: _privateMethod17 });\n    }\n    const Foo = function Foo() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n      _initialize.call(this);\n    };\n    Object.defineProperty(Foo.prototype, 'test', {\n      value: Object.defineProperty(\n        function () {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          return _classPrivateFieldLooseBase(this, _b)[_b]();\n        },\n        'name',\n        {\n          value: 'test',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(Foo, 'prototype', { writable: false });\n    return Foo;\n  })();\n  const foo = new Foo();\n  expect(foo.test()).toBe(3);\n};",
-  ],
-  [
-    'private instance methods > private method returning this for chaining',
-    '() => {\n  class Builder {\n    value = 0;\n    #add(n) {\n      this.value += n;\n      return this;\n    }\n    #mul(n) {\n      this.value *= n;\n      return this;\n    }\n    build(a, b) {\n      return this.#add(a).#mul(b).value;\n    }\n  }\n  const b = new Builder();\n  expect(b.build(3, 4)).toBe(12);\n}',
-    "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\n() => {\n  let Builder = (() => {\n    'use strict';\n    var _add = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Builder_add');\n    var _mul = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Builder_mul');\n    var _privateMethod = function (n) {\n      if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      this.value += n;\n      return this;\n    };\n    var _privateMethod19 = function (n) {\n      if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      this.value *= n;\n      return this;\n    };\n    function _initialize() {\n      Object.defineProperty(this, _add, { value: _privateMethod });\n      Object.defineProperty(this, _mul, { value: _privateMethod19 });\n      this.value = 0;\n    }\n    const Builder = function Builder() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n      _initialize.call(this);\n    };\n    Object.defineProperty(Builder.prototype, 'build', {\n      value: Object.defineProperty(\n        function (a, b) {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          return _classPrivateFieldLooseBase(\n            _classPrivateFieldLooseBase(this, _add)[_add](a),\n            _mul,\n          )[_mul](b).value;\n        },\n        'name',\n        {\n          value: 'build',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(Builder, 'prototype', { writable: false });\n    return Builder;\n  })();\n  const b = new Builder();\n  expect(b.build(3, 4)).toBe(12);\n};",
-  ],
-  [
-    'async private methods > async private method returns promise',
-    'async () => {\n  class Foo {\n    async #bar() {\n      return 42;\n    }\n    async test() {\n      return await this.#bar();\n    }\n  }\n  const foo = new Foo();\n  const result = await foo.test();\n  expect(result).toBe(42);\n}',
-    "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\nasync () => {\n  let Foo = (() => {\n    'use strict';\n    var _bar = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_bar');\n    var _privateMethod = async function () {\n      return 42;\n    };\n    function _initialize() {\n      Object.defineProperty(this, _bar, { value: _privateMethod });\n    }\n    const Foo = function Foo() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n      _initialize.call(this);\n    };\n    Object.defineProperty(Foo.prototype, 'test', {\n      value: Object.defineProperty(\n        async function () {\n          return await _classPrivateFieldLooseBase(this, _bar)[_bar]();\n        },\n        'name',\n        {\n          value: 'test',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(Foo, 'prototype', { writable: false });\n    return Foo;\n  })();\n  const foo = new Foo();\n  const result = await foo.test();\n  expect(result).toBe(42);\n};",
-  ],
-  [
-    'async private methods > async private method with await',
-    'async () => {\n  class Foo {\n    async #fetch(val) {\n      const result = await Promise.resolve(val * 2);\n      return result;\n    }\n    async test() {\n      return await this.#fetch(21);\n    }\n  }\n  const foo = new Foo();\n  expect(await foo.test()).toBe(42);\n}',
-    "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\nasync () => {\n  let Foo = (() => {\n    'use strict';\n    var _fetch = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_fetch');\n    var _privateMethod = async function (val) {\n      const result = await Promise.resolve(val * 2);\n      return result;\n    };\n    function _initialize() {\n      Object.defineProperty(this, _fetch, { value: _privateMethod });\n    }\n    const Foo = function Foo() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n      _initialize.call(this);\n    };\n    Object.defineProperty(Foo.prototype, 'test', {\n      value: Object.defineProperty(\n        async function () {\n          return await _classPrivateFieldLooseBase(this, _fetch)[_fetch](21);\n        },\n        'name',\n        {\n          value: 'test',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(Foo, 'prototype', { writable: false });\n    return Foo;\n  })();\n  const foo = new Foo();\n  expect(await foo.test()).toBe(42);\n};",
-  ],
-  [
-    'async private methods > async private method error propagation',
-    "async () => {\n  class Foo {\n    async #fail() {\n      throw new Error('private error');\n    }\n    async test() {\n      try {\n        await this.#fail();\n        return 'no error';\n      } catch (e) {\n        return e.message;\n      }\n    }\n  }\n  const foo = new Foo();\n  expect(await foo.test()).toBe('private error');\n}",
-    "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\nasync () => {\n  let Foo = (() => {\n    'use strict';\n    var _fail = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_fail');\n    var _privateMethod = async function () {\n      throw new Error('private error');\n    };\n    function _initialize() {\n      Object.defineProperty(this, _fail, { value: _privateMethod });\n    }\n    const Foo = function Foo() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n      _initialize.call(this);\n    };\n    Object.defineProperty(Foo.prototype, 'test', {\n      value: Object.defineProperty(\n        async function () {\n          try {\n            await _classPrivateFieldLooseBase(this, _fail)[_fail]();\n            return 'no error';\n          } catch (e) {\n            return e.message;\n          }\n        },\n        'name',\n        {\n          value: 'test',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(Foo, 'prototype', { writable: false });\n    return Foo;\n  })();\n  const foo = new Foo();\n  expect(await foo.test()).toBe('private error');\n};",
-  ],
-  [
-    'generator private methods > private generator method yields values',
-    '() => {\n  class Foo {\n    *#gen() {\n      yield 1;\n      yield 2;\n      yield 3;\n    }\n    test() {\n      return [...this.#gen()];\n    }\n  }\n  const foo = new Foo();\n  expect(foo.test()).toEqual([1, 2, 3]);\n}',
-    "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\n() => {\n  let Foo = (() => {\n    'use strict';\n    var _gen = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_gen');\n    var _privateMethod = function* () {\n      yield 1;\n      yield 2;\n      yield 3;\n    };\n    function _initialize() {\n      Object.defineProperty(this, _gen, { value: _privateMethod });\n    }\n    const Foo = function Foo() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n      _initialize.call(this);\n    };\n    Object.defineProperty(Foo.prototype, 'test', {\n      value: Object.defineProperty(\n        function () {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          return [..._classPrivateFieldLooseBase(this, _gen)[_gen]()];\n        },\n        'name',\n        {\n          value: 'test',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(Foo, 'prototype', { writable: false });\n    return Foo;\n  })();\n  const foo = new Foo();\n  expect(foo.test()).toEqual([1, 2, 3]);\n};",
-  ],
-  [
-    'generator private methods > private async generator method',
-    'async () => {\n  class Foo {\n    async *#gen() {\n      yield await Promise.resolve(1);\n      yield await Promise.resolve(2);\n      yield await Promise.resolve(3);\n    }\n    async test() {\n      const results = [];\n      for await (const val of this.#gen()) {\n        results.push(val);\n      }\n      return results;\n    }\n  }\n  const foo = new Foo();\n  expect(await foo.test()).toEqual([1, 2, 3]);\n}',
-    "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\nasync () => {\n  let Foo = (() => {\n    'use strict';\n    var _gen = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_gen');\n    var _privateMethod = async function* () {\n      yield await Promise.resolve(1);\n      yield await Promise.resolve(2);\n      yield await Promise.resolve(3);\n    };\n    function _initialize() {\n      Object.defineProperty(this, _gen, { value: _privateMethod });\n    }\n    const Foo = function Foo() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n      _initialize.call(this);\n    };\n    Object.defineProperty(Foo.prototype, 'test', {\n      value: Object.defineProperty(\n        async function () {\n          const results = [];\n          for await (const val of _classPrivateFieldLooseBase(this, _gen)[_gen]()) {\n            results.push(val);\n          }\n          return results;\n        },\n        'name',\n        {\n          value: 'test',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(Foo, 'prototype', { writable: false });\n    return Foo;\n  })();\n  const foo = new Foo();\n  expect(await foo.test()).toEqual([1, 2, 3]);\n};",
-  ],
-  [
-    'generator private methods > private generator with return',
-    "() => {\n  class Foo {\n    *#gen() {\n      yield 'a';\n      return 'done';\n    }\n    test() {\n      const gen = this.#gen();\n      const first = gen.next();\n      const second = gen.next();\n      return { first, second };\n    }\n  }\n  const foo = new Foo();\n  const result = foo.test();\n  expect(result.first.value).toBe('a');\n  expect(result.first.done).toBe(false);\n  expect(result.second.value).toBe('done');\n  expect(result.second.done).toBe(true);\n}",
-    "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\n() => {\n  let Foo = (() => {\n    'use strict';\n    var _gen = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_gen');\n    var _privateMethod = function* () {\n      yield 'a';\n      return 'done';\n    };\n    function _initialize() {\n      Object.defineProperty(this, _gen, { value: _privateMethod });\n    }\n    const Foo = function Foo() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n      _initialize.call(this);\n    };\n    Object.defineProperty(Foo.prototype, 'test', {\n      value: Object.defineProperty(\n        function () {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          const gen = _classPrivateFieldLooseBase(this, _gen)[_gen]();\n          const first = gen.next();\n          const second = gen.next();\n          return {\n            first,\n            second,\n          };\n        },\n        'name',\n        {\n          value: 'test',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(Foo, 'prototype', { writable: false });\n    return Foo;\n  })();\n  const foo = new Foo();\n  const result = foo.test();\n  expect(result.first.value).toBe('a');\n  expect(result.first.done).toBe(false);\n  expect(result.second.value).toBe('done');\n  expect(result.second.done).toBe(true);\n};",
-  ],
-  [
-    'private accessors > private getter',
-    '() => {\n  class Foo {\n    #x = 42;\n    get #value() {\n      return this.#x;\n    }\n    test() {\n      return this.#value;\n    }\n  }\n  const foo = new Foo();\n  expect(foo.test()).toBe(42);\n}',
-    "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\n() => {\n  let Foo = (() => {\n    'use strict';\n    var _value = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_value');\n    var _x = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_x');\n    function _initialize() {\n      Object.defineProperty(this, _value, {\n        get: function () {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          return _classPrivateFieldLooseBase(this, _x)[_x];\n        },\n      });\n      Object.defineProperty(this, _x, {\n        writable: true,\n        value: 42,\n      });\n    }\n    const Foo = function Foo() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n      _initialize.call(this);\n    };\n    Object.defineProperty(Foo.prototype, 'test', {\n      value: Object.defineProperty(\n        function () {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          return _classPrivateFieldLooseBase(this, _value)[_value];\n        },\n        'name',\n        {\n          value: 'test',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(Foo, 'prototype', { writable: false });\n    return Foo;\n  })();\n  const foo = new Foo();\n  expect(foo.test()).toBe(42);\n};",
-  ],
-  [
-    'private accessors > private setter',
-    '() => {\n  class Foo {\n    #x = 0;\n    set #value(v) {\n      this.#x = v;\n    }\n    getValue() {\n      return this.#x;\n    }\n    test(v) {\n      this.#value = v;\n    }\n  }\n  const foo = new Foo();\n  foo.test(42);\n  expect(foo.getValue()).toBe(42);\n}',
-    "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\n() => {\n  let Foo = (() => {\n    'use strict';\n    var _value = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_value');\n    var _x = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_x');\n    function _initialize() {\n      Object.defineProperty(this, _value, {\n        set: function (v) {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          _classPrivateFieldLooseBase(this, _x)[_x] = v;\n        },\n      });\n      Object.defineProperty(this, _x, {\n        writable: true,\n        value: 0,\n      });\n    }\n    const Foo = function Foo() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n      _initialize.call(this);\n    };\n    Object.defineProperty(Foo.prototype, 'getValue', {\n      value: Object.defineProperty(\n        function () {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          return _classPrivateFieldLooseBase(this, _x)[_x];\n        },\n        'name',\n        {\n          value: 'getValue',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(Foo.prototype, 'test', {\n      value: Object.defineProperty(\n        function (v) {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          _classPrivateFieldLooseBase(this, _value)[_value] = v;\n        },\n        'name',\n        {\n          value: 'test',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(Foo, 'prototype', { writable: false });\n    return Foo;\n  })();\n  const foo = new Foo();\n  foo.test(42);\n  expect(foo.getValue()).toBe(42);\n};",
-  ],
-  [
-    'private accessors > private getter and setter pair',
-    '() => {\n  class Foo {\n    #x = 0;\n    get #value() {\n      return this.#x;\n    }\n    set #value(v) {\n      this.#x = v * 2;\n    }\n    test() {\n      this.#value = 21;\n      return this.#value;\n    }\n  }\n  const foo = new Foo();\n  expect(foo.test()).toBe(42);\n}',
-    "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\n() => {\n  let Foo = (() => {\n    'use strict';\n    var _value = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_value');\n    var _x = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_x');\n    function _initialize() {\n      Object.defineProperty(this, _value, {\n        get: function () {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          return _classPrivateFieldLooseBase(this, _x)[_x];\n        },\n        set: function (v) {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          _classPrivateFieldLooseBase(this, _x)[_x] = v * 2;\n        },\n      });\n      Object.defineProperty(this, _x, {\n        writable: true,\n        value: 0,\n      });\n    }\n    const Foo = function Foo() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n      _initialize.call(this);\n    };\n    Object.defineProperty(Foo.prototype, 'test', {\n      value: Object.defineProperty(\n        function () {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          _classPrivateFieldLooseBase(this, _value)[_value] = 21;\n          return _classPrivateFieldLooseBase(this, _value)[_value];\n        },\n        'name',\n        {\n          value: 'test',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(Foo, 'prototype', { writable: false });\n    return Foo;\n  })();\n  const foo = new Foo();\n  expect(foo.test()).toBe(42);\n};",
-  ],
-  [
-    'private accessors > getter-only private accessor throws on set',
-    '() => {\n    expect(() => {\n      class Foo {\n        get #bar() {\n          return 1;\n        }\n        constructor() {\n          this.#bar = 2;\n        }\n      }\n      new Foo();\n    }).toThrow();\n  }',
-    "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\n() => {\n  expect(() => {\n    let Foo = (() => {\n      'use strict';\n      var _bar = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_bar');\n      function _initialize() {\n        Object.defineProperty(this, _bar, {\n          get: function () {\n            if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n            return 1;\n          },\n        });\n      }\n      const Foo = function Foo() {\n        if (!new.target) throw new TypeError('Cannot call a class as a function');\n        _initialize.call(this);\n        _classPrivateFieldLooseBase(this, _bar)[_bar] = 2;\n      };\n      Object.defineProperty(Foo, 'prototype', { writable: false });\n      return Foo;\n    })();\n    new Foo();\n  }).toThrow();\n};",
-  ],
-  [
-    'private accessors > setter-only private accessor throws on get',
-    '() => {\n    expect(() => {\n      class Foo {\n        set #bar(v) {}\n        constructor() {\n          const x = this.#bar;\n        }\n      }\n      new Foo();\n    }).toThrow();\n  }',
-    "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\n() => {\n  expect(() => {\n    let Foo = (() => {\n      'use strict';\n      var _bar = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_bar');\n      function _initialize() {\n        Object.defineProperty(this, _bar, {\n          set: function (v) {\n            if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          },\n        });\n      }\n      const Foo = function Foo() {\n        if (!new.target) throw new TypeError('Cannot call a class as a function');\n        _initialize.call(this);\n        const x = _classPrivateFieldLooseBase(this, _bar)[_bar];\n      };\n      Object.defineProperty(Foo, 'prototype', { writable: false });\n      return Foo;\n    })();\n    new Foo();\n  }).toThrow();\n};",
-  ],
-  [
-    'private accessors > private accessor available during field initialization',
-    '() => {\n  class Foo {\n    get #value() {\n      return 42;\n    }\n    field = this.#value;\n  }\n  const foo = new Foo();\n  expect(foo.field).toBe(42);\n}',
-    "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\n() => {\n  let Foo = (() => {\n    'use strict';\n    var _value = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_value');\n    function _initialize() {\n      Object.defineProperty(this, _value, {\n        get: function () {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          return 42;\n        },\n      });\n      this.field = _classPrivateFieldLooseBase(this, _value)[_value];\n    }\n    const Foo = function Foo() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n      _initialize.call(this);\n    };\n    Object.defineProperty(Foo, 'prototype', { writable: false });\n    return Foo;\n  })();\n  const foo = new Foo();\n  expect(foo.field).toBe(42);\n};",
-  ],
-  [
-    'private accessors > private getter with computed value',
-    '() => {\n  class Rect {\n    #w;\n    #h;\n    constructor(w, h) {\n      this.#w = w;\n      this.#h = h;\n    }\n    get #area() {\n      return this.#w * this.#h;\n    }\n    getArea() {\n      return this.#area;\n    }\n  }\n  const r = new Rect(3, 4);\n  expect(r.getArea()).toBe(12);\n}',
-    "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\n() => {\n  let Rect = (() => {\n    'use strict';\n    var _h = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Rect_h');\n    var _w = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Rect_w');\n    var _area = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Rect_area');\n    function _initialize() {\n      Object.defineProperty(this, _area, {\n        get: function () {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          return (\n            _classPrivateFieldLooseBase(this, _w)[_w] * _classPrivateFieldLooseBase(this, _h)[_h]\n          );\n        },\n      });\n      Object.defineProperty(this, _w, {\n        writable: true,\n        value: void 0,\n      });\n      Object.defineProperty(this, _h, {\n        writable: true,\n        value: void 0,\n      });\n    }\n    const Rect = function Rect(w, h) {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n      _initialize.call(this);\n      _classPrivateFieldLooseBase(this, _w)[_w] = w;\n      _classPrivateFieldLooseBase(this, _h)[_h] = h;\n    };\n    Object.defineProperty(Rect.prototype, 'getArea', {\n      value: Object.defineProperty(\n        function () {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          return _classPrivateFieldLooseBase(this, _area)[_area];\n        },\n        'name',\n        {\n          value: 'getArea',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(Rect, 'prototype', { writable: false });\n    return Rect;\n  })();\n  const r = new Rect(3, 4);\n  expect(r.getArea()).toBe(12);\n};",
-  ],
-  [
-    'private accessors > private accessor increment/decrement via getter+setter',
-    '() => {\n  class Counter {\n    #x = 0;\n    get #count() {\n      return this.#x;\n    }\n    set #count(v) {\n      this.#x = v;\n    }\n    inc() {\n      this.#count++;\n      return this.#count;\n    }\n    dec() {\n      this.#count--;\n      return this.#count;\n    }\n  }\n  const c = new Counter();\n  expect(c.inc()).toBe(1);\n  expect(c.inc()).toBe(2);\n  expect(c.dec()).toBe(1);\n}',
-    "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\n() => {\n  let Counter = (() => {\n    'use strict';\n    var _x = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Counter_x');\n    var _count = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Counter_count');\n    function _initialize() {\n      Object.defineProperty(this, _count, {\n        get: function () {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          return _classPrivateFieldLooseBase(this, _x)[_x];\n        },\n        set: function (v) {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          _classPrivateFieldLooseBase(this, _x)[_x] = v;\n        },\n      });\n      Object.defineProperty(this, _x, {\n        writable: true,\n        value: 0,\n      });\n    }\n    const Counter = function Counter() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n      _initialize.call(this);\n    };\n    Object.defineProperty(Counter.prototype, 'inc', {\n      value: Object.defineProperty(\n        function () {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          _classPrivateFieldLooseBase(this, _count)[_count]++;\n          return _classPrivateFieldLooseBase(this, _count)[_count];\n        },\n        'name',\n        {\n          value: 'inc',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(Counter.prototype, 'dec', {\n      value: Object.defineProperty(\n        function () {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          _classPrivateFieldLooseBase(this, _count)[_count]--;\n          return _classPrivateFieldLooseBase(this, _count)[_count];\n        },\n        'name',\n        {\n          value: 'dec',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(Counter, 'prototype', { writable: false });\n    return Counter;\n  })();\n  const c = new Counter();\n  expect(c.inc()).toBe(1);\n  expect(c.inc()).toBe(2);\n  expect(c.dec()).toBe(1);\n};",
-  ],
-  [
-    'private static methods > basic static private method',
-    "() => {\n  class Foo {\n    static #bar() {\n      return 'bar';\n    }\n    static test() {\n      return Foo.#bar();\n    }\n  }\n  expect(Foo.test()).toBe('bar');\n}",
-    "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\n() => {\n  let Foo = (() => {\n    'use strict';\n    var _bar = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_bar');\n    var _privateMethod = function () {\n      if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      return 'bar';\n    };\n    const Foo = function Foo() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n    };\n    Object.defineProperty(Foo, 'test', {\n      value: Object.defineProperty(\n        function () {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          return _classPrivateFieldLooseBase(Foo, _bar)[_bar]();\n        },\n        'name',\n        {\n          value: 'test',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(Foo, 'prototype', { writable: false });\n    Object.defineProperty(Foo, _bar, { value: _privateMethod });\n    return Foo;\n  })();\n  expect(Foo.test()).toBe('bar');\n};",
-  ],
-  [
-    'private static methods > static private method with class passed as argument',
-    "() => {\n  class Foo {\n    static #bar() {\n      return 'bar';\n    }\n    static extract(klass) {\n      return klass.#bar();\n    }\n  }\n  expect(Foo.extract(Foo)).toBe('bar');\n}",
-    "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\n() => {\n  let Foo = (() => {\n    'use strict';\n    var _bar = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_bar');\n    var _privateMethod = function () {\n      if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      return 'bar';\n    };\n    const Foo = function Foo() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n    };\n    Object.defineProperty(Foo, 'extract', {\n      value: Object.defineProperty(\n        function (klass) {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          return _classPrivateFieldLooseBase(klass, _bar)[_bar]();\n        },\n        'name',\n        {\n          value: 'extract',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(Foo, 'prototype', { writable: false });\n    Object.defineProperty(Foo, _bar, { value: _privateMethod });\n    return Foo;\n  })();\n  expect(Foo.extract(Foo)).toBe('bar');\n};",
-  ],
-  [
-    'private static methods > exfiltrated static private method has stable identity',
-    "() => {\n  class Foo {\n    static #bar() {\n      return 'bar';\n    }\n    static getBar() {\n      return Foo.#bar;\n    }\n  }\n  expect(Foo.getBar()).toBe(Foo.getBar());\n}",
-    "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\n() => {\n  let Foo = (() => {\n    'use strict';\n    var _bar = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_bar');\n    var _privateMethod = function () {\n      if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      return 'bar';\n    };\n    const Foo = function Foo() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n    };\n    Object.defineProperty(Foo, 'getBar', {\n      value: Object.defineProperty(\n        function () {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          return _classPrivateFieldLooseBase(Foo, _bar)[_bar];\n        },\n        'name',\n        {\n          value: 'getBar',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(Foo, 'prototype', { writable: false });\n    Object.defineProperty(Foo, _bar, { value: _privateMethod });\n    return Foo;\n  })();\n  expect(Foo.getBar()).toBe(Foo.getBar());\n};",
-  ],
-  [
-    'private static methods > multiple static private methods',
-    "() => {\n  class Foo {\n    static #bar() {\n      return 'bar';\n    }\n    static #baz() {\n      return 'baz';\n    }\n    static test() {\n      return Foo.#bar() + Foo.#baz();\n    }\n  }\n  expect(Foo.test()).toBe('barbaz');\n}",
-    "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\n() => {\n  let Foo = (() => {\n    'use strict';\n    var _baz = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_baz');\n    var _bar = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_bar');\n    var _privateMethod16 = function () {\n      if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      return 'bar';\n    };\n    var _privateMethod = function () {\n      if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      return 'baz';\n    };\n    const Foo = function Foo() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n    };\n    Object.defineProperty(Foo, 'test', {\n      value: Object.defineProperty(\n        function () {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          return (\n            _classPrivateFieldLooseBase(Foo, _bar)[_bar]() +\n            _classPrivateFieldLooseBase(Foo, _baz)[_baz]()\n          );\n        },\n        'name',\n        {\n          value: 'test',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(Foo, 'prototype', { writable: false });\n    Object.defineProperty(Foo, _bar, { value: _privateMethod16 });\n    Object.defineProperty(Foo, _baz, { value: _privateMethod });\n    return Foo;\n  })();\n  expect(Foo.test()).toBe('barbaz');\n};",
-  ],
-  [
-    'private static methods > static private method is read-only',
-    '() => {\n    expect(() => {\n      class Foo {\n        static #bar() {}\n        static {\n          Foo.#bar = 1;\n        }\n      }\n    }).toThrow();\n  }',
-    "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\n() => {\n  expect(() => {\n    let Foo = (() => {\n      'use strict';\n      var _bar = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_bar');\n      var _privateMethod = function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      };\n      const Foo = function Foo() {\n        if (!new.target) throw new TypeError('Cannot call a class as a function');\n      };\n      Object.defineProperty(Foo, 'prototype', { writable: false });\n      Object.defineProperty(Foo, _bar, { value: _privateMethod });\n      (function () {\n        _classPrivateFieldLooseBase(Foo, _bar)[_bar] = 1;\n      }).call(Foo);\n      return Foo;\n    })();\n  }).toThrow();\n};",
-  ],
-  [
-    'private static methods > static private method compound assignment throws',
-    '() => {\n    expect(() => {\n      class Foo {\n        static #bar() {}\n        static {\n          Foo.#bar += 1;\n        }\n      }\n    }).toThrow();\n  }',
-    "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\n() => {\n  expect(() => {\n    let Foo = (() => {\n      'use strict';\n      var _bar = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_bar');\n      var _privateMethod = function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      };\n      const Foo = function Foo() {\n        if (!new.target) throw new TypeError('Cannot call a class as a function');\n      };\n      Object.defineProperty(Foo, 'prototype', { writable: false });\n      Object.defineProperty(Foo, _bar, { value: _privateMethod });\n      (function () {\n        _classPrivateFieldLooseBase(Foo, _bar)[_bar] += 1;\n      }).call(Foo);\n      return Foo;\n    })();\n  }).toThrow();\n};",
-  ],
-  [
-    'private static methods > super access from static private method',
-    "() => {\n  class Base {\n    static greet() {\n      return 'hello';\n    }\n  }\n  class Derived extends Base {\n    static #bar() {\n      return super.greet();\n    }\n    static test() {\n      return Derived.#bar();\n    }\n  }\n  expect(Derived.test()).toBe('hello');\n}",
-    "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\nvar _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\nvar _get2 = { get: require('@babel/runtime/helpers/get') };\nfunction _get(e, t, r) {\n  return _get2.get(e, t, r);\n}\n() => {\n  class Base {\n    static greet() {\n      return 'hello';\n    }\n  }\n  let Derived = (__nox_super_114_297 => {\n    'use strict';\n    var _bar = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Derived_bar');\n    var _privateMethod = function () {\n      if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      return _get(Object.getPrototypeOf(Derived), 'greet', this).call(this);\n    };\n    const Derived = function Derived() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n      var _this = _construct(Object.getPrototypeOf(Derived), arguments, new.target || Derived);\n      return _this;\n    };\n    if (__nox_super_114_297 !== null && typeof __nox_super_114_297 !== 'function')\n      throw new TypeError('Super expression must either be null or a function');\n    Derived.prototype = Object.create(__nox_super_114_297 && __nox_super_114_297.prototype, {\n      constructor: {\n        value: Derived,\n        writable: true,\n        configurable: true,\n      },\n    });\n    if (Object.setPrototypeOf) Object.setPrototypeOf(Derived, __nox_super_114_297);\n    else Derived.__proto__ = __nox_super_114_297;\n    Object.defineProperty(Derived, 'test', {\n      value: Object.defineProperty(\n        function () {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          return _classPrivateFieldLooseBase(Derived, _bar)[_bar]();\n        },\n        'name',\n        {\n          value: 'test',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(Derived, 'prototype', { writable: false });\n    Object.defineProperty(Derived, _bar, { value: _privateMethod });\n    return Derived;\n  })(Base);\n  expect(Derived.test()).toBe('hello');\n};",
-  ],
-  [
-    'private static methods > this in static private method refers to class',
-    '() => {\n  class Foo {\n    static val = 42;\n    static #bar() {\n      return this.val;\n    }\n    static test() {\n      return this.#bar();\n    }\n  }\n  expect(Foo.test()).toBe(42);\n}',
-    "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\n() => {\n  let Foo = (() => {\n    'use strict';\n    var _bar = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_bar');\n    var _privateMethod = function () {\n      if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      return this.val;\n    };\n    const Foo = function Foo() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n    };\n    Object.defineProperty(Foo, 'test', {\n      value: Object.defineProperty(\n        function () {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          return _classPrivateFieldLooseBase(this, _bar)[_bar]();\n        },\n        'name',\n        {\n          value: 'test',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(Foo, 'prototype', { writable: false });\n    Object.defineProperty(Foo, _bar, { value: _privateMethod });\n    Foo.val = 42;\n    return Foo;\n  })();\n  expect(Foo.test()).toBe(42);\n};",
-  ],
-  [
-    'private static methods > static private method as tagged template',
-    "() => {\n  class Foo {\n    static #tag(strings, ...values) {\n      return { strings: Array.from(strings), values };\n    }\n    static test() {\n      return Foo.#tag`hi ${'there'}`;\n    }\n  }\n  const result = Foo.test();\n  expect(result.strings).toEqual(['hi ', '']);\n  expect(result.values).toEqual(['there']);\n}",
-    "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\n() => {\n  let Foo = (() => {\n    'use strict';\n    var _tag = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_tag');\n    var _privateMethod = function (strings, ...values) {\n      if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      return {\n        strings: Array.from(strings),\n        values,\n      };\n    };\n    const Foo = function Foo() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n    };\n    Object.defineProperty(Foo, 'test', {\n      value: Object.defineProperty(\n        function () {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          return _classPrivateFieldLooseBase(Foo, _tag)[_tag]`hi ${'there'}`;\n        },\n        'name',\n        {\n          value: 'test',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(Foo, 'prototype', { writable: false });\n    Object.defineProperty(Foo, _tag, { value: _privateMethod });\n    return Foo;\n  })();\n  const result = Foo.test();\n  expect(result.strings).toEqual(['hi ', '']);\n  expect(result.values).toEqual(['there']);\n};",
-  ],
-  [
-    'private static methods > static private generator method',
-    '() => {\n  class Foo {\n    static *#gen() {\n      yield 10;\n      yield 20;\n    }\n    static test() {\n      return [...Foo.#gen()];\n    }\n  }\n  expect(Foo.test()).toEqual([10, 20]);\n}',
-    "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\n() => {\n  let Foo = (() => {\n    'use strict';\n    var _gen = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_gen');\n    var _privateMethod = function* () {\n      yield 10;\n      yield 20;\n    };\n    const Foo = function Foo() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n    };\n    Object.defineProperty(Foo, 'test', {\n      value: Object.defineProperty(\n        function () {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          return [..._classPrivateFieldLooseBase(Foo, _gen)[_gen]()];\n        },\n        'name',\n        {\n          value: 'test',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(Foo, 'prototype', { writable: false });\n    Object.defineProperty(Foo, _gen, { value: _privateMethod });\n    return Foo;\n  })();\n  expect(Foo.test()).toEqual([10, 20]);\n};",
-  ],
-  [
-    'private static methods > static private async method',
-    'async () => {\n  class Foo {\n    static async #compute(x) {\n      return await Promise.resolve(x * 2);\n    }\n    static async test() {\n      return await Foo.#compute(21);\n    }\n  }\n  expect(await Foo.test()).toBe(42);\n}',
-    "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\nasync () => {\n  let Foo = (() => {\n    'use strict';\n    var _compute = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_compute');\n    var _privateMethod = async function (x) {\n      return await Promise.resolve(x * 2);\n    };\n    const Foo = function Foo() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n    };\n    Object.defineProperty(Foo, 'test', {\n      value: Object.defineProperty(\n        async function () {\n          return await _classPrivateFieldLooseBase(Foo, _compute)[_compute](21);\n        },\n        'name',\n        {\n          value: 'test',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(Foo, 'prototype', { writable: false });\n    Object.defineProperty(Foo, _compute, { value: _privateMethod });\n    return Foo;\n  })();\n  expect(await Foo.test()).toBe(42);\n};",
-  ],
-  [
-    'private static accessors > static private getter',
-    '() => {\n  class Foo {\n    static #x = 42;\n    static get #value() {\n      return Foo.#x;\n    }\n    static test() {\n      return Foo.#value;\n    }\n  }\n  expect(Foo.test()).toBe(42);\n}',
-    "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\n() => {\n  let Foo = (() => {\n    'use strict';\n    var _value = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_value');\n    var _x = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_x');\n    const Foo = function Foo() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n    };\n    Object.defineProperty(Foo, 'test', {\n      value: Object.defineProperty(\n        function () {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          return _classPrivateFieldLooseBase(Foo, _value)[_value];\n        },\n        'name',\n        {\n          value: 'test',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(Foo, 'prototype', { writable: false });\n    Object.defineProperty(Foo, _value, {\n      get: function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        return _classPrivateFieldLooseBase(Foo, _x)[_x];\n      },\n    });\n    Object.defineProperty(Foo, _x, {\n      writable: true,\n      value: 42,\n    });\n    return Foo;\n  })();\n  expect(Foo.test()).toBe(42);\n};",
-  ],
-  [
-    'private static accessors > static private setter',
-    '() => {\n  class Foo {\n    static #x = 0;\n    static set #value(v) {\n      Foo.#x = v;\n    }\n    static get() {\n      return Foo.#x;\n    }\n    static test(v) {\n      Foo.#value = v;\n    }\n  }\n  Foo.test(42);\n  expect(Foo.get()).toBe(42);\n}',
-    "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\n() => {\n  let Foo = (() => {\n    'use strict';\n    var _value = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_value');\n    var _x = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_x');\n    const Foo = function Foo() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n    };\n    Object.defineProperty(Foo, 'get', {\n      value: Object.defineProperty(\n        function () {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          return _classPrivateFieldLooseBase(Foo, _x)[_x];\n        },\n        'name',\n        {\n          value: 'get',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(Foo, 'test', {\n      value: Object.defineProperty(\n        function (v) {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          _classPrivateFieldLooseBase(Foo, _value)[_value] = v;\n        },\n        'name',\n        {\n          value: 'test',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(Foo, 'prototype', { writable: false });\n    Object.defineProperty(Foo, _value, {\n      set: function (v) {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        _classPrivateFieldLooseBase(Foo, _x)[_x] = v;\n      },\n    });\n    Object.defineProperty(Foo, _x, {\n      writable: true,\n      value: 0,\n    });\n    return Foo;\n  })();\n  Foo.test(42);\n  expect(Foo.get()).toBe(42);\n};",
-  ],
-  [
-    'private static accessors > static private getter and setter pair',
-    '() => {\n  class Foo {\n    static #x = 0;\n    static get #value() {\n      return Foo.#x;\n    }\n    static set #value(v) {\n      Foo.#x = v * 2;\n    }\n    static test() {\n      Foo.#value = 21;\n      return Foo.#value;\n    }\n  }\n  expect(Foo.test()).toBe(42);\n}',
-    "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\n() => {\n  let Foo = (() => {\n    'use strict';\n    var _value = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_value');\n    var _x = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_x');\n    const Foo = function Foo() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n    };\n    Object.defineProperty(Foo, 'test', {\n      value: Object.defineProperty(\n        function () {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          _classPrivateFieldLooseBase(Foo, _value)[_value] = 21;\n          return _classPrivateFieldLooseBase(Foo, _value)[_value];\n        },\n        'name',\n        {\n          value: 'test',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(Foo, 'prototype', { writable: false });\n    Object.defineProperty(Foo, _value, {\n      get: function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        return _classPrivateFieldLooseBase(Foo, _x)[_x];\n      },\n      set: function (v) {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        _classPrivateFieldLooseBase(Foo, _x)[_x] = v * 2;\n      },\n    });\n    Object.defineProperty(Foo, _x, {\n      writable: true,\n      value: 0,\n    });\n    return Foo;\n  })();\n  expect(Foo.test()).toBe(42);\n};",
-  ],
-  [
-    'private static accessors > static getter-only throws on set',
-    '() => {\n    expect(() => {\n      class Foo {\n        static get #bar() {\n          return 1;\n        }\n        static {\n          Foo.#bar = 2;\n        }\n      }\n    }).toThrow();\n  }',
-    "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\n() => {\n  expect(() => {\n    let Foo = (() => {\n      'use strict';\n      var _bar = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_bar');\n      const Foo = function Foo() {\n        if (!new.target) throw new TypeError('Cannot call a class as a function');\n      };\n      Object.defineProperty(Foo, 'prototype', { writable: false });\n      Object.defineProperty(Foo, _bar, {\n        get: function () {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          return 1;\n        },\n      });\n      (function () {\n        _classPrivateFieldLooseBase(Foo, _bar)[_bar] = 2;\n      }).call(Foo);\n      return Foo;\n    })();\n  }).toThrow();\n};",
-  ],
-  [
-    'inheritance and isolation > private methods are per-class (not inherited)',
-    "() => {\n  class Base {\n    #greet() {\n      return 'base';\n    }\n    test() {\n      return this.#greet();\n    }\n  }\n  class Child extends Base {\n    // Child does NOT have access to Base's #greet\n  }\n  const child = new Child();\n  // inherited public method still works because it calls #greet on Base\n  expect(child.test()).toBe('base');\n}",
-    "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\n() => {\n  let Base = (() => {\n    'use strict';\n    var _greet = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Base_greet');\n    var _privateMethod = function () {\n      if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      return 'base';\n    };\n    function _initialize() {\n      Object.defineProperty(this, _greet, { value: _privateMethod });\n    }\n    const Base = function Base() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n      _initialize.call(this);\n    };\n    Object.defineProperty(Base.prototype, 'test', {\n      value: Object.defineProperty(\n        function () {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          return _classPrivateFieldLooseBase(this, _greet)[_greet]();\n        },\n        'name',\n        {\n          value: 'test',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(Base, 'prototype', { writable: false });\n    return Base;\n  })();\n  class Child extends Base {}\n  const child = new Child();\n  // inherited public method still works because it calls #greet on Base\n  expect(child.test()).toBe('base');\n};",
-  ],
-  [
-    'inheritance and isolation > subclass can define same-named private method',
-    "() => {\n  class Base {\n    #method() {\n      return 'base';\n    }\n    baseTest() {\n      return this.#method();\n    }\n  }\n  class Child extends Base {\n    #method() {\n      return 'child';\n    }\n    childTest() {\n      return this.#method();\n    }\n  }\n  const c = new Child();\n  expect(c.baseTest()).toBe('base');\n  expect(c.childTest()).toBe('child');\n}",
-    "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\nvar _construct2 = { construct: require('@babel/runtime/helpers/construct') };\nfunction _construct(t, r, c) {\n  return _construct2.construct(t, r, c);\n}\n() => {\n  let Base = (() => {\n    'use strict';\n    var _method = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Base_method');\n    var _privateMethod = function () {\n      if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      return 'base';\n    };\n    function _initialize() {\n      Object.defineProperty(this, _method, { value: _privateMethod });\n    }\n    const Base = function Base() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n      _initialize.call(this);\n    };\n    Object.defineProperty(Base.prototype, 'baseTest', {\n      value: Object.defineProperty(\n        function () {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          return _classPrivateFieldLooseBase(this, _method)[_method]();\n        },\n        'name',\n        {\n          value: 'baseTest',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(Base, 'prototype', { writable: false });\n    return Base;\n  })();\n  let Child = (__nox_super_178_347 => {\n    'use strict';\n    var _method19 =\n      _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Child_method');\n    var _privateMethod20 = function () {\n      if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      return 'child';\n    };\n    function _initialize21() {\n      Object.defineProperty(this, _method19, { value: _privateMethod20 });\n    }\n    const Child = function Child() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n      var _this = _construct(Object.getPrototypeOf(Child), arguments, new.target || Child);\n      (function () {\n        _initialize21.call(this);\n      }).call(_this);\n      return _this;\n    };\n    if (__nox_super_178_347 !== null && typeof __nox_super_178_347 !== 'function')\n      throw new TypeError('Super expression must either be null or a function');\n    Child.prototype = Object.create(__nox_super_178_347 && __nox_super_178_347.prototype, {\n      constructor: {\n        value: Child,\n        writable: true,\n        configurable: true,\n      },\n    });\n    if (Object.setPrototypeOf) Object.setPrototypeOf(Child, __nox_super_178_347);\n    else Child.__proto__ = __nox_super_178_347;\n    Object.defineProperty(Child.prototype, 'childTest', {\n      value: Object.defineProperty(\n        function () {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          return _classPrivateFieldLooseBase(this, _method19)[_method19]();\n        },\n        'name',\n        {\n          value: 'childTest',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(Child, 'prototype', { writable: false });\n    return Child;\n  })(Base);\n  const c = new Child();\n  expect(c.baseTest()).toBe('base');\n  expect(c.childTest()).toBe('child');\n};",
-  ],
-  [
-    'inheritance and isolation > private method access on wrong class instance throws',
-    "() => {\n  class A {\n    #foo() {\n      return 'a';\n    }\n    test(obj) {\n      return obj.#foo();\n    }\n  }\n  class B {}\n  const a = new A();\n  const b = new B();\n  expect(() => a.test(b)).toThrow();\n}",
-    "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\n() => {\n  let A = (() => {\n    'use strict';\n    var _foo = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_A_foo');\n    var _privateMethod = function () {\n      if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      return 'a';\n    };\n    function _initialize() {\n      Object.defineProperty(this, _foo, { value: _privateMethod });\n    }\n    const A = function A() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n      _initialize.call(this);\n    };\n    Object.defineProperty(A.prototype, 'test', {\n      value: Object.defineProperty(\n        function (obj) {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          return _classPrivateFieldLooseBase(obj, _foo)[_foo]();\n        },\n        'name',\n        {\n          value: 'test',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(A, 'prototype', { writable: false });\n    return A;\n  })();\n  class B {}\n  const a = new A();\n  const b = new B();\n  expect(() => a.test(b)).toThrow();\n};",
-  ],
-  [
-    'inheritance and isolation > different classes with same private method name are independent',
-    "() => {\n  class A {\n    #x() {\n      return 'A';\n    }\n    test() {\n      return this.#x();\n    }\n  }\n  class B {\n    #x() {\n      return 'B';\n    }\n    test() {\n      return this.#x();\n    }\n  }\n  expect(new A().test()).toBe('A');\n  expect(new B().test()).toBe('B');\n}",
-    "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\n() => {\n  let A = (() => {\n    'use strict';\n    var _x = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_A_x');\n    var _privateMethod = function () {\n      if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      return 'A';\n    };\n    function _initialize() {\n      Object.defineProperty(this, _x, { value: _privateMethod });\n    }\n    const A = function A() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n      _initialize.call(this);\n    };\n    Object.defineProperty(A.prototype, 'test', {\n      value: Object.defineProperty(\n        function () {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          return _classPrivateFieldLooseBase(this, _x)[_x]();\n        },\n        'name',\n        {\n          value: 'test',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(A, 'prototype', { writable: false });\n    return A;\n  })();\n  let B = (() => {\n    'use strict';\n    var _x18 = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_B_x');\n    var _privateMethod19 = function () {\n      if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      return 'B';\n    };\n    function _initialize20() {\n      Object.defineProperty(this, _x18, { value: _privateMethod19 });\n    }\n    const B = function B() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n      _initialize20.call(this);\n    };\n    Object.defineProperty(B.prototype, 'test', {\n      value: Object.defineProperty(\n        function () {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          return _classPrivateFieldLooseBase(this, _x18)[_x18]();\n        },\n        'name',\n        {\n          value: 'test',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(B, 'prototype', { writable: false });\n    return B;\n  })();\n  expect(new A().test()).toBe('A');\n  expect(new B().test()).toBe('B');\n};",
-  ],
-  [
-    'private fields interaction > private method accessing private field',
-    '() => {\n  class Foo {\n    #x = 10;\n    #double() {\n      return this.#x * 2;\n    }\n    test() {\n      return this.#double();\n    }\n  }\n  expect(new Foo().test()).toBe(20);\n}',
-    "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\n() => {\n  let Foo = (() => {\n    'use strict';\n    var _double = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_double');\n    var _x = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_x');\n    var _privateMethod = function () {\n      if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      return _classPrivateFieldLooseBase(this, _x)[_x] * 2;\n    };\n    function _initialize() {\n      Object.defineProperty(this, _double, { value: _privateMethod });\n      Object.defineProperty(this, _x, {\n        writable: true,\n        value: 10,\n      });\n    }\n    const Foo = function Foo() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n      _initialize.call(this);\n    };\n    Object.defineProperty(Foo.prototype, 'test', {\n      value: Object.defineProperty(\n        function () {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          return _classPrivateFieldLooseBase(this, _double)[_double]();\n        },\n        'name',\n        {\n          value: 'test',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(Foo, 'prototype', { writable: false });\n    return Foo;\n  })();\n  expect(new Foo().test()).toBe(20);\n};",
-  ],
-  [
-    'private fields interaction > private method mutating private field',
-    '() => {\n  class Counter {\n    #count = 0;\n    #increment() {\n      this.#count++;\n    }\n    inc() {\n      this.#increment();\n      return this.#count;\n    }\n  }\n  const c = new Counter();\n  expect(c.inc()).toBe(1);\n  expect(c.inc()).toBe(2);\n}',
-    "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\n() => {\n  let Counter = (() => {\n    'use strict';\n    var _increment = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey(\n      '__private_Counter_increment',\n    );\n    var _count = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Counter_count');\n    var _privateMethod = function () {\n      if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      _classPrivateFieldLooseBase(this, _count)[_count]++;\n    };\n    function _initialize() {\n      Object.defineProperty(this, _increment, { value: _privateMethod });\n      Object.defineProperty(this, _count, {\n        writable: true,\n        value: 0,\n      });\n    }\n    const Counter = function Counter() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n      _initialize.call(this);\n    };\n    Object.defineProperty(Counter.prototype, 'inc', {\n      value: Object.defineProperty(\n        function () {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          _classPrivateFieldLooseBase(this, _increment)[_increment]();\n          return _classPrivateFieldLooseBase(this, _count)[_count];\n        },\n        'name',\n        {\n          value: 'inc',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(Counter, 'prototype', { writable: false });\n    return Counter;\n  })();\n  const c = new Counter();\n  expect(c.inc()).toBe(1);\n  expect(c.inc()).toBe(2);\n};",
-  ],
-  [
-    'private fields interaction > private setter validating before setting private field',
-    "() => {\n  class Temp {\n    #celsius = 0;\n    set #temperature(v) {\n      if (v < -273.15) throw new Error('below absolute zero');\n      this.#celsius = v;\n    }\n    get #temperature() {\n      return this.#celsius;\n    }\n    setTemp(v) {\n      this.#temperature = v;\n    }\n    getTemp() {\n      return this.#temperature;\n    }\n  }\n  const t = new Temp();\n  t.setTemp(100);\n  expect(t.getTemp()).toBe(100);\n  expect(() => t.setTemp(-300)).toThrow();\n  // Value unchanged after rejected set\n  expect(t.getTemp()).toBe(100);\n}",
-    "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\n() => {\n  let Temp = (() => {\n    'use strict';\n    var _temperature = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey(\n      '__private_Temp_temperature',\n    );\n    var _celsius = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Temp_celsius');\n    function _initialize() {\n      Object.defineProperty(this, _temperature, {\n        get: function () {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          return _classPrivateFieldLooseBase(this, _celsius)[_celsius];\n        },\n        set: function (v) {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          if (v < -273.15) throw new Error('below absolute zero');\n          _classPrivateFieldLooseBase(this, _celsius)[_celsius] = v;\n        },\n      });\n      Object.defineProperty(this, _celsius, {\n        writable: true,\n        value: 0,\n      });\n    }\n    const Temp = function Temp() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n      _initialize.call(this);\n    };\n    Object.defineProperty(Temp.prototype, 'setTemp', {\n      value: Object.defineProperty(\n        function (v) {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          _classPrivateFieldLooseBase(this, _temperature)[_temperature] = v;\n        },\n        'name',\n        {\n          value: 'setTemp',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(Temp.prototype, 'getTemp', {\n      value: Object.defineProperty(\n        function () {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          return _classPrivateFieldLooseBase(this, _temperature)[_temperature];\n        },\n        'name',\n        {\n          value: 'getTemp',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(Temp, 'prototype', { writable: false });\n    return Temp;\n  })();\n  const t = new Temp();\n  t.setTemp(100);\n  expect(t.getTemp()).toBe(100);\n  expect(() => t.setTemp(-300)).toThrow();\n  // Value unchanged after rejected set\n  expect(t.getTemp()).toBe(100);\n};",
-  ],
-  [
-    'edge cases > private method in expression class',
-    "() => {\n  const Foo = class {\n    #bar() {\n      return 'bar';\n    }\n    test() {\n      return this.#bar();\n    }\n  };\n  expect(new Foo().test()).toBe('bar');\n}",
-    "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\n() => {\n  const Foo = (() => {\n    'use strict';\n    var _bar = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private__Class_bar');\n    var _privateMethod = function () {\n      if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      return 'bar';\n    };\n    function _initialize() {\n      Object.defineProperty(this, _bar, { value: _privateMethod });\n    }\n    const _Class = function _Class() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n      _initialize.call(this);\n    };\n    Object.defineProperty(_Class, 'name', {\n      value: 'Foo',\n      configurable: true,\n    });\n    Object.defineProperty(_Class.prototype, 'test', {\n      value: Object.defineProperty(\n        function () {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          return _classPrivateFieldLooseBase(this, _bar)[_bar]();\n        },\n        'name',\n        {\n          value: 'test',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(_Class, 'prototype', { writable: false });\n    return _Class;\n  })();\n  expect(new Foo().test()).toBe('bar');\n};",
-  ],
-  [
-    'edge cases > private method in nested class',
-    "() => {\n  class Outer {\n    test() {\n      class Inner {\n        #foo() {\n          return 'inner';\n        }\n        test() {\n          return this.#foo();\n        }\n      }\n      return new Inner().test();\n    }\n  }\n  expect(new Outer().test()).toBe('inner');\n}",
-    "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\n() => {\n  class Outer {\n    test() {\n      let Inner = (() => {\n        'use strict';\n        var _foo = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Inner_foo');\n        var _privateMethod = function () {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          return 'inner';\n        };\n        function _initialize() {\n          Object.defineProperty(this, _foo, { value: _privateMethod });\n        }\n        const Inner = function Inner() {\n          if (!new.target) throw new TypeError('Cannot call a class as a function');\n          _initialize.call(this);\n        };\n        Object.defineProperty(Inner.prototype, 'test', {\n          value: Object.defineProperty(\n            function () {\n              if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n              return _classPrivateFieldLooseBase(this, _foo)[_foo]();\n            },\n            'name',\n            {\n              value: 'test',\n              configurable: true,\n            },\n          ),\n          writable: true,\n          configurable: true,\n        });\n        Object.defineProperty(Inner, 'prototype', { writable: false });\n        return Inner;\n      })();\n      return new Inner().test();\n    }\n  }\n  expect(new Outer().test()).toBe('inner');\n};",
-  ],
-  [
-    'edge cases > private method with symbol property on instance',
-    "() => {\n  const sym = Symbol('test');\n  class Foo {\n    [sym] = 'symbol-val';\n    #bar() {\n      return this[sym];\n    }\n    test() {\n      return this.#bar();\n    }\n  }\n  expect(new Foo().test()).toBe('symbol-val');\n}",
-    "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\nvar _classKey2 = { toPropertyKey: require('@babel/runtime/helpers/toPropertyKey') },\n  _classKey = _classKey2.toPropertyKey;\n() => {\n  const sym = Symbol('test');\n  let Foo = (_key => {\n    'use strict';\n    var _bar = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_bar');\n    var _privateMethod = function () {\n      if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      return this[sym];\n    };\n    function _initialize() {\n      Object.defineProperty(this, _bar, { value: _privateMethod });\n      this[_key] = 'symbol-val';\n    }\n    _key = _key(_bar);\n    _key = _classKey(_key);\n    const Foo = function Foo() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n      _initialize.call(this);\n    };\n    Object.defineProperty(Foo.prototype, 'test', {\n      value: Object.defineProperty(\n        function () {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          return _classPrivateFieldLooseBase(this, _bar)[_bar]();\n        },\n        'name',\n        {\n          value: 'test',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(Foo, 'prototype', { writable: false });\n    return Foo;\n  })(_bar => sym);\n  expect(new Foo().test()).toBe('symbol-val');\n};",
-  ],
-  [
-    'edge cases > private method with computed public method',
-    "() => {\n  const key = 'myMethod';\n  class Foo {\n    #priv() {\n      return 'private';\n    }\n    [key]() {\n      return this.#priv();\n    }\n  }\n  expect(new Foo().myMethod()).toBe('private');\n}",
-    "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\nvar _classKey2 = { toPropertyKey: require('@babel/runtime/helpers/toPropertyKey') },\n  _classKey = _classKey2.toPropertyKey;\n() => {\n  const key = 'myMethod';\n  let Foo = (_key => {\n    'use strict';\n    var _priv = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_priv');\n    var _privateMethod = function () {\n      if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      return 'private';\n    };\n    function _initialize() {\n      Object.defineProperty(this, _priv, { value: _privateMethod });\n    }\n    _key = _key(_priv);\n    _key = _classKey(_key);\n    const Foo = function Foo() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n      _initialize.call(this);\n    };\n    Object.defineProperty(Foo.prototype, _key, {\n      value: Object.defineProperty(\n        function () {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          return _classPrivateFieldLooseBase(this, _priv)[_priv]();\n        },\n        'name',\n        {\n          value: typeof _key === 'symbol' ? { [_key]: function () {} }[_key].name : String(_key),\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(Foo, 'prototype', { writable: false });\n    return Foo;\n  })(_priv => key);\n  expect(new Foo().myMethod()).toBe('private');\n};",
-  ],
-  [
-    'edge cases > multiple instances have independent private state but shared method identity',
-    '() => {\n  class Foo {\n    #val;\n    constructor(val) {\n      this.#val = val;\n    }\n    #getVal() {\n      return this.#val;\n    }\n    test() {\n      return this.#getVal();\n    }\n    getMethod() {\n      return this.#getVal;\n    }\n  }\n  const a = new Foo(1);\n  const b = new Foo(2);\n  expect(a.test()).toBe(1);\n  expect(b.test()).toBe(2);\n  // Private methods share identity across instances\n  expect(a.getMethod()).toBe(b.getMethod());\n}',
-    "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\n() => {\n  let Foo = (() => {\n    'use strict';\n    var _getVal = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_getVal');\n    var _val = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_val');\n    var _privateMethod = function () {\n      if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      return _classPrivateFieldLooseBase(this, _val)[_val];\n    };\n    function _initialize() {\n      Object.defineProperty(this, _getVal, { value: _privateMethod });\n      Object.defineProperty(this, _val, {\n        writable: true,\n        value: void 0,\n      });\n    }\n    const Foo = function Foo(val) {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n      _initialize.call(this);\n      _classPrivateFieldLooseBase(this, _val)[_val] = val;\n    };\n    Object.defineProperty(Foo.prototype, 'test', {\n      value: Object.defineProperty(\n        function () {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          return _classPrivateFieldLooseBase(this, _getVal)[_getVal]();\n        },\n        'name',\n        {\n          value: 'test',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(Foo.prototype, 'getMethod', {\n      value: Object.defineProperty(\n        function () {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          return _classPrivateFieldLooseBase(this, _getVal)[_getVal];\n        },\n        'name',\n        {\n          value: 'getMethod',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(Foo, 'prototype', { writable: false });\n    return Foo;\n  })();\n  const a = new Foo(1);\n  const b = new Foo(2);\n  expect(a.test()).toBe(1);\n  expect(b.test()).toBe(2);\n  // Private methods share identity across instances\n  expect(a.getMethod()).toBe(b.getMethod());\n};",
-  ],
-  [
-    'edge cases > private method in class with constructor returning different object',
-    '() => {\n  class Foo {\n    #x = 10;\n    #bar() {\n      return this.#x;\n    }\n    test() {\n      return this.#bar();\n    }\n  }\n  // Normal instance works\n  expect(new Foo().test()).toBe(10);\n}',
-    "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\n() => {\n  let Foo = (() => {\n    'use strict';\n    var _x = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_x');\n    var _bar = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_bar');\n    var _privateMethod16 = function () {\n      if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      return _classPrivateFieldLooseBase(this, _x)[_x];\n    };\n    function _initialize() {\n      Object.defineProperty(this, _bar, { value: _privateMethod16 });\n      Object.defineProperty(this, _x, {\n        writable: true,\n        value: 10,\n      });\n    }\n    const Foo = function Foo() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n      _initialize.call(this);\n    };\n    Object.defineProperty(Foo.prototype, 'test', {\n      value: Object.defineProperty(\n        function () {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          return _classPrivateFieldLooseBase(this, _bar)[_bar]();\n        },\n        'name',\n        {\n          value: 'test',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(Foo, 'prototype', { writable: false });\n    return Foo;\n  })();\n  // Normal instance works\n  expect(new Foo().test()).toBe(10);\n};",
-  ],
-  [
-    'edge cases > private static method not accessible on instances',
-    "() => {\n  class Foo {\n    static #bar() {\n      return 42;\n    }\n    static test() {\n      return Foo.#bar();\n    }\n    instanceTest() {\n      // Can't access static private from instance\n      return Foo.test();\n    }\n  }\n  expect(new Foo().instanceTest()).toBe(42);\n}",
-    "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\n() => {\n  let Foo = (() => {\n    'use strict';\n    var _bar = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_bar');\n    var _privateMethod = function () {\n      if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      return 42;\n    };\n    const Foo = function Foo() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n    };\n    Object.defineProperty(Foo, 'test', {\n      value: Object.defineProperty(\n        function () {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          return _classPrivateFieldLooseBase(Foo, _bar)[_bar]();\n        },\n        'name',\n        {\n          value: 'test',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(Foo.prototype, 'instanceTest', {\n      value: Object.defineProperty(\n        function () {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          // Can't access static private from instance\n          return Foo.test();\n        },\n        'name',\n        {\n          value: 'instanceTest',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(Foo, 'prototype', { writable: false });\n    Object.defineProperty(Foo, _bar, { value: _privateMethod });\n    return Foo;\n  })();\n  expect(new Foo().instanceTest()).toBe(42);\n};",
-  ],
-  [
-    'edge cases > toString does not reveal private method names',
-    "() => {\n  class Foo {\n    #secret() {\n      return 42;\n    }\n    test() {\n      return this.#secret();\n    }\n  }\n  const foo = new Foo();\n  const keys = Object.getOwnPropertyNames(foo);\n  const hasPrivate = keys.some((k) => k.includes('secret'));\n  expect(hasPrivate).toBe(false);\n}",
-    "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\n() => {\n  let Foo = (() => {\n    'use strict';\n    var _secret = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_secret');\n    var _privateMethod = function () {\n      if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      return 42;\n    };\n    function _initialize() {\n      Object.defineProperty(this, _secret, { value: _privateMethod });\n    }\n    const Foo = function Foo() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n      _initialize.call(this);\n    };\n    Object.defineProperty(Foo.prototype, 'test', {\n      value: Object.defineProperty(\n        function () {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          return _classPrivateFieldLooseBase(this, _secret)[_secret]();\n        },\n        'name',\n        {\n          value: 'test',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(Foo, 'prototype', { writable: false });\n    return Foo;\n  })();\n  const foo = new Foo();\n  const keys = Object.getOwnPropertyNames(foo);\n  const hasPrivate = keys.some(k => k.includes('secret'));\n  expect(hasPrivate).toBe(false);\n};",
-  ],
-  [
-    'edge cases > for-in does not enumerate private methods',
-    "() => {\n  class Foo {\n    #secret() {}\n    pub = 1;\n  }\n  const foo = new Foo();\n  const keys = [];\n  for (const k in foo) {\n    keys.push(k);\n  }\n  // In loose mode, the transformed key is non-enumerable.\n  // With native private methods, the key wouldn't exist at all.\n  // Either way, no key named '#secret' is enumerable.\n  expect(keys.indexOf('#secret')).toBe(-1);\n  expect(keys.indexOf('pub') >= 0).toBe(true);\n}",
-    "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\n() => {\n  let Foo = (() => {\n    'use strict';\n    var _secret = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_secret');\n    var _privateMethod = function () {\n      if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n    };\n    function _initialize() {\n      Object.defineProperty(this, _secret, { value: _privateMethod });\n      this.pub = 1;\n    }\n    const Foo = function Foo() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n      _initialize.call(this);\n    };\n    Object.defineProperty(Foo, 'prototype', { writable: false });\n    return Foo;\n  })();\n  const foo = new Foo();\n  const keys = [];\n  for (const k in foo) {\n    keys.push(k);\n  }\n  // In loose mode, the transformed key is non-enumerable.\n  // With native private methods, the key wouldn't exist at all.\n  // Either way, no key named '#secret' is enumerable.\n  expect(keys.indexOf('#secret')).toBe(-1);\n  expect(keys.indexOf('pub') >= 0).toBe(true);\n};",
-  ],
-  [
-    'edge cases > JSON.stringify only includes public properties',
-    '() => {\n  class Foo {\n    #method() {\n      return 42;\n    }\n    x = 1;\n  }\n  const foo = new Foo();\n  const parsed = JSON.parse(JSON.stringify(foo));\n  expect(parsed.x).toBe(1);\n  // Private method storage (loose or native) should not appear\n  var keyCount = Object.keys(parsed).length;\n  expect(keyCount).toBe(1);\n}',
-    "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\n() => {\n  let Foo = (() => {\n    'use strict';\n    var _method = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_method');\n    var _privateMethod = function () {\n      if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      return 42;\n    };\n    function _initialize() {\n      Object.defineProperty(this, _method, { value: _privateMethod });\n      this.x = 1;\n    }\n    const Foo = function Foo() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n      _initialize.call(this);\n    };\n    Object.defineProperty(Foo, 'prototype', { writable: false });\n    return Foo;\n  })();\n  const foo = new Foo();\n  const parsed = JSON.parse(JSON.stringify(foo));\n  expect(parsed.x).toBe(1);\n  // Private method storage (loose or native) should not appear\n  var keyCount = Object.keys(parsed).length;\n  expect(keyCount).toBe(1);\n};",
-  ],
-  [
-    'edge cases > Object.keys does not include private methods',
-    "() => {\n  class Foo {\n    #method() {}\n    x = 1;\n  }\n  const keys = Object.keys(new Foo());\n  expect(keys.indexOf('x') >= 0).toBe(true);\n  expect(keys.length).toBe(1);\n}",
-    "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\n() => {\n  let Foo = (() => {\n    'use strict';\n    var _method = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_method');\n    var _privateMethod = function () {\n      if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n    };\n    function _initialize() {\n      Object.defineProperty(this, _method, { value: _privateMethod });\n      this.x = 1;\n    }\n    const Foo = function Foo() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n      _initialize.call(this);\n    };\n    Object.defineProperty(Foo, 'prototype', { writable: false });\n    return Foo;\n  })();\n  const keys = Object.keys(new Foo());\n  expect(keys.indexOf('x') >= 0).toBe(true);\n  expect(keys.length).toBe(1);\n};",
-  ],
-  [
-    'edge cases > typeof private method is function',
-    "() => {\n  class Foo {\n    #bar() {}\n    test() {\n      return typeof this.#bar;\n    }\n  }\n  expect(new Foo().test()).toBe('function');\n}",
-    "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\n() => {\n  let Foo = (() => {\n    'use strict';\n    var _bar = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_bar');\n    var _privateMethod = function () {\n      if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n    };\n    function _initialize() {\n      Object.defineProperty(this, _bar, { value: _privateMethod });\n    }\n    const Foo = function Foo() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n      _initialize.call(this);\n    };\n    Object.defineProperty(Foo.prototype, 'test', {\n      value: Object.defineProperty(\n        function () {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          return typeof _classPrivateFieldLooseBase(this, _bar)[_bar];\n        },\n        'name',\n        {\n          value: 'test',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(Foo, 'prototype', { writable: false });\n    return Foo;\n  })();\n  expect(new Foo().test()).toBe('function');\n};",
-  ],
-  [
-    'edge cases > constructor returning different object loses private brand',
-    '() => {\n  class Foo {\n    #x = 10;\n    #bar() {\n      return this.#x;\n    }\n    constructor(override) {\n      if (override) return override;\n    }\n    test() {\n      return this.#bar();\n    }\n  }\n  // Normal construction installs brand\n  expect(new Foo().test()).toBe(10);\n  // Overridden constructor returns a plain object without the brand\n  const plain = {};\n  const result = new Foo(plain);\n  expect(result).toBe(plain);\n  expect(result.test).toBeUndefined();\n}',
-    "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\n() => {\n  let Foo = (() => {\n    'use strict';\n    var _x = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_x');\n    var _bar = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_bar');\n    var _privateMethod19 = function () {\n      if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      return _classPrivateFieldLooseBase(this, _x)[_x];\n    };\n    function _initialize() {\n      Object.defineProperty(this, _bar, { value: _privateMethod19 });\n      Object.defineProperty(this, _x, {\n        writable: true,\n        value: 10,\n      });\n    }\n    const Foo = function Foo(override) {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n      _initialize.call(this);\n      if (override) return override;\n    };\n    Object.defineProperty(Foo.prototype, 'test', {\n      value: Object.defineProperty(\n        function () {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          return _classPrivateFieldLooseBase(this, _bar)[_bar]();\n        },\n        'name',\n        {\n          value: 'test',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(Foo, 'prototype', { writable: false });\n    return Foo;\n  })();\n  // Normal construction installs brand\n  expect(new Foo().test()).toBe(10);\n  // Overridden constructor returns a plain object without the brand\n  const plain = {};\n  const result = new Foo(plain);\n  expect(result).toBe(plain);\n  expect(result.test).toBeUndefined();\n};",
-  ],
-  [
-    'edge cases > private method as detached callback loses this',
-    '() => {\n  class Foo {\n    #val = 42;\n    #getVal() {\n      return this.#val;\n    }\n    getCallback() {\n      // Wrapping in arrow preserves this\n      return () => this.#getVal();\n    }\n    getDetached() {\n      return this.#getVal;\n    }\n  }\n  const foo = new Foo();\n  // Arrow-wrapped callback works\n  expect(foo.getCallback()()).toBe(42);\n  // Detached loses this context — calling without a receiver\n  const detached = foo.getDetached();\n  expect(() => detached()).toThrow();\n}',
-    "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\n() => {\n  let Foo = (() => {\n    'use strict';\n    var _getVal = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_getVal');\n    var _val = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_val');\n    var _privateMethod = function () {\n      if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      return _classPrivateFieldLooseBase(this, _val)[_val];\n    };\n    function _initialize() {\n      Object.defineProperty(this, _getVal, { value: _privateMethod });\n      Object.defineProperty(this, _val, {\n        writable: true,\n        value: 42,\n      });\n    }\n    const Foo = function Foo() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n      _initialize.call(this);\n    };\n    Object.defineProperty(Foo.prototype, 'getCallback', {\n      value: Object.defineProperty(\n        function () {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          // Wrapping in arrow preserves this\n          return () => _classPrivateFieldLooseBase(this, _getVal)[_getVal]();\n        },\n        'name',\n        {\n          value: 'getCallback',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(Foo.prototype, 'getDetached', {\n      value: Object.defineProperty(\n        function () {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          return _classPrivateFieldLooseBase(this, _getVal)[_getVal];\n        },\n        'name',\n        {\n          value: 'getDetached',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(Foo, 'prototype', { writable: false });\n    return Foo;\n  })();\n  const foo = new Foo();\n  // Arrow-wrapped callback works\n  expect(foo.getCallback()()).toBe(42);\n  // Detached loses this context — calling without a receiver\n  const detached = foo.getDetached();\n  expect(() => detached()).toThrow();\n};",
-  ],
-  [
-    'edge cases > private method with closure over constructor parameter',
-    '() => {\n  class Foo {\n    #fn;\n    constructor(multiplier) {\n      this.#fn = (x) => x * multiplier;\n    }\n    test(x) {\n      return this.#fn(x);\n    }\n  }\n  expect(new Foo(3).test(7)).toBe(21);\n}',
-    '() => {\n  class Foo {\n    #fn;\n    constructor(multiplier) {\n      this.#fn = x => x * multiplier;\n    }\n    test(x) {\n      return this.#fn(x);\n    }\n  }\n  expect(new Foo(3).test(7)).toBe(21);\n};',
-  ],
-  [
-    'static blocks > static block can access private static method',
-    "() => {\n  let captured;\n  class Foo {\n    static #bar() {\n      return 'from static block';\n    }\n    static {\n      captured = Foo.#bar();\n    }\n  }\n  expect(captured).toBe('from static block');\n}",
-    "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\n() => {\n  let captured;\n  let Foo = (() => {\n    'use strict';\n    var _bar = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_bar');\n    var _privateMethod = function () {\n      if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n      return 'from static block';\n    };\n    const Foo = function Foo() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n    };\n    Object.defineProperty(Foo, 'prototype', { writable: false });\n    Object.defineProperty(Foo, _bar, { value: _privateMethod });\n    (function () {\n      captured = _classPrivateFieldLooseBase(Foo, _bar)[_bar]();\n    }).call(Foo);\n    return Foo;\n  })();\n  expect(captured).toBe('from static block');\n};",
-  ],
-  [
-    'static blocks > static block can access private static accessor',
-    '() => {\n  let captured;\n  class Foo {\n    static #x = 42;\n    static get #value() {\n      return Foo.#x;\n    }\n    static {\n      captured = Foo.#value;\n    }\n  }\n  expect(captured).toBe(42);\n}',
-    "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\n() => {\n  let captured;\n  let Foo = (() => {\n    'use strict';\n    var _value = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_value');\n    var _x = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_x');\n    const Foo = function Foo() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n    };\n    Object.defineProperty(Foo, 'prototype', { writable: false });\n    Object.defineProperty(Foo, _value, {\n      get: function () {\n        if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n        return _classPrivateFieldLooseBase(Foo, _x)[_x];\n      },\n    });\n    Object.defineProperty(Foo, _x, {\n      writable: true,\n      value: 42,\n    });\n    (function () {\n      captured = _classPrivateFieldLooseBase(Foo, _value)[_value];\n    }).call(Foo);\n    return Foo;\n  })();\n  expect(captured).toBe(42);\n};",
-  ],
-  [
-    'private-in checks (ergonomic brand checks) > #field in obj for instance with private method',
-    '() => {\n  class Foo {\n    #bar() {}\n    static check(obj) {\n      return #bar in obj;\n    }\n  }\n  expect(Foo.check(new Foo())).toBe(true);\n  expect(Foo.check({})).toBe(false);\n  // `in` operator throws TypeError for non-object right-hand side\n  expect(() => Foo.check(42)).toThrow();\n}',
-    "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\nvar _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },\n  _checkInRHS = _checkInRHS2.checkInRHS;\n() => {\n  let Foo = (() => {\n    'use strict';\n    var _bar = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_bar');\n    var _privateMethod = function () {\n      if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n    };\n    function _initialize() {\n      Object.defineProperty(this, _bar, { value: _privateMethod });\n    }\n    const Foo = function Foo() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n      _initialize.call(this);\n    };\n    Object.defineProperty(Foo, 'check', {\n      value: Object.defineProperty(\n        function (obj) {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          return Object.prototype.hasOwnProperty.call(_checkInRHS(obj), _bar);\n        },\n        'name',\n        {\n          value: 'check',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(Foo, 'prototype', { writable: false });\n    return Foo;\n  })();\n  expect(Foo.check(new Foo())).toBe(true);\n  expect(Foo.check({})).toBe(false);\n  // `in` operator throws TypeError for non-object right-hand side\n  expect(() => Foo.check(42)).toThrow();\n};",
-  ],
-  [
-    'private-in checks (ergonomic brand checks) > #field in obj for instance with private field',
-    '() => {\n  class Foo {\n    #x = 1;\n    static check(obj) {\n      return #x in obj;\n    }\n  }\n  expect(Foo.check(new Foo())).toBe(true);\n  expect(Foo.check({})).toBe(false);\n}',
-    "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\nvar _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },\n  _checkInRHS = _checkInRHS2.checkInRHS;\n() => {\n  let Foo = (() => {\n    'use strict';\n    var _x = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_x');\n    function _initialize() {\n      Object.defineProperty(this, _x, {\n        writable: true,\n        value: 1,\n      });\n    }\n    const Foo = function Foo() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n      _initialize.call(this);\n    };\n    Object.defineProperty(Foo, 'check', {\n      value: Object.defineProperty(\n        function (obj) {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          return Object.prototype.hasOwnProperty.call(_checkInRHS(obj), _x);\n        },\n        'name',\n        {\n          value: 'check',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(Foo, 'prototype', { writable: false });\n    return Foo;\n  })();\n  expect(Foo.check(new Foo())).toBe(true);\n  expect(Foo.check({})).toBe(false);\n};",
-  ],
-  [
-    'private-in checks (ergonomic brand checks) > #field in obj with inheritance',
-    '() => {\n  class Base {\n    #secret() {}\n    static check(obj) {\n      return #secret in obj;\n    }\n  }\n  class Child extends Base {}\n  expect(Base.check(new Base())).toBe(true);\n  expect(Base.check(new Child())).toBe(true);\n  expect(Base.check({})).toBe(false);\n}',
-    "var _classPrivateFieldLooseBase2 = {\n  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),\n  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),\n};\nfunction _classPrivateFieldLooseBase(e, s, a) {\n  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);\n}\nvar _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },\n  _checkInRHS = _checkInRHS2.checkInRHS;\n() => {\n  let Base = (() => {\n    'use strict';\n    var _secret = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Base_secret');\n    var _privateMethod = function () {\n      if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n    };\n    function _initialize() {\n      Object.defineProperty(this, _secret, { value: _privateMethod });\n    }\n    const Base = function Base() {\n      if (!new.target) throw new TypeError('Cannot call a class as a function');\n      _initialize.call(this);\n    };\n    Object.defineProperty(Base, 'check', {\n      value: Object.defineProperty(\n        function (obj) {\n          if (new.target) throw new TypeError(\"Class methods cannot be invoked with 'new'\");\n          return Object.prototype.hasOwnProperty.call(_checkInRHS(obj), _secret);\n        },\n        'name',\n        {\n          value: 'check',\n          configurable: true,\n        },\n      ),\n      writable: true,\n      configurable: true,\n    });\n    Object.defineProperty(Base, 'prototype', { writable: false });\n    return Base;\n  })();\n  class Child extends Base {}\n  expect(Base.check(new Base())).toBe(true);\n  expect(Base.check(new Child())).toBe(true);\n  expect(Base.check({})).toBe(false);\n};",
-  ],
+  {
+    title: 'private instance methods > private method can be called from constructor',
+    source: `() => {
+        class Foo {
+          #bar() {
+            return 42;
+          }
+          constructor() {
+            this.result = this.#bar();
+          }
+        }
+        const foo = new Foo();
+        expect(foo.result).toBe(42);
+      }`,
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+() => {
+  let Foo = (() => {
+    'use strict';
+    var _bar = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_bar');
+    var _privateMethod = function () {
+      if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      return 42;
+    };
+    function _initialize() {
+      Object.defineProperty(this, _bar, { value: _privateMethod });
+    }
+    const Foo = function Foo() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+      _initialize.call(this);
+      this.result = _classPrivateFieldLooseBase(this, _bar)[_bar]();
+    };
+    Object.defineProperty(Foo, 'prototype', { writable: false });
+    return Foo;
+  })();
+  const foo = new Foo();
+  expect(foo.result).toBe(42);
+};`,
+  },
+  {
+    title: 'private instance methods > private method preserves this context',
+    source: `() => {
+        class Foo {
+          #name = 'foo';
+          #bar() {
+            return this.#name;
+          }
+          test() {
+            return this.#bar();
+          }
+        }
+        const foo = new Foo();
+        expect(foo.test()).toBe('foo');
+      }`,
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+() => {
+  let Foo = (() => {
+    'use strict';
+    var _name = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_name');
+    var _bar = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_bar');
+    var _privateMethod17 = function () {
+      if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      return _classPrivateFieldLooseBase(this, _name)[_name];
+    };
+    function _initialize() {
+      Object.defineProperty(this, _bar, { value: _privateMethod17 });
+      Object.defineProperty(this, _name, {
+        writable: true,
+        value: 'foo',
+      });
+    }
+    const Foo = function Foo() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+      _initialize.call(this);
+    };
+    Object.defineProperty(Foo.prototype, 'test', {
+      value: Object.defineProperty(
+        function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          return _classPrivateFieldLooseBase(this, _bar)[_bar]();
+        },
+        'name',
+        {
+          value: 'test',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(Foo, 'prototype', { writable: false });
+    return Foo;
+  })();
+  const foo = new Foo();
+  expect(foo.test()).toBe('foo');
+};`,
+  },
+  {
+    title: 'private instance methods > private method called with different this via call/apply',
+    source: `() => {
+        class Foo {
+          x = 1;
+          #bar() {
+            return this.x;
+          }
+          getBar() {
+            return this.#bar;
+          }
+        }
+        const foo = new Foo();
+        const bar = foo.getBar();
+        // Private method extracted — calling with original receiver
+        expect(bar.call(foo)).toBe(1);
+      }`,
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+() => {
+  let Foo = (() => {
+    'use strict';
+    var _bar = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_bar');
+    var _privateMethod = function () {
+      if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      return this.x;
+    };
+    function _initialize() {
+      Object.defineProperty(this, _bar, { value: _privateMethod });
+      this.x = 1;
+    }
+    const Foo = function Foo() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+      _initialize.call(this);
+    };
+    Object.defineProperty(Foo.prototype, 'getBar', {
+      value: Object.defineProperty(
+        function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          return _classPrivateFieldLooseBase(this, _bar)[_bar];
+        },
+        'name',
+        {
+          value: 'getBar',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(Foo, 'prototype', { writable: false });
+    return Foo;
+  })();
+  const foo = new Foo();
+  const bar = foo.getBar();
+  // Private method extracted — calling with original receiver
+  expect(bar.call(foo)).toBe(1);
+};`,
+  },
+  {
+    title: 'private instance methods > exfiltrated private method has stable identity',
+    source: `() => {
+        class Foo {
+          #bar() {
+            return 'bar';
+          }
+          getBar() {
+            return this.#bar;
+          }
+        }
+        const foo = new Foo();
+        expect(foo.getBar()).toBe(foo.getBar());
+      }`,
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+() => {
+  let Foo = (() => {
+    'use strict';
+    var _bar = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_bar');
+    var _privateMethod = function () {
+      if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      return 'bar';
+    };
+    function _initialize() {
+      Object.defineProperty(this, _bar, { value: _privateMethod });
+    }
+    const Foo = function Foo() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+      _initialize.call(this);
+    };
+    Object.defineProperty(Foo.prototype, 'getBar', {
+      value: Object.defineProperty(
+        function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          return _classPrivateFieldLooseBase(this, _bar)[_bar];
+        },
+        'name',
+        {
+          value: 'getBar',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(Foo, 'prototype', { writable: false });
+    return Foo;
+  })();
+  const foo = new Foo();
+  expect(foo.getBar()).toBe(foo.getBar());
+};`,
+  },
+  {
+    title: 'private instance methods > private method available during field initialization',
+    source: `() => {
+        class Foo {
+          #bar() {
+            return 'bar';
+          }
+          foo = this.#bar();
+        }
+        const foo = new Foo();
+        expect(foo.foo).toBe('bar');
+      }`,
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+() => {
+  let Foo = (() => {
+    'use strict';
+    var _bar = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_bar');
+    var _privateMethod = function () {
+      if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      return 'bar';
+    };
+    function _initialize() {
+      Object.defineProperty(this, _bar, { value: _privateMethod });
+      this.foo = _classPrivateFieldLooseBase(this, _bar)[_bar]();
+    }
+    const Foo = function Foo() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+      _initialize.call(this);
+    };
+    Object.defineProperty(Foo, 'prototype', { writable: false });
+    return Foo;
+  })();
+  const foo = new Foo();
+  expect(foo.foo).toBe('bar');
+};`,
+  },
+  {
+    title: 'private instance methods > multiple private methods in same class',
+    source: `() => {
+        class Foo {
+          #bar() {
+            return 'bar';
+          }
+          #baz() {
+            return 'baz';
+          }
+          test() {
+            return this.#bar() + this.#baz();
+          }
+        }
+        const foo = new Foo();
+        expect(foo.test()).toBe('barbaz');
+      }`,
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+() => {
+  let Foo = (() => {
+    'use strict';
+    var _baz = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_baz');
+    var _bar = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_bar');
+    var _privateMethod17 = function () {
+      if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      return 'bar';
+    };
+    var _privateMethod = function () {
+      if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      return 'baz';
+    };
+    function _initialize() {
+      Object.defineProperty(this, _bar, { value: _privateMethod17 });
+      Object.defineProperty(this, _baz, { value: _privateMethod });
+    }
+    const Foo = function Foo() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+      _initialize.call(this);
+    };
+    Object.defineProperty(Foo.prototype, 'test', {
+      value: Object.defineProperty(
+        function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          return (
+            _classPrivateFieldLooseBase(this, _bar)[_bar]() +
+            _classPrivateFieldLooseBase(this, _baz)[_baz]()
+          );
+        },
+        'name',
+        {
+          value: 'test',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(Foo, 'prototype', { writable: false });
+    return Foo;
+  })();
+  const foo = new Foo();
+  expect(foo.test()).toBe('barbaz');
+};`,
+  },
+  {
+    title: 'private instance methods > private method is read-only (assignment throws)',
+    source: `() => {
+          expect(() => {
+            class Foo {
+              #bar() {}
+              constructor() {
+                this.#bar = 1;
+              }
+            }
+            new Foo();
+          }).toThrow();
+        }`,
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+() => {
+  expect(() => {
+    let Foo = (() => {
+      'use strict';
+      var _bar = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_bar');
+      var _privateMethod = function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      };
+      function _initialize() {
+        Object.defineProperty(this, _bar, { value: _privateMethod });
+      }
+      const Foo = function Foo() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+        _initialize.call(this);
+        _classPrivateFieldLooseBase(this, _bar)[_bar] = 1;
+      };
+      Object.defineProperty(Foo, 'prototype', { writable: false });
+      return Foo;
+    })();
+    new Foo();
+  }).toThrow();
+};`,
+  },
+  {
+    title: 'private instance methods > private method compound assignment throws',
+    source: `() => {
+          expect(() => {
+            class Foo {
+              #bar() {}
+              constructor() {
+                this.#bar += 1;
+              }
+            }
+            new Foo();
+          }).toThrow();
+        }`,
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+() => {
+  expect(() => {
+    let Foo = (() => {
+      'use strict';
+      var _bar = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_bar');
+      var _privateMethod = function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      };
+      function _initialize() {
+        Object.defineProperty(this, _bar, { value: _privateMethod });
+      }
+      const Foo = function Foo() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+        _initialize.call(this);
+        _classPrivateFieldLooseBase(this, _bar)[_bar] += 1;
+      };
+      Object.defineProperty(Foo, 'prototype', { writable: false });
+      return Foo;
+    })();
+    new Foo();
+  }).toThrow();
+};`,
+  },
+  {
+    title: 'private instance methods > private method increment throws',
+    source: `() => {
+          expect(() => {
+            class Foo {
+              #bar() {}
+              constructor() {
+                this.#bar++;
+              }
+            }
+            new Foo();
+          }).toThrow();
+        }`,
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+() => {
+  expect(() => {
+    let Foo = (() => {
+      'use strict';
+      var _bar = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_bar');
+      var _privateMethod = function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      };
+      function _initialize() {
+        Object.defineProperty(this, _bar, { value: _privateMethod });
+      }
+      const Foo = function Foo() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+        _initialize.call(this);
+        _classPrivateFieldLooseBase(this, _bar)[_bar]++;
+      };
+      Object.defineProperty(Foo, 'prototype', { writable: false });
+      return Foo;
+    })();
+    new Foo();
+  }).toThrow();
+};`,
+  },
+  {
+    title: 'private instance methods > class name binding preserved inside private method',
+    source: `() => {
+        class Foo {
+          #bar() {
+            return Foo;
+          }
+          test() {
+            return this.#bar();
+          }
+        }
+        const foo = new Foo();
+        expect(foo.test()).toBe(Foo);
+      }`,
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+() => {
+  let Foo = (() => {
+    'use strict';
+    var _bar = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_bar');
+    var _privateMethod = function () {
+      if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      return Foo;
+    };
+    function _initialize() {
+      Object.defineProperty(this, _bar, { value: _privateMethod });
+    }
+    const Foo = function Foo() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+      _initialize.call(this);
+    };
+    Object.defineProperty(Foo.prototype, 'test', {
+      value: Object.defineProperty(
+        function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          return _classPrivateFieldLooseBase(this, _bar)[_bar]();
+        },
+        'name',
+        {
+          value: 'test',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(Foo, 'prototype', { writable: false });
+    return Foo;
+  })();
+  const foo = new Foo();
+  expect(foo.test()).toBe(Foo);
+};`,
+  },
+  {
+    title: 'private instance methods > super method access from private method',
+    source: `() => {
+        class Base {
+          greet() {
+            return 'hello';
+          }
+        }
+        class Derived extends Base {
+          #bar() {
+            return super.greet();
+          }
+          test() {
+            return this.#bar();
+          }
+        }
+        const d = new Derived();
+        expect(d.test()).toBe('hello');
+      }`,
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+var _get2 = { get: require('@babel/runtime/helpers/get') };
+function _get(e, t, r) {
+  return _get2.get(e, t, r);
+}
+() => {
+  class Base {
+    greet() {
+      return 'hello';
+    }
+  }
+  let Derived = (__nox_super_107_273 => {
+    'use strict';
+    var _bar = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Derived_bar');
+    var _privateMethod = function () {
+      if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      return _get(Object.getPrototypeOf(Derived.prototype), 'greet', this).call(this);
+    };
+    function _initialize() {
+      Object.defineProperty(this, _bar, { value: _privateMethod });
+    }
+    const Derived = function Derived() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+      var _this = _construct(Object.getPrototypeOf(Derived), arguments, new.target || Derived);
+      (function () {
+        _initialize.call(this);
+      }).call(_this);
+      return _this;
+    };
+    if (__nox_super_107_273 !== null && typeof __nox_super_107_273 !== 'function')
+      throw new TypeError('Super expression must either be null or a function');
+    Derived.prototype = Object.create(__nox_super_107_273 && __nox_super_107_273.prototype, {
+      constructor: {
+        value: Derived,
+        writable: true,
+        configurable: true,
+      },
+    });
+    if (Object.setPrototypeOf) Object.setPrototypeOf(Derived, __nox_super_107_273);
+    else Derived.__proto__ = __nox_super_107_273;
+    Object.defineProperty(Derived.prototype, 'test', {
+      value: Object.defineProperty(
+        function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          return _classPrivateFieldLooseBase(this, _bar)[_bar]();
+        },
+        'name',
+        {
+          value: 'test',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(Derived, 'prototype', { writable: false });
+    return Derived;
+  })(Base);
+  const d = new Derived();
+  expect(d.test()).toBe('hello');
+};`,
+  },
+  {
+    title: 'private instance methods > private method as tagged template',
+    source: `() => {
+        class Foo {
+          #tag(strings, ...values) {
+            return { strings: Array.from(strings), values };
+          }
+          test() {
+            return this.#tag\`hello \${'world'}\`;
+          }
+        }
+        const foo = new Foo();
+        const result = foo.test();
+        expect(result.strings).toEqual(['hello ', '']);
+        expect(result.values).toEqual(['world']);
+      }`,
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+() => {
+  let Foo = (() => {
+    'use strict';
+    var _tag = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_tag');
+    var _privateMethod = function (strings, ...values) {
+      if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      return {
+        strings: Array.from(strings),
+        values,
+      };
+    };
+    function _initialize() {
+      Object.defineProperty(this, _tag, { value: _privateMethod });
+    }
+    const Foo = function Foo() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+      _initialize.call(this);
+    };
+    Object.defineProperty(Foo.prototype, 'test', {
+      value: Object.defineProperty(
+        function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          return _classPrivateFieldLooseBase(this, _tag)[_tag]\`hello \${'world'}\`;
+        },
+        'name',
+        {
+          value: 'test',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(Foo, 'prototype', { writable: false });
+    return Foo;
+  })();
+  const foo = new Foo();
+  const result = foo.test();
+  expect(result.strings).toEqual(['hello ', '']);
+  expect(result.values).toEqual(['world']);
+};`,
+  },
+  {
+    title: 'private instance methods > private method with parameters',
+    source: `() => {
+        class Calc {
+          #add(a, b) {
+            return a + b;
+          }
+          sum(a, b) {
+            return this.#add(a, b);
+          }
+        }
+        const calc = new Calc();
+        expect(calc.sum(3, 4)).toBe(7);
+      }`,
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+() => {
+  let Calc = (() => {
+    'use strict';
+    var _add = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Calc_add');
+    var _privateMethod = function (a, b) {
+      if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      return a + b;
+    };
+    function _initialize() {
+      Object.defineProperty(this, _add, { value: _privateMethod });
+    }
+    const Calc = function Calc() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+      _initialize.call(this);
+    };
+    Object.defineProperty(Calc.prototype, 'sum', {
+      value: Object.defineProperty(
+        function (a, b) {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          return _classPrivateFieldLooseBase(this, _add)[_add](a, b);
+        },
+        'name',
+        {
+          value: 'sum',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(Calc, 'prototype', { writable: false });
+    return Calc;
+  })();
+  const calc = new Calc();
+  expect(calc.sum(3, 4)).toBe(7);
+};`,
+  },
+  {
+    title: 'private instance methods > private method with default parameters',
+    source: `() => {
+        class Foo {
+          #greet(name = 'world') {
+            return \`hello \${name}\`;
+          }
+          test(n) {
+            return this.#greet(n);
+          }
+        }
+        const foo = new Foo();
+        expect(foo.test()).toBe('hello world');
+        expect(foo.test('bar')).toBe('hello bar');
+      }`,
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+() => {
+  let Foo = (() => {
+    'use strict';
+    var _greet = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_greet');
+    var _privateMethod = function (name = 'world') {
+      if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      return \`hello \${name}\`;
+    };
+    function _initialize() {
+      Object.defineProperty(this, _greet, { value: _privateMethod });
+    }
+    const Foo = function Foo() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+      _initialize.call(this);
+    };
+    Object.defineProperty(Foo.prototype, 'test', {
+      value: Object.defineProperty(
+        function (n) {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          return _classPrivateFieldLooseBase(this, _greet)[_greet](n);
+        },
+        'name',
+        {
+          value: 'test',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(Foo, 'prototype', { writable: false });
+    return Foo;
+  })();
+  const foo = new Foo();
+  expect(foo.test()).toBe('hello world');
+  expect(foo.test('bar')).toBe('hello bar');
+};`,
+  },
+  {
+    title: 'private instance methods > private method with rest parameters',
+    source: `() => {
+        class Foo {
+          #sum(...args) {
+            return args.reduce((a, b) => a + b, 0);
+          }
+          test(...args) {
+            return this.#sum(...args);
+          }
+        }
+        const foo = new Foo();
+        expect(foo.test(1, 2, 3)).toBe(6);
+      }`,
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+() => {
+  let Foo = (() => {
+    'use strict';
+    var _sum = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_sum');
+    var _privateMethod = function (...args) {
+      if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      return args.reduce((a, b) => a + b, 0);
+    };
+    function _initialize() {
+      Object.defineProperty(this, _sum, { value: _privateMethod });
+    }
+    const Foo = function Foo() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+      _initialize.call(this);
+    };
+    Object.defineProperty(Foo.prototype, 'test', {
+      value: Object.defineProperty(
+        function (...args) {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          return _classPrivateFieldLooseBase(this, _sum)[_sum](...args);
+        },
+        'name',
+        {
+          value: 'test',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(Foo, 'prototype', { writable: false });
+    return Foo;
+  })();
+  const foo = new Foo();
+  expect(foo.test(1, 2, 3)).toBe(6);
+};`,
+  },
+  {
+    title: 'private instance methods > private method with destructured parameters',
+    source: `() => {
+        class Foo {
+          #extract({ x, y }) {
+            return x + y;
+          }
+          test(obj) {
+            return this.#extract(obj);
+          }
+        }
+        const foo = new Foo();
+        expect(foo.test({ x: 10, y: 20 })).toBe(30);
+      }`,
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+() => {
+  let Foo = (() => {
+    'use strict';
+    var _extract = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_extract');
+    var _privateMethod = function ({ x, y }) {
+      if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      return x + y;
+    };
+    function _initialize() {
+      Object.defineProperty(this, _extract, { value: _privateMethod });
+    }
+    const Foo = function Foo() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+      _initialize.call(this);
+    };
+    Object.defineProperty(Foo.prototype, 'test', {
+      value: Object.defineProperty(
+        function (obj) {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          return _classPrivateFieldLooseBase(this, _extract)[_extract](obj);
+        },
+        'name',
+        {
+          value: 'test',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(Foo, 'prototype', { writable: false });
+    return Foo;
+  })();
+  const foo = new Foo();
+  expect(
+    foo.test({
+      x: 10,
+      y: 20,
+    }),
+  ).toBe(30);
+};`,
+  },
+  {
+    title: 'private instance methods > private method not accessible from outside',
+    source: `() => {
+        class Foo {
+          #secret() {
+            return 42;
+          }
+        }
+        const foo = new Foo();
+        expect(foo['#secret']).toBeUndefined();
+        expect(typeof foo['#secret']).toBe('undefined');
+      }`,
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+() => {
+  let Foo = (() => {
+    'use strict';
+    var _secret = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_secret');
+    var _privateMethod = function () {
+      if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      return 42;
+    };
+    function _initialize() {
+      Object.defineProperty(this, _secret, { value: _privateMethod });
+    }
+    const Foo = function Foo() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+      _initialize.call(this);
+    };
+    Object.defineProperty(Foo, 'prototype', { writable: false });
+    return Foo;
+  })();
+  const foo = new Foo();
+  expect(foo['#secret']).toBeUndefined();
+  expect(typeof foo['#secret']).toBe('undefined');
+};`,
+  },
+  {
+    title: 'private instance methods > private method not accessible from subclass',
+    source: `() => {
+        class Base {
+          #secret() {
+            return 42;
+          }
+          callSecret() {
+            return this.#secret();
+          }
+        }
+        class Child extends Base {}
+        const child = new Child();
+        // Can only call through inherited public method
+        expect(child.callSecret()).toBe(42);
+      }`,
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+() => {
+  let Base = (() => {
+    'use strict';
+    var _secret = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Base_secret');
+    var _privateMethod = function () {
+      if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      return 42;
+    };
+    function _initialize() {
+      Object.defineProperty(this, _secret, { value: _privateMethod });
+    }
+    const Base = function Base() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+      _initialize.call(this);
+    };
+    Object.defineProperty(Base.prototype, 'callSecret', {
+      value: Object.defineProperty(
+        function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          return _classPrivateFieldLooseBase(this, _secret)[_secret]();
+        },
+        'name',
+        {
+          value: 'callSecret',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(Base, 'prototype', { writable: false });
+    return Base;
+  })();
+  class Child extends Base {}
+  const child = new Child();
+  // Can only call through inherited public method
+  expect(child.callSecret()).toBe(42);
+};`,
+  },
+  {
+    title: 'private instance methods > private method calling another private method',
+    source: `() => {
+        class Foo {
+          #a() {
+            return 1;
+          }
+          #b() {
+            return this.#a() + 2;
+          }
+          test() {
+            return this.#b();
+          }
+        }
+        const foo = new Foo();
+        expect(foo.test()).toBe(3);
+      }`,
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+() => {
+  let Foo = (() => {
+    'use strict';
+    var _a = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_a');
+    var _b = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_b');
+    var _privateMethod = function () {
+      if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      return 1;
+    };
+    var _privateMethod17 = function () {
+      if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      return _classPrivateFieldLooseBase(this, _a)[_a]() + 2;
+    };
+    function _initialize() {
+      Object.defineProperty(this, _a, { value: _privateMethod });
+      Object.defineProperty(this, _b, { value: _privateMethod17 });
+    }
+    const Foo = function Foo() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+      _initialize.call(this);
+    };
+    Object.defineProperty(Foo.prototype, 'test', {
+      value: Object.defineProperty(
+        function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          return _classPrivateFieldLooseBase(this, _b)[_b]();
+        },
+        'name',
+        {
+          value: 'test',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(Foo, 'prototype', { writable: false });
+    return Foo;
+  })();
+  const foo = new Foo();
+  expect(foo.test()).toBe(3);
+};`,
+  },
+  {
+    title: 'private instance methods > private method returning this for chaining',
+    source: `() => {
+        class Builder {
+          value = 0;
+          #add(n) {
+            this.value += n;
+            return this;
+          }
+          #mul(n) {
+            this.value *= n;
+            return this;
+          }
+          build(a, b) {
+            return this.#add(a).#mul(b).value;
+          }
+        }
+        const b = new Builder();
+        expect(b.build(3, 4)).toBe(12);
+      }`,
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+() => {
+  let Builder = (() => {
+    'use strict';
+    var _add = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Builder_add');
+    var _mul = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Builder_mul');
+    var _privateMethod = function (n) {
+      if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      this.value += n;
+      return this;
+    };
+    var _privateMethod19 = function (n) {
+      if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      this.value *= n;
+      return this;
+    };
+    function _initialize() {
+      Object.defineProperty(this, _add, { value: _privateMethod });
+      Object.defineProperty(this, _mul, { value: _privateMethod19 });
+      this.value = 0;
+    }
+    const Builder = function Builder() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+      _initialize.call(this);
+    };
+    Object.defineProperty(Builder.prototype, 'build', {
+      value: Object.defineProperty(
+        function (a, b) {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          return _classPrivateFieldLooseBase(
+            _classPrivateFieldLooseBase(this, _add)[_add](a),
+            _mul,
+          )[_mul](b).value;
+        },
+        'name',
+        {
+          value: 'build',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(Builder, 'prototype', { writable: false });
+    return Builder;
+  })();
+  const b = new Builder();
+  expect(b.build(3, 4)).toBe(12);
+};`,
+  },
+  {
+    title: 'async private methods > async private method returns promise',
+    source: `async () => {
+        class Foo {
+          async #bar() {
+            return 42;
+          }
+          async test() {
+            return await this.#bar();
+          }
+        }
+        const foo = new Foo();
+        const result = await foo.test();
+        expect(result).toBe(42);
+      }`,
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+async () => {
+  let Foo = (() => {
+    'use strict';
+    var _bar = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_bar');
+    var _privateMethod = async function () {
+      return 42;
+    };
+    function _initialize() {
+      Object.defineProperty(this, _bar, { value: _privateMethod });
+    }
+    const Foo = function Foo() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+      _initialize.call(this);
+    };
+    Object.defineProperty(Foo.prototype, 'test', {
+      value: Object.defineProperty(
+        async function () {
+          return await _classPrivateFieldLooseBase(this, _bar)[_bar]();
+        },
+        'name',
+        {
+          value: 'test',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(Foo, 'prototype', { writable: false });
+    return Foo;
+  })();
+  const foo = new Foo();
+  const result = await foo.test();
+  expect(result).toBe(42);
+};`,
+  },
+  {
+    title: 'async private methods > async private method with await',
+    source: `async () => {
+        class Foo {
+          async #fetch(val) {
+            const result = await Promise.resolve(val * 2);
+            return result;
+          }
+          async test() {
+            return await this.#fetch(21);
+          }
+        }
+        const foo = new Foo();
+        expect(await foo.test()).toBe(42);
+      }`,
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+async () => {
+  let Foo = (() => {
+    'use strict';
+    var _fetch = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_fetch');
+    var _privateMethod = async function (val) {
+      const result = await Promise.resolve(val * 2);
+      return result;
+    };
+    function _initialize() {
+      Object.defineProperty(this, _fetch, { value: _privateMethod });
+    }
+    const Foo = function Foo() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+      _initialize.call(this);
+    };
+    Object.defineProperty(Foo.prototype, 'test', {
+      value: Object.defineProperty(
+        async function () {
+          return await _classPrivateFieldLooseBase(this, _fetch)[_fetch](21);
+        },
+        'name',
+        {
+          value: 'test',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(Foo, 'prototype', { writable: false });
+    return Foo;
+  })();
+  const foo = new Foo();
+  expect(await foo.test()).toBe(42);
+};`,
+  },
+  {
+    title: 'async private methods > async private method error propagation',
+    source: `async () => {
+        class Foo {
+          async #fail() {
+            throw new Error('private error');
+          }
+          async test() {
+            try {
+              await this.#fail();
+              return 'no error';
+            } catch (e) {
+              return e.message;
+            }
+          }
+        }
+        const foo = new Foo();
+        expect(await foo.test()).toBe('private error');
+      }`,
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+async () => {
+  let Foo = (() => {
+    'use strict';
+    var _fail = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_fail');
+    var _privateMethod = async function () {
+      throw new Error('private error');
+    };
+    function _initialize() {
+      Object.defineProperty(this, _fail, { value: _privateMethod });
+    }
+    const Foo = function Foo() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+      _initialize.call(this);
+    };
+    Object.defineProperty(Foo.prototype, 'test', {
+      value: Object.defineProperty(
+        async function () {
+          try {
+            await _classPrivateFieldLooseBase(this, _fail)[_fail]();
+            return 'no error';
+          } catch (e) {
+            return e.message;
+          }
+        },
+        'name',
+        {
+          value: 'test',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(Foo, 'prototype', { writable: false });
+    return Foo;
+  })();
+  const foo = new Foo();
+  expect(await foo.test()).toBe('private error');
+};`,
+  },
+  {
+    title: 'generator private methods > private generator method yields values',
+    source: `() => {
+        class Foo {
+          *#gen() {
+            yield 1;
+            yield 2;
+            yield 3;
+          }
+          test() {
+            return [...this.#gen()];
+          }
+        }
+        const foo = new Foo();
+        expect(foo.test()).toEqual([1, 2, 3]);
+      }`,
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+() => {
+  let Foo = (() => {
+    'use strict';
+    var _gen = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_gen');
+    var _privateMethod = function* () {
+      yield 1;
+      yield 2;
+      yield 3;
+    };
+    function _initialize() {
+      Object.defineProperty(this, _gen, { value: _privateMethod });
+    }
+    const Foo = function Foo() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+      _initialize.call(this);
+    };
+    Object.defineProperty(Foo.prototype, 'test', {
+      value: Object.defineProperty(
+        function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          return [..._classPrivateFieldLooseBase(this, _gen)[_gen]()];
+        },
+        'name',
+        {
+          value: 'test',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(Foo, 'prototype', { writable: false });
+    return Foo;
+  })();
+  const foo = new Foo();
+  expect(foo.test()).toEqual([1, 2, 3]);
+};`,
+  },
+  {
+    title: 'generator private methods > private async generator method',
+    source: `async () => {
+        class Foo {
+          async *#gen() {
+            yield await Promise.resolve(1);
+            yield await Promise.resolve(2);
+            yield await Promise.resolve(3);
+          }
+          async test() {
+            const results = [];
+            for await (const val of this.#gen()) {
+              results.push(val);
+            }
+            return results;
+          }
+        }
+        const foo = new Foo();
+        expect(await foo.test()).toEqual([1, 2, 3]);
+      }`,
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+async () => {
+  let Foo = (() => {
+    'use strict';
+    var _gen = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_gen');
+    var _privateMethod = async function* () {
+      yield await Promise.resolve(1);
+      yield await Promise.resolve(2);
+      yield await Promise.resolve(3);
+    };
+    function _initialize() {
+      Object.defineProperty(this, _gen, { value: _privateMethod });
+    }
+    const Foo = function Foo() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+      _initialize.call(this);
+    };
+    Object.defineProperty(Foo.prototype, 'test', {
+      value: Object.defineProperty(
+        async function () {
+          const results = [];
+          for await (const val of _classPrivateFieldLooseBase(this, _gen)[_gen]()) {
+            results.push(val);
+          }
+          return results;
+        },
+        'name',
+        {
+          value: 'test',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(Foo, 'prototype', { writable: false });
+    return Foo;
+  })();
+  const foo = new Foo();
+  expect(await foo.test()).toEqual([1, 2, 3]);
+};`,
+  },
+  {
+    title: 'generator private methods > private generator with return',
+    source: `() => {
+        class Foo {
+          *#gen() {
+            yield 'a';
+            return 'done';
+          }
+          test() {
+            const gen = this.#gen();
+            const first = gen.next();
+            const second = gen.next();
+            return { first, second };
+          }
+        }
+        const foo = new Foo();
+        const result = foo.test();
+        expect(result.first.value).toBe('a');
+        expect(result.first.done).toBe(false);
+        expect(result.second.value).toBe('done');
+        expect(result.second.done).toBe(true);
+      }`,
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+() => {
+  let Foo = (() => {
+    'use strict';
+    var _gen = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_gen');
+    var _privateMethod = function* () {
+      yield 'a';
+      return 'done';
+    };
+    function _initialize() {
+      Object.defineProperty(this, _gen, { value: _privateMethod });
+    }
+    const Foo = function Foo() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+      _initialize.call(this);
+    };
+    Object.defineProperty(Foo.prototype, 'test', {
+      value: Object.defineProperty(
+        function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          const gen = _classPrivateFieldLooseBase(this, _gen)[_gen]();
+          const first = gen.next();
+          const second = gen.next();
+          return {
+            first,
+            second,
+          };
+        },
+        'name',
+        {
+          value: 'test',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(Foo, 'prototype', { writable: false });
+    return Foo;
+  })();
+  const foo = new Foo();
+  const result = foo.test();
+  expect(result.first.value).toBe('a');
+  expect(result.first.done).toBe(false);
+  expect(result.second.value).toBe('done');
+  expect(result.second.done).toBe(true);
+};`,
+  },
+  {
+    title: 'private accessors > private getter',
+    source: `() => {
+        class Foo {
+          #x = 42;
+          get #value() {
+            return this.#x;
+          }
+          test() {
+            return this.#value;
+          }
+        }
+        const foo = new Foo();
+        expect(foo.test()).toBe(42);
+      }`,
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+() => {
+  let Foo = (() => {
+    'use strict';
+    var _value = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_value');
+    var _x = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_x');
+    function _initialize() {
+      Object.defineProperty(this, _value, {
+        get: function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          return _classPrivateFieldLooseBase(this, _x)[_x];
+        },
+      });
+      Object.defineProperty(this, _x, {
+        writable: true,
+        value: 42,
+      });
+    }
+    const Foo = function Foo() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+      _initialize.call(this);
+    };
+    Object.defineProperty(Foo.prototype, 'test', {
+      value: Object.defineProperty(
+        function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          return _classPrivateFieldLooseBase(this, _value)[_value];
+        },
+        'name',
+        {
+          value: 'test',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(Foo, 'prototype', { writable: false });
+    return Foo;
+  })();
+  const foo = new Foo();
+  expect(foo.test()).toBe(42);
+};`,
+  },
+  {
+    title: 'private accessors > private setter',
+    source: `() => {
+        class Foo {
+          #x = 0;
+          set #value(v) {
+            this.#x = v;
+          }
+          getValue() {
+            return this.#x;
+          }
+          test(v) {
+            this.#value = v;
+          }
+        }
+        const foo = new Foo();
+        foo.test(42);
+        expect(foo.getValue()).toBe(42);
+      }`,
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+() => {
+  let Foo = (() => {
+    'use strict';
+    var _value = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_value');
+    var _x = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_x');
+    function _initialize() {
+      Object.defineProperty(this, _value, {
+        set: function (v) {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          _classPrivateFieldLooseBase(this, _x)[_x] = v;
+        },
+      });
+      Object.defineProperty(this, _x, {
+        writable: true,
+        value: 0,
+      });
+    }
+    const Foo = function Foo() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+      _initialize.call(this);
+    };
+    Object.defineProperty(Foo.prototype, 'getValue', {
+      value: Object.defineProperty(
+        function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          return _classPrivateFieldLooseBase(this, _x)[_x];
+        },
+        'name',
+        {
+          value: 'getValue',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(Foo.prototype, 'test', {
+      value: Object.defineProperty(
+        function (v) {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          _classPrivateFieldLooseBase(this, _value)[_value] = v;
+        },
+        'name',
+        {
+          value: 'test',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(Foo, 'prototype', { writable: false });
+    return Foo;
+  })();
+  const foo = new Foo();
+  foo.test(42);
+  expect(foo.getValue()).toBe(42);
+};`,
+  },
+  {
+    title: 'private accessors > private getter and setter pair',
+    source: `() => {
+        class Foo {
+          #x = 0;
+          get #value() {
+            return this.#x;
+          }
+          set #value(v) {
+            this.#x = v * 2;
+          }
+          test() {
+            this.#value = 21;
+            return this.#value;
+          }
+        }
+        const foo = new Foo();
+        expect(foo.test()).toBe(42);
+      }`,
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+() => {
+  let Foo = (() => {
+    'use strict';
+    var _value = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_value');
+    var _x = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_x');
+    function _initialize() {
+      Object.defineProperty(this, _value, {
+        get: function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          return _classPrivateFieldLooseBase(this, _x)[_x];
+        },
+        set: function (v) {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          _classPrivateFieldLooseBase(this, _x)[_x] = v * 2;
+        },
+      });
+      Object.defineProperty(this, _x, {
+        writable: true,
+        value: 0,
+      });
+    }
+    const Foo = function Foo() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+      _initialize.call(this);
+    };
+    Object.defineProperty(Foo.prototype, 'test', {
+      value: Object.defineProperty(
+        function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          _classPrivateFieldLooseBase(this, _value)[_value] = 21;
+          return _classPrivateFieldLooseBase(this, _value)[_value];
+        },
+        'name',
+        {
+          value: 'test',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(Foo, 'prototype', { writable: false });
+    return Foo;
+  })();
+  const foo = new Foo();
+  expect(foo.test()).toBe(42);
+};`,
+  },
+  {
+    title: 'private accessors > getter-only private accessor throws on set',
+    source: `() => {
+          expect(() => {
+            class Foo {
+              get #bar() {
+                return 1;
+              }
+              constructor() {
+                this.#bar = 2;
+              }
+            }
+            new Foo();
+          }).toThrow();
+        }`,
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+() => {
+  expect(() => {
+    let Foo = (() => {
+      'use strict';
+      var _bar = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_bar');
+      function _initialize() {
+        Object.defineProperty(this, _bar, {
+          get: function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            return 1;
+          },
+        });
+      }
+      const Foo = function Foo() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+        _initialize.call(this);
+        _classPrivateFieldLooseBase(this, _bar)[_bar] = 2;
+      };
+      Object.defineProperty(Foo, 'prototype', { writable: false });
+      return Foo;
+    })();
+    new Foo();
+  }).toThrow();
+};`,
+  },
+  {
+    title: 'private accessors > setter-only private accessor throws on get',
+    source: `() => {
+          expect(() => {
+            class Foo {
+              set #bar(v) {}
+              constructor() {
+                const x = this.#bar;
+              }
+            }
+            new Foo();
+          }).toThrow();
+        }`,
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+() => {
+  expect(() => {
+    let Foo = (() => {
+      'use strict';
+      var _bar = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_bar');
+      function _initialize() {
+        Object.defineProperty(this, _bar, {
+          set: function (v) {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          },
+        });
+      }
+      const Foo = function Foo() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+        _initialize.call(this);
+        const x = _classPrivateFieldLooseBase(this, _bar)[_bar];
+      };
+      Object.defineProperty(Foo, 'prototype', { writable: false });
+      return Foo;
+    })();
+    new Foo();
+  }).toThrow();
+};`,
+  },
+  {
+    title: 'private accessors > private accessor available during field initialization',
+    source: `() => {
+        class Foo {
+          get #value() {
+            return 42;
+          }
+          field = this.#value;
+        }
+        const foo = new Foo();
+        expect(foo.field).toBe(42);
+      }`,
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+() => {
+  let Foo = (() => {
+    'use strict';
+    var _value = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_value');
+    function _initialize() {
+      Object.defineProperty(this, _value, {
+        get: function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          return 42;
+        },
+      });
+      this.field = _classPrivateFieldLooseBase(this, _value)[_value];
+    }
+    const Foo = function Foo() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+      _initialize.call(this);
+    };
+    Object.defineProperty(Foo, 'prototype', { writable: false });
+    return Foo;
+  })();
+  const foo = new Foo();
+  expect(foo.field).toBe(42);
+};`,
+  },
+  {
+    title: 'private accessors > private getter with computed value',
+    source: `() => {
+        class Rect {
+          #w;
+          #h;
+          constructor(w, h) {
+            this.#w = w;
+            this.#h = h;
+          }
+          get #area() {
+            return this.#w * this.#h;
+          }
+          getArea() {
+            return this.#area;
+          }
+        }
+        const r = new Rect(3, 4);
+        expect(r.getArea()).toBe(12);
+      }`,
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+() => {
+  let Rect = (() => {
+    'use strict';
+    var _h = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Rect_h');
+    var _w = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Rect_w');
+    var _area = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Rect_area');
+    function _initialize() {
+      Object.defineProperty(this, _area, {
+        get: function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          return (
+            _classPrivateFieldLooseBase(this, _w)[_w] * _classPrivateFieldLooseBase(this, _h)[_h]
+          );
+        },
+      });
+      Object.defineProperty(this, _w, {
+        writable: true,
+        value: void 0,
+      });
+      Object.defineProperty(this, _h, {
+        writable: true,
+        value: void 0,
+      });
+    }
+    const Rect = function Rect(w, h) {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+      _initialize.call(this);
+      _classPrivateFieldLooseBase(this, _w)[_w] = w;
+      _classPrivateFieldLooseBase(this, _h)[_h] = h;
+    };
+    Object.defineProperty(Rect.prototype, 'getArea', {
+      value: Object.defineProperty(
+        function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          return _classPrivateFieldLooseBase(this, _area)[_area];
+        },
+        'name',
+        {
+          value: 'getArea',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(Rect, 'prototype', { writable: false });
+    return Rect;
+  })();
+  const r = new Rect(3, 4);
+  expect(r.getArea()).toBe(12);
+};`,
+  },
+  {
+    title: 'private accessors > private accessor increment/decrement via getter+setter',
+    source: `() => {
+        class Counter {
+          #x = 0;
+          get #count() {
+            return this.#x;
+          }
+          set #count(v) {
+            this.#x = v;
+          }
+          inc() {
+            this.#count++;
+            return this.#count;
+          }
+          dec() {
+            this.#count--;
+            return this.#count;
+          }
+        }
+        const c = new Counter();
+        expect(c.inc()).toBe(1);
+        expect(c.inc()).toBe(2);
+        expect(c.dec()).toBe(1);
+      }`,
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+() => {
+  let Counter = (() => {
+    'use strict';
+    var _x = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Counter_x');
+    var _count = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Counter_count');
+    function _initialize() {
+      Object.defineProperty(this, _count, {
+        get: function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          return _classPrivateFieldLooseBase(this, _x)[_x];
+        },
+        set: function (v) {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          _classPrivateFieldLooseBase(this, _x)[_x] = v;
+        },
+      });
+      Object.defineProperty(this, _x, {
+        writable: true,
+        value: 0,
+      });
+    }
+    const Counter = function Counter() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+      _initialize.call(this);
+    };
+    Object.defineProperty(Counter.prototype, 'inc', {
+      value: Object.defineProperty(
+        function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          _classPrivateFieldLooseBase(this, _count)[_count]++;
+          return _classPrivateFieldLooseBase(this, _count)[_count];
+        },
+        'name',
+        {
+          value: 'inc',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(Counter.prototype, 'dec', {
+      value: Object.defineProperty(
+        function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          _classPrivateFieldLooseBase(this, _count)[_count]--;
+          return _classPrivateFieldLooseBase(this, _count)[_count];
+        },
+        'name',
+        {
+          value: 'dec',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(Counter, 'prototype', { writable: false });
+    return Counter;
+  })();
+  const c = new Counter();
+  expect(c.inc()).toBe(1);
+  expect(c.inc()).toBe(2);
+  expect(c.dec()).toBe(1);
+};`,
+  },
+  {
+    title: 'private static methods > basic static private method',
+    source: `() => {
+        class Foo {
+          static #bar() {
+            return 'bar';
+          }
+          static test() {
+            return Foo.#bar();
+          }
+        }
+        expect(Foo.test()).toBe('bar');
+      }`,
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+() => {
+  let Foo = (() => {
+    'use strict';
+    var _bar = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_bar');
+    var _privateMethod = function () {
+      if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      return 'bar';
+    };
+    const Foo = function Foo() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+    };
+    Object.defineProperty(Foo, 'test', {
+      value: Object.defineProperty(
+        function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          return _classPrivateFieldLooseBase(Foo, _bar)[_bar]();
+        },
+        'name',
+        {
+          value: 'test',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(Foo, 'prototype', { writable: false });
+    Object.defineProperty(Foo, _bar, { value: _privateMethod });
+    return Foo;
+  })();
+  expect(Foo.test()).toBe('bar');
+};`,
+  },
+  {
+    title: 'private static methods > static private method with class passed as argument',
+    source: `() => {
+        class Foo {
+          static #bar() {
+            return 'bar';
+          }
+          static extract(klass) {
+            return klass.#bar();
+          }
+        }
+        expect(Foo.extract(Foo)).toBe('bar');
+      }`,
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+() => {
+  let Foo = (() => {
+    'use strict';
+    var _bar = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_bar');
+    var _privateMethod = function () {
+      if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      return 'bar';
+    };
+    const Foo = function Foo() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+    };
+    Object.defineProperty(Foo, 'extract', {
+      value: Object.defineProperty(
+        function (klass) {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          return _classPrivateFieldLooseBase(klass, _bar)[_bar]();
+        },
+        'name',
+        {
+          value: 'extract',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(Foo, 'prototype', { writable: false });
+    Object.defineProperty(Foo, _bar, { value: _privateMethod });
+    return Foo;
+  })();
+  expect(Foo.extract(Foo)).toBe('bar');
+};`,
+  },
+  {
+    title: 'private static methods > exfiltrated static private method has stable identity',
+    source: `() => {
+        class Foo {
+          static #bar() {
+            return 'bar';
+          }
+          static getBar() {
+            return Foo.#bar;
+          }
+        }
+        expect(Foo.getBar()).toBe(Foo.getBar());
+      }`,
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+() => {
+  let Foo = (() => {
+    'use strict';
+    var _bar = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_bar');
+    var _privateMethod = function () {
+      if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      return 'bar';
+    };
+    const Foo = function Foo() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+    };
+    Object.defineProperty(Foo, 'getBar', {
+      value: Object.defineProperty(
+        function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          return _classPrivateFieldLooseBase(Foo, _bar)[_bar];
+        },
+        'name',
+        {
+          value: 'getBar',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(Foo, 'prototype', { writable: false });
+    Object.defineProperty(Foo, _bar, { value: _privateMethod });
+    return Foo;
+  })();
+  expect(Foo.getBar()).toBe(Foo.getBar());
+};`,
+  },
+  {
+    title: 'private static methods > multiple static private methods',
+    source: `() => {
+        class Foo {
+          static #bar() {
+            return 'bar';
+          }
+          static #baz() {
+            return 'baz';
+          }
+          static test() {
+            return Foo.#bar() + Foo.#baz();
+          }
+        }
+        expect(Foo.test()).toBe('barbaz');
+      }`,
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+() => {
+  let Foo = (() => {
+    'use strict';
+    var _baz = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_baz');
+    var _bar = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_bar');
+    var _privateMethod16 = function () {
+      if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      return 'bar';
+    };
+    var _privateMethod = function () {
+      if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      return 'baz';
+    };
+    const Foo = function Foo() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+    };
+    Object.defineProperty(Foo, 'test', {
+      value: Object.defineProperty(
+        function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          return (
+            _classPrivateFieldLooseBase(Foo, _bar)[_bar]() +
+            _classPrivateFieldLooseBase(Foo, _baz)[_baz]()
+          );
+        },
+        'name',
+        {
+          value: 'test',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(Foo, 'prototype', { writable: false });
+    Object.defineProperty(Foo, _bar, { value: _privateMethod16 });
+    Object.defineProperty(Foo, _baz, { value: _privateMethod });
+    return Foo;
+  })();
+  expect(Foo.test()).toBe('barbaz');
+};`,
+  },
+  {
+    title: 'private static methods > static private method is read-only',
+    source: `() => {
+          expect(() => {
+            class Foo {
+              static #bar() {}
+              static {
+                Foo.#bar = 1;
+              }
+            }
+          }).toThrow();
+        }`,
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+() => {
+  expect(() => {
+    let Foo = (() => {
+      'use strict';
+      var _bar = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_bar');
+      var _privateMethod = function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      };
+      const Foo = function Foo() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+      };
+      Object.defineProperty(Foo, 'prototype', { writable: false });
+      Object.defineProperty(Foo, _bar, { value: _privateMethod });
+      (function () {
+        _classPrivateFieldLooseBase(Foo, _bar)[_bar] = 1;
+      }).call(Foo);
+      return Foo;
+    })();
+  }).toThrow();
+};`,
+  },
+  {
+    title: 'private static methods > static private method compound assignment throws',
+    source: `() => {
+          expect(() => {
+            class Foo {
+              static #bar() {}
+              static {
+                Foo.#bar += 1;
+              }
+            }
+          }).toThrow();
+        }`,
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+() => {
+  expect(() => {
+    let Foo = (() => {
+      'use strict';
+      var _bar = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_bar');
+      var _privateMethod = function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      };
+      const Foo = function Foo() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+      };
+      Object.defineProperty(Foo, 'prototype', { writable: false });
+      Object.defineProperty(Foo, _bar, { value: _privateMethod });
+      (function () {
+        _classPrivateFieldLooseBase(Foo, _bar)[_bar] += 1;
+      }).call(Foo);
+      return Foo;
+    })();
+  }).toThrow();
+};`,
+  },
+  {
+    title: 'private static methods > super access from static private method',
+    source: `() => {
+        class Base {
+          static greet() {
+            return 'hello';
+          }
+        }
+        class Derived extends Base {
+          static #bar() {
+            return super.greet();
+          }
+          static test() {
+            return Derived.#bar();
+          }
+        }
+        expect(Derived.test()).toBe('hello');
+      }`,
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+var _get2 = { get: require('@babel/runtime/helpers/get') };
+function _get(e, t, r) {
+  return _get2.get(e, t, r);
+}
+() => {
+  class Base {
+    static greet() {
+      return 'hello';
+    }
+  }
+  let Derived = (__nox_super_114_297 => {
+    'use strict';
+    var _bar = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Derived_bar');
+    var _privateMethod = function () {
+      if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      return _get(Object.getPrototypeOf(Derived), 'greet', this).call(this);
+    };
+    const Derived = function Derived() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+      var _this = _construct(Object.getPrototypeOf(Derived), arguments, new.target || Derived);
+      return _this;
+    };
+    if (__nox_super_114_297 !== null && typeof __nox_super_114_297 !== 'function')
+      throw new TypeError('Super expression must either be null or a function');
+    Derived.prototype = Object.create(__nox_super_114_297 && __nox_super_114_297.prototype, {
+      constructor: {
+        value: Derived,
+        writable: true,
+        configurable: true,
+      },
+    });
+    if (Object.setPrototypeOf) Object.setPrototypeOf(Derived, __nox_super_114_297);
+    else Derived.__proto__ = __nox_super_114_297;
+    Object.defineProperty(Derived, 'test', {
+      value: Object.defineProperty(
+        function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          return _classPrivateFieldLooseBase(Derived, _bar)[_bar]();
+        },
+        'name',
+        {
+          value: 'test',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(Derived, 'prototype', { writable: false });
+    Object.defineProperty(Derived, _bar, { value: _privateMethod });
+    return Derived;
+  })(Base);
+  expect(Derived.test()).toBe('hello');
+};`,
+  },
+  {
+    title: 'private static methods > this in static private method refers to class',
+    source: `() => {
+        class Foo {
+          static val = 42;
+          static #bar() {
+            return this.val;
+          }
+          static test() {
+            return this.#bar();
+          }
+        }
+        expect(Foo.test()).toBe(42);
+      }`,
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+() => {
+  let Foo = (() => {
+    'use strict';
+    var _bar = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_bar');
+    var _privateMethod = function () {
+      if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      return this.val;
+    };
+    const Foo = function Foo() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+    };
+    Object.defineProperty(Foo, 'test', {
+      value: Object.defineProperty(
+        function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          return _classPrivateFieldLooseBase(this, _bar)[_bar]();
+        },
+        'name',
+        {
+          value: 'test',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(Foo, 'prototype', { writable: false });
+    Object.defineProperty(Foo, _bar, { value: _privateMethod });
+    Foo.val = 42;
+    return Foo;
+  })();
+  expect(Foo.test()).toBe(42);
+};`,
+  },
+  {
+    title: 'private static methods > static private method as tagged template',
+    source: `() => {
+        class Foo {
+          static #tag(strings, ...values) {
+            return { strings: Array.from(strings), values };
+          }
+          static test() {
+            return Foo.#tag\`hi \${'there'}\`;
+          }
+        }
+        const result = Foo.test();
+        expect(result.strings).toEqual(['hi ', '']);
+        expect(result.values).toEqual(['there']);
+      }`,
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+() => {
+  let Foo = (() => {
+    'use strict';
+    var _tag = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_tag');
+    var _privateMethod = function (strings, ...values) {
+      if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      return {
+        strings: Array.from(strings),
+        values,
+      };
+    };
+    const Foo = function Foo() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+    };
+    Object.defineProperty(Foo, 'test', {
+      value: Object.defineProperty(
+        function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          return _classPrivateFieldLooseBase(Foo, _tag)[_tag]\`hi \${'there'}\`;
+        },
+        'name',
+        {
+          value: 'test',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(Foo, 'prototype', { writable: false });
+    Object.defineProperty(Foo, _tag, { value: _privateMethod });
+    return Foo;
+  })();
+  const result = Foo.test();
+  expect(result.strings).toEqual(['hi ', '']);
+  expect(result.values).toEqual(['there']);
+};`,
+  },
+  {
+    title: 'private static methods > static private generator method',
+    source: `() => {
+        class Foo {
+          static *#gen() {
+            yield 10;
+            yield 20;
+          }
+          static test() {
+            return [...Foo.#gen()];
+          }
+        }
+        expect(Foo.test()).toEqual([10, 20]);
+      }`,
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+() => {
+  let Foo = (() => {
+    'use strict';
+    var _gen = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_gen');
+    var _privateMethod = function* () {
+      yield 10;
+      yield 20;
+    };
+    const Foo = function Foo() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+    };
+    Object.defineProperty(Foo, 'test', {
+      value: Object.defineProperty(
+        function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          return [..._classPrivateFieldLooseBase(Foo, _gen)[_gen]()];
+        },
+        'name',
+        {
+          value: 'test',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(Foo, 'prototype', { writable: false });
+    Object.defineProperty(Foo, _gen, { value: _privateMethod });
+    return Foo;
+  })();
+  expect(Foo.test()).toEqual([10, 20]);
+};`,
+  },
+  {
+    title: 'private static methods > static private async method',
+    source: `async () => {
+        class Foo {
+          static async #compute(x) {
+            return await Promise.resolve(x * 2);
+          }
+          static async test() {
+            return await Foo.#compute(21);
+          }
+        }
+        expect(await Foo.test()).toBe(42);
+      }`,
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+async () => {
+  let Foo = (() => {
+    'use strict';
+    var _compute = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_compute');
+    var _privateMethod = async function (x) {
+      return await Promise.resolve(x * 2);
+    };
+    const Foo = function Foo() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+    };
+    Object.defineProperty(Foo, 'test', {
+      value: Object.defineProperty(
+        async function () {
+          return await _classPrivateFieldLooseBase(Foo, _compute)[_compute](21);
+        },
+        'name',
+        {
+          value: 'test',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(Foo, 'prototype', { writable: false });
+    Object.defineProperty(Foo, _compute, { value: _privateMethod });
+    return Foo;
+  })();
+  expect(await Foo.test()).toBe(42);
+};`,
+  },
+  {
+    title: 'private static accessors > static private getter',
+    source: `() => {
+        class Foo {
+          static #x = 42;
+          static get #value() {
+            return Foo.#x;
+          }
+          static test() {
+            return Foo.#value;
+          }
+        }
+        expect(Foo.test()).toBe(42);
+      }`,
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+() => {
+  let Foo = (() => {
+    'use strict';
+    var _value = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_value');
+    var _x = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_x');
+    const Foo = function Foo() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+    };
+    Object.defineProperty(Foo, 'test', {
+      value: Object.defineProperty(
+        function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          return _classPrivateFieldLooseBase(Foo, _value)[_value];
+        },
+        'name',
+        {
+          value: 'test',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(Foo, 'prototype', { writable: false });
+    Object.defineProperty(Foo, _value, {
+      get: function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return _classPrivateFieldLooseBase(Foo, _x)[_x];
+      },
+    });
+    Object.defineProperty(Foo, _x, {
+      writable: true,
+      value: 42,
+    });
+    return Foo;
+  })();
+  expect(Foo.test()).toBe(42);
+};`,
+  },
+  {
+    title: 'private static accessors > static private setter',
+    source: `() => {
+        class Foo {
+          static #x = 0;
+          static set #value(v) {
+            Foo.#x = v;
+          }
+          static get() {
+            return Foo.#x;
+          }
+          static test(v) {
+            Foo.#value = v;
+          }
+        }
+        Foo.test(42);
+        expect(Foo.get()).toBe(42);
+      }`,
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+() => {
+  let Foo = (() => {
+    'use strict';
+    var _value = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_value');
+    var _x = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_x');
+    const Foo = function Foo() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+    };
+    Object.defineProperty(Foo, 'get', {
+      value: Object.defineProperty(
+        function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          return _classPrivateFieldLooseBase(Foo, _x)[_x];
+        },
+        'name',
+        {
+          value: 'get',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(Foo, 'test', {
+      value: Object.defineProperty(
+        function (v) {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          _classPrivateFieldLooseBase(Foo, _value)[_value] = v;
+        },
+        'name',
+        {
+          value: 'test',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(Foo, 'prototype', { writable: false });
+    Object.defineProperty(Foo, _value, {
+      set: function (v) {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        _classPrivateFieldLooseBase(Foo, _x)[_x] = v;
+      },
+    });
+    Object.defineProperty(Foo, _x, {
+      writable: true,
+      value: 0,
+    });
+    return Foo;
+  })();
+  Foo.test(42);
+  expect(Foo.get()).toBe(42);
+};`,
+  },
+  {
+    title: 'private static accessors > static private getter and setter pair',
+    source: `() => {
+        class Foo {
+          static #x = 0;
+          static get #value() {
+            return Foo.#x;
+          }
+          static set #value(v) {
+            Foo.#x = v * 2;
+          }
+          static test() {
+            Foo.#value = 21;
+            return Foo.#value;
+          }
+        }
+        expect(Foo.test()).toBe(42);
+      }`,
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+() => {
+  let Foo = (() => {
+    'use strict';
+    var _value = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_value');
+    var _x = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_x');
+    const Foo = function Foo() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+    };
+    Object.defineProperty(Foo, 'test', {
+      value: Object.defineProperty(
+        function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          _classPrivateFieldLooseBase(Foo, _value)[_value] = 21;
+          return _classPrivateFieldLooseBase(Foo, _value)[_value];
+        },
+        'name',
+        {
+          value: 'test',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(Foo, 'prototype', { writable: false });
+    Object.defineProperty(Foo, _value, {
+      get: function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return _classPrivateFieldLooseBase(Foo, _x)[_x];
+      },
+      set: function (v) {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        _classPrivateFieldLooseBase(Foo, _x)[_x] = v * 2;
+      },
+    });
+    Object.defineProperty(Foo, _x, {
+      writable: true,
+      value: 0,
+    });
+    return Foo;
+  })();
+  expect(Foo.test()).toBe(42);
+};`,
+  },
+  {
+    title: 'private static accessors > static getter-only throws on set',
+    source: `() => {
+          expect(() => {
+            class Foo {
+              static get #bar() {
+                return 1;
+              }
+              static {
+                Foo.#bar = 2;
+              }
+            }
+          }).toThrow();
+        }`,
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+() => {
+  expect(() => {
+    let Foo = (() => {
+      'use strict';
+      var _bar = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_bar');
+      const Foo = function Foo() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+      };
+      Object.defineProperty(Foo, 'prototype', { writable: false });
+      Object.defineProperty(Foo, _bar, {
+        get: function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          return 1;
+        },
+      });
+      (function () {
+        _classPrivateFieldLooseBase(Foo, _bar)[_bar] = 2;
+      }).call(Foo);
+      return Foo;
+    })();
+  }).toThrow();
+};`,
+  },
+  {
+    title: 'inheritance and isolation > private methods are per-class (not inherited)',
+    source: `() => {
+        class Base {
+          #greet() {
+            return 'base';
+          }
+          test() {
+            return this.#greet();
+          }
+        }
+        class Child extends Base {
+          // Child does NOT have access to Base's #greet
+        }
+        const child = new Child();
+        // inherited public method still works because it calls #greet on Base
+        expect(child.test()).toBe('base');
+      }`,
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+() => {
+  let Base = (() => {
+    'use strict';
+    var _greet = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Base_greet');
+    var _privateMethod = function () {
+      if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      return 'base';
+    };
+    function _initialize() {
+      Object.defineProperty(this, _greet, { value: _privateMethod });
+    }
+    const Base = function Base() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+      _initialize.call(this);
+    };
+    Object.defineProperty(Base.prototype, 'test', {
+      value: Object.defineProperty(
+        function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          return _classPrivateFieldLooseBase(this, _greet)[_greet]();
+        },
+        'name',
+        {
+          value: 'test',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(Base, 'prototype', { writable: false });
+    return Base;
+  })();
+  class Child extends Base {}
+  const child = new Child();
+  // inherited public method still works because it calls #greet on Base
+  expect(child.test()).toBe('base');
+};`,
+  },
+  {
+    title: 'inheritance and isolation > subclass can define same-named private method',
+    source: `() => {
+        class Base {
+          #method() {
+            return 'base';
+          }
+          baseTest() {
+            return this.#method();
+          }
+        }
+        class Child extends Base {
+          #method() {
+            return 'child';
+          }
+          childTest() {
+            return this.#method();
+          }
+        }
+        const c = new Child();
+        expect(c.baseTest()).toBe('base');
+        expect(c.childTest()).toBe('child');
+      }`,
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+function _construct(t, r, c) {
+  return _construct2.construct(t, r, c);
+}
+() => {
+  let Base = (() => {
+    'use strict';
+    var _method = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Base_method');
+    var _privateMethod = function () {
+      if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      return 'base';
+    };
+    function _initialize() {
+      Object.defineProperty(this, _method, { value: _privateMethod });
+    }
+    const Base = function Base() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+      _initialize.call(this);
+    };
+    Object.defineProperty(Base.prototype, 'baseTest', {
+      value: Object.defineProperty(
+        function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          return _classPrivateFieldLooseBase(this, _method)[_method]();
+        },
+        'name',
+        {
+          value: 'baseTest',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(Base, 'prototype', { writable: false });
+    return Base;
+  })();
+  let Child = (__nox_super_178_347 => {
+    'use strict';
+    var _method19 =
+      _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Child_method');
+    var _privateMethod20 = function () {
+      if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      return 'child';
+    };
+    function _initialize21() {
+      Object.defineProperty(this, _method19, { value: _privateMethod20 });
+    }
+    const Child = function Child() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+      var _this = _construct(Object.getPrototypeOf(Child), arguments, new.target || Child);
+      (function () {
+        _initialize21.call(this);
+      }).call(_this);
+      return _this;
+    };
+    if (__nox_super_178_347 !== null && typeof __nox_super_178_347 !== 'function')
+      throw new TypeError('Super expression must either be null or a function');
+    Child.prototype = Object.create(__nox_super_178_347 && __nox_super_178_347.prototype, {
+      constructor: {
+        value: Child,
+        writable: true,
+        configurable: true,
+      },
+    });
+    if (Object.setPrototypeOf) Object.setPrototypeOf(Child, __nox_super_178_347);
+    else Child.__proto__ = __nox_super_178_347;
+    Object.defineProperty(Child.prototype, 'childTest', {
+      value: Object.defineProperty(
+        function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          return _classPrivateFieldLooseBase(this, _method19)[_method19]();
+        },
+        'name',
+        {
+          value: 'childTest',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(Child, 'prototype', { writable: false });
+    return Child;
+  })(Base);
+  const c = new Child();
+  expect(c.baseTest()).toBe('base');
+  expect(c.childTest()).toBe('child');
+};`,
+  },
+  {
+    title: 'inheritance and isolation > private method access on wrong class instance throws',
+    source: `() => {
+        class A {
+          #foo() {
+            return 'a';
+          }
+          test(obj) {
+            return obj.#foo();
+          }
+        }
+        class B {}
+        const a = new A();
+        const b = new B();
+        expect(() => a.test(b)).toThrow();
+      }`,
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+() => {
+  let A = (() => {
+    'use strict';
+    var _foo = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_A_foo');
+    var _privateMethod = function () {
+      if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      return 'a';
+    };
+    function _initialize() {
+      Object.defineProperty(this, _foo, { value: _privateMethod });
+    }
+    const A = function A() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+      _initialize.call(this);
+    };
+    Object.defineProperty(A.prototype, 'test', {
+      value: Object.defineProperty(
+        function (obj) {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          return _classPrivateFieldLooseBase(obj, _foo)[_foo]();
+        },
+        'name',
+        {
+          value: 'test',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(A, 'prototype', { writable: false });
+    return A;
+  })();
+  class B {}
+  const a = new A();
+  const b = new B();
+  expect(() => a.test(b)).toThrow();
+};`,
+  },
+  {
+    title:
+      'inheritance and isolation > different classes with same private method name are independent',
+    source: `() => {
+        class A {
+          #x() {
+            return 'A';
+          }
+          test() {
+            return this.#x();
+          }
+        }
+        class B {
+          #x() {
+            return 'B';
+          }
+          test() {
+            return this.#x();
+          }
+        }
+        expect(new A().test()).toBe('A');
+        expect(new B().test()).toBe('B');
+      }`,
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+() => {
+  let A = (() => {
+    'use strict';
+    var _x = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_A_x');
+    var _privateMethod = function () {
+      if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      return 'A';
+    };
+    function _initialize() {
+      Object.defineProperty(this, _x, { value: _privateMethod });
+    }
+    const A = function A() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+      _initialize.call(this);
+    };
+    Object.defineProperty(A.prototype, 'test', {
+      value: Object.defineProperty(
+        function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          return _classPrivateFieldLooseBase(this, _x)[_x]();
+        },
+        'name',
+        {
+          value: 'test',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(A, 'prototype', { writable: false });
+    return A;
+  })();
+  let B = (() => {
+    'use strict';
+    var _x18 = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_B_x');
+    var _privateMethod19 = function () {
+      if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      return 'B';
+    };
+    function _initialize20() {
+      Object.defineProperty(this, _x18, { value: _privateMethod19 });
+    }
+    const B = function B() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+      _initialize20.call(this);
+    };
+    Object.defineProperty(B.prototype, 'test', {
+      value: Object.defineProperty(
+        function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          return _classPrivateFieldLooseBase(this, _x18)[_x18]();
+        },
+        'name',
+        {
+          value: 'test',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(B, 'prototype', { writable: false });
+    return B;
+  })();
+  expect(new A().test()).toBe('A');
+  expect(new B().test()).toBe('B');
+};`,
+  },
+  {
+    title: 'private fields interaction > private method accessing private field',
+    source: `() => {
+        class Foo {
+          #x = 10;
+          #double() {
+            return this.#x * 2;
+          }
+          test() {
+            return this.#double();
+          }
+        }
+        expect(new Foo().test()).toBe(20);
+      }`,
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+() => {
+  let Foo = (() => {
+    'use strict';
+    var _double = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_double');
+    var _x = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_x');
+    var _privateMethod = function () {
+      if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      return _classPrivateFieldLooseBase(this, _x)[_x] * 2;
+    };
+    function _initialize() {
+      Object.defineProperty(this, _double, { value: _privateMethod });
+      Object.defineProperty(this, _x, {
+        writable: true,
+        value: 10,
+      });
+    }
+    const Foo = function Foo() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+      _initialize.call(this);
+    };
+    Object.defineProperty(Foo.prototype, 'test', {
+      value: Object.defineProperty(
+        function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          return _classPrivateFieldLooseBase(this, _double)[_double]();
+        },
+        'name',
+        {
+          value: 'test',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(Foo, 'prototype', { writable: false });
+    return Foo;
+  })();
+  expect(new Foo().test()).toBe(20);
+};`,
+  },
+  {
+    title: 'private fields interaction > private method mutating private field',
+    source: `() => {
+        class Counter {
+          #count = 0;
+          #increment() {
+            this.#count++;
+          }
+          inc() {
+            this.#increment();
+            return this.#count;
+          }
+        }
+        const c = new Counter();
+        expect(c.inc()).toBe(1);
+        expect(c.inc()).toBe(2);
+      }`,
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+() => {
+  let Counter = (() => {
+    'use strict';
+    var _increment = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey(
+      '__private_Counter_increment',
+    );
+    var _count = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Counter_count');
+    var _privateMethod = function () {
+      if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      _classPrivateFieldLooseBase(this, _count)[_count]++;
+    };
+    function _initialize() {
+      Object.defineProperty(this, _increment, { value: _privateMethod });
+      Object.defineProperty(this, _count, {
+        writable: true,
+        value: 0,
+      });
+    }
+    const Counter = function Counter() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+      _initialize.call(this);
+    };
+    Object.defineProperty(Counter.prototype, 'inc', {
+      value: Object.defineProperty(
+        function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          _classPrivateFieldLooseBase(this, _increment)[_increment]();
+          return _classPrivateFieldLooseBase(this, _count)[_count];
+        },
+        'name',
+        {
+          value: 'inc',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(Counter, 'prototype', { writable: false });
+    return Counter;
+  })();
+  const c = new Counter();
+  expect(c.inc()).toBe(1);
+  expect(c.inc()).toBe(2);
+};`,
+  },
+  {
+    title: 'private fields interaction > private setter validating before setting private field',
+    source: `() => {
+        class Temp {
+          #celsius = 0;
+          set #temperature(v) {
+            if (v < -273.15) throw new Error('below absolute zero');
+            this.#celsius = v;
+          }
+          get #temperature() {
+            return this.#celsius;
+          }
+          setTemp(v) {
+            this.#temperature = v;
+          }
+          getTemp() {
+            return this.#temperature;
+          }
+        }
+        const t = new Temp();
+        t.setTemp(100);
+        expect(t.getTemp()).toBe(100);
+        expect(() => t.setTemp(-300)).toThrow();
+        // Value unchanged after rejected set
+        expect(t.getTemp()).toBe(100);
+      }`,
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+() => {
+  let Temp = (() => {
+    'use strict';
+    var _temperature = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey(
+      '__private_Temp_temperature',
+    );
+    var _celsius = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Temp_celsius');
+    function _initialize() {
+      Object.defineProperty(this, _temperature, {
+        get: function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          return _classPrivateFieldLooseBase(this, _celsius)[_celsius];
+        },
+        set: function (v) {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          if (v < -273.15) throw new Error('below absolute zero');
+          _classPrivateFieldLooseBase(this, _celsius)[_celsius] = v;
+        },
+      });
+      Object.defineProperty(this, _celsius, {
+        writable: true,
+        value: 0,
+      });
+    }
+    const Temp = function Temp() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+      _initialize.call(this);
+    };
+    Object.defineProperty(Temp.prototype, 'setTemp', {
+      value: Object.defineProperty(
+        function (v) {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          _classPrivateFieldLooseBase(this, _temperature)[_temperature] = v;
+        },
+        'name',
+        {
+          value: 'setTemp',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(Temp.prototype, 'getTemp', {
+      value: Object.defineProperty(
+        function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          return _classPrivateFieldLooseBase(this, _temperature)[_temperature];
+        },
+        'name',
+        {
+          value: 'getTemp',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(Temp, 'prototype', { writable: false });
+    return Temp;
+  })();
+  const t = new Temp();
+  t.setTemp(100);
+  expect(t.getTemp()).toBe(100);
+  expect(() => t.setTemp(-300)).toThrow();
+  // Value unchanged after rejected set
+  expect(t.getTemp()).toBe(100);
+};`,
+  },
+  {
+    title: 'edge cases > private method in expression class',
+    source: `() => {
+        const Foo = class {
+          #bar() {
+            return 'bar';
+          }
+          test() {
+            return this.#bar();
+          }
+        };
+        expect(new Foo().test()).toBe('bar');
+      }`,
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+() => {
+  const Foo = (() => {
+    'use strict';
+    var _bar = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private__Class_bar');
+    var _privateMethod = function () {
+      if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      return 'bar';
+    };
+    function _initialize() {
+      Object.defineProperty(this, _bar, { value: _privateMethod });
+    }
+    const _Class = function _Class() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+      _initialize.call(this);
+    };
+    Object.defineProperty(_Class, 'name', {
+      value: 'Foo',
+      configurable: true,
+    });
+    Object.defineProperty(_Class.prototype, 'test', {
+      value: Object.defineProperty(
+        function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          return _classPrivateFieldLooseBase(this, _bar)[_bar]();
+        },
+        'name',
+        {
+          value: 'test',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(_Class, 'prototype', { writable: false });
+    return _Class;
+  })();
+  expect(new Foo().test()).toBe('bar');
+};`,
+  },
+  {
+    title: 'edge cases > private method in nested class',
+    source: `() => {
+        class Outer {
+          test() {
+            class Inner {
+              #foo() {
+                return 'inner';
+              }
+              test() {
+                return this.#foo();
+              }
+            }
+            return new Inner().test();
+          }
+        }
+        expect(new Outer().test()).toBe('inner');
+      }`,
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+() => {
+  class Outer {
+    test() {
+      let Inner = (() => {
+        'use strict';
+        var _foo = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Inner_foo');
+        var _privateMethod = function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          return 'inner';
+        };
+        function _initialize() {
+          Object.defineProperty(this, _foo, { value: _privateMethod });
+        }
+        const Inner = function Inner() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+          _initialize.call(this);
+        };
+        Object.defineProperty(Inner.prototype, 'test', {
+          value: Object.defineProperty(
+            function () {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              return _classPrivateFieldLooseBase(this, _foo)[_foo]();
+            },
+            'name',
+            {
+              value: 'test',
+              configurable: true,
+            },
+          ),
+          writable: true,
+          configurable: true,
+        });
+        Object.defineProperty(Inner, 'prototype', { writable: false });
+        return Inner;
+      })();
+      return new Inner().test();
+    }
+  }
+  expect(new Outer().test()).toBe('inner');
+};`,
+  },
+  {
+    title: 'edge cases > private method with symbol property on instance',
+    source: `() => {
+        const sym = Symbol('test');
+        class Foo {
+          [sym] = 'symbol-val';
+          #bar() {
+            return this[sym];
+          }
+          test() {
+            return this.#bar();
+          }
+        }
+        expect(new Foo().test()).toBe('symbol-val');
+      }`,
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+var _classKey2 = { toPropertyKey: require('@babel/runtime/helpers/toPropertyKey') },
+  _classKey = _classKey2.toPropertyKey;
+() => {
+  const sym = Symbol('test');
+  let Foo = (_key => {
+    'use strict';
+    var _bar = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_bar');
+    var _privateMethod = function () {
+      if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      return this[sym];
+    };
+    function _initialize() {
+      Object.defineProperty(this, _bar, { value: _privateMethod });
+      this[_key] = 'symbol-val';
+    }
+    _key = _key(_bar);
+    _key = _classKey(_key);
+    const Foo = function Foo() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+      _initialize.call(this);
+    };
+    Object.defineProperty(Foo.prototype, 'test', {
+      value: Object.defineProperty(
+        function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          return _classPrivateFieldLooseBase(this, _bar)[_bar]();
+        },
+        'name',
+        {
+          value: 'test',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(Foo, 'prototype', { writable: false });
+    return Foo;
+  })(_bar => sym);
+  expect(new Foo().test()).toBe('symbol-val');
+};`,
+  },
+  {
+    title: 'edge cases > private method with computed public method',
+    source: `() => {
+        const key = 'myMethod';
+        class Foo {
+          #priv() {
+            return 'private';
+          }
+          [key]() {
+            return this.#priv();
+          }
+        }
+        expect(new Foo().myMethod()).toBe('private');
+      }`,
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+var _classKey2 = { toPropertyKey: require('@babel/runtime/helpers/toPropertyKey') },
+  _classKey = _classKey2.toPropertyKey;
+() => {
+  const key = 'myMethod';
+  let Foo = (_key => {
+    'use strict';
+    var _priv = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_priv');
+    var _privateMethod = function () {
+      if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      return 'private';
+    };
+    function _initialize() {
+      Object.defineProperty(this, _priv, { value: _privateMethod });
+    }
+    _key = _key(_priv);
+    _key = _classKey(_key);
+    const Foo = function Foo() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+      _initialize.call(this);
+    };
+    Object.defineProperty(Foo.prototype, _key, {
+      value: Object.defineProperty(
+        function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          return _classPrivateFieldLooseBase(this, _priv)[_priv]();
+        },
+        'name',
+        {
+          value: typeof _key === 'symbol' ? { [_key]: function () {} }[_key].name : String(_key),
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(Foo, 'prototype', { writable: false });
+    return Foo;
+  })(_priv => key);
+  expect(new Foo().myMethod()).toBe('private');
+};`,
+  },
+  {
+    title:
+      'edge cases > multiple instances have independent private state but shared method identity',
+    source: `() => {
+        class Foo {
+          #val;
+          constructor(val) {
+            this.#val = val;
+          }
+          #getVal() {
+            return this.#val;
+          }
+          test() {
+            return this.#getVal();
+          }
+          getMethod() {
+            return this.#getVal;
+          }
+        }
+        const a = new Foo(1);
+        const b = new Foo(2);
+        expect(a.test()).toBe(1);
+        expect(b.test()).toBe(2);
+        // Private methods share identity across instances
+        expect(a.getMethod()).toBe(b.getMethod());
+      }`,
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+() => {
+  let Foo = (() => {
+    'use strict';
+    var _getVal = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_getVal');
+    var _val = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_val');
+    var _privateMethod = function () {
+      if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      return _classPrivateFieldLooseBase(this, _val)[_val];
+    };
+    function _initialize() {
+      Object.defineProperty(this, _getVal, { value: _privateMethod });
+      Object.defineProperty(this, _val, {
+        writable: true,
+        value: void 0,
+      });
+    }
+    const Foo = function Foo(val) {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+      _initialize.call(this);
+      _classPrivateFieldLooseBase(this, _val)[_val] = val;
+    };
+    Object.defineProperty(Foo.prototype, 'test', {
+      value: Object.defineProperty(
+        function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          return _classPrivateFieldLooseBase(this, _getVal)[_getVal]();
+        },
+        'name',
+        {
+          value: 'test',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(Foo.prototype, 'getMethod', {
+      value: Object.defineProperty(
+        function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          return _classPrivateFieldLooseBase(this, _getVal)[_getVal];
+        },
+        'name',
+        {
+          value: 'getMethod',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(Foo, 'prototype', { writable: false });
+    return Foo;
+  })();
+  const a = new Foo(1);
+  const b = new Foo(2);
+  expect(a.test()).toBe(1);
+  expect(b.test()).toBe(2);
+  // Private methods share identity across instances
+  expect(a.getMethod()).toBe(b.getMethod());
+};`,
+  },
+  {
+    title: 'edge cases > private method in class with constructor returning different object',
+    source: `() => {
+        class Foo {
+          #x = 10;
+          #bar() {
+            return this.#x;
+          }
+          test() {
+            return this.#bar();
+          }
+        }
+        // Normal instance works
+        expect(new Foo().test()).toBe(10);
+      }`,
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+() => {
+  let Foo = (() => {
+    'use strict';
+    var _x = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_x');
+    var _bar = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_bar');
+    var _privateMethod16 = function () {
+      if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      return _classPrivateFieldLooseBase(this, _x)[_x];
+    };
+    function _initialize() {
+      Object.defineProperty(this, _bar, { value: _privateMethod16 });
+      Object.defineProperty(this, _x, {
+        writable: true,
+        value: 10,
+      });
+    }
+    const Foo = function Foo() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+      _initialize.call(this);
+    };
+    Object.defineProperty(Foo.prototype, 'test', {
+      value: Object.defineProperty(
+        function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          return _classPrivateFieldLooseBase(this, _bar)[_bar]();
+        },
+        'name',
+        {
+          value: 'test',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(Foo, 'prototype', { writable: false });
+    return Foo;
+  })();
+  // Normal instance works
+  expect(new Foo().test()).toBe(10);
+};`,
+  },
+  {
+    title: 'edge cases > private static method not accessible on instances',
+    source: `() => {
+        class Foo {
+          static #bar() {
+            return 42;
+          }
+          static test() {
+            return Foo.#bar();
+          }
+          instanceTest() {
+            // Can't access static private from instance
+            return Foo.test();
+          }
+        }
+        expect(new Foo().instanceTest()).toBe(42);
+      }`,
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+() => {
+  let Foo = (() => {
+    'use strict';
+    var _bar = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_bar');
+    var _privateMethod = function () {
+      if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      return 42;
+    };
+    const Foo = function Foo() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+    };
+    Object.defineProperty(Foo, 'test', {
+      value: Object.defineProperty(
+        function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          return _classPrivateFieldLooseBase(Foo, _bar)[_bar]();
+        },
+        'name',
+        {
+          value: 'test',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(Foo.prototype, 'instanceTest', {
+      value: Object.defineProperty(
+        function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          // Can't access static private from instance
+          return Foo.test();
+        },
+        'name',
+        {
+          value: 'instanceTest',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(Foo, 'prototype', { writable: false });
+    Object.defineProperty(Foo, _bar, { value: _privateMethod });
+    return Foo;
+  })();
+  expect(new Foo().instanceTest()).toBe(42);
+};`,
+  },
+  {
+    title: 'edge cases > toString does not reveal private method names',
+    source: `() => {
+        class Foo {
+          #secret() {
+            return 42;
+          }
+          test() {
+            return this.#secret();
+          }
+        }
+        const foo = new Foo();
+        const keys = Object.getOwnPropertyNames(foo);
+        const hasPrivate = keys.some((k) => k.includes('secret'));
+        expect(hasPrivate).toBe(false);
+      }`,
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+() => {
+  let Foo = (() => {
+    'use strict';
+    var _secret = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_secret');
+    var _privateMethod = function () {
+      if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      return 42;
+    };
+    function _initialize() {
+      Object.defineProperty(this, _secret, { value: _privateMethod });
+    }
+    const Foo = function Foo() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+      _initialize.call(this);
+    };
+    Object.defineProperty(Foo.prototype, 'test', {
+      value: Object.defineProperty(
+        function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          return _classPrivateFieldLooseBase(this, _secret)[_secret]();
+        },
+        'name',
+        {
+          value: 'test',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(Foo, 'prototype', { writable: false });
+    return Foo;
+  })();
+  const foo = new Foo();
+  const keys = Object.getOwnPropertyNames(foo);
+  const hasPrivate = keys.some(k => k.includes('secret'));
+  expect(hasPrivate).toBe(false);
+};`,
+  },
+  {
+    title: 'edge cases > for-in does not enumerate private methods',
+    source: `() => {
+        class Foo {
+          #secret() {}
+          pub = 1;
+        }
+        const foo = new Foo();
+        const keys = [];
+        for (const k in foo) {
+          keys.push(k);
+        }
+        // In loose mode, the transformed key is non-enumerable.
+        // With native private methods, the key wouldn't exist at all.
+        // Either way, no key named '#secret' is enumerable.
+        expect(keys.indexOf('#secret')).toBe(-1);
+        expect(keys.indexOf('pub') >= 0).toBe(true);
+      }`,
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+() => {
+  let Foo = (() => {
+    'use strict';
+    var _secret = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_secret');
+    var _privateMethod = function () {
+      if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+    };
+    function _initialize() {
+      Object.defineProperty(this, _secret, { value: _privateMethod });
+      this.pub = 1;
+    }
+    const Foo = function Foo() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+      _initialize.call(this);
+    };
+    Object.defineProperty(Foo, 'prototype', { writable: false });
+    return Foo;
+  })();
+  const foo = new Foo();
+  const keys = [];
+  for (const k in foo) {
+    keys.push(k);
+  }
+  // In loose mode, the transformed key is non-enumerable.
+  // With native private methods, the key wouldn't exist at all.
+  // Either way, no key named '#secret' is enumerable.
+  expect(keys.indexOf('#secret')).toBe(-1);
+  expect(keys.indexOf('pub') >= 0).toBe(true);
+};`,
+  },
+  {
+    title: 'edge cases > JSON.stringify only includes public properties',
+    source: `() => {
+        class Foo {
+          #method() {
+            return 42;
+          }
+          x = 1;
+        }
+        const foo = new Foo();
+        const parsed = JSON.parse(JSON.stringify(foo));
+        expect(parsed.x).toBe(1);
+        // Private method storage (loose or native) should not appear
+        var keyCount = Object.keys(parsed).length;
+        expect(keyCount).toBe(1);
+      }`,
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+() => {
+  let Foo = (() => {
+    'use strict';
+    var _method = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_method');
+    var _privateMethod = function () {
+      if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      return 42;
+    };
+    function _initialize() {
+      Object.defineProperty(this, _method, { value: _privateMethod });
+      this.x = 1;
+    }
+    const Foo = function Foo() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+      _initialize.call(this);
+    };
+    Object.defineProperty(Foo, 'prototype', { writable: false });
+    return Foo;
+  })();
+  const foo = new Foo();
+  const parsed = JSON.parse(JSON.stringify(foo));
+  expect(parsed.x).toBe(1);
+  // Private method storage (loose or native) should not appear
+  var keyCount = Object.keys(parsed).length;
+  expect(keyCount).toBe(1);
+};`,
+  },
+  {
+    title: 'edge cases > Object.keys does not include private methods',
+    source: `() => {
+        class Foo {
+          #method() {}
+          x = 1;
+        }
+        const keys = Object.keys(new Foo());
+        expect(keys.indexOf('x') >= 0).toBe(true);
+        expect(keys.length).toBe(1);
+      }`,
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+() => {
+  let Foo = (() => {
+    'use strict';
+    var _method = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_method');
+    var _privateMethod = function () {
+      if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+    };
+    function _initialize() {
+      Object.defineProperty(this, _method, { value: _privateMethod });
+      this.x = 1;
+    }
+    const Foo = function Foo() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+      _initialize.call(this);
+    };
+    Object.defineProperty(Foo, 'prototype', { writable: false });
+    return Foo;
+  })();
+  const keys = Object.keys(new Foo());
+  expect(keys.indexOf('x') >= 0).toBe(true);
+  expect(keys.length).toBe(1);
+};`,
+  },
+  {
+    title: 'edge cases > typeof private method is function',
+    source: `() => {
+        class Foo {
+          #bar() {}
+          test() {
+            return typeof this.#bar;
+          }
+        }
+        expect(new Foo().test()).toBe('function');
+      }`,
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+() => {
+  let Foo = (() => {
+    'use strict';
+    var _bar = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_bar');
+    var _privateMethod = function () {
+      if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+    };
+    function _initialize() {
+      Object.defineProperty(this, _bar, { value: _privateMethod });
+    }
+    const Foo = function Foo() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+      _initialize.call(this);
+    };
+    Object.defineProperty(Foo.prototype, 'test', {
+      value: Object.defineProperty(
+        function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          return typeof _classPrivateFieldLooseBase(this, _bar)[_bar];
+        },
+        'name',
+        {
+          value: 'test',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(Foo, 'prototype', { writable: false });
+    return Foo;
+  })();
+  expect(new Foo().test()).toBe('function');
+};`,
+  },
+  {
+    title: 'edge cases > constructor returning different object loses private brand',
+    source: `() => {
+        class Foo {
+          #x = 10;
+          #bar() {
+            return this.#x;
+          }
+          constructor(override) {
+            if (override) return override;
+          }
+          test() {
+            return this.#bar();
+          }
+        }
+        // Normal construction installs brand
+        expect(new Foo().test()).toBe(10);
+        // Overridden constructor returns a plain object without the brand
+        const plain = {};
+        const result = new Foo(plain);
+        expect(result).toBe(plain);
+        expect(result.test).toBeUndefined();
+      }`,
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+() => {
+  let Foo = (() => {
+    'use strict';
+    var _x = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_x');
+    var _bar = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_bar');
+    var _privateMethod19 = function () {
+      if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      return _classPrivateFieldLooseBase(this, _x)[_x];
+    };
+    function _initialize() {
+      Object.defineProperty(this, _bar, { value: _privateMethod19 });
+      Object.defineProperty(this, _x, {
+        writable: true,
+        value: 10,
+      });
+    }
+    const Foo = function Foo(override) {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+      _initialize.call(this);
+      if (override) return override;
+    };
+    Object.defineProperty(Foo.prototype, 'test', {
+      value: Object.defineProperty(
+        function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          return _classPrivateFieldLooseBase(this, _bar)[_bar]();
+        },
+        'name',
+        {
+          value: 'test',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(Foo, 'prototype', { writable: false });
+    return Foo;
+  })();
+  // Normal construction installs brand
+  expect(new Foo().test()).toBe(10);
+  // Overridden constructor returns a plain object without the brand
+  const plain = {};
+  const result = new Foo(plain);
+  expect(result).toBe(plain);
+  expect(result.test).toBeUndefined();
+};`,
+  },
+  {
+    title: 'edge cases > private method as detached callback loses this',
+    source: `() => {
+        class Foo {
+          #val = 42;
+          #getVal() {
+            return this.#val;
+          }
+          getCallback() {
+            // Wrapping in arrow preserves this
+            return () => this.#getVal();
+          }
+          getDetached() {
+            return this.#getVal;
+          }
+        }
+        const foo = new Foo();
+        // Arrow-wrapped callback works
+        expect(foo.getCallback()()).toBe(42);
+        // Detached loses this context — calling without a receiver
+        const detached = foo.getDetached();
+        expect(() => detached()).toThrow();
+      }`,
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+() => {
+  let Foo = (() => {
+    'use strict';
+    var _getVal = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_getVal');
+    var _val = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_val');
+    var _privateMethod = function () {
+      if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      return _classPrivateFieldLooseBase(this, _val)[_val];
+    };
+    function _initialize() {
+      Object.defineProperty(this, _getVal, { value: _privateMethod });
+      Object.defineProperty(this, _val, {
+        writable: true,
+        value: 42,
+      });
+    }
+    const Foo = function Foo() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+      _initialize.call(this);
+    };
+    Object.defineProperty(Foo.prototype, 'getCallback', {
+      value: Object.defineProperty(
+        function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          // Wrapping in arrow preserves this
+          return () => _classPrivateFieldLooseBase(this, _getVal)[_getVal]();
+        },
+        'name',
+        {
+          value: 'getCallback',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(Foo.prototype, 'getDetached', {
+      value: Object.defineProperty(
+        function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          return _classPrivateFieldLooseBase(this, _getVal)[_getVal];
+        },
+        'name',
+        {
+          value: 'getDetached',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(Foo, 'prototype', { writable: false });
+    return Foo;
+  })();
+  const foo = new Foo();
+  // Arrow-wrapped callback works
+  expect(foo.getCallback()()).toBe(42);
+  // Detached loses this context — calling without a receiver
+  const detached = foo.getDetached();
+  expect(() => detached()).toThrow();
+};`,
+  },
+  {
+    title: 'edge cases > private method with closure over constructor parameter',
+    source: `() => {
+        class Foo {
+          #fn;
+          constructor(multiplier) {
+            this.#fn = (x) => x * multiplier;
+          }
+          test(x) {
+            return this.#fn(x);
+          }
+        }
+        expect(new Foo(3).test(7)).toBe(21);
+      }`,
+    output: `() => {
+  class Foo {
+    #fn;
+    constructor(multiplier) {
+      this.#fn = x => x * multiplier;
+    }
+    test(x) {
+      return this.#fn(x);
+    }
+  }
+  expect(new Foo(3).test(7)).toBe(21);
+};`,
+  },
+  {
+    title: 'static blocks > static block can access private static method',
+    source: `() => {
+        let captured;
+        class Foo {
+          static #bar() {
+            return 'from static block';
+          }
+          static {
+            captured = Foo.#bar();
+          }
+        }
+        expect(captured).toBe('from static block');
+      }`,
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+() => {
+  let captured;
+  let Foo = (() => {
+    'use strict';
+    var _bar = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_bar');
+    var _privateMethod = function () {
+      if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+      return 'from static block';
+    };
+    const Foo = function Foo() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+    };
+    Object.defineProperty(Foo, 'prototype', { writable: false });
+    Object.defineProperty(Foo, _bar, { value: _privateMethod });
+    (function () {
+      captured = _classPrivateFieldLooseBase(Foo, _bar)[_bar]();
+    }).call(Foo);
+    return Foo;
+  })();
+  expect(captured).toBe('from static block');
+};`,
+  },
+  {
+    title: 'static blocks > static block can access private static accessor',
+    source: `() => {
+        let captured;
+        class Foo {
+          static #x = 42;
+          static get #value() {
+            return Foo.#x;
+          }
+          static {
+            captured = Foo.#value;
+          }
+        }
+        expect(captured).toBe(42);
+      }`,
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+() => {
+  let captured;
+  let Foo = (() => {
+    'use strict';
+    var _value = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_value');
+    var _x = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_x');
+    const Foo = function Foo() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+    };
+    Object.defineProperty(Foo, 'prototype', { writable: false });
+    Object.defineProperty(Foo, _value, {
+      get: function () {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return _classPrivateFieldLooseBase(Foo, _x)[_x];
+      },
+    });
+    Object.defineProperty(Foo, _x, {
+      writable: true,
+      value: 42,
+    });
+    (function () {
+      captured = _classPrivateFieldLooseBase(Foo, _value)[_value];
+    }).call(Foo);
+    return Foo;
+  })();
+  expect(captured).toBe(42);
+};`,
+  },
+  {
+    title:
+      'private-in checks (ergonomic brand checks) > #field in obj for instance with private method',
+    source: `() => {
+        class Foo {
+          #bar() {}
+          static check(obj) {
+            return #bar in obj;
+          }
+        }
+        expect(Foo.check(new Foo())).toBe(true);
+        expect(Foo.check({})).toBe(false);
+        // \`in\` operator throws TypeError for non-object right-hand side
+        expect(() => Foo.check(42)).toThrow();
+      }`,
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+  _checkInRHS = _checkInRHS2.checkInRHS;
+() => {
+  let Foo = (() => {
+    'use strict';
+    var _bar = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_bar');
+    var _privateMethod = function () {
+      if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+    };
+    function _initialize() {
+      Object.defineProperty(this, _bar, { value: _privateMethod });
+    }
+    const Foo = function Foo() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+      _initialize.call(this);
+    };
+    Object.defineProperty(Foo, 'check', {
+      value: Object.defineProperty(
+        function (obj) {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          return Object.prototype.hasOwnProperty.call(_checkInRHS(obj), _bar);
+        },
+        'name',
+        {
+          value: 'check',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(Foo, 'prototype', { writable: false });
+    return Foo;
+  })();
+  expect(Foo.check(new Foo())).toBe(true);
+  expect(Foo.check({})).toBe(false);
+  // \`in\` operator throws TypeError for non-object right-hand side
+  expect(() => Foo.check(42)).toThrow();
+};`,
+  },
+  {
+    title:
+      'private-in checks (ergonomic brand checks) > #field in obj for instance with private field',
+    source: `() => {
+        class Foo {
+          #x = 1;
+          static check(obj) {
+            return #x in obj;
+          }
+        }
+        expect(Foo.check(new Foo())).toBe(true);
+        expect(Foo.check({})).toBe(false);
+      }`,
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+  _checkInRHS = _checkInRHS2.checkInRHS;
+() => {
+  let Foo = (() => {
+    'use strict';
+    var _x = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Foo_x');
+    function _initialize() {
+      Object.defineProperty(this, _x, {
+        writable: true,
+        value: 1,
+      });
+    }
+    const Foo = function Foo() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+      _initialize.call(this);
+    };
+    Object.defineProperty(Foo, 'check', {
+      value: Object.defineProperty(
+        function (obj) {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          return Object.prototype.hasOwnProperty.call(_checkInRHS(obj), _x);
+        },
+        'name',
+        {
+          value: 'check',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(Foo, 'prototype', { writable: false });
+    return Foo;
+  })();
+  expect(Foo.check(new Foo())).toBe(true);
+  expect(Foo.check({})).toBe(false);
+};`,
+  },
+  {
+    title: 'private-in checks (ergonomic brand checks) > #field in obj with inheritance',
+    source: `() => {
+        class Base {
+          #secret() {}
+          static check(obj) {
+            return #secret in obj;
+          }
+        }
+        class Child extends Base {}
+        expect(Base.check(new Base())).toBe(true);
+        expect(Base.check(new Child())).toBe(true);
+        expect(Base.check({})).toBe(false);
+      }`,
+    output: `var _classPrivateFieldLooseBase2 = {
+  classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+  classPrivateFieldLooseKey: require('@babel/runtime/helpers/classPrivateFieldLooseKey'),
+};
+function _classPrivateFieldLooseBase(e, s, a) {
+  return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+}
+var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+  _checkInRHS = _checkInRHS2.checkInRHS;
+() => {
+  let Base = (() => {
+    'use strict';
+    var _secret = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Base_secret');
+    var _privateMethod = function () {
+      if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+    };
+    function _initialize() {
+      Object.defineProperty(this, _secret, { value: _privateMethod });
+    }
+    const Base = function Base() {
+      if (!new.target) throw new TypeError('Cannot call a class as a function');
+      _initialize.call(this);
+    };
+    Object.defineProperty(Base, 'check', {
+      value: Object.defineProperty(
+        function (obj) {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          return Object.prototype.hasOwnProperty.call(_checkInRHS(obj), _secret);
+        },
+        'name',
+        {
+          value: 'check',
+          configurable: true,
+        },
+      ),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(Base, 'prototype', { writable: false });
+    return Base;
+  })();
+  class Child extends Base {}
+  expect(Base.check(new Base())).toBe(true);
+  expect(Base.check(new Child())).toBe(true);
+  expect(Base.check({})).toBe(false);
+};`,
+  },
 ] as const satisfies readonly CorpusCase[];
 
 runCorpus(cases, corpusConfig);

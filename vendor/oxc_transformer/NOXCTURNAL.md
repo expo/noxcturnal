@@ -1,11 +1,15 @@
-Vendored from crates.io oxc_transformer 0.141.0. Original MIT license retained.
-Noxcturnal patches the pinned transformer to repair constructor initialization, exponentiation assignment, logical assignment, optional chaining, legacy decorator lowering, async lowering, TypeScript import and enum preservation, resource-management scope and module ordering, and Compiler/Refresh integration.
+Read this when a transform in this tree behaves differently from upstream Oxc.
+The bullets name the file that holds each repair. Open that file and confirm the
+repair is still there before you edit it or treat the bullet as a diff.
 
-Original crates.io archive SHA-256: `3481b17ea50d4866901de759f736aa2c63bfca1fb6a20a67faa423f5361429e9`.
+Vendored Oxc transformer, pinned at 0.154.0 and selected by `[patch.crates-io]`.
+`UPSTREAM_REVISION` records `oxc-project/oxc` tag `crates_v0.154.0` (`d47efe5`).
+Original MIT license retained.
 
-Provenance: upstream commit `14533a3dc118bea73e755426aaf35f71dbe81eb8`,
-`crates/oxc_transformer`. LICENSE was retrieved from that commit's repository root
-because the published crate archive omits the license file.
+Noxcturnal patches this tree to repair constructor initialization, exponentiation assignment, logical assignment, optional chaining, legacy decorator lowering, async lowering, TypeScript import and enum preservation, resource-management scope and module ordering, and Compiler/Refresh integration.
+
+`LICENSE` is taken from the Oxc repository root because the published crate
+archive omits it.
 
 Local patches:
 
@@ -18,8 +22,7 @@ Local patches:
 - `es2021/logical_assignment_operators.rs`: lower private targets in the same
   traversal as ordinary targets. Semantic receiver duplication reserves unresolved
   names and captures mutable bindings; the following nullish pass sees generated
-  coalescing expressions when selected. This replaces Noxcturnal's separate
-  post-transform private completion pass.
+  coalescing expressions when selected.
 - `common/duplicate.rs`: regexp literals are identity-bearing allocations, so
   repeated uses share a temporary rather than cloning the literal. The shared
   utility also serves private class operations and legacy decorator computed keys.
@@ -56,6 +59,8 @@ Local patches:
 - `state.rs`: retain that parsed reset directive across compiler reconstruction.
 - `jsx/refresh.rs`: complete callback paths, enclosing-function hook ownership with
   static-block boundaries, reset comments, and safe synthetic-span signatures.
+  Propagate HOC signature descriptions instead of cloning callback ASTs, so each
+  emitted custom-hook callback has fresh scopes and references for later passes.
 
 Keep Rust and npm Oxc versions pinned together. Reassess these patches against the
 upstream implementation before any upgrade; archived regressions define the repair

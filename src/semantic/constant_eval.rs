@@ -290,20 +290,10 @@ fn evaluate_binary(
 ) -> Option<EvaluatedConstant> {
     use BinaryOperator as Op;
 
-    if operator == Op::Addition
-        && (matches!(left, EvaluatedConstant::String(_))
-            || matches!(right, EvaluatedConstant::String(_)))
-    {
-        return Some(EvaluatedConstant::String(format!(
-            "{}{}",
-            constant_string(&left)?,
-            constant_string(&right)?
-        )));
-    }
     if matches!(operator, Op::StrictEquality | Op::StrictInequality) {
         let equal = constants_strictly_equal(&left, &right);
         return Some(EvaluatedConstant::Boolean(
-            if matches!(operator, Op::StrictInequality | Op::Inequality) {
+            if operator == Op::StrictInequality {
                 !equal
             } else {
                 equal
@@ -417,15 +407,5 @@ fn constant_string(value: &EvaluatedConstant) -> Option<String> {
 }
 
 fn js_number_string(value: f64) -> String {
-    if value.is_nan() {
-        "NaN".into()
-    } else if value == f64::INFINITY {
-        "Infinity".into()
-    } else if value == f64::NEG_INFINITY {
-        "-Infinity".into()
-    } else if value == 0.0 {
-        "0".into()
-    } else {
-        value.to_js_string()
-    }
+    value.to_js_string()
 }

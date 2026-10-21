@@ -207,6 +207,50 @@ pub(crate) fn member_write_root_child(
     }
 }
 
+pub(super) struct MemberWriteStack<'a> {
+    frames: Option<Vec<(AstKind<'a>, bool, bool)>>,
+}
+
+impl<'a> MemberWriteStack<'a> {
+    pub(super) fn new(enabled: bool) -> Self {
+        Self {
+            frames: enabled.then(Vec::new),
+        }
+    }
+
+    pub(super) fn enter(&mut self, kind: AstKind<'a>) -> (bool, bool) {
+        let Some(frames) = self.frames.as_mut() else {
+            return (false, false);
+        };
+        let member_write = frames.last().is_some_and(|(parent, parent_is_target, _)| {
+            mutation_target_child(kind, *parent, *parent_is_target)
+        });
+        let member_root_write =
+            frames
+                .last()
+                .is_some_and(|(parent, parent_member_write, parent_is_member_root)| {
+                    member_write_root_child(
+                        kind,
+                        *parent,
+                        *parent_member_write,
+                        *parent_is_member_root,
+                    )
+                });
+        frames.push((kind, member_write, member_root_write));
+        (member_write, member_root_write)
+    }
+
+    pub(super) fn leave(&mut self) -> (bool, bool) {
+        let Some(frames) = self.frames.as_mut() else {
+            return (false, false);
+        };
+        let (_, member_write, member_root_write) = frames
+            .pop()
+            .expect("member-write traversal enter/leave balance");
+        (member_write, member_root_write)
+    }
+}
+
 #[derive(Default)]
 pub(crate) struct MemberPathInterner {
     transitions: FxHashMap<(u32, u8), u32>,

@@ -1,7 +1,6 @@
 import { resolve } from 'node:path';
 import { expect, test } from 'vitest';
 import { stripVTControlCharacters } from 'node:util';
-import { transformSync } from '@babel/core';
 import {
   defineNativePipeline,
   defineNativePlugin,
@@ -203,28 +202,9 @@ test('buildCodeFrameError points to the plugin node after an earlier edit', () =
   expect((failure as NativeTransformError).message).not.toContain('const first');
 });
 
-test('plugin error frames align with Babel and keep a zero-based location', () => {
+test('plugin error frames include the source and a zero-based location', () => {
   const source = 'const value = 1;';
   const filename = '/app/input.js';
-  let babelFailure: unknown;
-  try {
-    transformSync(source, {
-      filename,
-      configFile: false,
-      babelrc: false,
-      plugins: [
-        () => ({
-          visitor: {
-            Identifier(path: any) {
-              throw path.buildCodeFrameError('Invalid value');
-            },
-          },
-        }),
-      ],
-    });
-  } catch (error) {
-    babelFailure = error;
-  }
   const plugin = defineNativePlugin({
     name: 'reject',
     visitors: [
@@ -243,14 +223,9 @@ test('plugin error frames align with Babel and keep a zero-based location', () =
   } catch (error) {
     failure = error;
   }
-  expect(babelFailure).not.toHaveProperty('codeFrame');
   expect(failure).not.toHaveProperty('codeFrame');
-  expect((babelFailure as Error).message).toContain(`${filename}: Invalid value`);
   expect((failure as Error).message).toContain(`${filename}: Invalid value (1:6)`);
   expect(stripVTControlCharacters((failure as NativeTransformError).message)).toContain(
-    '> 1 | const value = 1;\n    |       ^',
-  );
-  expect(stripVTControlCharacters((babelFailure as Error).message)).toContain(
     '> 1 | const value = 1;\n    |       ^',
   );
   expect((failure as NativeTransformError).loc).toEqual({ line: 1, column: 6 });
@@ -324,7 +299,7 @@ test.each([
   { filename: '/shared/input.js', projectRoot: '/workspace/app' },
   { filename: 'src/input.js', projectRoot: undefined },
   { filename: 'src/input.js', projectRoot: 'apps/mobile' },
-])('resolves diagnostic filenames like Babel: %j', ({ filename, projectRoot }) => {
+])('resolves diagnostic filenames against the project root: %j', ({ filename, projectRoot }) => {
   const source = 'const value = 1;';
   let observedFilename: string | undefined;
   const plugin = defineNativePlugin({
@@ -339,7 +314,6 @@ test.each([
     ],
   });
   let failure: unknown;
-  let babelFailure: unknown;
   try {
     transform(
       source,
@@ -352,31 +326,11 @@ test.each([
   } catch (error) {
     failure = error;
   }
-  try {
-    transformSync(source, {
-      cwd: projectRoot,
-      filename,
-      configFile: false,
-      babelrc: false,
-      plugins: [
-        () => ({
-          visitor: {
-            Identifier(path: any) {
-              throw path.buildCodeFrameError('Invalid value');
-            },
-          },
-        }),
-      ],
-    });
-  } catch (error) {
-    babelFailure = error;
-  }
   const absoluteFilename = resolve(projectRoot ?? process.cwd(), filename);
   expect(failure).toBeInstanceOf(NativeTransformError);
   expect(failure).toMatchObject({ filename: absoluteFilename });
   expect((failure as Error).message).toContain(`${absoluteFilename}: Invalid value`);
   expect((failure as Error).stack).toContain(`${absoluteFilename}: Invalid value`);
-  expect((babelFailure as Error).message).toContain(`${absoluteFilename}: Invalid value`);
   expect(observedFilename).toBe(filename);
 });
 

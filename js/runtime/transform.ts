@@ -5,13 +5,14 @@ import { compilePhasePlan } from '../pipeline/compile';
 import { closeDefinitionScope } from '../pipeline/define';
 import type { CompiledRouteTemplate, PreparedPhase } from '../pipeline/types';
 import {
+  accumulateRetention,
   compileNestedVisitor,
-  mergeFieldRequests,
+  createRetentionFacts,
   nestedManifest,
   prepareApplicablePhase,
 } from '../pipeline/routes';
 import { Bailout, createDispatcher } from './dispatch';
-import { SourceVersionStore, type SourceVersionId } from './source-versions';
+import { SourceVersionStore } from './source-versions';
 import { ArtifactDemand, hasSemanticDemand } from '../pipeline/artifacts';
 import type { IntentRegistration } from './fragments';
 import {
@@ -135,7 +136,6 @@ export function assertNativePhaseCompleted(
 
 interface RetainedPlan {
   futureSubscriptions: ReadonlySet<string>;
-  futureRetentionCapabilities: number;
   retentionManifest: Buffer;
 }
 
@@ -219,72 +219,33 @@ function buildRetainedPlan(
   lookahead: readonly PreparedPhase[],
 ): RetainedPlan {
   const futureSubscriptions = new Set<string>();
-  const childRetention: Record<string, string[]> = {};
-  const retainedFields: Record<string, string[]> = {};
-  const ancestorFields: Record<string, string[]> = {};
-  const ancestorTypes = new Set<string>();
-  const ancestorChildParentTypes = new Set<string>();
-  let ancestryDepth = 0;
+  const facts = createRetentionFacts();
   const retainedRoutes: CompiledRouteTemplate[] = [...prepared.compiledRoutes];
   let futureRetentionCapabilities = 0;
   let retainScope = prepared.includeScope;
-  const collect = (phase: PreparedPhase) => {
-    for (const plugin of phase.activePlugins) {
-      const plan = phase.plans.get(plugin);
-      mergeChildRetention(childRetention, plan?.children);
-      mergeChildRetention(childRetention, plan?.ancestryChildren);
-      mergeFieldRequests(retainedFields, plan?.fields ?? {});
-      mergeFieldRequests(retainedFields, plan?.ancestryFields ?? {});
-      mergeFieldRequests(ancestorFields, plan?.ancestryFields ?? {});
-      for (const type of plan?.ancestryTypes ?? []) ancestorTypes.add(type);
-      for (const type of Object.keys(plan?.ancestryChildren ?? {}))
-        ancestorChildParentTypes.add(type);
-      if (plan?.ancestry != null)
-        ancestryDepth = Math.max(
-          ancestryDepth,
-          typeof plan.ancestry.mode === 'number'
-            ? plan.ancestry.mode
-            : plan.ancestry.mode === 'parent'
-              ? 1
-              : Number.POSITIVE_INFINITY,
-        );
-    }
-  };
-  collect(prepared);
+  accumulateRetention(facts, prepared.activePlugins, prepared.plans);
   for (const future of lookahead) {
     for (const subscription of future.subscriptions) futureSubscriptions.add(subscription);
     retainedRoutes.push(...future.compiledRoutes);
     futureRetentionCapabilities |= future.retentionCapabilities;
     retainScope ||= future.includeScope;
-    collect(future);
+    accumulateRetention(facts, future.activePlugins, future.plans);
   }
   return {
     futureSubscriptions,
-    futureRetentionCapabilities,
     retentionManifest: packRouteManifest(
       retainedRoutes.map((route, id) => ({ ...route, id })),
       prepared.includeParent,
       retainScope,
       prepared.retentionCapabilities | futureRetentionCapabilities,
-      childRetention,
-      retainedFields,
-      ancestorFields,
-      [...ancestorTypes],
-      [...ancestorChildParentTypes],
-      ancestryDepth,
+      facts.childRoles,
+      facts.fields,
+      facts.ancestorFields,
+      [...facts.ancestorTypes],
+      [...facts.ancestorChildParentTypes],
+      facts.ancestryDepth,
     ),
   };
-}
-
-function mergeChildRetention(
-  target: Record<string, string[]>,
-  source: Readonly<Partial<Record<string, readonly string[]>>> | undefined,
-): void {
-  for (const [type, roles] of Object.entries(source ?? {})) {
-    if (roles == null) continue;
-    const retained = (target[type] ??= []);
-    for (const role of roles) if (!retained.includes(role)) retained.push(role);
-  }
 }
 
 interface PreparedState {
@@ -444,7 +405,6 @@ export function transform(
   let currentVersion = sourceVersions.original;
   if (source !== originalSource || adapterMap != null) {
     currentVersion = sourceVersions.commit(currentVersion, {
-      normalizedEditCount: 0,
       codeChanged: source !== originalSource,
       mapChanged: adapterMap != null,
     });
@@ -526,7 +486,6 @@ export function transform(
       if (result.functionMap != null) initialFunctionMap ??= result.functionMap;
       if (result.status === 'complete' && result.changed)
         currentVersion = sourceVersions.commit(currentVersion, {
-          normalizedEditCount: 1,
           codeChanged: true,
           mapChanged: true,
         });
@@ -591,7 +550,6 @@ export function transform(
     for (let phaseIndex = 0; phaseIndex < pipeline.phases.length; phaseIndex++) {
       const phase = pipeline.phases[phaseIndex];
       const executionPlan = phasePlan[phaseIndex];
-      const observedVersion: SourceVersionId = currentVersion;
       if (phase.native != null) {
         parsedSource?.close();
         parsedSource = null;
@@ -725,8 +683,8 @@ export function transform(
       // Parsed/index artifacts live exactly as long as their retained native
       // session. If orchestration dropped that owner, the generic planner must
       // not report a logical cache hit for the version.
-      if (retainedSession == null) sourceVersions.dropParsedArtifacts(observedVersion);
-      sourceVersions.ensure(observedVersion, artifactDemand, requiresIndex);
+      if (retainedSession == null) sourceVersions.dropParsedArtifacts(currentVersion);
+      sourceVersions.ensure(currentVersion, artifactDemand, requiresIndex);
       const session: NativeTransformSession =
         retainedSession ??
         new NativeTransformSession(
@@ -846,7 +804,7 @@ export function transform(
       for (const plugin of activePlugins)
         plugin.post?.(dispatch.contexts.get(plugin)!.context, dispatch.contexts.get(plugin)!.state);
       for (const plugin of activePlugins) {
-        const pluginEffect = plans.get(plugin)?.editEffect ?? plugin.editEffect;
+        const pluginEffect = plugin.editEffect;
         if (pluginEffect === 'none' && edits.some(edit => edit.owner === plugin.name))
           throw new Error(`${plugin.name}: plugin declared edit effect none but emitted edits`);
       }
@@ -855,7 +813,7 @@ export function transform(
       dispatch.flushInsertions();
       const effectiveEdits: EditCommand[] = edits;
       if (effectiveEdits.length === 0) {
-        if (observedVersion === currentVersion && canReuseForNextPhase) {
+        if (canReuseForNextPhase) {
           reusableSession = session;
           reusableRoutedBatch = { manifest, batch };
         } else {
@@ -874,26 +832,13 @@ export function transform(
       );
       const codeChanged = committed.codeChanged;
       const mapChanged = committed.mapChanged;
-      const resultingVersion = sourceVersions.commit(observedVersion, {
-        normalizedEditCount: committed.edits.length,
-        normalizedEdits: committed.edits,
+      const resultingVersion = sourceVersions.commit(currentVersion, {
         codeChanged,
         mapChanged,
       });
       currentVersion = resultingVersion;
       // The rendered source stays resident; a following native phase reads it
       // without a crossing, and a following visitor phase materializes it lazily.
-      if (!codeChanged && !mapChanged) {
-        if (canReuseForNextPhase) {
-          reusableSession = session;
-          reusableRoutedBatch = { manifest, batch };
-          openSession = session;
-        } else {
-          session.close();
-          openSession = null;
-        }
-        continue;
-      }
       if (!codeChanged) {
         if (canReuseForNextPhase) {
           reusableSession = session;

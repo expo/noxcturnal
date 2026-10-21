@@ -112,7 +112,7 @@ const cases = [
     expected: [[true, 0]],
   },
   {
-    name: 'return proxies observe the iterator receiver with Babel return lookups',
+    name: 'return proxies observe the iterator receiver during repeated return lookups',
     babelExpected: ['return:get', 'return:get', [true, 0]],
     source: `const events=[];let iterator;const close=new Proxy(function(){},{apply(target,receiver,args){events.push([receiver===iterator,args.length]);return {};},get(){throw new Error('property read');}});
       iterator={next(){return {done:false,value:1};},get return(){events.push('return:get');return close;}};

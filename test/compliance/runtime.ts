@@ -1,5 +1,3 @@
-import { expect } from 'vitest';
-
 import type { PreflightPlan, TransformOptions } from '../../js';
 import { defineNativePipeline, transform } from '../../js';
 
@@ -24,8 +22,7 @@ export function compile(
     }),
     options,
   );
-  expect(result.status, JSON.stringify(result)).toBe('complete');
-  if (result.status !== 'complete') throw new Error(result.reason);
+  if (result.status !== 'complete') throw new Error(JSON.stringify(result));
   return result.code;
 }
 
@@ -34,11 +31,14 @@ export function execute<T extends RuntimeBindings = RuntimeBindings>(
   plan: PreflightPlan,
   bindings: RuntimeBindings = {},
   filename = 'input.js',
+  assertOutput?: (code: string) => void,
 ): T {
+  const code = compile(source, plan, filename);
+  assertOutput?.(code);
   const context: RuntimeBindings = {};
   const names = Object.keys(bindings);
   const values = Object.values(bindings);
-  new Function(...names, 'globalThis', compile(source, plan, filename))(...values, context);
+  new Function(...names, 'globalThis', code)(...values, context);
   return context as T;
 }
 
@@ -47,9 +47,7 @@ export async function executeModule(
   plan: PreflightPlan,
   filename = 'input.mjs',
 ): Promise<Record<string, unknown>> {
-  const code = compile(source, plan, filename);
-  const url = `data:text/javascript;base64,${Buffer.from(code).toString('base64')}#${crypto.randomUUID()}`;
-  return import(url) as Promise<Record<string, unknown>>;
+  return importCode(compile(source, plan, filename));
 }
 
 export async function importCode(code: string): Promise<Record<string, unknown>> {

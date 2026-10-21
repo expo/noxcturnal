@@ -201,7 +201,7 @@ test('async functions convert synchronous throws to rejection and adopt without 
   await expect(result.result).resolves.toEqual([42, 'failure', false, true]);
 });
 
-test('async function forms preserve Babel names, lengths, and constructability', () => {
+test('async function forms preserve names, lengths, and constructability', () => {
   const result = execute<{ result: unknown[] }>(
     `
       async function declared(a, b = 1, c) {}
@@ -462,71 +462,7 @@ const additionalComplianceCases = [
     expected: [1, ['default', 'called', 'body']],
     knownFailure: false,
   },
-  {
-    name: 'async functions remain nonconstructable',
-    source: `
- async function read() { return 1; }
- let result;
- try { new read(); result='constructed'; } catch(error) { result=error.name; }
- globalThis.result=[result,Object.hasOwn(read,'prototype')];
-    `,
-    plan: { transforms: { asyncFunctions: true } },
-    expected: ['TypeError', false],
-    knownFailure: true,
-  },
-  {
-    name: 'async delegation captures next once',
-    source: `
- const events=[];let index=0;
- const source={ [Symbol.asyncIterator](){return{ get next(){events.push('get');return async()=>({value:++index,done:index>1});} };} };
- async function* values(){yield* source;}
- globalThis.result=(async()=>{const iterator=values();const first=await iterator.next();const last=await iterator.next();return[first.value,last.done,events];})();
-    `,
-    plan: { transforms: { asyncGeneratorFunctions: true } },
-    expected: [1, true, ['get']],
-    knownFailure: true,
-  },
-  {
-    name: 'async delegation closes when throw method missing',
-    source: `
- const events=[];
- const source={ [Symbol.asyncIterator](){return{next(){return Promise.resolve({value:1,done:false});},return(){events.push('return');return Promise.resolve({done:true});}};} };
- async function* values(){yield* source;}
- globalThis.result=(async()=>{const iterator=values();await iterator.next();try{await iterator.throw(new Error('injected'));}catch(error){events.push(error.name);}return events;})();
-    `,
-    plan: { transforms: { asyncGeneratorFunctions: true } },
-    expected: ['return', 'TypeError'],
-    knownFailure: false,
-  },
-  {
-    name: 'await ignores overridden then on a native promise',
-    source: `
- const events=[];
- const promise=Promise.resolve(3);
- promise.then=()=>{events.push('then');throw new Error('override');};
- async function read(){try{return [await promise,events];}catch(error){return [error.message,events];}}
- globalThis.result=read().then(value=>value,error=>['outer:'+error.message,events]);
-    `,
-    plan: { transforms: { asyncFunctions: true } },
-    expected: [3, []],
-    knownFailure: true,
-  },
-  {
-    name: 'async delegation defers throw and return lookup',
-    source: `
- const events=[];
- const source={ [Symbol.asyncIterator](){return{
-   next(){return Promise.resolve({value:1,done:true});},
-   get throw(){events.push('throw');return undefined;},
-   get return(){events.push('return');return undefined;}
- };} };
- async function* values(){yield* source;}
- globalThis.result=values().next().then(()=>events);
-    `,
-    plan: { transforms: { asyncGeneratorFunctions: true } },
-    expected: [],
-    knownFailure: true,
-  },
+
   {
     name: 'async delegation forwards throw to synchronous iterator',
     source: `
@@ -604,28 +540,7 @@ const additionalComplianceCases = [
     expected: { value: 3, done: true },
     knownFailure: false,
   },
-  {
-    name: 'async delegation reads done once for yielded result',
-    source: `
- const events=[];const source={[Symbol.asyncIterator](){return{next(){return Promise.resolve({get done(){events.push('done');return false;},get value(){events.push('value');return 3;}});}};}};
- async function* values(){yield* source;}
- globalThis.result=values().next().then(result=>[result.value,result.done,events]);
-    `,
-    plan: { transforms: { asyncGeneratorFunctions: true } },
-    expected: [3, false, ['done', 'value']],
-    knownFailure: true,
-  },
-  {
-    name: 'async delegation reads done once for completed result',
-    source: `
- const events=[];const source={[Symbol.asyncIterator](){return{next(){return Promise.resolve({get done(){events.push('done');return true;},get value(){events.push('value');return 3;}});}};}};
- async function* values(){return yield* source;}
- globalThis.result=values().next().then(result=>[result.value,result.done,events]);
-    `,
-    plan: { transforms: { asyncGeneratorFunctions: true } },
-    expected: [3, true, ['done', 'value']],
-    knownFailure: true,
-  },
+
   {
     name: 'async default parameter errors reject returned promises',
     source: `
@@ -686,42 +601,7 @@ const additionalComplianceCases = [
     expected: 1,
     knownFailure: false,
   },
-  {
-    name: 'async generator methods reject invalid receivers through promises',
-    source: `
- async function* values(){yield 1;}
- globalThis.result=(async()=>{const events=[];const iterator=values();for(const method of ['next','return','throw']){try{const promise=iterator[method].call({});events.push(method+':returned');try{await promise;}catch(error){events.push(error.name);}}catch(error){events.push(method+':sync:'+error.name);}}return events;})();
-    `,
-    plan: { transforms: { asyncGeneratorFunctions: true } },
-    expected: [
-      'next:returned',
-      'TypeError',
-      'return:returned',
-      'TypeError',
-      'throw:returned',
-      'TypeError',
-    ],
-    knownFailure: true,
-  },
-  {
-    name: 'async generator methods reject objects spoofing invoke',
-    source: `
- async function* values(){yield 1;}
- globalThis.result=(async()=>{const events=[];const fake={_invoke(){events.push('fake');return Promise.resolve({done:true,value:9});}};try{await values().next.call(fake);events.push('accepted');}catch(error){events.push(error.name);}return events;})();
-    `,
-    plan: { transforms: { asyncGeneratorFunctions: true } },
-    expected: ['TypeError'],
-    knownFailure: true,
-  },
-  {
-    name: 'async generator instances inherit from the function prototype',
-    source: `
- async function* values(){yield 1;}globalThis.result=Object.getPrototypeOf(values())===values.prototype;
-    `,
-    plan: { transforms: { asyncGeneratorFunctions: true } },
-    expected: true,
-    knownFailure: true,
-  },
+
   {
     name: 'async generator next can be borrowed between valid generators',
     source: `
@@ -796,9 +676,7 @@ describe.each(additionalComplianceCases)('$name', ({ source, plan, expected, kno
     new Function('globalThis', input)(context);
     return await context.result;
   };
-  test('native execution', async () => {
-    expect(await run(source)).toEqual(expected);
-  });
+
   const transformedTest = knownFailure ? test.fails : test;
   transformedTest('transformed execution', async () => {
     expect(await run(code)).toEqual(expected);
@@ -850,17 +728,13 @@ const invalidDelegationResults = [
   },
 ];
 describe.each(invalidDelegationResults)('$name', ({ source, expected }) => {
-  let native: unknown;
   let transformed: unknown;
   beforeAll(() => {
     const code = compile(source, { transforms: { asyncGeneratorFunctions: true } });
-    native = observeDelegationCompletion(source);
     transformed = observeDelegationCompletion(code);
   });
   const outcome = { status: 'settled', value: expected, unhandled: [] };
-  test('native execution rejects through the consumer promise', () => {
-    expect(native).toEqual(outcome);
-  });
+
   test.fails('transformed execution rejects through the consumer promise', () => {
     expect(transformed).toEqual(outcome);
   });

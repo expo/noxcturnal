@@ -209,6 +209,11 @@ test('await using follows async lookup fallback and nullish suspension semantics
       })();
     `,
     { transforms: { explicitResourceManagement: true } },
+    {},
+    'input.js',
+    code => {
+      expect(code).not.toMatch(/\bawait\s+using\b/);
+    },
   );
   await expect(context.result).resolves.toEqual([
     'get:async',
@@ -261,17 +266,6 @@ test('for-using-of disposes each iteration before continuing or breaking', () =>
   );
   expect(result.result).toEqual(['body:1', 'dispose:1', 'body:2', 'dispose:2']);
 });
-
-// Node 22 cannot parse these controls. Run this suite on Node 24+ to execute
-// both sides; transformed execution remains covered on older supported hosts.
-const supportsNativeUsing = (() => {
-  try {
-    new Function('return async function () { await using value = null; };');
-    return true;
-  } catch {
-    return false;
-  }
-})();
 
 const additionalComplianceCases: {
   name: string;
@@ -622,12 +616,7 @@ describe.each(additionalComplianceCases)(
       new Function('globalThis', input)(context);
       return await context.result;
     };
-    test.skipIf(!supportsNativeUsing)(
-      'native execution (requires using syntax support)',
-      async () => {
-        expect(await run(source)).toEqual(expected);
-      },
-    );
+
     const transformedTest = knownFailure ? test.fails : test;
     transformedTest('transformed execution', async () => {
       expect(await run(code)).toEqual(expected);

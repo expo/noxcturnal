@@ -144,6 +144,8 @@ impl NativeSourceText {
         output.into()
     }
 
+    /// The first program insertion at an offset gets a leading newline unless it
+    /// starts the file or follows a line break, so it stays on its own line.
     #[napi]
     pub fn needs_line_boundary(&self, offset: u32) -> bool {
         offset > 0 && self.source.get(offset as usize - 1) != Some(&10)
@@ -151,6 +153,12 @@ impl NativeSourceText {
 
     /// Text and composite payloads use separate typed batches. Results are in
     /// text-first order, followed by composite order, without an outer union.
+    ///
+    /// A program insertion always ends with a newline. It also gets a semicolon
+    /// when it is not a terminated statement, or when it contains a slash, so it
+    /// cannot glue onto the next statement or open a comment or a regex. A
+    /// composite counts as terminated only when its last part is text that ends
+    /// a statement; a slash in any part then still forces the semicolon.
     #[napi]
     pub fn insertion_suffixes(
         &self,
@@ -288,6 +296,8 @@ impl NativeSourceText {
                 })
                 .collect()
         };
+        // A plain string search is escaped above. Unicode flags decode the pattern
+        // and leave an unpaired surrogate as a lone code unit.
         let flags = flags.unwrap_or_default();
         let expression = regress::Regex::from_unicode(pattern.into_iter(), flags.as_str())
             .map_err(|error| Error::new(Status::InvalidArg, error.to_string()))?;
@@ -310,6 +320,8 @@ impl NativeSourceText {
                 expression.find_from_ucs2(text, offset).next()
             };
             let Some(found) = found else { break };
+            // Sticky matching stops at the first match that does not begin on the
+            // cursor, so a later unanchored match is left alone.
             if flags.contains('y') && found.start() != offset {
                 break;
             }

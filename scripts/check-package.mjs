@@ -5,8 +5,9 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 
 import {
+  assertBuildInputs,
+  currentBuildInputs,
   currentTarget,
-  nativeInputHash,
   nativeTargets,
   sha256File,
   targetBy,
@@ -110,12 +111,33 @@ function readJson(filename) {
   return JSON.parse(fs.readFileSync(filename, 'utf8'));
 }
 
+function assertSameMembers(actual, expected, label) {
+  const left = [...actual].sort();
+  const right = [...expected].sort();
+  if (left.length !== right.length || left.some((value, index) => value !== right[index]))
+    throw new Error(
+      `${label} must match native-targets.json (${right.join(', ')}) but has (${left.join(', ')})`,
+    );
+}
+
 function checkIntegrity(selector) {
   const rootPackage = readJson(path.join(root, 'package.json'));
   const repositoryUrl = 'https://github.com/expo/noxcturnal.git';
   if (rootPackage.repository?.url !== repositoryUrl)
     throw new Error(`root package repository must be ${repositoryUrl}`);
+  assertSameMembers(
+    rootPackage.napi?.targets ?? [],
+    nativeTargets.map(target => target.rustTarget),
+    'package.json napi.targets',
+  );
+  assertSameMembers(
+    Object.keys(rootPackage.optionalDependencies ?? {}),
+    nativeTargets.map(target => target.packageName),
+    'package.json optionalDependencies',
+  );
   for (const target of nativeTargets) {
+    if (!rootPackage.napi.targets.includes(target.rustTarget))
+      throw new Error(`package.json napi.targets is missing ${target.rustTarget}`);
     const packageJson = readJson(path.join(root, target.workspace, 'package.json'));
     const expected = {
       name: target.packageName,
@@ -165,20 +187,7 @@ function checkIntegrity(selector) {
     throw new Error(`${target.rustTarget} is not a release artifact`);
   if (artifact.buildManifest.sourceHash !== staging.sourceHash)
     throw new Error(`${target.rustTarget} has inconsistent source metadata`);
-  if (artifact.buildManifest.nativeInputSha256 !== nativeInputHash())
-    throw new Error(`${target.rustTarget} was built from stale native inputs`);
-  if (artifact.buildManifest.flakeLockHash !== sha256File(path.join(root, 'flake.lock')))
-    throw new Error(`${target.rustTarget} was built with another flake.lock`);
-  if (
-    artifact.buildManifest.dependencies?.cargoLockSha256 !==
-    sha256File(path.join(root, 'Cargo.lock'))
-  )
-    throw new Error(`${target.rustTarget} was built with another Cargo.lock`);
-  if (
-    artifact.buildManifest.dependencies?.pnpmLockSha256 !==
-    sha256File(path.join(root, 'pnpm-lock.yaml'))
-  )
-    throw new Error(`${target.rustTarget} was built with another pnpm-lock.yaml`);
+  assertBuildInputs(target, artifact.buildManifest, currentBuildInputs());
   const binary = path.join(root, target.workspace, target.binary);
   if (!fs.existsSync(binary)) throw new Error(`${target.workspace}/${target.binary} is missing`);
   const payloadHash = sha256File(binary);

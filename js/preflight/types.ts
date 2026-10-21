@@ -83,10 +83,10 @@ export interface PreflightTransforms {
 }
 
 /**
- * Declarative configuration reserved for native preflight phases.
+ * Declarative configuration for one native phase (`PipelinePhase.native`).
  *
- * An absent or empty plan is disabled. The restructuring phase deliberately gives
- * this data no runtime behavior; native phase compilation will consume it in N1.
+ * An absent or empty plan disables that phase. `defineNativePipeline` validates
+ * and freezes the plan; `src/preflight` executes it.
  */
 export interface PreflightPlan {
   transforms?: PreflightTransforms;

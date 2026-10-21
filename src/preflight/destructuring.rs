@@ -20,7 +20,7 @@ use oxc_semantic::Semantic;
 #[cfg(test)]
 use oxc_span::SourceType;
 use oxc_span::{GetSpan, Span};
-use oxc_syntax::operator::{AssignmentOperator, BinaryOperator, UnaryOperator};
+use oxc_syntax::operator::{AssignmentOperator, BinaryOperator};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::generated::inline_helpers::{
@@ -626,12 +626,7 @@ impl<'a> DestructuringDeclaratorLowerer<'a> {
     }
 
     fn undefined(&self, span: Span) -> Expression<'a> {
-        oxc_ast::ast::Expression::new_unary_expression(
-            span,
-            UnaryOperator::Void,
-            self.number(span, 0),
-            self.ast().builder(),
-        )
+        super::void_zero(&self.ast(), span)
     }
 
     fn default_value(&self, span: Span, temp: &str, fallback: Expression<'a>) -> Expression<'a> {
@@ -1265,7 +1260,7 @@ impl<'a> VisitMut<'a> for DestructuringDeclaratorLowerer<'a> {
                 self.error = Some("destructuring-generated-initializer-missing");
                 return;
             };
-            clear_leading_pure_annotation(&mut init);
+            super::clear_leading_pure_annotation(&mut init);
             let mut replacements = ArenaVec::new_in(&ast);
             let mut reserved = SnapshotReservations {
                 base: &self.base_reserved,
@@ -1434,17 +1429,6 @@ impl<'a> VisitMut<'a> for DestructuringDeclaratorLowerer<'a> {
             );
         }
         self.changed = true;
-    }
-}
-
-fn clear_leading_pure_annotation(expression: &mut Expression<'_>) {
-    match expression {
-        Expression::CallExpression(call) => call.pure = false,
-        Expression::NewExpression(new) => new.pure = false,
-        Expression::ParenthesizedExpression(parenthesized) => {
-            clear_leading_pure_annotation(&mut parenthesized.expression);
-        }
-        _ => {}
     }
 }
 

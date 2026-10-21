@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
@@ -123,7 +122,6 @@ async function buildBundle(roots) {
   return {
     code,
     helpers: ordered,
-    hash: `sha256-${createHash('sha256').update(code).digest('hex')}`,
   };
 }
 
@@ -135,24 +133,55 @@ const compatibilityRoots = new Set([...Object.values(bundles).flat(), 'toArray']
 const adapterBundles = {
   INLINE_FOR_OF_HELPER: {
     roots: ['createForOfIteratorHelper'],
-    binding: '_createForOfIteratorHelper2',
-    adapter:
-      'var _createForOfIteratorHelper=_createForOfIteratorHelper2.createForOfIteratorHelper;',
+    async directInline() {
+      // Use callable runtime functions directly instead of a module-loader adapter.
+      await loadClosure('createForOfIteratorHelper', [], new Set());
+      const dependencies = ['arrayLikeToArray', 'unsupportedIterableToArray'];
+      assert.deepEqual(moduleDependencies.get('createForOfIteratorHelper'), [
+        'unsupportedIterableToArray',
+      ]);
+      assert.deepEqual(moduleDependencies.get('unsupportedIterableToArray'), ['arrayLikeToArray']);
+      assert.deepEqual(moduleDependencies.get('arrayLikeToArray'), []);
+      const declarations = dependencies
+        .map(name => `var ${name}=${require(`@babel/runtime/helpers/${name}`).toString()};`)
+        .join('');
+      return generatedDirectFragment(
+        `var _createForOfIteratorHelper=(function(){${declarations}return ${require('@babel/runtime/helpers/createForOfIteratorHelper').toString()};})();`,
+        [...dependencies, 'createForOfIteratorHelper'],
+      );
+    },
+    directRuntime:
+      'var _createForOfIteratorHelper=require("@babel/runtime/helpers/createForOfIteratorHelper");',
   },
   INLINE_EXTENDS_HELPER: {
     roots: ['extends'],
-    binding: '_extends2',
-    adapter: 'var _extends=_extends2.extends;',
+    directInline() {
+      // Remove CommonJS self-export bookkeeping from the callable declaration.
+      const source = require('@babel/runtime/helpers/extends')
+        .toString()
+        .replace('return module.exports = _extends =', 'return _extends =')
+        .replace(
+          ', module.exports.__esModule = true, module.exports["default"] = module.exports, _extends.apply',
+          ', _extends.apply',
+        );
+      return generatedDirectFragment(source, ['extends']);
+    },
+    directRuntime: 'var _extends=require("@babel/runtime/helpers/extends");',
   },
   INLINE_READ_ONLY_ERROR_HELPER: {
     roots: ['readOnlyError'],
-    binding: '_readOnlyError2',
-    adapter: 'var _readOnlyError=_readOnlyError2.readOnlyError;',
+    directInline: () =>
+      generatedDirectFragment(require('@babel/runtime/helpers/readOnlyError').toString(), [
+        'readOnlyError',
+      ]),
+    directRuntime: 'var _readOnlyError=require("@babel/runtime/helpers/readOnlyError");',
   },
   INLINE_TO_PROPERTY_KEY_HELPER: {
     roots: ['toPropertyKey'],
     binding: '_toPropertyKey2',
     adapter: 'function _toPropertyKey(value){return _toPropertyKey2.toPropertyKey(value)}',
+    directRuntime:
+      'var _toPropertyKey2=require("@babel/runtime/helpers/toPropertyKey");function _toPropertyKey(value){return _toPropertyKey2(value)}',
   },
   INLINE_DESTRUCTURING_ITER_HELPER: {
     roots: ['slicedToArray', 'toConsumableArray'],
@@ -236,37 +265,39 @@ const adapterBundles = {
     adapter: 'var _wrapRegExp=_wrapRegExp2.wrapRegExp;',
   },
 };
-for (const [name, { roots, binding, adapter }] of Object.entries(adapterBundles)) {
+for (const [name, { roots, binding, adapter, directInline, directRuntime }] of Object.entries(
+  adapterBundles,
+)) {
   for (const root of roots) compatibilityRoots.add(root);
-  const bundle = await buildBundle(roots);
-  const code = transformSync(`var ${binding}=${bundle.code};${adapter}`, {
-    charset: 'ascii',
-    legalComments: 'inline',
-    minify: true,
-    target: 'es2018',
-  }).code.trim();
-  generated[name] = {
-    code,
-    helpers: bundle.helpers,
-    hash: `sha256-${createHash('sha256').update(code).digest('hex')}`,
-  };
-  const runtimeObject = roots
-    .map(
-      helper =>
-        `${JSON.stringify(helper)}:require(${JSON.stringify(`@babel/runtime/helpers/${helper}`)})`,
-    )
-    .join(',');
-  const runtimeCode = transformSync(`var ${binding}={${runtimeObject}};${adapter}`, {
-    charset: 'ascii',
-    legalComments: 'inline',
-    minify: true,
-    target: 'es2018',
-  }).code.trim();
-  generated[`${name}_RUNTIME`] = {
-    code: runtimeCode,
-    helpers: roots,
-    hash: `sha256-${createHash('sha256').update(runtimeCode).digest('hex')}`,
-  };
+  if (directInline) {
+    generated[name] = await directInline();
+  } else {
+    const bundle = await buildBundle(roots);
+    const code = transformSync(`var ${binding}=${bundle.code};${adapter}`, {
+      charset: 'ascii',
+      legalComments: 'inline',
+      minify: true,
+      target: 'es2018',
+    }).code.trim();
+    generated[name] = { code, helpers: bundle.helpers };
+  }
+  if (directRuntime) {
+    generated[`${name}_RUNTIME`] = generatedDirectFragment(directRuntime, roots);
+  } else {
+    const runtimeObject = roots
+      .map(
+        helper =>
+          `${JSON.stringify(helper)}:require(${JSON.stringify(`@babel/runtime/helpers/${helper}`)})`,
+      )
+      .join(',');
+    const code = transformSync(`var ${binding}={${runtimeObject}};${adapter}`, {
+      charset: 'ascii',
+      legalComments: 'inline',
+      minify: true,
+      target: 'es2018',
+    }).code.trim();
+    generated[`${name}_RUNTIME`] = { code, helpers: roots };
+  }
 }
 
 const compatibility = [...compatibilityRoots].sort().map(name => {
@@ -295,57 +326,8 @@ function generatedDirectFragment(source, helpers) {
   return {
     code,
     helpers,
-    hash: `sha256-${createHash('sha256').update(code).digest('hex')}`,
   };
 }
-
-// Keep the for-of inline closure small: use the runtime functions directly,
-// with their dependency bindings local to the initializer (no module loader).
-const forOfDependencies = ['arrayLikeToArray', 'unsupportedIterableToArray'];
-assert.deepEqual(moduleDependencies.get('createForOfIteratorHelper'), [
-  'unsupportedIterableToArray',
-]);
-assert.deepEqual(moduleDependencies.get('unsupportedIterableToArray'), ['arrayLikeToArray']);
-assert.deepEqual(moduleDependencies.get('arrayLikeToArray'), []);
-const forOfDeclarations = forOfDependencies
-  .map(name => `var ${name}=${require(`@babel/runtime/helpers/${name}`).toString()};`)
-  .join('');
-generated.INLINE_FOR_OF_HELPER = generatedDirectFragment(
-  `var _createForOfIteratorHelper=(function(){${forOfDeclarations}return ${require('@babel/runtime/helpers/createForOfIteratorHelper').toString()};})();`,
-  [...forOfDependencies, 'createForOfIteratorHelper'],
-);
-generated.INLINE_FOR_OF_HELPER_RUNTIME = generatedDirectFragment(
-  'var _createForOfIteratorHelper=require("@babel/runtime/helpers/createForOfIteratorHelper");',
-  ['createForOfIteratorHelper'],
-);
-
-// Direct callable roots do not need an object adapter. These implementations
-// are still read from the installed runtime; only Babel's CommonJS self-export
-// bookkeeping is removed from the inline declaration.
-const extendsFunction = require('@babel/runtime/helpers/extends')
-  .toString()
-  .replace('return module.exports = _extends =', 'return _extends =')
-  .replace(
-    ', module.exports.__esModule = true, module.exports["default"] = module.exports, _extends.apply',
-    ', _extends.apply',
-  );
-generated.INLINE_EXTENDS_HELPER = generatedDirectFragment(extendsFunction, ['extends']);
-generated.INLINE_EXTENDS_HELPER_RUNTIME = generatedDirectFragment(
-  'var _extends=require("@babel/runtime/helpers/extends");',
-  ['extends'],
-);
-generated.INLINE_READ_ONLY_ERROR_HELPER = generatedDirectFragment(
-  require('@babel/runtime/helpers/readOnlyError').toString(),
-  ['readOnlyError'],
-);
-generated.INLINE_READ_ONLY_ERROR_HELPER_RUNTIME = generatedDirectFragment(
-  'var _readOnlyError=require("@babel/runtime/helpers/readOnlyError");',
-  ['readOnlyError'],
-);
-generated.INLINE_TO_PROPERTY_KEY_HELPER_RUNTIME = generatedDirectFragment(
-  'var _toPropertyKey2=require("@babel/runtime/helpers/toPropertyKey");function _toPropertyKey(value){return _toPropertyKey2(value)}',
-  ['toPropertyKey'],
-);
 
 function materializeGeneratedFunction(name, binding) {
   return Function(`"use strict";${generated[name].code};return ${binding}`)();
@@ -393,46 +375,26 @@ function materializeGeneratedFunction(name, binding) {
   }
 }
 
-for (const [name, value] of Object.entries(generated)) {
-  if (
-    !name.startsWith('INLINE_FOR_OF_') &&
-    !name.startsWith('INLINE_EXTENDS_') &&
-    !name.startsWith('INLINE_READ_ONLY_ERROR_') &&
-    !name.startsWith('INLINE_TO_PROPERTY_KEY_') &&
-    !name.startsWith('INLINE_DESTRUCTURING_') &&
-    !name.startsWith('INLINE_CLASS_') &&
-    !name.startsWith('INLINE_REGEXP_')
-  )
-    continue;
-  value.prettyCode = execFileSync('cargo', ['run', '--quiet', '--bin', 'format_inline_helper'], {
+// Parse each fragment once and return all metadata in one Cargo invocation.
+const fragments = [...Object.values(generated), ...inlineRoots];
+const metadata = JSON.parse(
+  execFileSync('cargo', ['run', '--quiet', '--bin', 'format_inline_helper'], {
     cwd: root,
     encoding: 'utf8',
-    input: value.code,
-  });
-  value.prettyHash = `sha256-${createHash('sha256').update(value.prettyCode).digest('hex')}`;
-  value.bindings = execFileSync(
-    'cargo',
-    ['run', '--quiet', '--bin', 'format_inline_helper', '--', '--bindings'],
-    {
-      cwd: root,
-      encoding: 'utf8',
-      input: value.code,
-    },
-  )
-    .split('\n')
-    .filter(Boolean);
-}
-
-// Resolve free globals at generation time with the same semantics used by the
-// transform. Metadata describes the emitted fragment, including its dependencies.
-for (const value of [...Object.values(generated), ...inlineRoots]) {
-  value.globals = execFileSync(
-    'cargo',
-    ['run', '--quiet', '--bin', 'format_inline_helper', '--', '--globals'],
-    { cwd: root, encoding: 'utf8', input: value.code },
-  )
-    .split('\n')
-    .filter(Boolean);
+    input: JSON.stringify(fragments.map(value => value.code)),
+  }),
+);
+assert.equal(metadata.length, fragments.length, 'helper metadata must cover every fragment');
+const adaptedFragments = new Set(
+  Object.keys(adapterBundles).flatMap(name => [generated[name], generated[`${name}_RUNTIME`]]),
+);
+for (const [index, value] of fragments.entries()) {
+  const { prettyCode, bindings, globals } = metadata[index];
+  value.globals = globals;
+  if (adaptedFragments.has(value)) {
+    value.prettyCode = prettyCode;
+    value.bindings = bindings;
+  }
 }
 const rustNames = names => `&[${names.map(name => JSON.stringify(name)).join(',')}]`;
 
@@ -486,12 +448,13 @@ const rust = execFileSync('rustfmt', ['--edition', '2024', '--emit', 'stdout'], 
   encoding: 'utf8',
   input: rustUnformatted,
 });
-const outputs = new Map([['src/generated/inline_helpers.rs', rust]]);
-for (const [path, content] of outputs) {
-  const target = join(root, path);
-  if (check) {
-    assert.equal(await readFile(target, 'utf8'), content, `${path} is stale; run pnpm codegen`);
-  } else {
-    await writeFile(target, content);
-  }
+const destination = join(root, 'src/generated/inline_helpers.rs');
+if (check) {
+  assert.equal(
+    await readFile(destination, 'utf8'),
+    rust,
+    `${destination} is stale; run pnpm codegen`,
+  );
+} else {
+  await writeFile(destination, rust);
 }

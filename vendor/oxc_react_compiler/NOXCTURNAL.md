@@ -1,11 +1,15 @@
-Vendored crates.io `oxc_react_compiler` 0.141.0, MIT license retained.
+Read this when compiler integration in this tree behaves differently from upstream.
+The bullets name the file that holds each repair. Open that file and confirm the
+repair is still there before you edit it or treat the bullet as a diff.
 
-Archive SHA-256: `7d2dd0c52fb4e90464605951b18a14efb525f7f6ea0ca0b811ecc5d167983962`.
-Upstream commit: `14533a3dc118bea73e755426aaf35f71dbe81eb8`,
-`crates/oxc_react_compiler`. All source files were verified byte for byte against
-that registry archive before local patches. Upstream fixtures/snapshot tests are
-omitted and their explicit Cargo test targets removed; repository alignment and
-actual React renderer regressions cover the integration patches.
+Vendored `oxc_react_compiler` from `oxc-project/oxc` tag `crates_v0.154.0`
+(`d47efe5`, recorded in `UPSTREAM_REVISION`), selected by `[patch.crates-io]`.
+The React Compiler crate has its own version line: that Oxc release publishes it
+as 0.143.0, while the other Oxc crates are 0.154.0. MIT license retained.
+
+Upstream fixtures and snapshot tests are omitted and their Cargo test targets
+removed; repository alignment and React renderer regressions cover the
+integration patches.
 
 Keep Rust and npm Oxc versions pinned together. Reassess local compiler diagnostics,
 selection, and source-cache invalidation patches against upstream before upgrades.
@@ -22,5 +26,4 @@ Local patches:
   fixed memo slot and clear memo values when the fingerprint changes. This is
   a change detector, not a security hash. Disabled mode emits no additional code.
 
-The Nix Cargo vendor hash changes because this crate now resolves locally. The
-existing native fingerprint and Nix source fileset already include all `vendor/`.
+The native fingerprint and the Nix source fileset include all of `vendor/`.

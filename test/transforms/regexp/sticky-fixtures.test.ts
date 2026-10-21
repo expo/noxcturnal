@@ -1,12 +1,12 @@
 import { runFixtures, type FixtureCase } from '../fixture';
 
-const expectedOutputs = ["var re = new RegExp('o+', 'y');", 'var re = /o+/;'] as const;
-
 export const fixtureCases = [
   {
     title: 'sticky regex — basic (input)',
-    source: 'var re = /o+/y;\n',
+    source: `var re = /o+/y;
+`,
     filename: 'input.js',
+    output: "var re = new RegExp('o+', 'y');",
     modes: [
       {
         title: 'default',
@@ -15,14 +15,15 @@ export const fixtureCases = [
             regexpSticky: true,
           },
         },
-        output: expectedOutputs[0],
       },
     ],
   },
   {
     title: 'sticky regex — ignore non sticky (input)',
-    source: 'var re = /o+/;\n',
+    source: `var re = /o+/;
+`,
     filename: 'input.js',
+    output: 'var re = /o+/;',
     modes: [
       {
         title: 'default',
@@ -31,7 +32,6 @@ export const fixtureCases = [
             regexpSticky: true,
           },
         },
-        output: expectedOutputs[1],
       },
     ],
   },

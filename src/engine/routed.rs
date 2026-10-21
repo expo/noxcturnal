@@ -15,21 +15,17 @@ use oxc_syntax::scope::{ScopeFlags, ScopeId};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::event_types::NodeField;
-use crate::generated::event_schema::{
-    ast_kind_protocol_id, field_key_id, field_key_name, node_type_name,
-};
+use crate::generated::event_schema::{ast_kind_protocol_id, field_key_name, node_type_name};
 use crate::protocol::constants::FieldMask;
 use crate::protocol::manifest::{CompiledManifest, CompiledPredicate, CompiledScalar, VisitSide};
 use crate::protocol::routed::{PackedWords, encode_routed_envelope};
 use crate::syntax::classification::source_type;
 
 use super::fields::{
-    fields, packed_fields_direct, packed_scalar, predicate_scalar_type, utf16_index,
+    compiled_scalar_matches, fields, packed_fields_direct, predicate_scalar_type, utf16_index,
 };
 
-use super::member::{
-    MemberPathInterner, member_write_root_child, mutation_target_child, tracks_member_writes,
-};
+use super::member::{MemberPathInterner, MemberWriteStack, tracks_member_writes};
 use super::{RoutedCounts, decode_route_manifest};
 
 enum PredicateScalar<'a> {
@@ -106,8 +102,10 @@ pub(super) fn materialize_routed_program<'a>(
         counts: RoutedCounts::default(),
         route_scratch: Vec::new(),
         parent_ids: FxHashSet::default(),
-        target_stack: Vec::new(),
-        tracks_member_writes: tracks_member_writes(Some(manifest), manifest.retention_capabilities),
+        member_writes: MemberWriteStack::new(tracks_member_writes(
+            Some(manifest),
+            manifest.retention_capabilities,
+        )),
         member_paths: MemberPathInterner::default(),
         comments: manifest
             .needs_comments
@@ -243,8 +241,7 @@ struct RoutedEventCollector<'a> {
     counts: RoutedCounts,
     route_scratch: Vec<u32>,
     parent_ids: FxHashSet<u32>,
-    target_stack: Vec<(AstKind<'a>, bool, bool)>,
-    tracks_member_writes: bool,
+    member_writes: MemberWriteStack<'a>,
     member_paths: MemberPathInterner,
     comments: Option<&'a [Comment]>,
 }
@@ -315,19 +312,10 @@ impl RoutedEventCollector<'_> {
                 actual.value.as_str(),
             )
         };
-        predicate.values.iter().any(|expected| match expected {
-            CompiledScalar::String(expected) => scalar_type == 0 && value == expected,
-            CompiledScalar::Number(expected) => {
-                scalar_type == 1 && value.parse::<f64>().is_ok_and(|actual| actual == *expected)
-            }
-            CompiledScalar::Boolean(expected) => {
-                scalar_type == 2
-                    && value
-                        .parse::<bool>()
-                        .is_ok_and(|actual| actual == *expected)
-            }
-            CompiledScalar::Null => scalar_type == 3,
-        })
+        predicate
+            .values
+            .iter()
+            .any(|expected| compiled_scalar_matches(expected, scalar_type, value))
     }
 
     fn emit(
@@ -432,20 +420,6 @@ impl RoutedEventCollector<'_> {
             &mut self.string_ids,
             &mut self.member_paths,
         );
-        let mut fallback_payload = if direct_payload.is_none() && !payload_mask.is_empty() {
-            fields(
-                kind,
-                self.declaration_kinds.last().copied(),
-                self.source,
-                member_write,
-                member_root_write,
-                self.scoping,
-                payload_mask,
-            )
-        } else {
-            Vec::new()
-        };
-        normalize_routed_fields(&mut fallback_payload, self.utf16);
         let is_root = id.index() == 0;
         let parent_id = (self.manifest.include_parent && !is_root).then(|| {
             self.nodes
@@ -496,13 +470,7 @@ impl RoutedEventCollector<'_> {
             self.words.push((payload.len / 2) as u32);
             self.words.extend_from_slice(&payload.words[..payload.len]);
         } else {
-            self.words.push(fallback_payload.len() as u32);
-            for field in fallback_payload {
-                let key = field_key_id(&field.key).expect("requested generated field");
-                let value = packed_scalar(&field.key, &field.value)
-                    .unwrap_or_else(|| self.intern(&field.value));
-                self.words.extend([key, value]);
-            }
+            self.words.push(0);
         }
         if self.manifest.needs_comments {
             if comments_inner {
@@ -685,24 +653,7 @@ impl<'a> Visit<'a> for RoutedEventCollector<'a> {
         if let AstKind::VariableDeclaration(declaration) = kind {
             self.declaration_kinds.push(declaration.kind);
         }
-        let member_write = self.tracks_member_writes
-            && self
-                .target_stack
-                .last()
-                .is_some_and(|(parent, parent_is_target, _)| {
-                    mutation_target_child(kind, *parent, *parent_is_target)
-                });
-        let member_root_write = self.tracks_member_writes
-            && self.target_stack.last().is_some_and(
-                |(parent, parent_member_write, parent_is_member_root)| {
-                    member_write_root_child(
-                        kind,
-                        *parent,
-                        *parent_member_write,
-                        *parent_is_member_root,
-                    )
-                },
-            );
+        let (member_write, member_root_write) = self.member_writes.enter(kind);
         if self.scoping.is_none() {
             match kind {
                 AstKind::BindingIdentifier(_) => self.validation_stats.symbols += 1,
@@ -713,22 +664,10 @@ impl<'a> Visit<'a> for RoutedEventCollector<'a> {
         }
         self.node_count += 1;
         self.emit(kind, VisitSide::Enter, member_write, member_root_write);
-        if self.tracks_member_writes {
-            self.target_stack
-                .push((kind, member_write, member_root_write));
-        }
     }
 
     fn leave_node(&mut self, kind: AstKind<'a>) {
-        let (member_write, member_root_write) = if self.tracks_member_writes {
-            let (_, member_write, member_root_write) = self
-                .target_stack
-                .pop()
-                .expect("routed target traversal enter/leave balance");
-            (member_write, member_root_write)
-        } else {
-            (false, false)
-        };
+        let (member_write, member_root_write) = self.member_writes.leave();
         if self.manifest.include_exit
             && self.manifest.routes_by_type[ast_kind_protocol_id(kind) as usize]
                 .iter()
