@@ -53,15 +53,29 @@ pnpm changeset
 
 ## Maintaining automation
 
-Keep the automation behind these existing surfaces:
+`package.json` owns command composition, including `pnpm check`. The remaining
+files in `scripts/` implement these active build and release jobs:
 
-- `package.json` scripts — repository verification through `pnpm check`
-- `scripts/native.mjs` — native build, smoke test, and materialization
-- `scripts/native-lib.mjs` — shared internal native metadata
-- `scripts/check-package.mjs` — package integrity and pack tests
-- `scripts/release.mjs` — workflow-only Changesets operations
-- `scripts/native-targets.json` — the single platform matrix
+| File                                     | Caller and purpose                                                                                                            |
+| ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `sync-oxc-event-schema.mjs`              | `pnpm codegen`: reconciles the event schema with the pinned Rust AST and npm types.                                           |
+| `generate-event-schema.mjs`              | `pnpm codegen`: emits matching Rust/TypeScript event tables and node predicates.                                              |
+| `generate-estree-schema.mjs`             | `pnpm codegen`: derives the Flow eraser's Rust schema from the pinned Hermes `ESTree.def`.                                    |
+| `generate-inline-helpers.mjs`            | `pnpm codegen`: builds helper fragments and ABI metadata from the pinned Babel runtime.                                       |
+| `generate-regexp-unicode-properties.mjs` | `pnpm codegen`: emits Unicode property ranges used by native RegExp lowering.                                                 |
+| `rollup.config.mjs`                      | `pnpm build:js`: bundles the public CommonJS, ESM, and declaration entry points.                                              |
+| `native.mjs`                             | Build/test commands and release workflow: builds, validates, smoke-tests, and stages native addons.                           |
+| `native-lib.mjs`                         | Native and package/release tooling: shares target lookup, fingerprints, and artifact validation.                              |
+| `native-targets.json`                    | Native tooling and Nix: the shared platform/package matrix.                                                                   |
+| `check-package.mjs`                      | `pnpm package:check` and packing/publishing hooks: validates package contents and native artifact integrity.                  |
+| `release.mjs`                            | Release workflow and publishing hooks: coordinates Changesets and verifies publication authorization.                         |
+| `changelog.cjs`                          | `.changeset/config.json`: formats release/dependency notes and GitHub references.                                             |
+| `prepare.mjs`                            | Package `prepare` hook: installs the local pre-commit hook that formats staged files. Setup with `--ignore-scripts` skips it. |
 
-Prefer an existing npm command or a subcommand on one of these files. Avoid
+Each generator supports `--check`; `pnpm codegen:check` verifies all generated
+outputs without writing them. Historical revision-comparison and benchmark
+scripts are not part of this maintained automation.
+
+Prefer an existing npm command or a subcommand on the owning script. Avoid
 single-use wrappers and do not repeat validation steps in workflow YAML. Pin new
 tools in the flake and third-party GitHub Actions to full commit SHAs.

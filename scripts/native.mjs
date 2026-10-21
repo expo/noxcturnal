@@ -160,13 +160,7 @@ function materialize() {
   let directories;
   if (artifactRootIndex >= 0) {
     const artifactRoot = path.resolve(arguments_[artifactRootIndex + 1]);
-    directories = nativeTargets.map(target => {
-      const direct = path.join(artifactRoot, target.rustTarget);
-      const plain = path.join(direct, 'build');
-      const prefixed = path.join(artifactRoot, `native-${target.rustTarget}`, 'build');
-      if (fs.existsSync(path.join(direct, 'build-manifest.json'))) return direct;
-      return fs.existsSync(plain) ? plain : prefixed;
-    });
+    directories = nativeTargets.map(target => path.join(artifactRoot, target.rustTarget));
   } else if (outputsIndex >= 0) {
     const outputs = JSON.parse(fs.readFileSync(arguments_[outputsIndex + 1], 'utf8'));
     directories = nativeTargets.map(target => outputs[target.rustTarget]);

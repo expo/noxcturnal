@@ -14,8 +14,8 @@ annotations directly from Hermes' AST; it does not reparse Flow syntax.
 `cases.json` is the executable matrix: each named row contains the complete
 source, expected native outcome, exact erasure text, public exception/boundary
 where applicable, classification, provenance key, and `hermes-parser` 0.36.0
-acceptance. `native-observations.json` records native outcomes, exact emitted
-code for successes, and the input SHA-256.
+acceptance. Native tests assert these current expectations directly; the historical
+old-versus-new parser audit and its duplicated observation report are retired.
 
 The assertions for every row `id` are:
 
@@ -58,8 +58,8 @@ Canonical paths are under `test/alignment/flow/`, public paths under
 
 Known differences from the reference implementations:
 
-- Both references retain member decorators in ESTree, but their Babel adapters
-  drop them. Native preserves them. Babel's Flow stripper supplies the output
+- Hermes retains member decorators in ESTree, but its Babel adapter
+  drops them. Native preserves them. Babel's Flow stripper supplies the output
   preservation oracle, and executed legacy-decorator tests protect behavior.
 - Hermes' record key-name map aliases numeric `1` and bigint `1n`, selecting the
   last generated local for both assignments. Native keeps each property's own

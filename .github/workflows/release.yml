@@ -175,9 +175,6 @@ jobs:
       - run: node scripts/native.mjs materialize --artifact-root artifacts
       - run: nix develop .#release --command pnpm install --offline --frozen-lockfile --ignore-scripts
       - run: nix develop .#release --command pnpm package:check --release
-      - run: >-
-          nix develop .#release --command pnpm --recursive --include-workspace-root pack
-          --pack-destination target/npm-tarballs
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: validated-packages
@@ -214,7 +211,6 @@ jobs:
         with:
           name: validated-packages
       - run: nix develop .#release --command pnpm install --offline --frozen-lockfile --ignore-scripts
-      - run: nix develop .#release --command pnpm package:check --release
       - uses: changesets/action@a45c4d594aa4e2c509dc14a9f2b3b67ba3780d0d # v1.9.0
         with:
           publish: nix develop .#release --command node scripts/release.mjs publish
