@@ -13,5 +13,4 @@ cannot drift from the JavaScript loader. Each platform README
 loader selects the matching optional package.
 
 On `main`, the release workflow maintains a version PR. Merging that PR builds every native target
-and publishes the complete workspace through npm trusted publishing. Provenance remains disabled
-while the source repository is private.
+and publishes the complete workspace.

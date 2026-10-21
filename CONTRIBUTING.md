@@ -10,7 +10,7 @@ Use the pinned Nix environment:
 
 ```sh
 nix develop
-pnpm install --offline --frozen-lockfile --ignore-scripts
+pnpm install --frozen-lockfile --ignore-scripts
 pnpm build
 ```
 
@@ -35,57 +35,21 @@ Use focused commands while iterating, then run `pnpm check` before handoff.
 Generated protocol files must be changed through their generators; run
 `pnpm codegen` and verify them with `pnpm codegen:check`.
 
-## Native release packages
-
-On x86_64 Linux or Apple Silicon macOS, build and place all eight supported
-native binaries into their `npm/**` workspaces with:
-
-```sh
-nix run .#prepare-release-packages
-```
-
-The command validates the complete artifact set before changing package
-workspaces. To inspect the resulting packages or create local tarballs:
-
-```sh
-pnpm package:check --release
-pnpm --recursive --include-workspace-root pack --pack-destination target/npm-tarballs
-```
-
-Nix owns cross-compilation and reproducible native artifacts. pnpm owns npm
-packing, workspace links, and Changesets. Do not add custom tarball generation or
-duplicate cross-build scripts.
+## Updating Hermes
 
 The flake pins Hermes as a source input so Nix builds do not depend on special
 submodule-aware flake invocation. The Git submodule remains the normal source
 for development outside Nix builds; keep the two revisions aligned when updating
 Hermes.
 
-## CI and releases
+## CI and changesets
 
-Pull requests and `main` run the same Nix-backed `pnpm check`. The release
-workflow starts only after CI succeeds on `main`, builds the exact verified
-commit, smoke-tests every platform, validates all npm packages, and publishes
-through Changesets and npm trusted publishing.
-
-Contributors normally only create a Changeset:
+Pull requests and `main` run the same Nix-backed `pnpm check`. Add a changeset
+for every user-visible change:
 
 ```sh
 pnpm changeset
 ```
-
-The workflow manages version PRs and publication. Direct local publication is
-also supported for recovery or maintainer-driven releases after preparing the
-complete native package set:
-
-```sh
-nix run .#prepare-release-packages
-pnpm release
-```
-
-`pnpm release` performs the same package checks and Changesets publication as
-CI, using the maintainer's existing npm authentication. Package lifecycle hooks
-still reject direct `npm publish` commands and incomplete or stale artifacts.
 
 ## Maintaining automation
 
@@ -101,5 +65,3 @@ Keep the automation behind these existing surfaces:
 Prefer an existing npm command or a subcommand on one of these files. Avoid
 single-use wrappers and do not repeat validation steps in workflow YAML. Pin new
 tools in the flake and third-party GitHub Actions to full commit SHAs.
-
-See `RELEASE_PLAN.md` for the complete build and release design.
