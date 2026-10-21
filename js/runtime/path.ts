@@ -133,7 +133,6 @@ export type PathRuntime = {
   widen: (target: NativeEvent, types: string[], scopeOnly: boolean) => void;
   parent: (target: NativeEvent, id: number, ancestryDepth: number) => NativeNodePath | null;
   children: (target: NativeEvent, ancestryDepth: number, role?: string) => NativeNodePath[];
-  allowsChild: (type: string, role: string) => boolean;
   allowsAncestry: () => boolean;
   allowsScope: () => boolean;
   scopeCache: Map<number, NativeScope>;
@@ -692,10 +691,10 @@ export class NodePathImpl implements NativeNodePath {
     return this.#pluginError(message);
   }
   prependToBody(content: Code): void {
-    this.#insert('AppendRight', this.#bodyOffset(true), content);
+    this.unshiftContainer('body', content);
   }
   appendToBody(content: Code): void {
-    this.#insert('PrependLeft', this.#bodyOffset(false), content);
+    this.pushContainer('body', content);
   }
 
   #pluginError(message: string, cause?: unknown): NativeTransformError {

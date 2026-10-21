@@ -2,7 +2,6 @@ import type {
   NativeFieldKey,
   NativeNodeFields,
   NativeNodeType,
-  NativeRouteFields,
   NativeRouteTypes,
 } from './generated/event-schema';
 
@@ -133,18 +132,6 @@ export type KnownNodeType = keyof NativeNodeMap;
 export type NodeOfType<T extends string> = T extends KnownNodeType
   ? NativeNodeMap[T]
   : NodeView & { readonly type: T };
-
-export type IdentifierView = NativeNodeMap['Identifier'];
-export type StringLiteralView = NativeNodeMap['StringLiteral'];
-export type NumericLiteralView = NativeNodeMap['NumericLiteral'];
-export type BooleanLiteralView = NativeNodeMap['BooleanLiteral'];
-export type CallExpressionView = NativeNodeMap['CallExpression'];
-/** Function and arrow-function events, as the `Function` alias route sees them. */
-export type FunctionView = NodeView & {
-  readonly type: NativeRouteTypes['Function'];
-} & NativeRouteFields['Function'];
-export type ImportDeclarationView = NativeNodeMap['ImportDeclaration'];
-export type ExportNamedDeclarationView = NativeNodeMap['ExportNamedDeclaration'];
 
 export interface NodeSummary {
   id: NodeId;

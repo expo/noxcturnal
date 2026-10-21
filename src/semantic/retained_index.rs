@@ -1383,16 +1383,9 @@ impl RetainedIndex {
     }
 
     pub(crate) fn scalar_field(&self, node_id: u32, key_id: u32) -> Option<RetainedFieldValue> {
-        self.scalar_fields_for(node_id)
-            .iter()
-            .find(|field| field.key_id == key_id)
-            .map(|field| {
-                if field.value & 0xc000_0000 == 0 {
-                    RetainedFieldValue::String(field.value)
-                } else {
-                    RetainedFieldValue::Packed(field.value)
-                }
-            })
+        self.scalar_fields(node_id)
+            .find(|&(key, _)| key == key_id)
+            .map(|(_, value)| value)
     }
 
     pub(crate) fn scalar_string(&self, id: u32) -> Option<&str> {
@@ -1491,33 +1484,29 @@ impl RetainedIndex {
         words
     }
 
+    fn child_edge_slice(&self, parent_id: u32) -> &[ChildEdge] {
+        let Some(offsets) = self.child_offsets.as_ref() else {
+            return &[];
+        };
+        let Some(&start) = offsets.get(parent_id as usize) else {
+            return &[];
+        };
+        let Some(&end) = offsets.get(parent_id as usize + 1) else {
+            return &[];
+        };
+        &self.child_edges[start as usize..end as usize]
+    }
+
     pub fn children(&self, parent_id: u32) -> Children<'_> {
-        let edges = self.child_offsets.as_ref().map_or(&[][..], |offsets| {
-            let Some((&start, &end)) = offsets
-                .get(parent_id as usize)
-                .zip(offsets.get(parent_id as usize + 1))
-            else {
-                return &[];
-            };
-            &self.child_edges[start as usize..end as usize]
-        });
         Children {
-            edges: edges.iter(),
-            role_id: None,
+            edges: self.child_edge_slice(parent_id).iter(),
         }
     }
 
     pub(crate) fn child_edges(&self, parent_id: u32) -> impl Iterator<Item = (u32, u32)> + '_ {
-        let edges = self.child_offsets.as_ref().map_or(&[][..], |offsets| {
-            let Some((&start, &end)) = offsets
-                .get(parent_id as usize)
-                .zip(offsets.get(parent_id as usize + 1))
-            else {
-                return &[];
-            };
-            &self.child_edges[start as usize..end as usize]
-        });
-        edges.iter().map(|edge| (edge.child_id, edge.role_id))
+        self.child_edge_slice(parent_id)
+            .iter()
+            .map(|edge| (edge.child_id, edge.role_id))
     }
 
     /// Build only on demand; selected buckets contain IDs, never duplicate facts.
@@ -1873,16 +1862,13 @@ fn scope_intervals(scope_parents: &[u32]) -> (Vec<u32>, Vec<u32>) {
 
 pub struct Children<'a> {
     edges: std::slice::Iter<'a, ChildEdge>,
-    role_id: Option<u32>,
 }
 
 impl Iterator for Children<'_> {
     type Item = u32;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.edges
-            .find(|edge| self.role_id.is_none_or(|role_id| edge.role_id == role_id))
-            .map(|edge| edge.child_id)
+        self.edges.next().map(|edge| edge.child_id)
     }
 }
 use std::rc::Rc;

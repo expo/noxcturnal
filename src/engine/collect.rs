@@ -21,8 +21,7 @@ use crate::semantic::retained_index::{RetainedComment, RetainedIndex};
 use crate::syntax::classification::source_type;
 
 use super::fields::{packed_fields_direct, utf16_index};
-use super::member::MemberPathInterner;
-use super::member::{member_write_root_child, mutation_target_child, tracks_member_writes};
+use super::member::{MemberPathInterner, MemberWriteStack, tracks_member_writes};
 use super::retained::routed_buffer_from_index;
 use super::{
     MaterializedSessionParts, RETAIN_CALLS, RETAIN_CHILDREN, RETAIN_CONSTANTS, RETAIN_IDENTIFIERS,
@@ -35,8 +34,7 @@ struct EventCollector<'a> {
     scoping: &'a Scoping,
     utf16: Option<&'a [u32]>,
     retained_index: RetainedIndex,
-    target_stack: Vec<(AstKind<'a>, bool, bool)>,
-    tracks_member_writes: bool,
+    member_writes: MemberWriteStack<'a>,
     retention_routes: Option<&'a CompiledManifest>,
     retention_capabilities: u32,
     retain_scopes: bool,
@@ -53,8 +51,7 @@ struct SyntaxIndexCollector<'a> {
     retained_string_ids: FxHashMap<String, u32>,
     member_paths: MemberPathInterner,
     parent_stack: Vec<(u32, u32, AstKind<'a>)>,
-    target_stack: Vec<(AstKind<'a>, bool, bool)>,
-    tracks_member_writes: bool,
+    member_writes: MemberWriteStack<'a>,
     node_count: u32,
     validation_stats: Stats,
 }
@@ -84,24 +81,7 @@ impl<'a> Visit<'a> for SyntaxIndexCollector<'a> {
             AstKind::IdentifierReference(_) => self.validation_stats.references += 1,
             _ => {}
         }
-        let member_write = self.tracks_member_writes
-            && self
-                .target_stack
-                .last()
-                .is_some_and(|(parent, parent_is_target, _)| {
-                    mutation_target_child(kind, *parent, *parent_is_target)
-                });
-        let member_root_write = self.tracks_member_writes
-            && self.target_stack.last().is_some_and(
-                |(parent, parent_member_write, parent_is_member_root)| {
-                    member_write_root_child(
-                        kind,
-                        *parent,
-                        *parent_member_write,
-                        *parent_is_member_root,
-                    )
-                },
-            );
+        let (member_write, member_root_write) = self.member_writes.enter(kind);
         let id = self.node_count;
         self.node_count += 1;
         kind.set_node_id(NodeId::new(id as usize));
@@ -164,10 +144,6 @@ impl<'a> Visit<'a> for SyntaxIndexCollector<'a> {
             }
         }
         self.parent_stack.push((id, protocol_id, kind));
-        if self.tracks_member_writes {
-            self.target_stack
-                .push((kind, member_write, member_root_write));
-        }
     }
 
     fn leave_node(&mut self, kind: AstKind<'a>) {
@@ -175,11 +151,7 @@ impl<'a> Visit<'a> for SyntaxIndexCollector<'a> {
             .parent_stack
             .pop()
             .expect("syntax traversal enter/leave balance");
-        if self.tracks_member_writes {
-            self.target_stack
-                .pop()
-                .expect("syntax target traversal enter/leave balance");
-        }
+        self.member_writes.leave();
         if self.retains_traversal_kind(kind) {
             self.retained_index.record_exit(id);
         }
@@ -304,38 +276,13 @@ impl<'a> EventCollector<'a> {
 
 impl<'a> Visit<'a> for EventCollector<'a> {
     fn enter_node(&mut self, kind: AstKind<'a>) {
-        let member_write = self.tracks_member_writes
-            && self
-                .target_stack
-                .last()
-                .is_some_and(|(parent, parent_is_target, _)| {
-                    mutation_target_child(kind, *parent, *parent_is_target)
-                });
-        let member_root_write = self.tracks_member_writes
-            && self.target_stack.last().is_some_and(
-                |(parent, parent_member_write, parent_is_member_root)| {
-                    member_write_root_child(
-                        kind,
-                        *parent,
-                        *parent_member_write,
-                        *parent_is_member_root,
-                    )
-                },
-            );
+        let (member_write, member_root_write) = self.member_writes.enter(kind);
         self.retained_index
             .record_enter(kind.node_id().index() as u32);
         self.record_summary(kind, member_write, member_root_write);
-        if self.tracks_member_writes {
-            self.target_stack
-                .push((kind, member_write, member_root_write));
-        }
     }
     fn leave_node(&mut self, kind: AstKind<'a>) {
-        if self.tracks_member_writes {
-            self.target_stack
-                .pop()
-                .expect("semantic target traversal enter/leave balance");
-        }
+        self.member_writes.leave();
         if self.retains_traversal_kind(kind) {
             self.retained_index
                 .record_exit(kind.node_id().index() as u32);
@@ -433,11 +380,10 @@ pub(crate) fn materialize_program<'a>(
             retained_string_ids: FxHashMap::default(),
             member_paths: MemberPathInterner::default(),
             parent_stack: Vec::new(),
-            target_stack: Vec::new(),
-            tracks_member_writes: tracks_member_writes(
+            member_writes: MemberWriteStack::new(tracks_member_writes(
                 retention_manifest.as_ref(),
                 retention_capabilities,
-            ),
+            )),
             node_count: 0,
             validation_stats: Stats::default(),
         };
@@ -520,11 +466,10 @@ pub(crate) fn materialize_program<'a>(
         retain_scopes,
         retained_string_ids: FxHashMap::default(),
         member_paths: MemberPathInterner::default(),
-        target_stack: Vec::new(),
-        tracks_member_writes: tracks_member_writes(
+        member_writes: MemberWriteStack::new(tracks_member_writes(
             retention_manifest.as_ref(),
             retention_capabilities,
-        ),
+        )),
     };
     collector.visit_program(program);
     if retain_scopes && retention_capabilities & RETAIN_IDENTIFIERS != 0 {

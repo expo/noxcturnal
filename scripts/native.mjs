@@ -5,6 +5,7 @@ import path from 'node:path';
 
 import {
   assertBuildInputs,
+  assertNativeSourceRoots,
   currentBuildInputs,
   currentTarget,
   nativeInputHash,
@@ -20,11 +21,13 @@ const command = process.argv[2];
 if (command === 'build') buildDevelopment();
 else if (command === 'build-target') buildTarget();
 else if (command === 'materialize') materialize();
-else if (command === 'check') checkDevelopment();
-else if (command === 'smoke') smoke();
+else if (command === 'check') {
+  assertNativeSourceRoots();
+  checkDevelopment();
+} else if (command === 'smoke') smoke();
 else
   throw new Error(
-    'use native.mjs build [--release] | build-target | materialize (--artifact-root <directory> | --outputs-file <json>) | check | smoke <artifact> <target>',
+    'use native.mjs build [--release] | build-target | materialize --artifact-root <directory> | check | smoke <artifact> <target>',
   );
 
 function buildDevelopment() {
@@ -156,19 +159,9 @@ function materialize() {
   const workspaceIndex = arguments_.indexOf('--workspace-root');
   const workspace = path.resolve(workspaceIndex >= 0 ? arguments_[workspaceIndex + 1] : root);
   const artifactRootIndex = arguments_.indexOf('--artifact-root');
-  const outputsIndex = arguments_.indexOf('--outputs-file');
-  let directories;
-  if (artifactRootIndex >= 0) {
-    const artifactRoot = path.resolve(arguments_[artifactRootIndex + 1]);
-    directories = nativeTargets.map(target => path.join(artifactRoot, target.rustTarget));
-  } else if (outputsIndex >= 0) {
-    const outputs = JSON.parse(fs.readFileSync(arguments_[outputsIndex + 1], 'utf8'));
-    directories = nativeTargets.map(target => outputs[target.rustTarget]);
-  } else {
-    throw new Error('materialize requires --artifact-root <directory> or --outputs-file <json>');
-  }
-  if (directories.some(directory => typeof directory !== 'string'))
-    throw new Error('artifact set does not contain every declared target');
+  if (artifactRootIndex < 0) throw new Error('materialize requires --artifact-root <directory>');
+  const artifactRoot = path.resolve(arguments_[artifactRootIndex + 1]);
+  const directories = nativeTargets.map(target => path.join(artifactRoot, target.rustTarget));
 
   const expected = currentBuildInputs(workspace);
   const validated = nativeTargets.map((target, index) => ({

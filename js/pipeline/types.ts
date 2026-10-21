@@ -27,7 +27,6 @@ export interface RouteCapabilities {
 }
 
 export type PreparedPluginPlan = {
-  editEffect?: EditEffect;
   subscriptions: readonly string[];
   fields?: Readonly<Partial<Record<NativeNodeType, readonly NativeFieldKey[]>>>;
   controlFlow?: readonly ControlFlowCapability[];
@@ -76,7 +75,6 @@ export interface CompiledNestedRoutes {
   callbacks: readonly (readonly Handler<any>[])[];
   routes: readonly NativeRouteManifestEntry[];
   capabilities: readonly RouteCapabilities[];
-  ancestorChildParentTypes: readonly string[];
 }
 
 /** A phase prepared from its definitions.
@@ -93,8 +91,6 @@ export interface PreparedPhase {
   retentionCapabilities: number;
   requiresIndexBase: boolean;
   structuralParentTypes: readonly string[];
-  ancestorChildParentTypes: readonly string[];
-  ancestryDepth: number;
   runtimeEditEffect: EditEffect;
   compiledRoutes: readonly CompiledRouteTemplate[];
   dispatchRoutes: readonly DispatchRoute[];

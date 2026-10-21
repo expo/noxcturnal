@@ -3,7 +3,6 @@ import { test } from 'vitest';
 
 import { defineNativePipeline, defineNativePlugin, defineVisitor, transform } from '../../index';
 import { native } from '../../native/binding';
-import { packFieldRequests } from '../../protocol/edits';
 import {
   decodeEventBatch,
   decodePackedEnvelope,
@@ -63,19 +62,6 @@ test('Program-only routing agrees with descendant traversal for counts, exits, a
     assert.equal(root.events.length, sides.length);
     assert.deepEqual(root, read(true));
   }
-});
-
-test('packs only known field requests into the native request format', () => {
-  assert.equal(packFieldRequests(), undefined);
-  const packed = packFieldRequests({
-    Identifier: ['name', 'unknown-field'],
-    UnknownNode: ['name'],
-  });
-  assert.ok(packed);
-  assert.equal(packed.length, 12);
-  assert.notEqual(packed.readUInt32LE(0), 0);
-  assert.equal(packed.readUInt32LE(4), 1);
-  assert.notEqual(packed.readUInt32LE(8), 0);
 });
 
 test('rejects malformed routed string tables before decoding records', () => {

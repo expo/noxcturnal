@@ -233,7 +233,7 @@ function appendSourcelessFragment(chunks: string[], fragment: Code): void {
   } else chunks.push((fragment as CodeFragment).code);
 }
 
-function identicalContentParts(
+export function identicalContentParts(
   a: readonly (string | { start: number; end: number })[],
   b: readonly (string | { start: number; end: number })[],
 ): boolean {

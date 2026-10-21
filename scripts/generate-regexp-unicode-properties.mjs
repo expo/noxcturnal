@@ -218,17 +218,11 @@ function unicodeStringProperties() {
     .join('\n');
   const memberConstants = properties
     .map(property => {
-      const { characters, strings } = require(
+      const { strings } = require(
         `regenerate-unicode-properties/Property_of_Strings/${property}.js`,
       );
-      const characterRanges = [];
-      for (let index = 0; index < characters.data.length; index += 2) {
-        characterRanges.push(
-          `    (0x${characters.data[index].toString(16).toUpperCase()}, 0x${(characters.data[index + 1] - 1).toString(16).toUpperCase()}),`,
-        );
-      }
       const constant = property.replaceAll(/(?<!^)([A-Z])/g, '_$1').toUpperCase();
-      return `const ${constant}_RANGES: &[(u32, u32)] = &[\n${characterRanges.join('\n')}\n];
+      return `const ${constant}_RANGES: &[(u32, u32)] = &[\n${ranges(`Property_of_Strings/${property}.js`)}\n];
 const ${constant}_STRINGS: &[&str] = &[\n${strings.map(value => `    ${JSON.stringify(value)},`).join('\n')}\n];`;
     })
     .join('\n\n');

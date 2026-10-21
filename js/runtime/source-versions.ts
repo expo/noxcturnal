@@ -4,51 +4,33 @@ import {
   planArtifacts,
   type ArtifactPlan,
 } from '../pipeline/artifacts';
-import type { EditCommand } from '../types';
 
 export type SourceVersionId = number & { readonly __sourceVersionId: unique symbol };
 
 export interface SourceVersion {
   readonly id: SourceVersionId;
-  readonly parentId: SourceVersionId | null;
-  readonly normalizedEditCount: number;
-  readonly normalizedEdits?: readonly EditCommand[];
-  readonly codeChanged: boolean;
-  readonly mapChanged: boolean;
   availableArtifacts: ArtifactDemand;
   renderedText?: string;
 }
 
-/**
- * Transform-local immutable version graph. It is intentionally linear today,
- * but callers address opaque IDs and never infer identity from source strings.
- */
 export class SourceVersionStore {
-  readonly #versions: SourceVersion[];
+  #current: SourceVersion;
 
   constructor(source: string) {
-    this.#versions = [
-      {
-        id: 0 as SourceVersionId,
-        parentId: null,
-        normalizedEditCount: 0,
-        normalizedEdits: undefined,
-        codeChanged: false,
-        mapChanged: false,
-        availableArtifacts: ArtifactDemand.RenderedText,
-        renderedText: source,
-      },
-    ];
+    this.#current = {
+      id: 0 as SourceVersionId,
+      availableArtifacts: ArtifactDemand.RenderedText,
+      renderedText: source,
+    };
   }
 
   get original(): SourceVersionId {
-    return this.#versions[0].id;
+    return 0 as SourceVersionId;
   }
 
   get(id: SourceVersionId): SourceVersion {
-    const version = this.#versions[id as number];
-    if (version == null) throw new Error(`unknown source version ${id}`);
-    return version;
+    if (id !== this.#current.id) throw new Error(`unknown source version ${id}`);
+    return this.#current;
   }
 
   ensure(
@@ -74,30 +56,20 @@ export class SourceVersionStore {
 
   commit(
     parentId: SourceVersionId,
-    effect: {
-      normalizedEditCount: number;
-      normalizedEdits?: readonly EditCommand[];
-      codeChanged: boolean;
-      mapChanged: boolean;
-    },
+    effect: { codeChanged: boolean; mapChanged: boolean },
   ): SourceVersionId {
     const parent = this.get(parentId);
     if (!effect.codeChanged && !effect.mapChanged) return parentId;
-    const id = this.#versions.length as SourceVersionId;
-    this.#versions.push({
+    const id = (parent.id + 1) as SourceVersionId;
+    // Map-only children share every text-derived product with their parent.
+    // A byte-changing child starts with resident rendered text only.
+    this.#current = {
       id,
-      parentId,
-      normalizedEditCount: effect.normalizedEditCount,
-      normalizedEdits: effect.normalizedEdits,
-      codeChanged: effect.codeChanged,
-      mapChanged: effect.mapChanged,
-      // Map-only children share every text-derived product with their parent.
-      // A byte-changing child starts with resident rendered text only.
       availableArtifacts: effect.codeChanged
         ? ArtifactDemand.RenderedText
         : parent.availableArtifacts | ArtifactDemand.RealizedMap,
       renderedText: effect.codeChanged ? undefined : parent.renderedText,
-    });
+    };
     return id;
   }
 

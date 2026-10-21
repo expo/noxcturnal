@@ -1037,27 +1037,6 @@ fn lower_derived_constructor_body<'a>(
     {
         return Ok(false);
     }
-    let mut declarations = ArenaVec::new_in(ast);
-    declarations.push(oxc_ast::ast::VariableDeclarator::new(
-        anchor,
-        oxc_ast::ast::BindingPattern::new_binding_identifier(
-            anchor,
-            ast.allocator().alloc_str(receiver_name),
-            ast.builder(),
-        ),
-        None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
-        None::<Expression<'a>>,
-        false,
-        ast.builder(),
-    ));
-    let receiver_declaration =
-        Statement::VariableDeclaration(oxc_ast::ast::VariableDeclaration::boxed(
-            anchor,
-            VariableDeclarationKind::Var,
-            declarations,
-            false,
-            ast.builder(),
-        ));
     lower_general_derived_constructor_body(
         ast,
         body,
@@ -1070,7 +1049,6 @@ fn lower_derived_constructor_body<'a>(
         super_call_name.ok_or("classes-direct-derived-super-call-name-missing")?,
         anchor,
         instance_initializers,
-        receiver_declaration,
         parameters,
         construct_assert,
     )?;
@@ -1116,35 +1094,52 @@ fn contains_new_target(body: &oxc_ast::ast::FunctionBody<'_>) -> bool {
     detector.new_target
 }
 
+fn rewrite_chain_element<'a>(
+    allocator: &'a Allocator,
+    element: &mut ChainElement<'a>,
+    visit: impl FnOnce(&mut Expression<'a>),
+) {
+    let ast = AstBuilder::new(allocator);
+    let mut expression = match element.take_in(&ast) {
+        ChainElement::CallExpression(call) => Expression::CallExpression(call),
+        ChainElement::TSNonNullExpression(expr) => Expression::TSNonNullExpression(expr),
+        other => Expression::from(other.into_member_expression()),
+    };
+    visit(&mut expression);
+    *element = match expression {
+        Expression::CallExpression(call) => ChainElement::CallExpression(call),
+        Expression::TSNonNullExpression(expr) => ChainElement::TSNonNullExpression(expr),
+        other => ChainElement::from(other.into_member_expression()),
+    };
+}
+
+fn statement_is_leading_super(statement: &Statement<'_>) -> bool {
+    let expression = match statement {
+        Statement::ExpressionStatement(statement) => Some(&statement.expression),
+        Statement::ReturnStatement(statement) => statement.argument.as_ref(),
+        _ => None,
+    };
+    match expression {
+        Some(Expression::CallExpression(call)) => matches!(call.callee, Expression::Super(_)),
+        Some(Expression::SequenceExpression(sequence)) => {
+            sequence.expressions.first().is_some_and(|expression| {
+                matches!(
+                    expression,
+                    Expression::CallExpression(call) if matches!(call.callee, Expression::Super(_))
+                )
+            })
+        }
+        _ => false,
+    }
+}
+
 fn has_single_leading_super(body: &oxc_ast::ast::FunctionBody<'_>) -> bool {
     let mut detector = ConstructorShapeDetector {
         super_calls: 0,
         new_target: false,
     };
     detector.visit_function_body(body);
-    detector.super_calls == 1
-        && body.statements.iter().any(|statement| {
-            let expression = match statement {
-                Statement::ExpressionStatement(statement) => Some(&statement.expression),
-                Statement::ReturnStatement(statement) => statement.argument.as_ref(),
-                _ => None,
-            };
-            match expression {
-                Some(Expression::CallExpression(call)) => {
-                    matches!(call.callee, Expression::Super(_))
-                }
-                Some(Expression::SequenceExpression(sequence)) => {
-                    sequence.expressions.first().is_some_and(|expression| {
-                        matches!(
-                            expression,
-                            Expression::CallExpression(call)
-                                if matches!(call.callee, Expression::Super(_))
-                        )
-                    })
-                }
-                _ => false,
-            }
-        })
+    detector.super_calls == 1 && body.statements.iter().any(statement_is_leading_super)
 }
 
 impl<'a> VisitMut<'a> for SuperCallCounter {
@@ -1181,28 +1176,7 @@ fn lower_leading_super_constructor_body<'a>(
     if counter.count != 1 {
         return Ok(false);
     }
-    let Some(index) = body.statements.iter().position(|statement| {
-        let expression = match statement {
-            Statement::ExpressionStatement(statement) => Some(&statement.expression),
-            Statement::ReturnStatement(statement) => statement.argument.as_ref(),
-            _ => None,
-        };
-        match expression {
-            Some(Expression::CallExpression(call)) => {
-                matches!(call.callee, Expression::Super(_))
-            }
-            Some(Expression::SequenceExpression(sequence)) => {
-                sequence.expressions.first().is_some_and(|expression| {
-                    matches!(
-                        expression,
-                        Expression::CallExpression(call)
-                            if matches!(call.callee, Expression::Super(_))
-                    )
-                })
-            }
-            _ => false,
-        }
-    }) else {
+    let Some(index) = body.statements.iter().position(statement_is_leading_super) else {
         return Ok(false);
     };
     if let Some(new_target_name) = new_target_name {
@@ -1389,7 +1363,6 @@ fn lower_general_derived_constructor_body<'a>(
     super_call_name: &str,
     anchor: Span,
     instance_initializers: &mut ArenaVec<'a, Statement<'a>>,
-    _receiver_declaration: Statement<'a>,
     mut parameters: Option<ArenaBox<'a, FormalParameters<'a>>>,
     construct_assert: &mut bool,
 ) -> Result<(), &'static str> {
@@ -1602,20 +1575,7 @@ fn lower_general_derived_constructor_body<'a>(
         ),
     );
     let mut apply_arguments = ArenaVec::new_in(ast);
-    apply_arguments.push(Argument::from(
-        oxc_ast::ast::Expression::new_unary_expression(
-            anchor,
-            oxc_syntax::operator::UnaryOperator::Void,
-            oxc_ast::ast::Expression::new_numeric_literal(
-                anchor,
-                0.0,
-                None,
-                oxc_ast::ast::NumberBase::Decimal,
-                ast.builder(),
-            ),
-            ast.builder(),
-        ),
-    ));
+    apply_arguments.push(Argument::from(super::void_zero(ast, anchor)));
     apply_arguments.push(Argument::from(oxc_ast::ast::Expression::new_identifier(
         anchor,
         "arguments",
@@ -1644,18 +1604,7 @@ fn lower_general_derived_constructor_body<'a>(
         result_name,
     ));
 
-    let undefined = oxc_ast::ast::Expression::new_unary_expression(
-        anchor,
-        oxc_syntax::operator::UnaryOperator::Void,
-        oxc_ast::ast::Expression::new_numeric_literal(
-            anchor,
-            0.0,
-            None,
-            oxc_ast::ast::NumberBase::Decimal,
-            ast.builder(),
-        ),
-        ast.builder(),
-    );
+    let undefined = super::void_zero(ast, anchor);
     let mut error_arguments = ArenaVec::new_in(ast);
     error_arguments.push(Argument::from(
         oxc_ast::ast::Expression::new_string_literal(
@@ -1925,18 +1874,7 @@ fn possible_constructor_return_statement<'a>(
             ast.builder(),
         )
     };
-    let undefined = oxc_ast::ast::Expression::new_unary_expression(
-        span,
-        oxc_syntax::operator::UnaryOperator::Void,
-        oxc_ast::ast::Expression::new_numeric_literal(
-            span,
-            0.0,
-            None,
-            oxc_ast::ast::NumberBase::Decimal,
-            ast.builder(),
-        ),
-        ast.builder(),
-    );
+    let undefined = super::void_zero(ast, span);
     let test = oxc_ast::ast::Expression::new_binary_expression(
         span,
         result(),
@@ -2158,19 +2096,8 @@ impl<'a> VisitMut<'a> for StaticInitializerThisRewriter<'a> {
                 &AstBuilder::new(self.allocator),
             );
         } else if matches!(expression, Expression::NewTarget(_)) {
-            let ast = AstBuilder::new(self.allocator);
-            *expression = oxc_ast::ast::Expression::new_unary_expression(
-                expression.span(),
-                oxc_syntax::operator::UnaryOperator::Void,
-                oxc_ast::ast::Expression::new_numeric_literal(
-                    expression.span(),
-                    0.0,
-                    None,
-                    oxc_ast::ast::NumberBase::Decimal,
-                    ast.builder(),
-                ),
-                ast.builder(),
-            );
+            let span = expression.span();
+            *expression = super::void_zero(&AstBuilder::new(self.allocator), span);
         } else {
             walk_mut::walk_expression(self, expression);
         }
@@ -2247,18 +2174,9 @@ impl<'a> VisitMut<'a> for PrivateLooseRewriter<'a, '_> {
     }
 
     fn visit_chain_element(&mut self, element: &mut ChainElement<'a>) {
-        let ast = AstBuilder::new(self.allocator);
-        let mut expression = match element.take_in(&ast) {
-            ChainElement::CallExpression(call) => Expression::CallExpression(call),
-            ChainElement::TSNonNullExpression(expr) => Expression::TSNonNullExpression(expr),
-            other => Expression::from(other.into_member_expression()),
-        };
-        self.visit_expression(&mut expression);
-        *element = match expression {
-            Expression::CallExpression(call) => ChainElement::CallExpression(call),
-            Expression::TSNonNullExpression(expr) => ChainElement::TSNonNullExpression(expr),
-            other => ChainElement::from(other.into_member_expression()),
-        };
+        rewrite_chain_element(self.allocator, element, |expression| {
+            self.visit_expression(expression);
+        });
     }
 
     fn visit_expression(&mut self, expression: &mut Expression<'a>) {
@@ -2666,18 +2584,9 @@ impl<'a> SuperAccessRewriter<'a> {
 
 impl<'a> VisitMut<'a> for SuperAccessRewriter<'a> {
     fn visit_chain_element(&mut self, element: &mut ChainElement<'a>) {
-        let ast = AstBuilder::new(self.allocator);
-        let mut expression = match element.take_in(&ast) {
-            ChainElement::CallExpression(call) => Expression::CallExpression(call),
-            ChainElement::TSNonNullExpression(expr) => Expression::TSNonNullExpression(expr),
-            other => Expression::from(other.into_member_expression()),
-        };
-        self.visit_expression(&mut expression);
-        *element = match expression {
-            Expression::CallExpression(call) => ChainElement::CallExpression(call),
-            Expression::TSNonNullExpression(expr) => ChainElement::TSNonNullExpression(expr),
-            other => ChainElement::from(other.into_member_expression()),
-        };
+        rewrite_chain_element(self.allocator, element, |expression| {
+            self.visit_expression(expression);
+        });
     }
 
     fn visit_expression(&mut self, expression: &mut Expression<'a>) {
@@ -3735,7 +3644,7 @@ fn lower_simple_class<'a>(
             ClassElement::PropertyDefinition(property) => {
                 let mut property = property.unbox();
                 if let Some(value) = &mut property.value {
-                    clear_leading_pure_annotation(value);
+                    super::clear_leading_pure_annotation(value);
                     if let Some(super_name) = super_name {
                         if plan.class_properties_loose == Some(true) {
                             LooseFieldSuperRewriter {
@@ -3824,7 +3733,7 @@ fn lower_simple_class<'a>(
                     .0
                     .clone();
                 if let Some(value) = &mut accessor.value {
-                    clear_leading_pure_annotation(value);
+                    super::clear_leading_pure_annotation(value);
                     SuperAccessRewriter {
                         allocator,
                         class_name: allocator.alloc_str(name),
@@ -4579,22 +4488,7 @@ fn lower_simple_class<'a>(
         ));
         wrapper_statements.push(oxc_ast::ast::Statement::new_expression_statement(
             anchor,
-            oxc_ast::ast::Expression::new_call_expression(
-                anchor,
-                Expression::from(
-                    oxc_ast::ast::MemberExpression::new_static_member_expression(
-                        anchor,
-                        oxc_ast::ast::Expression::new_identifier(anchor, "Object", ast.builder()),
-                        oxc_ast::ast::IdentifierName::new(anchor, "defineProperty", ast.builder()),
-                        false,
-                        ast.builder(),
-                    ),
-                ),
-                None::<ArenaBox<'a, TSTypeParameterInstantiation<'a>>>,
-                arguments,
-                false,
-                ast.builder(),
-            ),
+            object_define_property_call(&ast, anchor, arguments),
             ast.builder(),
         ));
     }
@@ -4710,6 +4604,29 @@ fn static_block_initializer<'a>(
     )
 }
 
+fn object_define_property_call<'a>(
+    ast: &AstBuilder<'a>,
+    anchor: Span,
+    arguments: ArenaVec<'a, Argument<'a>>,
+) -> Expression<'a> {
+    oxc_ast::ast::Expression::new_call_expression(
+        anchor,
+        Expression::from(
+            oxc_ast::ast::MemberExpression::new_static_member_expression(
+                anchor,
+                oxc_ast::ast::Expression::new_identifier(anchor, "Object", ast.builder()),
+                oxc_ast::ast::IdentifierName::new(anchor, "defineProperty", ast.builder()),
+                false,
+                ast.builder(),
+            ),
+        ),
+        None::<ArenaBox<'a, TSTypeParameterInstantiation<'a>>>,
+        arguments,
+        false,
+        ast.builder(),
+    )
+}
+
 fn lock_class_prototype<'a>(ast: &AstBuilder<'a>, class_name: &str, anchor: Span) -> Statement<'a> {
     let mut descriptor = ArenaVec::new_in(ast);
     descriptor.push(oxc_ast::ast::ObjectPropertyKind::new_object_property(
@@ -4736,22 +4653,7 @@ fn lock_class_prototype<'a>(ast: &AstBuilder<'a>, class_name: &str, anchor: Span
     ));
     oxc_ast::ast::Statement::new_expression_statement(
         anchor,
-        oxc_ast::ast::Expression::new_call_expression(
-            anchor,
-            Expression::from(
-                oxc_ast::ast::MemberExpression::new_static_member_expression(
-                    anchor,
-                    oxc_ast::ast::Expression::new_identifier(anchor, "Object", ast.builder()),
-                    oxc_ast::ast::IdentifierName::new(anchor, "defineProperty", ast.builder()),
-                    false,
-                    ast.builder(),
-                ),
-            ),
-            None::<ArenaBox<'a, TSTypeParameterInstantiation<'a>>>,
-            arguments,
-            false,
-            ast.builder(),
-        ),
+        object_define_property_call(ast, anchor, arguments),
         ast.builder(),
     )
 }
@@ -4808,22 +4710,7 @@ fn private_accessor_initializer<'a>(
     ));
     oxc_ast::ast::Statement::new_expression_statement(
         anchor,
-        oxc_ast::ast::Expression::new_call_expression(
-            anchor,
-            Expression::from(
-                oxc_ast::ast::MemberExpression::new_static_member_expression(
-                    anchor,
-                    oxc_ast::ast::Expression::new_identifier(anchor, "Object", ast.builder()),
-                    oxc_ast::ast::IdentifierName::new(anchor, "defineProperty", ast.builder()),
-                    false,
-                    ast.builder(),
-                ),
-            ),
-            None::<ArenaBox<'a, TSTypeParameterInstantiation<'a>>>,
-            arguments,
-            false,
-            ast.builder(),
-        ),
+        object_define_property_call(ast, anchor, arguments),
         ast.builder(),
     )
 }
@@ -4993,20 +4880,7 @@ fn private_element_initializer<'a>(
     } else {
         oxc_ast::ast::Expression::new_this_expression(anchor, ast.builder())
     };
-    let value = value.unwrap_or_else(|| {
-        oxc_ast::ast::Expression::new_unary_expression(
-            anchor,
-            oxc_syntax::operator::UnaryOperator::Void,
-            oxc_ast::ast::Expression::new_numeric_literal(
-                anchor,
-                0.0,
-                None,
-                oxc_ast::ast::NumberBase::Decimal,
-                ast.builder(),
-            ),
-            ast.builder(),
-        )
-    });
+    let value = value.unwrap_or_else(|| super::void_zero(ast, anchor));
     let mut descriptor = ArenaVec::new_in(ast);
     if writable {
         descriptor.push(oxc_ast::ast::ObjectPropertyKind::new_object_property(
@@ -5042,35 +4916,9 @@ fn private_element_initializer<'a>(
     ));
     oxc_ast::ast::Statement::new_expression_statement(
         anchor,
-        oxc_ast::ast::Expression::new_call_expression(
-            anchor,
-            Expression::from(
-                oxc_ast::ast::MemberExpression::new_static_member_expression(
-                    anchor,
-                    oxc_ast::ast::Expression::new_identifier(anchor, "Object", ast.builder()),
-                    oxc_ast::ast::IdentifierName::new(anchor, "defineProperty", ast.builder()),
-                    false,
-                    ast.builder(),
-                ),
-            ),
-            None::<ArenaBox<'a, TSTypeParameterInstantiation<'a>>>,
-            arguments,
-            false,
-            ast.builder(),
-        ),
+        object_define_property_call(ast, anchor, arguments),
         ast.builder(),
     )
-}
-
-fn clear_leading_pure_annotation(expression: &mut Expression<'_>) {
-    match expression {
-        Expression::CallExpression(call) => call.pure = false,
-        Expression::NewExpression(new) => new.pure = false,
-        Expression::ParenthesizedExpression(parenthesized) => {
-            clear_leading_pure_annotation(&mut parenthesized.expression);
-        }
-        _ => {}
-    }
 }
 
 fn public_field_initializer<'a>(
@@ -5114,21 +4962,10 @@ fn public_field_initializer<'a>(
     } else {
         oxc_ast::ast::Expression::new_this_expression(anchor, ast.builder())
     };
-    let mut value = property.value.unwrap_or_else(|| {
-        oxc_ast::ast::Expression::new_unary_expression(
-            anchor,
-            oxc_syntax::operator::UnaryOperator::Void,
-            oxc_ast::ast::Expression::new_numeric_literal(
-                anchor,
-                0.0,
-                None,
-                oxc_ast::ast::NumberBase::Decimal,
-                ast.builder(),
-            ),
-            ast.builder(),
-        )
-    });
-    clear_leading_pure_annotation(&mut value);
+    let mut value = property
+        .value
+        .unwrap_or_else(|| super::void_zero(ast, anchor));
+    super::clear_leading_pure_annotation(&mut value);
     let expression = if loose
         && !(property.r#static
             && key_name.is_some_and(|key| matches!(key.as_str(), "name" | "length")))
@@ -5202,22 +5039,7 @@ fn public_field_initializer<'a>(
         arguments.push(Argument::from(
             oxc_ast::ast::Expression::new_object_expression(anchor, descriptor, ast.builder()),
         ));
-        oxc_ast::ast::Expression::new_call_expression(
-            anchor,
-            Expression::from(
-                oxc_ast::ast::MemberExpression::new_static_member_expression(
-                    anchor,
-                    oxc_ast::ast::Expression::new_identifier(anchor, "Object", ast.builder()),
-                    oxc_ast::ast::IdentifierName::new(anchor, "defineProperty", ast.builder()),
-                    false,
-                    ast.builder(),
-                ),
-            ),
-            None::<ArenaBox<'a, TSTypeParameterInstantiation<'a>>>,
-            arguments,
-            false,
-            ast.builder(),
-        )
+        object_define_property_call(ast, anchor, arguments)
     };
     Ok((
         property.r#static,
@@ -5318,22 +5140,7 @@ fn set_function_name<'a>(
     arguments.push(Argument::from(
         oxc_ast::ast::Expression::new_object_expression(anchor, descriptor, ast.builder()),
     ));
-    oxc_ast::ast::Expression::new_call_expression(
-        anchor,
-        Expression::from(
-            oxc_ast::ast::MemberExpression::new_static_member_expression(
-                anchor,
-                oxc_ast::ast::Expression::new_identifier(anchor, "Object", ast.builder()),
-                oxc_ast::ast::IdentifierName::new(anchor, "defineProperty", ast.builder()),
-                false,
-                ast.builder(),
-            ),
-        ),
-        None::<ArenaBox<'a, TSTypeParameterInstantiation<'a>>>,
-        arguments,
-        false,
-        ast.builder(),
-    )
+    object_define_property_call(ast, anchor, arguments)
 }
 
 fn computed_function_name<'a>(
@@ -5471,16 +5278,7 @@ fn local_name(base: &str, reserved: &FxHashSet<String>) -> String {
 }
 
 fn reserve(base: &str, reserved: &mut FxHashSet<String>) -> String {
-    if reserved.insert(base.to_owned()) {
-        return base.to_owned();
-    }
-    for suffix in reserved.len().max(2).. {
-        let candidate = format!("{base}{suffix}");
-        if reserved.insert(candidate.clone()) {
-            return candidate;
-        }
-    }
-    unreachable!()
+    super::reserve_generated_name(base, reserved)
 }
 
 #[cfg(test)]

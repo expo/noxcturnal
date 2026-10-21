@@ -399,7 +399,6 @@ fn transform_with_function_map(
         || options.private_methods == Some(true)
         || options.private_property_in_object == Some(true);
     let class_rewrite_selected = options.classes == Some(true) || focused_class_features;
-    let classes_ast_selected = class_rewrite_selected;
     let regexp_rewrite_selected = options.regexp_unicode == Some(true)
         || options.regexp_unicode_property_escapes == Some(true)
         || options.regexp_dot_all == Some(true)
@@ -769,15 +768,10 @@ fn transform_with_function_map(
             // transform so inherited accessors observe the same receiver semantics.
             super::classes::rewrite_loose_static_field_super(allocator, &mut program);
         }
-        let check_regexp = options.regexp_unicode == Some(true)
-            || options.regexp_unicode_property_escapes == Some(true)
-            || options.regexp_dot_all == Some(true)
-            || options.regexp_named_capture_groups == Some(true)
-            || options.regexp_unicode_sets == Some(true);
         let mut detector = PostconditionDetector {
             // NOTE: The focused class pass now owns class-property/private
             // composition, so Oxc's historical fusion guard is unreachable.
-            check_regexp,
+            check_regexp: regexp_rewrite_selected,
             // Flat declarators now run after semantic planning. Remaining
             // shapes have already taken the compatibility path.
             check_destructuring: false,
@@ -804,7 +798,7 @@ fn transform_with_function_map(
                         || options.parameters == Some(true)
                         || options.destructuring == Some(true)
                         || focused_object_rest
-                        || classes_ast_selected,
+                        || class_rewrite_selected,
                 )
                 .with_excess_capacity(2.0)
                 .with_enum_eval(true)
@@ -847,7 +841,7 @@ fn transform_with_function_map(
                 }
             }
         }
-        let classes_ast_plan = if classes_ast_selected {
+        let classes_ast_plan = if class_rewrite_selected {
             match super::classes::prepare_ast(
                 &semantic.semantic,
                 options.classes == Some(true),
@@ -865,27 +859,11 @@ fn transform_with_function_map(
                             Some(options.class_properties_loose.unwrap_or(false))
                         })
                 },
-                class_rewrite_selected || options.class_static_block == Some(true),
-                if options.classes == Some(true) {
-                    // NOTE: Use the loose private representation and do not retain a second
-                    // class-lowering implementation solely for spec private state.
-                    Some(true)
-                } else {
-                    options
-                        .private_methods
-                        .filter(|enabled| *enabled)
-                        .map(|_| true)
-                        .or(focused_class_features.then_some(true))
-                },
-                if options.classes == Some(true) {
-                    Some(true)
-                } else {
-                    options
-                        .private_property_in_object
-                        .filter(|enabled| *enabled)
-                        .map(|_| true)
-                        .or(focused_class_features.then_some(true))
-                },
+                // The class rewrite owns static blocks and both private features
+                // whenever it runs. Those option flags cannot turn them off here.
+                true,
+                Some(true),
+                Some(true),
                 options.helpers_mode.as_deref() == Some("inline"),
             ) {
                 Ok(plan) => Some(plan),
@@ -940,7 +918,7 @@ fn transform_with_function_map(
             semantic.semantic.scoping_mut(),
             classes_custom_helper_requests.scope_names(),
         );
-        if classes_ast_selected && options.classes == Some(true) {
+        if class_rewrite_selected && options.classes == Some(true) {
             let mut classes_postcondition = PostconditionDetector {
                 check_classes: true,
                 ..PostconditionDetector::default()
@@ -1762,45 +1740,13 @@ fn validate_option_ownership(options: &NativePreflightOptions) -> Result<()> {
 }
 
 fn has_active_operation(options: &NativePreflightOptions) -> bool {
-    options.react_compiler == Some(true)
-        || options.react_refresh == Some(true)
-        || options.typescript.is_some()
-        || options.jsx.is_some()
+    requires_generic_pipeline(options)
         || options.compact == Some(true)
         || options.comments == Some(false)
-        || [
-            options.constant_folding,
-            options.dead_code_elimination,
-            options.block_scoping,
-            options.classes,
-            options.legacy_decorators,
-            options.destructuring,
-            options.parameters,
-            options.for_of,
-            options.explicit_resource_management,
-            options.class_static_block,
-            options.class_properties,
-            options.logical_assignment_operators,
-            options.optional_chaining,
-            options.nullish_coalescing_operator,
-            options.export_namespace_from,
-            options.optional_catch_binding,
-            options.object_rest_spread,
-            options.async_generator_functions,
-            options.async_functions,
-            options.exponentiation_operator,
-            options.private_methods,
-            options.private_property_in_object,
-            options.regexp_sticky,
-            options.regexp_unicode,
-            options.regexp_unicode_property_escapes,
-            options.regexp_dot_all,
-            options.regexp_named_capture_groups,
-            options.regexp_look_behind,
-            options.regexp_match_indices,
-            options.regexp_unicode_sets,
-        ]
-        .contains(&Some(true))
+        || options.constant_folding == Some(true)
+        || options.dead_code_elimination == Some(true)
+        || options.regexp_look_behind == Some(true)
+        || options.regexp_match_indices == Some(true)
 }
 
 fn requires_generic_pipeline(options: &NativePreflightOptions) -> bool {

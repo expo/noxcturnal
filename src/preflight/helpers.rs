@@ -365,52 +365,13 @@ pub struct HelperCompatibility {
 }
 
 pub fn babel_helper_spec(name: &str) -> Option<HelperCompatibility> {
-    let canonical = match name {
-        "awaitAsyncGenerator" => "awaitAsyncGenerator",
-        "asyncGeneratorDelegate" => "asyncGeneratorDelegate",
-        "asyncIterator" => "asyncIterator",
-        "asyncToGenerator" => "asyncToGenerator",
-        "wrapAsyncGenerator" => "wrapAsyncGenerator",
-        "extends" => "extends",
-        "defineProperty" => "defineProperty",
-        "objectDestructuringEmpty" => "objectDestructuringEmpty",
-        "objectWithoutProperties" => "objectWithoutProperties",
-        "objectWithoutPropertiesLoose" => "objectWithoutPropertiesLoose",
-        "readOnlyError" => "readOnlyError",
-        "writeOnlyError" => "writeOnlyError",
-        "taggedTemplateLiteral" => "taggedTemplateLiteral",
-        "construct" => "construct",
-        "assertThisInitialized" => "assertThisInitialized",
-        "createForOfIteratorHelper" => "createForOfIteratorHelper",
-        "get" => "get",
-        "set" => "set",
-        "slicedToArray" => "slicedToArray",
-        "toArray" => "toArray",
-        "toConsumableArray" => "toConsumableArray",
-        "wrapRegExp" => "wrapRegExp",
-        "objectSpread2" => "objectSpread2",
-        "classPrivateFieldInitSpec" => "classPrivateFieldInitSpec",
-        "classPrivateMethodInitSpec" => "classPrivateMethodInitSpec",
-        "classPrivateFieldLooseKey" => "classPrivateFieldLooseKey",
-        "classPrivateFieldLooseBase" => "classPrivateFieldLooseBase",
-        "toPropertyKey" => "toPropertyKey",
-        "checkInRHS" => "checkInRHS",
-        "classPrivateFieldGet2" => "classPrivateFieldGet2",
-        "classPrivateFieldSet2" => "classPrivateFieldSet2",
-        "assertClassBrand" => "assertClassBrand",
-        "toSetter" => "toSetter",
-        "superPropGet" => "superPropGet",
-        "superPropSet" => "superPropSet",
-        "usingCtx" => "usingCtx",
-        _ => return None,
-    };
     let generated = crate::generated::inline_helpers::BABEL_HELPER_COMPATIBILITY
-        .binary_search_by(|spec| spec.name.cmp(canonical))
+        .binary_search_by(|spec| spec.name.cmp(name))
         .ok()
         .map(|index| &crate::generated::inline_helpers::BABEL_HELPER_COMPATIBILITY[index])?;
     Some(HelperCompatibility {
         ordinal: generated.ordinal,
-        oxc_name: canonical,
+        oxc_name: generated.name,
         babel_path: generated.runtime_path,
         minimum_version: generated.min_version,
         export_shape: generated.export_shape,
@@ -590,6 +551,50 @@ pub fn validate_custom_runtime_helpers(
     Ok(())
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum InlineHelperFamily {
+    AsyncGenerator,
+    OrdinaryAsync,
+    Using,
+    Object,
+    Class,
+}
+
+fn inline_helper_family(helper: Helper) -> Option<InlineHelperFamily> {
+    match helper {
+        Helper::AwaitAsyncGenerator
+        | Helper::AsyncGeneratorDelegate
+        | Helper::AsyncIterator
+        | Helper::WrapAsyncGenerator => Some(InlineHelperFamily::AsyncGenerator),
+        Helper::AsyncToGenerator => Some(InlineHelperFamily::OrdinaryAsync),
+        Helper::UsingCtx => Some(InlineHelperFamily::Using),
+        Helper::DefineProperty
+        | Helper::Extends
+        | Helper::ObjectDestructuringEmpty
+        | Helper::ObjectSpread2
+        | Helper::ObjectWithoutProperties
+        | Helper::ToPropertyKey => Some(InlineHelperFamily::Object),
+        Helper::ClassPrivateFieldInitSpec
+        | Helper::ClassPrivateMethodInitSpec
+        | Helper::ClassPrivateFieldGet2
+        | Helper::ClassPrivateFieldSet2
+        | Helper::AssertClassBrand
+        | Helper::ToSetter
+        | Helper::ClassPrivateFieldLooseKey
+        | Helper::ClassPrivateFieldLooseBase
+        | Helper::SuperPropGet
+        | Helper::SuperPropSet
+        | Helper::ReadOnlyError
+        | Helper::WriteOnlyError
+        | Helper::CheckInRHS
+        | Helper::TaggedTemplateLiteral => Some(InlineHelperFamily::Class),
+        Helper::Decorate
+        | Helper::DecorateParam
+        | Helper::DecorateMetadata
+        | Helper::SetFunctionName => None,
+    }
+}
+
 pub fn inline_helpers(
     helpers: impl IntoIterator<Item = Helper>,
     selective: bool,
@@ -599,42 +604,7 @@ pub fn inline_helpers(
         return Ok(None);
     }
     for helper in &helpers {
-        if *helper != Helper::UsingCtx
-            && !matches!(
-                helper,
-                Helper::DefineProperty
-                    | Helper::Extends
-                    | Helper::ObjectDestructuringEmpty
-                    | Helper::ObjectSpread2
-                    | Helper::ObjectWithoutProperties
-                    | Helper::ToPropertyKey
-            )
-            && !matches!(
-                helper,
-                Helper::AwaitAsyncGenerator
-                    | Helper::AsyncGeneratorDelegate
-                    | Helper::AsyncIterator
-                    | Helper::WrapAsyncGenerator
-                    | Helper::AsyncToGenerator
-            )
-            && !matches!(
-                helper,
-                Helper::ClassPrivateFieldInitSpec
-                    | Helper::ClassPrivateMethodInitSpec
-                    | Helper::ClassPrivateFieldGet2
-                    | Helper::ClassPrivateFieldSet2
-                    | Helper::AssertClassBrand
-                    | Helper::ToSetter
-                    | Helper::ClassPrivateFieldLooseKey
-                    | Helper::ClassPrivateFieldLooseBase
-                    | Helper::SuperPropGet
-                    | Helper::SuperPropSet
-                    | Helper::ReadOnlyError
-                    | Helper::WriteOnlyError
-                    | Helper::CheckInRHS
-                    | Helper::TaggedTemplateLiteral
-            )
-        {
+        if inline_helper_family(*helper).is_none() {
             return Err(format!("inline-helper-not-compatible:{}", helper.name()));
         }
     }
@@ -643,45 +613,21 @@ pub fn inline_helpers(
     // are locally scoped and introduce no runtime dependency or global.
     let prefixes = if !selective {
         let has_async_generator = helpers.iter().any(|helper| {
-            matches!(
-                helper,
-                Helper::AwaitAsyncGenerator
-                    | Helper::AsyncGeneratorDelegate
-                    | Helper::AsyncIterator
-                    | Helper::WrapAsyncGenerator
-            )
+            inline_helper_family(*helper) == Some(InlineHelperFamily::AsyncGenerator)
         });
-        let has_async = has_async_generator || helpers.contains(&Helper::AsyncToGenerator);
-        let has_object = helpers.iter().any(|helper| {
-            matches!(
-                helper,
-                Helper::DefineProperty
-                    | Helper::Extends
-                    | Helper::ObjectDestructuringEmpty
-                    | Helper::ObjectSpread2
-                    | Helper::ObjectWithoutProperties
-                    | Helper::ToPropertyKey
-            )
-        });
-        let has_class = helpers.iter().any(|helper| {
-            matches!(
-                helper,
-                Helper::ClassPrivateFieldInitSpec
-                    | Helper::ClassPrivateMethodInitSpec
-                    | Helper::ClassPrivateFieldGet2
-                    | Helper::ClassPrivateFieldSet2
-                    | Helper::AssertClassBrand
-                    | Helper::ToSetter
-                    | Helper::ClassPrivateFieldLooseKey
-                    | Helper::ClassPrivateFieldLooseBase
-                    | Helper::SuperPropGet
-                    | Helper::SuperPropSet
-                    | Helper::ReadOnlyError
-                    | Helper::WriteOnlyError
-                    | Helper::CheckInRHS
-                    | Helper::TaggedTemplateLiteral
-            )
-        });
+        let has_async = has_async_generator
+            || helpers.iter().any(|helper| {
+                inline_helper_family(*helper) == Some(InlineHelperFamily::OrdinaryAsync)
+            });
+        let has_using = helpers
+            .iter()
+            .any(|helper| inline_helper_family(*helper) == Some(InlineHelperFamily::Using));
+        let has_object = helpers
+            .iter()
+            .any(|helper| inline_helper_family(*helper) == Some(InlineHelperFamily::Object));
+        let has_class = helpers
+            .iter()
+            .any(|helper| inline_helper_family(*helper) == Some(InlineHelperFamily::Class));
         [
             has_async.then_some(if has_async_generator {
                 (
@@ -694,7 +640,7 @@ pub fn inline_helpers(
                     crate::generated::inline_helpers::INLINE_ASYNC_TO_GENERATOR_GLOBALS,
                 )
             }),
-            helpers.contains(&Helper::UsingCtx).then_some((
+            has_using.then_some((
                 GENERATED_INLINE_USING_CTX,
                 crate::generated::inline_helpers::INLINE_USING_CTX_GLOBALS,
             )),
@@ -711,57 +657,22 @@ pub fn inline_helpers(
         .flatten()
         .collect::<Vec<_>>()
     } else {
-        let mut names = helpers
-            .iter()
-            .map(|helper| helper.name())
-            .collect::<Vec<_>>();
-        names.sort_unstable();
-        names.dedup();
-        let async_group = names.iter().any(|name| {
-            matches!(
-                *name,
-                "awaitAsyncGenerator"
-                    | "asyncGeneratorDelegate"
-                    | "asyncIterator"
-                    | "wrapAsyncGenerator"
-            )
+        let mut distinct = helpers;
+        distinct.sort_by_key(|helper| helper.name());
+        distinct.dedup();
+        let async_group = distinct.iter().any(|helper| {
+            inline_helper_family(*helper) == Some(InlineHelperFamily::AsyncGenerator)
         });
-        let object_group = names
+        let object_group = distinct
             .iter()
-            .filter(|name| {
-                matches!(
-                    **name,
-                    "defineProperty"
-                        | "extends"
-                        | "objectDestructuringEmpty"
-                        | "objectSpread2"
-                        | "objectWithoutProperties"
-                        | "toPropertyKey"
-                )
-            })
+            .copied()
+            .filter(|helper| inline_helper_family(*helper) == Some(InlineHelperFamily::Object))
             .count()
             > 1;
-        let class_group = names
+        let class_group = distinct
             .iter()
-            .filter(|name| {
-                matches!(
-                    **name,
-                    "classPrivateFieldInitSpec"
-                        | "classPrivateMethodInitSpec"
-                        | "classPrivateFieldGet2"
-                        | "classPrivateFieldSet2"
-                        | "assertClassBrand"
-                        | "toSetter"
-                        | "classPrivateFieldLooseKey"
-                        | "classPrivateFieldLooseBase"
-                        | "superPropGet"
-                        | "superPropSet"
-                        | "readOnlyError"
-                        | "writeOnlyError"
-                        | "checkInRHS"
-                        | "taggedTemplateLiteral"
-                )
-            })
+            .copied()
+            .filter(|helper| inline_helper_family(*helper) == Some(InlineHelperFamily::Class))
             .count()
             > 1;
         let mut prefixes = async_group
@@ -779,56 +690,25 @@ pub fn inline_helpers(
             GENERATED_INLINE_CLASS_FEATURE_HELPERS,
             crate::generated::inline_helpers::INLINE_OXC_CLASS_FEATURE_HELPERS_GLOBALS,
         )));
-        prefixes.extend(
-            names
-                .into_iter()
-                .filter(|name| {
-                    (!async_group
-                        || !matches!(
-                            *name,
-                            "awaitAsyncGenerator"
-                                | "asyncGeneratorDelegate"
-                                | "asyncIterator"
-                                | "wrapAsyncGenerator"
-                                | "asyncToGenerator"
-                        ))
-                        && (!object_group
-                            || !matches!(
-                                *name,
-                                "defineProperty"
-                                    | "extends"
-                                    | "objectDestructuringEmpty"
-                                    | "objectSpread2"
-                                    | "objectWithoutProperties"
-                                    | "toPropertyKey"
-                            ))
-                        && (!class_group
-                            || !matches!(
-                                *name,
-                                "classPrivateFieldInitSpec"
-                                    | "classPrivateMethodInitSpec"
-                                    | "classPrivateFieldGet2"
-                                    | "classPrivateFieldSet2"
-                                    | "assertClassBrand"
-                                    | "toSetter"
-                                    | "classPrivateFieldLooseKey"
-                                    | "classPrivateFieldLooseBase"
-                                    | "superPropGet"
-                                    | "superPropSet"
-                                    | "readOnlyError"
-                                    | "writeOnlyError"
-                                    | "checkInRHS"
-                                    | "taggedTemplateLiteral"
-                            ))
-                })
-                .map(|name| {
-                    let root = crate::generated::inline_helpers::BABEL_INLINE_ROOTS
-                        .iter()
-                        .find(|root| root.name == name)
-                        .expect("reachable helper has a generated inline root");
-                    (root.compact, root.globals)
-                }),
-        );
+        prefixes.extend(distinct.into_iter().filter_map(|helper| {
+            let covered = match inline_helper_family(helper) {
+                Some(InlineHelperFamily::AsyncGenerator | InlineHelperFamily::OrdinaryAsync) => {
+                    async_group
+                }
+                Some(InlineHelperFamily::Object) => object_group,
+                Some(InlineHelperFamily::Class) => class_group,
+                Some(InlineHelperFamily::Using) | None => false,
+            };
+            if covered {
+                None
+            } else {
+                let root = crate::generated::inline_helpers::BABEL_INLINE_ROOTS
+                    .iter()
+                    .find(|root| root.name == helper.name())
+                    .expect("reachable helper has a generated inline root");
+                Some((root.compact, root.globals))
+            }
+        }));
         prefixes
     };
     let mut globals = FxHashSet::default();

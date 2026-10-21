@@ -111,11 +111,30 @@ function readJson(filename) {
   return JSON.parse(fs.readFileSync(filename, 'utf8'));
 }
 
+function assertSameMembers(actual, expected, label) {
+  const left = [...actual].sort();
+  const right = [...expected].sort();
+  if (left.length !== right.length || left.some((value, index) => value !== right[index]))
+    throw new Error(
+      `${label} must match native-targets.json (${right.join(', ')}) but has (${left.join(', ')})`,
+    );
+}
+
 function checkIntegrity(selector) {
   const rootPackage = readJson(path.join(root, 'package.json'));
   const repositoryUrl = 'https://github.com/expo/noxcturnal.git';
   if (rootPackage.repository?.url !== repositoryUrl)
     throw new Error(`root package repository must be ${repositoryUrl}`);
+  assertSameMembers(
+    rootPackage.napi?.targets ?? [],
+    nativeTargets.map(target => target.rustTarget),
+    'package.json napi.targets',
+  );
+  assertSameMembers(
+    Object.keys(rootPackage.optionalDependencies ?? {}),
+    nativeTargets.map(target => target.packageName),
+    'package.json optionalDependencies',
+  );
   for (const target of nativeTargets) {
     if (!rootPackage.napi.targets.includes(target.rustTarget))
       throw new Error(`package.json napi.targets is missing ${target.rustTarget}`);

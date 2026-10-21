@@ -1,7 +1,7 @@
 import type { RouteCapabilities } from '../pipeline/types';
 import { decodeConstant, decodeString } from '../protocol/value-transport';
 import { parserFilename } from '../adapters/classification';
-import { CHILD_ROLES, FIELD_KEY_IDS, NODE_TYPE_IDS, NODE_TYPES } from '../generated/event-schema';
+import { CHILD_ROLES, FIELD_KEY_IDS, NODE_TYPES } from '../generated/event-schema';
 import {
   native,
   type NativeIndexedSessionBinding,
@@ -286,43 +286,22 @@ export class NativeTransformSession {
   }
   children(parentId: number, roleId?: number): NativeEvent[] {
     this.#assertOpen();
-    const cached = this.#childrenCache.get(parentId);
-    if (cached) {
-      const selected =
-        roleId == null ? cached : (this.#childRoleCache.get(parentId)?.get(roleId) ?? []);
-      return selected.flatMap(nodeId => this.event(nodeId) ?? []);
+    if (!this.#childrenCache.has(parentId)) {
+      const parent = this.event(parentId);
+      if (parent && this.#isPrefetchedChildType(parent.type)) {
+        const empty: number[] = [];
+        this.#childrenCache.set(parentId, empty);
+        this.#childIdsCache.set(parentId, new Set());
+        this.#childRoleCache.set(parentId, new Map());
+        return [];
+      }
+      this.prefetchChildren([parentId]);
     }
-    const parent = this.event(parentId);
-    if (parent && this.#isPrefetchedChildType(parent.type)) {
-      const empty: number[] = [];
-      this.#childrenCache.set(parentId, empty);
-      this.#childIdsCache.set(parentId, new Set());
-      this.#childRoleCache.set(parentId, new Map());
-      return [];
-    }
-    this.prefetchChildren([parentId]);
     const selected =
       roleId == null
         ? this.#childrenCache.get(parentId)!
         : (this.#childRoleCache.get(parentId)?.get(roleId) ?? []);
     return selected.flatMap(nodeId => this.event(nodeId) ?? []);
-  }
-  constantNodes(nodeIds: readonly number[]): NodeView[] {
-    this.#assertOpen();
-    return this.#binding('query.constants')
-      .queryConstants([...nodeIds])
-      .flatMap(fact => {
-        const event = this.event(fact.id);
-        return event
-          ? [
-              {
-                ...toNodeView(event),
-                constantKind: fact.kind,
-                constantValue: decodeConstant(fact.value),
-              },
-            ]
-          : [];
-      });
   }
   nodes(nodeTypes: readonly string[]): NodeView[] {
     this.#assertOpen();
@@ -381,23 +360,11 @@ export class NativeTransformSession {
       }
     }
   }
-  prefetchChildren(parentIds: readonly number[] = [], parentTypes: readonly string[] = []): void {
+  prefetchChildren(parentIds: readonly number[] = []): void {
     this.#assertOpen();
     const missing = parentIds.filter(parentId => !this.#childrenCache.has(parentId));
-    const missingTypes = parentTypes.filter(type => !this.#prefetchedChildTypes.has(type));
-    if (missing.length === 0 && missingTypes.length === 0) return;
-    const typeIds: number[] = [];
-    const fallbackTypes: string[] = [];
-    for (const type of missingTypes) {
-      const id = NODE_TYPE_IDS.get(type);
-      if (id == null) fallbackTypes.push(type);
-      else typeIds.push(id);
-    }
-    const nativeBatch = this.#binding('children.prefetch').childrenPackedBuffer(
-      missing,
-      fallbackTypes,
-      typeIds,
-    );
+    if (missing.length === 0) return;
+    const nativeBatch = this.#binding('children.prefetch').childrenPackedBuffer(missing, [], []);
     if (nativeBatch.events == null)
       throw new Error(`invalid native child batch: ${Object.keys(nativeBatch).join(',')}`);
     const batch = decodeEventBatch(decodePackedEnvelope(nativeBatch.events));
@@ -431,7 +398,6 @@ export class NativeTransformSession {
         roles.set(edge.roleId, roleChildren);
       }
     }
-    for (const type of missingTypes) this.#prefetchedChildTypes.add(type);
   }
   event(nodeId: number): NativeEvent | undefined {
     this.#assertOpen();
@@ -739,16 +705,6 @@ export class NativeTransformSession {
       session != null
         ? session.commitPacked(data, mode)
         : native.commitPackedBuffer(this.source, this.#nativeFilename, data, mode),
-    );
-  }
-  /** Commit whose map stays a packed decoded layer for later chain composition. */
-  commitDecoded(edits: EditCommand[], mode?: string) {
-    this.#assertOpen();
-    const session = this.#native;
-    return commitWithDedupe(edits, data =>
-      session != null
-        ? session.commitDecoded(data, mode)
-        : native.commitDecodedBuffer(this.source, this.#nativeFilename, data, mode),
     );
   }
   close(): void {

@@ -154,20 +154,10 @@ impl<'a> VisitMut<'a> for BodyRewriter<'a, '_> {
         let key = (span.start, span.end);
         let completion = match statement {
             Statement::ReturnStatement(return_) if self.mutation.returns.contains(&key) => {
-                let value = return_.argument.take().unwrap_or_else(|| {
-                    oxc_ast::ast::Expression::new_unary_expression(
-                        span,
-                        oxc_syntax::operator::UnaryOperator::Void,
-                        oxc_ast::ast::Expression::new_numeric_literal(
-                            span,
-                            0.0,
-                            None,
-                            oxc_ast::ast::NumberBase::Decimal,
-                            self.ast.builder(),
-                        ),
-                        self.ast.builder(),
-                    )
-                });
+                let value = return_
+                    .argument
+                    .take()
+                    .unwrap_or_else(|| super::super::void_zero(&self.ast, span));
                 Some(("return", Some(value)))
             }
             Statement::BreakStatement(_) if self.mutation.breaks.contains(&key) => {

@@ -149,10 +149,6 @@ impl<'a> Cursor<'a> {
         Ok(f64::from_bits(high << 32 | low))
     }
 
-    pub fn skip_number(&mut self) -> Result<(), ReadError> {
-        self.number().map(drop)
-    }
-
     /// Reads a string field. The bytes are Hermes' "modified UTF-8", which is
     /// not guaranteed to be valid UTF-8, so they stay bytes; every comparison
     /// the rules make is against an ASCII keyword.
@@ -188,7 +184,7 @@ impl<'a> Cursor<'a> {
                 Ok(())
             }
             FieldType::Bool => self.word().map(drop),
-            FieldType::Number => self.skip_number(),
+            FieldType::Number => self.number().map(drop),
             FieldType::Label => self.label().map(drop),
         }
     }

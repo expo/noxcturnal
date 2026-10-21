@@ -462,16 +462,7 @@ impl<'a> VisitMut<'a> for ForOfLowerer<'a> {
 }
 
 fn reserve(base: &str, reserved: &mut FxHashSet<String>) -> String {
-    if reserved.insert(base.to_owned()) {
-        return base.to_owned();
-    }
-    for suffix in reserved.len().max(2).. {
-        let candidate = format!("{base}{suffix}");
-        if reserved.insert(candidate.clone()) {
-            return candidate;
-        }
-    }
-    unreachable!()
+    super::reserve_generated_name(base, reserved)
 }
 
 #[cfg(test)]

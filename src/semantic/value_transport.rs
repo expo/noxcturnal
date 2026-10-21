@@ -75,26 +75,12 @@ fn marked_unit(after: &str) -> Option<u16> {
     ((0xd800..=0xdfff).contains(&unit) || unit == 0xfffd).then_some(unit)
 }
 
-/// JavaScript numeric spelling, except negative zero keeps the sign that
-/// `ToString` would erase. Infinity is never Rust's `inf`.
+/// JavaScript numeric spelling. Negative zero keeps the sign `ToString` erases.
 pub(crate) fn number_literal(value: f64) -> String {
-    if value.is_nan() {
-        "NaN".into()
-    } else if value.is_infinite() {
-        if value.is_sign_negative() {
-            "-Infinity".into()
-        } else {
-            "Infinity".into()
-        }
-    } else if value == 0.0 {
-        if value.is_sign_negative() {
-            "-0".into()
-        } else {
-            "0".into()
-        }
-    } else {
-        value.to_js_string()
+    if value == 0.0 && value.is_sign_negative() {
+        return "-0".into();
     }
+    value.to_js_string()
 }
 
 #[derive(Clone, Debug)]

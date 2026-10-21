@@ -32,13 +32,6 @@ export const NATIVE_TRANSFORM_NAMES = [
   'regexpUnicodeSets',
 ] as const satisfies readonly (keyof PreflightTransforms)[];
 
-export const NATIVE_TRANSFORM_OPTION_NAMES = [
-  'classProperties',
-  'optionalChaining',
-  'nullishCoalescingOperator',
-  'objectRestSpread',
-] as const satisfies readonly (keyof PreflightTransforms)[];
-
 export const NATIVE_TRANSFORM_OPTION_KEYS = {
   classProperties: ['loose'],
   optionalChaining: ['loose'],

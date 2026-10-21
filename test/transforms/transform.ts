@@ -20,15 +20,7 @@ export async function transformSource(
     defineNativePipeline({ phases: [{ name: 'preflight', native: preflight }] }),
   );
   if (result.status !== 'complete') throw new Error(JSON.stringify(result));
-
-  const formatted = await format('output.js', result.code, {
-    arrowParens: 'avoid',
-    printWidth: 100,
-    singleQuote: true,
-    trailingComma: 'all',
-  });
-  expect(formatted.errors).toEqual([]);
-  return formatted.code.trimEnd();
+  return formatOutput(result.code);
 }
 
 /** Transform an external corpus case, retaining an intentional bailout as snapshot output. */
@@ -57,8 +49,11 @@ export async function transformOutcome(
     throw error;
   }
   if (result.status !== 'complete') return `[bailout] ${result.reason}`;
+  return formatOutput(result.code);
+}
 
-  const formatted = await format('output.js', result.code, {
+async function formatOutput(code: string): Promise<string> {
+  const formatted = await format('output.js', code, {
     arrowParens: 'avoid',
     printWidth: 100,
     singleQuote: true,
@@ -66,24 +61,6 @@ export async function transformOutcome(
   });
   expect(formatted.errors).toEqual([]);
   return formatted.code.trimEnd();
-}
-
-/** Assert a deliberately unsupported boundary without presenting it as transformed output. */
-export function expectBailout(
-  source: string,
-  filename: string,
-  preflight: PreflightPlan,
-  reason: string,
-): void {
-  const result = transform(
-    source,
-    filename,
-    defineNativePipeline({ phases: [{ name: 'preflight', native: preflight }] }),
-  );
-  expect(result.status, result.status === 'bailout' ? undefined : JSON.stringify(result)).toBe(
-    'bailout',
-  );
-  if (result.status === 'bailout') expect(result.reason).toBe(reason);
 }
 
 export const runtimeHelpers = {

@@ -61,7 +61,6 @@ pub struct NativeIndexedSession {
     initial_route_manifest: Option<Vec<u8>>,
     initial_routed_buffer: Option<Vec<u8>>,
     program_body_offsets: Option<[u32; 5]>,
-    initial_routed_served: bool,
     closed: bool,
 }
 
@@ -479,7 +478,6 @@ impl NativeIndexedSession {
         self.scope_parents.clear();
         self.initial_route_manifest = None;
         self.initial_routed_buffer = None;
-        self.initial_routed_served = true;
     }
 
     #[napi]
@@ -527,7 +525,6 @@ impl NativeIndexedSession {
             initial_route_manifest: initial_route_manifest.map(|manifest| manifest.to_vec()),
             initial_routed_buffer,
             program_body_offsets: Some(program_body_offsets),
-            initial_routed_served: false,
             closed: false,
         }
     }

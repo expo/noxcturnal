@@ -1,4 +1,3 @@
-import { FIELD_KEY_IDS, NODE_TYPE_IDS } from '../generated/event-schema';
 import type { EditCommand } from '../types';
 import { MISSING_VALUE, PARTS_TAG, alignToWord } from './constants';
 
@@ -140,26 +139,5 @@ export function packEdits(edits: readonly EditCommand[]): Buffer {
   }
   for (const word of partsData) write(word);
   data.set(new Uint8Array(words.buffer, 0, words.byteLength), wordsOffset);
-  return data;
-}
-
-export function packFieldRequests(
-  fields?: Readonly<Record<string, readonly string[]>>,
-): Buffer | undefined {
-  if (!fields) return undefined;
-  const words: number[] = [];
-  for (const [nodeType, requested] of Object.entries(fields)) {
-    const typeId = NODE_TYPE_IDS.get(nodeType);
-    if (typeId == null) continue;
-    const countIndex = words.length + 1;
-    words.push(typeId, 0);
-    for (const field of requested) {
-      const fieldId = FIELD_KEY_IDS.get(field);
-      if (fieldId != null && fieldId !== 0) words.push(fieldId);
-    }
-    words[countIndex] = words.length - countIndex - 1;
-  }
-  const data = Buffer.allocUnsafe(words.length * 4);
-  for (let index = 0; index < words.length; index++) data.writeUInt32LE(words[index], index * 4);
   return data;
 }

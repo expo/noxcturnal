@@ -1385,17 +1385,7 @@ fn loop_body(kind: AstKind<'_>) -> Option<&Statement<'_>> {
 }
 
 fn reserve_name(base: &str, used: &mut FxHashSet<String>) -> String {
-    if used.insert(base.to_owned()) {
-        return base.to_owned();
-    }
-    let mut suffix = used.len().max(2);
-    loop {
-        let name = format!("{base}{suffix}");
-        if used.insert(name.clone()) {
-            return name;
-        }
-        suffix += 1;
-    }
+    super::reserve_generated_name(base, used)
 }
 
 /// Lower lexical declarations whose bindings do not require per-iteration loop
@@ -1609,35 +1599,23 @@ pub(super) fn prepare_with_reserved<'a>(
             if !reference.is_write() {
                 continue;
             }
-            let write_expression =
+            let write_span =
                 semantic
                     .nodes()
                     .ancestor_ids(reference.node_id())
                     .find_map(|ancestor| match semantic.nodes().kind(ancestor) {
-                        AstKind::AssignmentExpression(expression) => Some((expression.span, false)),
-                        AstKind::UpdateExpression(expression) => Some((expression.span, true)),
+                        AstKind::AssignmentExpression(expression) => Some(expression.span),
+                        AstKind::UpdateExpression(expression) => Some(expression.span),
                         _ => None,
                     });
-            match write_expression {
-                Some((expression_span, false)) => {
-                    let reference_span = semantic.nodes().kind(reference.node_id()).span();
-                    if expression_span != reference_span {
-                        const_write_expressions.insert(
-                            (expression_span.start, expression_span.end),
-                            scoping.symbol_name(symbol_id).to_owned(),
-                        );
-                    }
+            if let Some(expression_span) = write_span {
+                let reference_span = semantic.nodes().kind(reference.node_id()).span();
+                if expression_span != reference_span {
+                    const_write_expressions.insert(
+                        (expression_span.start, expression_span.end),
+                        scoping.symbol_name(symbol_id).to_owned(),
+                    );
                 }
-                Some((expression_span, true)) => {
-                    let reference_span = semantic.nodes().kind(reference.node_id()).span();
-                    if expression_span != reference_span {
-                        const_write_expressions.insert(
-                            (expression_span.start, expression_span.end),
-                            scoping.symbol_name(symbol_id).to_owned(),
-                        );
-                    }
-                }
-                _ => {}
             }
         }
     }
@@ -2162,19 +2140,8 @@ impl<'a> VisitMut<'a> for BlockScopingLowerer<'a> {
                         .contains(&(declarator.span.start, declarator.span.end))
                 {
                     let span = declarator.span;
-                    let ast = AstBuilder::new(self.allocator);
-                    declarator.init = Some(oxc_ast::ast::Expression::new_unary_expression(
-                        span,
-                        oxc_syntax::operator::UnaryOperator::Void,
-                        oxc_ast::ast::Expression::new_numeric_literal(
-                            span,
-                            0.0,
-                            None,
-                            oxc_ast::ast::NumberBase::Decimal,
-                            ast.builder(),
-                        ),
-                        ast.builder(),
-                    ));
+                    declarator.init =
+                        Some(super::void_zero(&AstBuilder::new(self.allocator), span));
                 }
             }
             declaration.kind = VariableDeclarationKind::Var;

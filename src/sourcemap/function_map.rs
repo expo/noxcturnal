@@ -93,12 +93,7 @@ impl<'a> FunctionMapCollector<'a> {
             line_starts: line_starts(source),
             utf16_offsets: (!source.is_ascii()).then(|| {
                 let mut offsets = Vec::with_capacity(source.len() + 1);
-                let mut utf16 = 0u32;
-                for character in source.chars() {
-                    offsets.extend(std::iter::repeat_n(utf16, character.len_utf8()));
-                    utf16 += character.len_utf16() as u32;
-                }
-                offsets.push(utf16);
+                super::fill_utf16_offsets(source, |offset| offsets.push(offset));
                 offsets
             }),
             filename_prefix: filename

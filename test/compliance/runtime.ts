@@ -47,9 +47,7 @@ export async function executeModule(
   plan: PreflightPlan,
   filename = 'input.mjs',
 ): Promise<Record<string, unknown>> {
-  const code = compile(source, plan, filename);
-  const url = `data:text/javascript;base64,${Buffer.from(code).toString('base64')}#${crypto.randomUUID()}`;
-  return import(url) as Promise<Record<string, unknown>>;
+  return importCode(compile(source, plan, filename));
 }
 
 export async function importCode(code: string): Promise<Record<string, unknown>> {

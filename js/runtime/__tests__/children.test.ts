@@ -611,7 +611,6 @@ test('batches child hydration for sparse matched parents and caches empty childr
       );
       assert.equal(prefetch.mock.calls.length, 1);
       assert.equal(prefetch.mock.calls[0][0]?.length, 2);
-      assert.equal(prefetch.mock.calls[0][1], undefined);
     }
     assert.deepEqual(observed, [['2'], [], ['2'], [], ['2'], []]);
   } finally {

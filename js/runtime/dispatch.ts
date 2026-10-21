@@ -11,7 +11,6 @@ import {
   type RealizedContent,
 } from './fragments';
 import {
-  childRoleIsDeclared,
   eventIsSkipped,
   makePath,
   NodePathImpl,
@@ -512,14 +511,6 @@ export function createDispatcher(
           }
           return makePath(runtime, child, 0);
         });
-      },
-      allowsChild(type, role) {
-        // childRules is normalized to concrete parent types when the visitor is
-        // compiled, and path node types are concrete. Avoid rescanning every rule
-        // (and redoing alias matching) on each structural access.
-        const roles = capabilities.childRules?.[type];
-        if (roles == null || !childRoleIsDeclared(roles, role)) return false;
-        return true;
       },
       allowsAncestry() {
         return capabilities.ancestry != null;

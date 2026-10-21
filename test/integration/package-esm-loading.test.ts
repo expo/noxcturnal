@@ -38,8 +38,8 @@ const hostBinaryName = `noxcturnal.${hostSuffix()}.node`;
 const hostBinary = realpathSync(join(root, hostBinaryName));
 
 beforeAll(() => {
-  // Exercise fresh published entry points, outside Vitest's module rewriting.
-  execFileSync('pnpm', ['build:js'], { cwd: root, stdio: 'pipe' });
+  // prepack writes dist. Loading below uses that build, outside Vitest's module rewriting.
+  packedArchive();
   for (const mode of ['require', 'import']) {
     const load =
       mode === 'require'

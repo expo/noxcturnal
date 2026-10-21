@@ -2,6 +2,7 @@ import { native } from '../native/binding';
 import type { NativeEditor } from '../contracts/visitor';
 import { packEdits } from '../protocol/edits';
 import type { EditCommand } from '../types';
+import { identicalContentParts } from './fragments';
 
 // Host-only ownership; never serialized into the native edit protocol.
 export const EDIT_OWNER = Symbol('edit owner');
@@ -18,14 +19,14 @@ interface EditorSession {
 export function commitWithDedupe<Committed extends object>(
   edits: EditCommand[],
   commit: (data: Buffer) => Committed,
-): Committed & { edits: EditCommand[]; deduped: number } {
+): Committed & { edits: EditCommand[] } {
   try {
-    return { ...commit(packEdits(edits)), edits, deduped: 0 };
+    return { ...commit(packEdits(edits)), edits };
   } catch (error) {
     const { edits: deduped, dropped } = dedupeConvergentEdits(edits);
     if (dropped > 0) {
       try {
-        return { ...commit(packEdits(deduped)), edits: deduped, deduped: dropped };
+        return { ...commit(packEdits(deduped)), edits: deduped };
       } catch (retryError) {
         throw attributeEditConflict(retryError, deduped);
       }
@@ -57,19 +58,24 @@ export function createEditor(
       order: nextOrder(),
       [EDIT_OWNER]: ownerIdentity,
     });
-  // Replacing a range is an ordinary replacement whichever method asked for it, so
-  // these agree with `overwrite`'s default rather than leaving the text unmapped.
-  const replaceRange = (start: number, end: number, content: string) =>
+  const overwrite = (
+    start: number,
+    end: number,
+    content: string,
+    mapping?: 'anchor-start' | 'anchor-boundaries' | 'identity' | 'sourceless',
+  ) =>
     edits.push({
       kind: 'Replace',
       start,
       end,
       content,
-      mapping: 'AnchorStart',
+      mapping: editorMappingPolicy(mapping),
       owner,
       order: nextOrder(),
       [EDIT_OWNER]: ownerIdentity,
     });
+  const replaceRange = (start: number, end: number, content: string) =>
+    overwrite(start, end, content);
   let text: InstanceType<typeof native.NativeSourceText> | undefined;
   const operations = () =>
     session.sourceTextOperations ?? (text ??= new native.NativeSourceText(source));
@@ -109,17 +115,7 @@ export function createEditor(
     appendRight: (offset, content) => push('AppendRight', offset, offset, content),
     prependRight: (offset, content) => push('PrependRight', offset, offset, content),
     update: (start, end, content) => replaceRange(start, end, content),
-    overwrite: (start, end, content, mapping) =>
-      edits.push({
-        kind: 'Replace',
-        start,
-        end,
-        content,
-        mapping: editorMappingPolicy(mapping),
-        owner,
-        order: nextOrder(),
-        [EDIT_OWNER]: ownerIdentity,
-      }),
+    overwrite,
     remove: (start, end) => push('Remove', start, end),
     move(start, end, destination) {
       if (destination > start && destination < end)
@@ -243,20 +239,6 @@ function attributeEditConflict(error: unknown, edits: readonly EditCommand[]): u
     owners.length === 1 ? ` (owner: ${first})` : ` (owners: ${owners[0]}, ${owners[1]})`;
   (error as Error & { owners?: readonly string[] }).owners = owners;
   return error;
-}
-
-function identicalContentParts(
-  a: readonly (string | { start: number; end: number })[],
-  b: readonly (string | { start: number; end: number })[],
-): boolean {
-  return (
-    a.length === b.length &&
-    a.every((part, index) => {
-      const other = b[index];
-      if (typeof part === 'string' || typeof other === 'string') return part === other;
-      return part.start === other.start && part.end === other.end;
-    })
-  );
 }
 
 function identicalConvergentEdit(a: EditCommand, b: EditCommand): boolean {

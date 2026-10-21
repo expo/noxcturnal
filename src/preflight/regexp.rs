@@ -15,7 +15,7 @@ use oxc_regular_expression::{
     LiteralParser, Options as RegExpParserOptions,
     ast::{
         CapturingGroup, CharacterClass, CharacterClassContents, CharacterClassContentsKind,
-        CharacterClassEscapeKind, Disjunction, Dot, IgnoreGroup, Modifier, NamedReference, Pattern,
+        CharacterClassEscapeKind, Disjunction, IgnoreGroup, Modifier, NamedReference, Pattern,
         Term, UnicodePropertyEscape,
     },
     visit::{Visit as RegExpVisit, walk},
@@ -520,20 +520,13 @@ fn sort_class_additions(additions: &str) -> Result<String, &'static str> {
 
 #[derive(Default)]
 struct RegExpFacts {
-    has_dot: bool,
     has_named_groups: bool,
-    has_named_references: bool,
-    has_unicode_properties: bool,
-    has_string_properties: bool,
-    has_unicode_set_operations: bool,
 }
 
 impl RegExpFacts {
-    fn analyze<'a>(pattern: &Pattern<'a>, selected: bool) -> Self {
+    fn analyze(pattern: &Pattern<'_>) -> Self {
         let mut facts = Self::default();
-        if selected {
-            facts.visit_pattern(pattern);
-        }
+        facts.visit_pattern(pattern);
         facts
     }
 }
@@ -556,34 +549,13 @@ pub(super) fn pattern_has_unicode_property(pattern: &str) -> bool {
 }
 
 pub(super) fn pattern_has_named_group(pattern: &Pattern<'_>) -> bool {
-    RegExpFacts::analyze(pattern, true).has_named_groups
+    RegExpFacts::analyze(pattern).has_named_groups
 }
 
 impl<'a> RegExpVisit<'a> for RegExpFacts {
     fn visit_capturing_group(&mut self, group: &CapturingGroup<'a>) {
         self.has_named_groups |= group.name.is_some();
         walk::walk_capturing_group(self, group);
-    }
-
-    fn visit_named_reference(&mut self, reference: &NamedReference<'a>) {
-        self.has_named_references = true;
-        walk::walk_named_reference(self, reference);
-    }
-
-    fn visit_dot(&mut self, dot: &Dot) {
-        self.has_dot = true;
-        walk::walk_dot(self, dot);
-    }
-
-    fn visit_unicode_property_escape(&mut self, property: &UnicodePropertyEscape<'a>) {
-        self.has_unicode_properties = true;
-        self.has_string_properties |= property.strings;
-        walk::walk_unicode_property_escape(self, property);
-    }
-
-    fn visit_character_class(&mut self, class: &CharacterClass<'a>) {
-        self.has_unicode_set_operations |= class.kind != CharacterClassContentsKind::Union;
-        walk::walk_character_class(self, class);
     }
 }
 
@@ -1448,29 +1420,17 @@ fn class_atom(body: &str, index: usize) -> Result<(ClassAtom, usize), &'static s
         b'\\' | b']' | b'[' | b'-' | b'^' | b'/' | b'.' | b'$' | b'*' | b'+' | b'?' | b'('
         | b')' | b'{' | b'}' | b'|' => Ok((ClassAtom::Single(escape as u32), index + 2)),
         b'd' | b'D' | b'w' | b'W' | b's' | b'S' => {
-            let ranges = match escape.to_ascii_lowercase() {
-                b'd' => vec![(0x30, 0x39)],
-                b'w' => vec![(0x30, 0x39), (0x41, 0x5A), (0x5F, 0x5F), (0x61, 0x7A)],
-                b's' => vec![
-                    (0x09, 0x0D),
-                    (0x20, 0x20),
-                    (0xA0, 0xA0),
-                    (0x1680, 0x1680),
-                    (0x2000, 0x200A),
-                    (0x2028, 0x2029),
-                    (0x202F, 0x202F),
-                    (0x205F, 0x205F),
-                    (0x3000, 0x3000),
-                    (0xFEFF, 0xFEFF),
-                ],
+            let kind = match escape {
+                b'd' => CharacterClassEscapeKind::D,
+                b'D' => CharacterClassEscapeKind::NegativeD,
+                b'w' => CharacterClassEscapeKind::W,
+                b'W' => CharacterClassEscapeKind::NegativeW,
+                b's' => CharacterClassEscapeKind::S,
+                b'S' => CharacterClassEscapeKind::NegativeS,
                 _ => unreachable!(),
             };
             Ok((
-                ClassAtom::Ranges(if escape.is_ascii_uppercase() {
-                    complement_ranges(&ranges)
-                } else {
-                    ranges
-                }),
+                ClassAtom::Ranges(character_class_escape_ranges(kind)),
                 index + 2,
             ))
         }
@@ -1904,6 +1864,21 @@ struct NamedGroupCollector<'s> {
     error: Option<RegexpFailure>,
 }
 
+fn relative_pattern_span(
+    span_offset: u32,
+    span: oxc_span::Span,
+) -> Result<(usize, usize), RegexpFailure> {
+    let start = span
+        .start
+        .checked_sub(span_offset)
+        .ok_or_else(|| RegexpFailure::fatal("regexp-pattern-span-invalid"))?;
+    let end = span
+        .end
+        .checked_sub(span_offset)
+        .ok_or_else(|| RegexpFailure::fatal("regexp-pattern-span-invalid"))?;
+    Ok((start as usize, end as usize))
+}
+
 impl<'s> NamedGroupCollector<'s> {
     fn new(source: &'s str, span_offset: u32) -> Self {
         Self {
@@ -1918,15 +1893,7 @@ impl<'s> NamedGroupCollector<'s> {
     }
 
     fn relative_span(&self, span: oxc_span::Span) -> Result<(usize, usize), RegexpFailure> {
-        let start = span
-            .start
-            .checked_sub(self.span_offset)
-            .ok_or_else(|| RegexpFailure::fatal("regexp-pattern-span-invalid"))?;
-        let end = span
-            .end
-            .checked_sub(self.span_offset)
-            .ok_or_else(|| RegexpFailure::fatal("regexp-pattern-span-invalid"))?;
-        Ok((start as usize, end as usize))
+        relative_pattern_span(self.span_offset, span)
     }
 
     fn visit_disjunction(&mut self, disjunction: &Disjunction<'_>) {
@@ -2059,15 +2026,7 @@ struct UnicodePropertyEditCollector {
 
 impl UnicodePropertyEditCollector {
     fn relative_span(&self, span: oxc_span::Span) -> Result<(usize, usize), RegexpFailure> {
-        let start = span
-            .start
-            .checked_sub(self.span_offset)
-            .ok_or_else(|| RegexpFailure::fatal("regexp-pattern-span-invalid"))?;
-        let end = span
-            .end
-            .checked_sub(self.span_offset)
-            .ok_or_else(|| RegexpFailure::fatal("regexp-pattern-span-invalid"))?;
-        Ok((start as usize, end as usize))
+        relative_pattern_span(self.span_offset, span)
     }
 
     fn push_edit(&mut self, span: oxc_span::Span, replacement: String) {
