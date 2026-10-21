@@ -8,8 +8,7 @@ use hmac_sha1_compact::Hash as Sha1;
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use oxc_allocator::{
-    ArenaStringBuilder, ArenaVec, CloneIn, GetAddress, GetAllocator, ReplaceWith, TakeIn,
-    UnstableAddress,
+    ArenaStringBuilder, ArenaVec, GetAddress, GetAllocator, ReplaceWith, TakeIn, UnstableAddress,
 };
 use oxc_ast::{ast::*, builder::AstBuilder, match_expression};
 use oxc_ast_visit::{
@@ -76,6 +75,84 @@ fn signature_text<'s>(node: &impl GetSpan, source: &'s str) -> &'s str {
     source.get(span.start as usize..span.end as usize).unwrap_or_default()
 }
 
+// Signature descriptions are reusable; each emitted callback owns fresh semantic IDs.
+struct CustomHook<'a> {
+    binding: BoundIdentifier<'a>,
+    middle_property: Option<Ident<'a>>,
+    property: Option<Ident<'a>>,
+}
+
+struct SignatureArguments<'a> {
+    key: Str<'a>,
+    force_reset: bool,
+    custom_hooks: Vec<CustomHook<'a>>,
+}
+
+impl<'a> SignatureArguments<'a> {
+    fn create_arguments(&self, ctx: &mut TraverseCtx<'a>) -> ArenaVec<'a, Argument<'a>> {
+        let allocator = ctx.allocator();
+        let custom_hooks_in_scope = ArenaVec::from_iter_in(
+            self.custom_hooks.iter().map(|hook| {
+                let mut expression = hook.binding.create_read_expression(ctx);
+                for property in [hook.middle_property, hook.property].into_iter().flatten() {
+                    expression = Expression::new_static_member_expression(
+                        SPAN,
+                        expression,
+                        IdentifierName::new(SPAN, property, ctx),
+                        false,
+                        ctx,
+                    );
+                }
+                ArrayExpressionElement::from(expression)
+            }),
+            &allocator,
+        );
+        let mut arguments = ArenaVec::new_in(ctx);
+        arguments.push(Argument::new_string_literal(SPAN, self.key, None, ctx));
+
+        if self.force_reset || !custom_hooks_in_scope.is_empty() {
+            arguments.push(Argument::new_boolean_literal(SPAN, self.force_reset, ctx));
+        }
+
+        if !custom_hooks_in_scope.is_empty() {
+            // function () { return custom_hooks_in_scope }
+            let formal_parameters =
+                FormalParameters::boxed(SPAN, FormalParameterKind::FormalParameter, [], None, ctx);
+            let function_body = FunctionBody::boxed(
+                SPAN,
+                [],
+                [Statement::new_return_statement(
+                    SPAN,
+                    Some(Expression::new_array_expression(SPAN, custom_hooks_in_scope, ctx)),
+                    ctx,
+                )],
+                ctx,
+            );
+            let scope_id = ctx.create_child_scope_of_current(ScopeFlags::Function);
+            let function = Argument::new_function_expression_with_scope_id_and_pure_and_pife(
+                SPAN,
+                FunctionType::FunctionExpression,
+                None,
+                false,
+                false,
+                false,
+                None,
+                None,
+                formal_parameters,
+                None,
+                Some(function_body),
+                scope_id,
+                false,
+                false,
+                ctx,
+            );
+            arguments.push(function);
+        }
+
+        arguments
+    }
+}
+
 /// React Fast Refresh
 ///
 /// Transform React functional components to integrate Fast Refresh.
@@ -93,10 +170,10 @@ pub struct ReactRefresh<'a> {
     registrations: Vec<(BoundIdentifier<'a>, Str<'a>)>,
     /// Used to wrap call expression with signature.
     /// (eg: hoc(() => {}) -> _s1(hoc(_s1(() => {}))))
-    last_signature: Option<(BindingIdentifier<'a>, ArenaVec<'a, Argument<'a>>)>,
+    last_signature: Option<(BindingIdentifier<'a>, SignatureArguments<'a>)>,
     // (function_scope_id, key)
     function_signature_keys: FxHashMap<ScopeId, String>,
-    non_builtin_hooks_callee: FxHashMap<ScopeId, Vec<Option<Expression<'a>>>>,
+    non_builtin_hooks_callee: FxHashMap<ScopeId, Vec<Option<CustomHook<'a>>>>,
     /// Used to determine which bindings are used in JSX calls.
     used_in_jsx_bindings: FxHashSet<SymbolId>,
 }
@@ -198,7 +275,7 @@ impl<'a> Traverse<'a, TransformState<'a>> for ReactRefresh<'a> {
             return;
         }
 
-        let Some((binding_identifier, mut arguments)) = self.create_signature_call_expression(
+        let Some((binding_identifier, signature)) = self.create_signature_call_expression(
             func.scope_id(),
             func.body.as_mut().unwrap(),
             ctx,
@@ -211,6 +288,7 @@ impl<'a> Traverse<'a, TransformState<'a>> for ReactRefresh<'a> {
         };
         let id_binding = BoundIdentifier::from_binding_ident(id);
 
+        let mut arguments = signature.create_arguments(ctx);
         arguments.insert(0, Argument::from(id_binding.create_read_expression(ctx)));
 
         let binding = BoundIdentifier::from_binding_ident(&binding_identifier);
@@ -291,35 +369,10 @@ impl<'a> Traverse<'a, TransformState<'a>> for ReactRefresh<'a> {
                             ctx.scoping().scope_parent_id(current_scope_id).unwrap(),
                             binding_name,
                         )
-                        .map(|symbol_id| {
-                            let mut expr = ctx.create_bound_ident_expr(
-                                SPAN,
-                                binding_name,
-                                symbol_id,
-                                ReferenceFlags::Read,
-                            );
-
-                            if is_member_expression {
-                                if let Some(middle_property) = middle_property {
-                                    // binding_name.middle_property
-                                    expr = Expression::new_static_member_expression(
-                                        SPAN,
-                                        expr,
-                                        IdentifierName::new(SPAN, middle_property, ctx),
-                                        false,
-                                        ctx,
-                                    );
-                                }
-                                // binding_name.hook_name
-                                expr = Expression::new_static_member_expression(
-                                    SPAN,
-                                    expr,
-                                    IdentifierName::new(SPAN, hook_name, ctx),
-                                    false,
-                                    ctx,
-                                );
-                            }
-                            expr
+                        .map(|symbol_id| CustomHook {
+                            binding: BoundIdentifier::new(binding_name, symbol_id),
+                            middle_property,
+                            property: is_member_expression.then_some(hook_name.into()),
                         }),
                 );
             }
@@ -396,10 +449,11 @@ impl<'a> ReactRefresh<'a> {
             _ => unreachable!(),
         };
 
-        let Some((binding_identifier, mut arguments)) = signature else {
+        let Some((binding_identifier, signature)) = signature else {
             return;
         };
         let binding = BoundIdentifier::from_binding_ident(&binding_identifier);
+        let mut arguments = signature.create_arguments(ctx);
 
         if !matches!(expr, Expression::CallExpression(_)) {
             // Try to get binding from parent VariableDeclarator
@@ -424,8 +478,9 @@ impl<'a> ReactRefresh<'a> {
         }
 
         if found_call_expression {
-            self.last_signature =
-                Some((binding_identifier.clone(), arguments.clone_in(ctx.allocator())));
+            // Carry signature data through HOCs, not cloned callback ASTs whose
+            // scope and reference identities would be lost or shared.
+            self.last_signature = Some((binding_identifier.clone(), signature));
         }
 
         let span = expr.span();
@@ -565,7 +620,7 @@ impl<'a> ReactRefresh<'a> {
         scope_id: ScopeId,
         body: &mut FunctionBody<'a>,
         ctx: &mut TraverseCtx<'a>,
-    ) -> Option<(BindingIdentifier<'a>, ArenaVec<'a, Argument<'a>>)> {
+    ) -> Option<(BindingIdentifier<'a>, SignatureArguments<'a>)> {
         let key = self.function_signature_keys.remove(&scope_id)?;
 
         let key = if self.emit_full_signatures {
@@ -611,54 +666,12 @@ impl<'a> ReactRefresh<'a> {
 
         let callee_list = self.non_builtin_hooks_callee.remove(&scope_id).unwrap_or_default();
         let callee_len = callee_list.len();
-        let custom_hooks_in_scope = ArenaVec::from_iter_in(
-            callee_list.into_iter().filter_map(|e| e.map(ArrayExpressionElement::from)),
-            ctx,
-        );
-
-        let force_reset = self.force_reset || custom_hooks_in_scope.len() != callee_len;
-
-        let mut arguments = ArenaVec::new_in(ctx);
-        arguments.push(Argument::new_string_literal(SPAN, key, None, ctx));
-
-        if force_reset || !custom_hooks_in_scope.is_empty() {
-            arguments.push(Argument::new_boolean_literal(SPAN, force_reset, ctx));
-        }
-
-        if !custom_hooks_in_scope.is_empty() {
-            // function () { return custom_hooks_in_scope }
-            let formal_parameters =
-                FormalParameters::boxed(SPAN, FormalParameterKind::FormalParameter, [], None, ctx);
-            let function_body = FunctionBody::boxed(
-                SPAN,
-                [],
-                [Statement::new_return_statement(
-                    SPAN,
-                    Some(Expression::new_array_expression(SPAN, custom_hooks_in_scope, ctx)),
-                    ctx,
-                )],
-                ctx,
-            );
-            let scope_id = ctx.create_child_scope_of_current(ScopeFlags::Function);
-            let function = Argument::new_function_expression_with_scope_id_and_pure_and_pife(
-                SPAN,
-                FunctionType::FunctionExpression,
-                None,
-                false,
-                false,
-                false,
-                None,
-                None,
-                formal_parameters,
-                None,
-                Some(function_body),
-                scope_id,
-                false,
-                false,
-                ctx,
-            );
-            arguments.push(function);
-        }
+        let custom_hooks: Vec<_> = callee_list.into_iter().flatten().collect();
+        let signature = SignatureArguments {
+            key,
+            force_reset: self.force_reset || custom_hooks.len() != callee_len,
+            custom_hooks,
+        };
 
         // _s = refresh_sig();
         let init = Expression::new_call_expression(
@@ -691,7 +704,7 @@ impl<'a> ReactRefresh<'a> {
         // _s(App, signature_key, false, function() { return [] });
         //                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ custom hooks only
         let binding_identifier = binding.create_binding_identifier(ctx);
-        Some((binding_identifier, arguments))
+        Some((binding_identifier, signature))
     }
 
     fn process_statement(

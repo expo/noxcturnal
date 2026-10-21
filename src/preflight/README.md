@@ -12,6 +12,8 @@ Other repairs must run inside the Oxc traversal because a later transform in tha
 
 Async lowering needs a second traversal when React Refresh replaces a function after its awaits were visited. Refresh stays in the first traversal so it can see JSX. Block scoping may also need another pass when Oxc introduces lexical bindings, such as during TypeScript enum lowering.
 
+Parameter and destructuring rewrites can introduce captured lexical locals inside loops. Settle those captures again before flat block-scoping planning.
+
 Every rewrite that changes bindings invalidates semantic plans built before it. Reserve helper names before subsequent passes allocate names, and rebuild scope information before planning more binding-sensitive work.
 
 ## Completion and failure

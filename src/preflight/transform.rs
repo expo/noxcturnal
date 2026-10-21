@@ -1121,19 +1121,40 @@ fn transform_with_function_map(
             let plan = if let Some(plan) = early_block_scoping_plan {
                 plan
             } else {
-                let semantic = {
-                    SemanticBuilder::new()
+                // Parameter and destructuring lowering can introduce lexical
+                // locals captured by callbacks inside a loop. Settle those new
+                // captures before the flat block-scoping plan checks its postcondition.
+                let semantic = loop {
+                    let semantic = SemanticBuilder::new()
                         .with_build_nodes(true)
                         .with_excess_capacity(2.0)
                         .with_enum_eval(true)
-                        .build(&program)
+                        .build(&program);
+                    if !semantic.diagnostics.is_empty() {
+                        return Ok(fatal(
+                            "pre-block-scoping-semantic-error",
+                            semantic.diagnostics,
+                        ));
+                    }
+                    let captured = match block_scoping::prepare_captured_loop_ast(
+                        source,
+                        &semantic.semantic,
+                    ) {
+                        Ok(plan) => plan,
+                        Err(reason) => return Ok(fatal(reason, [] as [String; 0])),
+                    };
+                    if captured.is_empty() {
+                        break semantic;
+                    }
+                    drop(semantic);
+                    match block_scoping::run_captured_loop_ast(allocator, &mut program, captured) {
+                        Ok(true) => {}
+                        Ok(false) => {
+                            return Ok(fatal("captured-loop-ast-target-missing", [] as [String; 0]));
+                        }
+                        Err(reason) => return Ok(fatal(reason, [] as [String; 0])),
+                    }
                 };
-                if !semantic.diagnostics.is_empty() {
-                    return Ok(fatal(
-                        "pre-block-scoping-semantic-error",
-                        semantic.diagnostics,
-                    ));
-                }
                 match block_scoping::prepare_with_reserved(
                     &semantic.semantic,
                     structural_custom_helper_requests

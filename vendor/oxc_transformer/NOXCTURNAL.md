@@ -59,6 +59,8 @@ Local patches:
 - `state.rs`: retain that parsed reset directive across compiler reconstruction.
 - `jsx/refresh.rs`: complete callback paths, enclosing-function hook ownership with
   static-block boundaries, reset comments, and safe synthetic-span signatures.
+  Propagate HOC signature descriptions instead of cloning callback ASTs, so each
+  emitted custom-hook callback has fresh scopes and references for later passes.
 
 Keep Rust and npm Oxc versions pinned together. Reassess these patches against the
 upstream implementation before any upgrade; archived regressions define the repair
