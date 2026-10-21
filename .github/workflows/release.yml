@@ -20,26 +20,48 @@ jobs:
     name: Plan release
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    permissions:
+      actions: read
+      contents: read
     outputs:
-      mode: ${{ steps.plan.outputs.mode }}
+      mode: ${{ steps.dedupe.outputs.mode || steps.plan.outputs.mode }}
       version: ${{ steps.plan.outputs.version }}
       sha: ${{ steps.plan.outputs.sha }}
       build_matrix: ${{ steps.plan.outputs.buildMatrix }}
       smoke_matrix: ${{ steps.plan.outputs.smokeMatrix }}
       musl_smoke_matrix: ${{ steps.plan.outputs.muslSmokeMatrix }}
     steps:
+      - name: Skip a commit already released successfully
+        id: dedupe
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          previous_run=$(gh api --method GET \
+            "repos/$GITHUB_REPOSITORY/actions/workflows/release.yml/runs" \
+            -f head_sha="$RELEASE_SHA" -f branch=main -f event=push \
+            -f status=success -f per_page=1 \
+            --jq '.workflow_runs[0].html_url // empty')
+          if [ -n "$previous_run" ]; then
+            echo "Release already completed for $RELEASE_SHA: $previous_run"
+            echo 'mode=noop' >> "$GITHUB_OUTPUT"
+          fi
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        if: steps.dedupe.outputs.mode != 'noop'
         with:
           fetch-depth: 0
           ref: ${{ env.RELEASE_SHA }}
       - name: Require the release commit to remain at main
+        if: steps.dedupe.outputs.mode != 'noop'
         run: |
           git fetch --no-tags origin main
           test "$(git rev-parse origin/main)" = "$RELEASE_SHA"
           test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
       - uses: DeterminateSystems/determinate-nix-action@61cbfe2efc2d4e7a8a6d56967c3c1058e846c858 # v3.21.9
+        if: steps.dedupe.outputs.mode != 'noop'
       - uses: DeterminateSystems/magic-nix-cache-action@565684385bcd71bad329742eefe8d12f2e765b39 # v13
+        if: steps.dedupe.outputs.mode != 'noop'
       - id: plan
+        if: steps.dedupe.outputs.mode != 'noop'
         env:
           NOXCTURNAL_RELEASE_SHA: ${{ env.RELEASE_SHA }}
         run: nix develop .#ci --command node scripts/release.mjs plan
