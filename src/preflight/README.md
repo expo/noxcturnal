@@ -2,7 +2,7 @@
 
 This is one native phase. The public switches are described with the TypeScript plan. Illegal combinations are rejected when the pipeline is defined. Flow erasure runs earlier. A file that was erased arrives here as JavaScript, reclassified as JSX when an `@flow` comment would otherwise make it look like Flow again.
 
-Some repairs live in the vendored Oxc transformer and React Compiler. A later plugin in the same visit has to see the syntax they generate, so a pass after that visit returns is too late. The notes beside those crates list the repairs. The list started against a clean vendor drop. The trees have moved since, and that list was not rewritten with them. Confirm a bullet against the current source before relying on it.
+Some repairs live in the vendored Oxc transformer and React Compiler. A later plugin in the same visit has to see the syntax they generate, so a pass after that visit returns is too late. The `NOXCTURNAL.md` notes beside those crates list the repairs.
 
 ## What a phase can return
 
@@ -50,7 +50,7 @@ For-of lowers next, through Babel's iterator helper. Labels on the loop stay. Fo
 
 Destructuring covers declarators, catches, assignments, and for-loop left patterns. If parameters or for-of already rewrote the program, semantics are rebuilt first. An object rest with no excluded keys is a copy through the extend helper, which snapshots keys once before getters run. A numeric or bigint computed key is excluded as a string, so the rest helper compares strings.
 
-Symbol block scoping runs after those passes, because they introduce bindings. An earlier plan is reused only when none of them ran.
+Symbol block scoping runs after those passes, because they introduce bindings. A plan built before them is reused only when none of them ran.
 
 Class helper names are reserved before parameters, for-of, and destructuring. RegExp helper names are included in the block-scoping plan and reserved again before for-of is planned. The reservation has to happen before the pass that allocates UIDs, not after the pass that emits the call.
 
@@ -58,7 +58,7 @@ Class helper names are reserved before parameters, for-of, and destructuring. Re
 
 One visit covers the remaining ES, TypeScript, JSX, Refresh, and React Compiler work. These repairs stay inside it because a later plugin in the same visit has to see the syntax they generate:
 
-- Logical assignment, including private targets, so the nullish pass sees the generated nullish expression. A separate pass after the visit could not do that, and the host post-pass was removed.
+- Logical assignment, including private targets, so the nullish pass sees the generated nullish expression. A separate pass after the visit could not do that.
 - Optional chaining: mutable receivers, the parameter scope, and a parenthesized delete or call. When both optional chaining and nullish coalescing are on, their loose settings match or the phase throws. Loose optional chaining sets the assumption that `document.all` is ordinary, and only then. Optional chaining and the private-field chains inside class lowering read that assumption. Nullish coalescing does not.
 - Exponentiation assignment captures computed receivers and keys while the reference is built.
 - Constructor parameter properties are initialized after a super call that sits in a try or a conditional.

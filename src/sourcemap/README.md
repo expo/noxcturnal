@@ -1,6 +1,6 @@
 # Source maps
 
-Each phase records mappings as integer segments. The VLQ string is written once, when the pipeline finishes. Composition needs the original ranges until then. Encoding at every boundary was dropping provenance, and a gap in a boundary map was letting an edit spill onto neighboring code.
+Each phase records mappings as integer segments. The VLQ string is written once, when the pipeline finishes. Composition needs the original ranges until then. Encoding at every boundary would drop provenance, and a gap in a boundary map would let an edit spill onto neighboring code.
 
 A segment records the generated position, the original position, and a name. Two marks on the name say whether the span is an open-ended anchor or an identity span. Those marks stay inside composition and are stripped before VLQ. Columns are UTF-16, the same coordinates as edits.
 

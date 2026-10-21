@@ -2,7 +2,7 @@
 
 The engine holds a parsed program while JavaScript chooses plugins, asks for the nodes those plugins declared, and keeps one source for the whole transform.
 
-Syntax checks and the function map read the input parse. Both can be read again. Materializing the tape, validating the program, or closing it consumes that parse. A later read fails. Selection and the first visitor phase share the parse, so a function map describes the file the caller passed. The map used to be collected from a later parse, after lowering had already changed the file.
+Syntax checks and the function map read the input parse. Both can be read again. Materializing the tape, validating the program, or closing it consumes that parse. A later read fails. Selection and the first visitor phase share the parse, so a function map describes the file the caller passed.
 
 The rest of the call keeps one resident source. Native phases and visitor commits update it in place and append a map layer. Finishing returns the code and the composed map. An all-native pipeline can do this in one call. Each phase that completed is returned. A phase that declined or failed its postcondition stops the run, and the code and map are absent. A parse or internal failure throws and returns no results. That phase has already taken the resident source, so a later read of the text or a finish fails. Every change goes through preflight or the edit commit, so the resident path and a direct call print the same output.
 
@@ -16,9 +16,9 @@ The session answers binding queries, call queries, child batches, rename plans, 
 
 Retention is opt-in. The manifest asks for identifiers, constants, calls, children, inspection, module facts, or any combination. Those are the only facts the session builds. Comment collection is separate: a visitor can ask for inner comments, and comment retention is its own capability. Declare every field the visitor reads. A field that is not valid on the route's node types is rejected when the pipeline is defined. A field that is valid and left out of the contract is absent on the node. Inspection with no scalar fields is a capability that was never declared.
 
-UID allocation returns nothing from the native side when the identifier index was not retained. JavaScript then scans the source. A session that did retain identifiers answers from that index and remembers names it has already issued, including across a phase that did not edit. Allocation is a lookup. It used to rescan the file.
+UID allocation returns nothing from the native side when the identifier index was not retained. JavaScript then scans the source. A session that did retain identifiers answers from that index and remembers names it has already issued, including across a phase that did not edit. Allocation is a lookup.
 
-A binding query with a name returns that binding. A query that omits the name returns every binding in the requested scope. An unknown name returns nothing. Asking only for reads or only for writes narrows that binding's reference list. The binding still comes back when the filter removes every reference. An earlier bug ignored the name and returned the whole scope. Nested traversal walks a bounded range. With nothing retained and no initial route, the session skips the parse and fills body offsets on the first request.
+A binding query with a name returns that binding. A query that omits the name returns every binding in the requested scope. An unknown name returns nothing. Asking only for reads or only for writes narrows that binding's reference list. The binding still comes back when the filter removes every reference. Nested traversal walks a bounded range. With nothing retained and no initial route, the session skips the parse and fills body offsets on the first request.
 
 ## The tape
 
