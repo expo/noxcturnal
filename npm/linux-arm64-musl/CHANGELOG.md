@@ -1,5 +1,11 @@
 # @noxcturnal/noxcturnal-linux-arm64-musl
 
+## 0.1.8
+
+### Patch Changes
+
+- Remove the unused `TransformOptions.preflight` option. Native configuration belongs on `PipelinePhase.native`, by [@kitten](https://github.com/kitten) (See [#65](https://github.com/expo/noxcturnal/pull/65))
+
 ## 0.1.7
 
 ## 0.1.6

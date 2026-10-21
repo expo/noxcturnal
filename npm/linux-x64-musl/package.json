@@ -1,6 +1,6 @@
 {
   "name": "@noxcturnal/noxcturnal-linux-x64-musl",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "description": "Native-backed JavaScript transform runtime with visitor ergonomics",
   "license": "MIT",
   "repository": {
