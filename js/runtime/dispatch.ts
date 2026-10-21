@@ -138,6 +138,9 @@ export function createDispatcher(
     hasPendingInsertions = false;
   };
   const boundaryPrefixes: [string?, string?] = [];
+  // Only the first insertion at an offset gets a prefix: a newline when it does
+  // not start a line, and a semicolon when the directive above a prologue
+  // insertion, or the statement above an append, is unterminated.
   const insertionPrefix = (kind: OwnedEdit['kind'], offset: number): string => {
     if (programInsertionPoints.has(offset)) return '';
     const index = kind === 'Prologue' ? 0 : 1;
@@ -166,6 +169,8 @@ export function createDispatcher(
       if (edit.kind === 'AppendLeft') append = edit;
     }
     if (programEndBoundary && !edits.includes(programEndBoundary)) programEndBoundary = undefined;
+    // A file ending in a line comment gets a trailing newline so the comment
+    // cannot swallow an appended statement.
     if (append && programBodyOffsets?.[2] && !programEndBoundary) {
       programEndBoundary = {
         kind: 'AppendLeft',

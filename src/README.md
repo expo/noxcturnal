@@ -1,10 +1,8 @@
 # Native runtime
 
-This crate is the addon the package loads. TypeScript decides what a phase may do. This tree parses the file, answers queries, rewrites syntax, and commits edits. The [TypeScript notes](../js/README.md) are the other side of that boundary.
+This crate is the addon the package loads. TypeScript decides what a phase may do. This tree parses the file, answers queries, rewrites syntax, and commits edits. The TypeScript package under [`js/`](../js/) is the other side of that boundary.
 
-Flow erasure sits beside the engine, the edit commit, the protocol, semantics, syntax, source maps, and preflight. Hermes parses. The Flow crate collects byte ranges. Those ranges become piece-table edits. Most ranges are removed. Enums, component headers, the `hook` keyword, records, and `match` are rewritten in place, because deleting them would drop a runtime construct. The map records the edits. Flow erasure is on in a normal build. Success replaces the working source. A decline, including a binary built without erasure, leaves the file to a parser adapter. A rejected construct, a malformed buffer, or a cover-grammar node throws. Rejection is reserved for input no implementation can compile.
-
-A private field with no value is kept. It still declares the class-scoped name used by reads and by the `in` operator. The type annotation on that field is erased. A declared field is removed, private or public, because it never exists at runtime. A public field that has a type and no value is removed when it is not decorated. A decorated one stays, because the decorator is a runtime call.
+Flow erasure keeps a private field with no value. It still declares the class-scoped name used by reads and by the `in` operator. The type annotation on that field is erased. A declared field is removed, private or public, because it never exists at runtime. A public field that has a type and no value is removed when it is not decorated. A decorated one stays, because the decorator is a runtime call.
 
 ## How to report a failure
 
@@ -13,5 +11,3 @@ Throw when the input or the configuration was illegal, or a resource limit was h
 Return a decline, with no code and no map, when the file is legal and this transform will not take it. The caller gets a bailout and keeps the original source. A namespace that exports a mutable binding is that kind of decline only when every diagnostic from the visit is that one Oxc limitation. Any other diagnostic in the list keeps the failure fatal. An escaped regexp name that the parser cannot accept takes the decline path as well. Other parse diagnostics throw.
 
 Return an error when a rewrite already ran and the result still breaks a postcondition. The partial buffer is dropped, and the caller gets a fatal transform error.
-
-A test-only inventory lists reason strings. The call that constructs the error is the decision.

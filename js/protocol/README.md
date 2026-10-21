@@ -10,4 +10,4 @@ Edit offsets are UTF-16 indexes into the original source. A move stores its dest
 
 The tape carries a string slab and records. Each record identifies the node and its span. Parent and scope are added only when the manifest asked for them, so a walk does not take another native call, and a phase that did not ask does not pay for them. A short buffer or a bad magic is rejected.
 
-Host strings stay UTF-8. A value that contains an isolated surrogate, or that itself starts with the escape used to mark one, is sent as a tagged JSON string. Constants use a small set of tags. A plain round-trip was changing lone surrogates and signed zeroes, which is why the tagged form exists. Constant folding has its own rules and leaves a lone surrogate unfolded.
+Host strings stay UTF-8. A value that contains an isolated surrogate, or that itself starts with the escape used to mark one, is sent as a tagged JSON string. Constants use a small set of tags, so lone surrogates and signed zeroes survive the round trip. Constant folding has its own rules and leaves a lone surrogate unfolded.

@@ -8,7 +8,7 @@ Native phases and visitor phases then share one resident source. A native phase 
 
 The React Compiler after an adapter or an erasure map bails. The compiler reads the caller's original file, and that file is gone once an adapter or erasure has replaced it.
 
-A function map is collected from the input parse, before lowering, and that parse is reused. An earlier bug collected the map after the file had already been rewritten.
+A function map is collected from the input parse, before lowering, and that parse is reused.
 
 A bailout is the signal for a plugin that declines the file, a native decline, an analysis result of unsupported, and a visitor that subscribed to every node. The source on that result is the string the caller passed, including when erasure or an adapter had already produced a working buffer.
 
@@ -25,10 +25,6 @@ Rename rewrites the local binding. An unbound name fails, and so does a replacem
 Pushing a statement into a class goes to the nearest scope that has a statement list. Pushing into a switch goes to the enclosing function, static block, or program. A class body has no statement list, and neither does a statement sitting before the first case. When nothing above can take the statement, the push fails.
 
 Two capture requests for the same function that disagree on which program bindings to close over are a conflict.
-
-Replace emits one edit per match. A global expression starts at the beginning. When that expression is also sticky, the scan stops as soon as a match does not begin on the cursor, so a later match that is not anchored there stays. A sticky expression that is not global resumes at the expression's cursor, and stops if the next match is not on that cursor. A non-numeric or negative cursor becomes zero. A positive cursor truncates toward zero. Past the end of the text, nothing matches. The length check uses the full number, before the cursor is stored as an offset, which keeps a huge cursor from wrapping into a small index. A plain string is escaped before search. Unicode flags decode the pattern as Unicode and leave an unpaired surrogate as an unpaired code unit.
-
-A program insertion has to stay its own statement and its own line. It always ends with a newline. Plain text that is not already a terminated statement, or that contains a slash, also gets a semicolon, so it cannot glue to the next statement or open a comment or a regex. A composite is treated as terminated only when its last part is a string that already ends as a statement. A slash in a part forces the semicolon only once the composite is otherwise terminated. The first insertion at an offset also gets a prefix: a leading newline when the offset is past the start and the previous unit is not a line break, and a semicolon when the directive above a prologue, or the statement above an append, is unterminated. An append whose file ends in a trailing line comment also inserts a newline at the end of the source, so the comment does not swallow the insertion.
 
 A provenance fragment keeps its source range so the piece table can map it. Coercing it to a string fails. Ask for the text.
 

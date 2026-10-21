@@ -4,7 +4,7 @@ This lowers `let` and `const` inside a native preflight phase. The preflight not
 
 A binding a closure captures needs a fresh box on every iteration. Everything else is a rename. The two halves share one classification of which bindings are captured. The rename half fails if a captured binding is still present, so a binding the loop rewrite declined to touch is not renamed into the wrong shape.
 
-Uncaptured loop bindings used to make the rewrite repeat forever. Captured bindings were a later fix: the loop rewrite has to keep exits and lexical boundaries, not only rename the binding.
+The loop rewrite has to keep exits and lexical boundaries, not only rename the binding, and it has to terminate when the remaining loop bindings are uncaptured.
 
 Removing an unused block-scoped var whose initializer is a function is the optimizer's job. It is a later pass. A plain unused value stays.
 

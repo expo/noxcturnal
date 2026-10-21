@@ -2,7 +2,7 @@
 
 Classification, fragment checks, and UID reservation sit at the edge of a parse.
 
-The extension decides the syntax. Declaration files, including the module and CommonJS declaration suffixes, are declaration files. TypeScript and JSX suffixes follow their names. A script, module, or CommonJS file is Flow when a leading comment, after an optional hashbang, contains `@flow` as a whole word. Flow and an unrecognized extension are unsupported here. Every other recognized extension is Oxc-supported. Classification is the extension plus that directive. A React Native codegen scan used to ride along on the result and was removed.
+The extension decides the syntax. Declaration files, including the module and CommonJS declaration suffixes, are declaration files. TypeScript and JSX suffixes follow their names. A script, module, or CommonJS file is Flow when a leading comment, after an optional hashbang, contains `@flow` as a whole word. Flow and an unrecognized extension are unsupported here. Every other recognized extension is Oxc-supported. Classification is the extension plus that directive.
 
 Classification runs once, at the public boundary. Later passes trust the source type they were given. After erasure or an adapter, the TypeScript runtime may replace that syntax. A Flow file that was erased is reclassified as JSX, because the `@flow` comment would otherwise classify it as Flow again.
 
