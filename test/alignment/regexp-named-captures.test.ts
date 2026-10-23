@@ -267,3 +267,70 @@ describe('named reference compatibility', () => {
     );
   });
 });
+
+describe('numeric escapes in named capture patterns', () => {
+  const linkPattern =
+    /(?<fence>(`{3,}|~{3,})[\s\S]*?(?:\2|$))|(?<span>(`+)[^\n]*?\4)|\[[^\]\n]*\]\((?<href>thread:\/\/v1\/[^\s)]+)\)/g;
+  test.each(['inline', 'runtime'] as const)(
+    'Link pattern, flags, and code skipping match Babel with %s helpers',
+    mode => {
+      const input = [
+        '[Thread](thread://v1/abc)',
+        '`[Skip](thread://v1/inline)` [Keep](thread://v1/def)',
+        '```\n[Skip](thread://v1/fenced)\n``` [Keep](thread://v1/ghi)',
+        '~~~\n[Skip](thread://v1/tilde)\n~~~ [Keep](thread://v1/jkl)',
+      ].join('\n');
+      const source = `"use strict";
+        const pattern = ${linkPattern};
+        globalThis.result = [pattern.source, pattern.flags,
+          Array.from(${JSON.stringify(input)}.matchAll(pattern), match => match.groups.href)
+            .filter(href => href !== undefined)];`;
+      const reference = transformSync(source, {
+        configFile: false,
+        babelrc: false,
+        sourceType: 'module',
+        plugins: [require('@babel/plugin-transform-named-capturing-groups-regex')],
+      })!.code!;
+      const code = compile(
+        source,
+        {
+          transforms: { regexpNamedCaptureGroups: true },
+          helpers: { mode, moduleName: '@babel/runtime', version: '7.29.7' },
+        },
+        'links.ts',
+      );
+      const actual = run(code) as [string, string, string[]];
+      expect(code).not.toContain('(?<href>');
+      expect(actual).toEqual(run(reference));
+      expect(actual[2]).toEqual([
+        'thread://v1/abc',
+        'thread://v1/def',
+        'thread://v1/ghi',
+        'thread://v1/jkl',
+      ]);
+    },
+  );
+  for (const [name, pattern, input, expected] of [
+    ['links outside code', linkPattern.source, '[Thread](thread://v1/abc)', 'thread://v1/abc'],
+    ['backreference', String.raw`(?<href>a)\1`, 'aa', 'a'],
+    ['legacy octal escape', String.raw`(?<href>\141)`, 'a', 'a'],
+    ['class octal escape', String.raw`(?<href>[\141])`, 'a', 'a'],
+  ]) {
+    test.each(['inline', 'runtime'] as const)(`${name} with %s helpers`, mode => {
+      const source = `"use strict"; globalThis.result = /${pattern}/g.exec(${JSON.stringify(input)}).groups.href;`;
+      const reference = transformSync(source, {
+        configFile: false,
+        babelrc: false,
+        sourceType: 'module',
+        plugins: [require('@babel/plugin-transform-named-capturing-groups-regex')],
+      })!.code!;
+      expect(run(reference)).toBe(expected);
+      const code = compile(source, {
+        transforms: { regexpNamedCaptureGroups: true },
+        helpers: { mode, moduleName: '@babel/runtime', version: '7.29.7' },
+      });
+      expect(code).not.toContain('(?<href>');
+      expect(run(code)).toBe(expected);
+    });
+  }
+});
