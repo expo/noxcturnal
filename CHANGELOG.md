@@ -1,5 +1,11 @@
 # noxcturnal
 
+## 0.1.9
+
+### Patch Changes
+
+- ⚠️ Fix named capture group lowering rejecting valid regular expressions containing numeric backreferences or legacy octal escapes in strict mode, by [@kitten](https://github.com/kitten) (See [#67](https://github.com/expo/noxcturnal/pull/67))
+
 ## 0.1.8
 
 ### Patch Changes
