@@ -20,7 +20,7 @@ use oxc_regular_expression::{
     },
     visit::{Visit as RegExpVisit, walk},
 };
-use oxc_span::GetSpan;
+use oxc_span::{GetSpan, Span};
 use regex_syntax::hir::{Class, HirKind};
 use rustc_hash::{FxHashMap, FxHashSet};
 
@@ -237,8 +237,10 @@ impl<'a> RegexpLowerer<'a> {
         let regexp = expression.take_in(&self.ast);
         let mut properties = ArenaVec::new_in(&self.ast);
         for (name, indices) in groups {
+            // Generated keys need empty spans so regexp escapes aren't validated
+            // as strict-mode string escapes.
             let key = oxc_ast::ast::Expression::new_string_literal(
-                span,
+                Span::new(span.start, span.start),
                 self.ast.allocator().alloc_str(&name),
                 None,
                 self.ast.builder(),
