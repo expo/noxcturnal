@@ -18,7 +18,7 @@ use crate::event_types::NodeField;
 use crate::generated::event_schema::{ast_kind_protocol_id, field_key_name, node_type_name};
 use crate::protocol::constants::FieldMask;
 use crate::protocol::manifest::{CompiledManifest, CompiledPredicate, CompiledScalar, VisitSide};
-use crate::protocol::routed::{PackedWords, encode_routed_envelope};
+use crate::protocol::routed::{PackedWords, encode_routed_envelope, routed_shape_flags};
 use crate::syntax::classification::source_type;
 
 use super::fields::{
@@ -94,6 +94,7 @@ pub(super) fn materialize_routed_program<'a>(
         utf16: utf16.as_deref().map(|offsets| &**offsets),
         root,
         node_count: 0,
+        open_bounds: Vec::new(),
         validation_stats: Stats::default(),
         declaration_kinds: Vec::new(),
         sequence: 0,
@@ -122,8 +123,9 @@ pub(super) fn materialize_routed_program<'a>(
         )?;
         collector.node_count = validated.stats.nodes;
         collector.emit(AstKind::Program(program), VisitSide::Enter, false, false);
+        collector.sequence = collector.node_count;
+        collector.close_bounds(AstKind::Program(program));
         if manifest.include_exit {
-            collector.sequence = collector.node_count;
             collector.emit(AstKind::Program(program), VisitSide::Exit, false, false);
         }
     } else {
@@ -152,7 +154,7 @@ pub(super) fn materialize_routed_program<'a>(
         strings[id as usize] = value;
     }
     encode_routed_envelope(
-        manifest,
+        routed_shape_flags(manifest, manifest.include_traversal),
         node_count,
         strings,
         data,
@@ -233,6 +235,8 @@ struct RoutedEventCollector<'a> {
     utf16: Option<&'a [u32]>,
     root: Option<(u32, u32)>,
     node_count: u32,
+    // Only emitted ancestors need backpatches; memory is bounded by AST depth.
+    open_bounds: Vec<(NodeId, usize)>,
     validation_stats: Stats,
     declaration_kinds: Vec<oxc_ast::ast::VariableDeclarationKind>,
     sequence: u32,
@@ -247,6 +251,17 @@ struct RoutedEventCollector<'a> {
 }
 
 impl RoutedEventCollector<'_> {
+    fn close_bounds(&mut self, kind: AstKind<'_>) {
+        if self
+            .open_bounds
+            .last()
+            .is_some_and(|&(id, _)| id == kind.node_id())
+        {
+            let (_, offset) = self.open_bounds.pop().expect("open traversal bounds");
+            self.words.patch(offset, self.sequence);
+        }
+    }
+
     fn intern(&mut self, value: &str) -> u32 {
         if let Some(id) = self.string_ids.get(value) {
             return *id;
@@ -449,6 +464,12 @@ impl RoutedEventCollector<'_> {
         });
         self.words
             .extend([sequence, id.index() as u32, protocol_id, start, end]);
+        if self.manifest.include_traversal {
+            // Event sequence follows this walk, independently of node IDs and
+            // source anchors. Its matching leave backpatches the exclusive end.
+            self.open_bounds.push((id, self.words.len()));
+            self.words.push(0);
+        }
         if self.manifest.include_parent {
             if let Some(parent_id) = parent_id {
                 self.parent_ids.insert(parent_id);
@@ -667,6 +688,9 @@ impl<'a> Visit<'a> for RoutedEventCollector<'a> {
     }
 
     fn leave_node(&mut self, kind: AstKind<'a>) {
+        if self.manifest.include_traversal {
+            self.close_bounds(kind);
+        }
         let (member_write, member_root_write) = self.member_writes.leave();
         if self.manifest.include_exit
             && self.manifest.routes_by_type[ast_kind_protocol_id(kind) as usize]
@@ -682,5 +706,84 @@ impl<'a> Visit<'a> for RoutedEventCollector<'a> {
 
     fn visit_program(&mut self, program: &oxc_ast::ast::Program<'a>) {
         walk::walk_program(self, program);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::generated::event_schema::node_type_id;
+    use crate::protocol::constants::ROUTE_MANIFEST_MAGIC;
+    use crate::protocol::manifest::CompiledRoute;
+    use oxc_ast_visit::VisitMut;
+    use oxc_span::Span;
+
+    #[test]
+    fn skip_bounds_follow_walk_order_with_shared_or_reversed_anchors() {
+        struct Anchors(bool);
+        impl<'a> VisitMut<'a> for Anchors {
+            fn visit_span(&mut self, span: &mut Span) {
+                *span = if self.0 {
+                    Span::default()
+                } else {
+                    Span::new(100 - span.end, 100 - span.start)
+                };
+            }
+        }
+        let source = "first(1);second(2);";
+        for semantics in [false, true] {
+            for anchors in ["parsed", "shared", "reversed"] {
+                let allocator = Allocator::default();
+                let mut parsed =
+                    Parser::new(&allocator, source, source_type("input.js", source).unwrap())
+                        .parse();
+                // Preserve the source anchors while moving the actual statements.
+                parsed.program.body.reverse();
+                if anchors != "parsed" {
+                    Anchors(anchors == "shared").visit_program(&mut parsed.program);
+                }
+                let bytes = [ROUTE_MANIFEST_MAGIC, 0, 0, 0, 32, 0, 0, 0]
+                    .into_iter()
+                    .flat_map(u32::to_le_bytes)
+                    .collect::<Vec<_>>();
+                let mut manifest = decode_route_manifest(&bytes).unwrap();
+                manifest.program_only = false;
+                manifest.include_traversal = true;
+                manifest.needs_semantics = semantics;
+                for (id, name) in ["ExpressionStatement", "NumericLiteral"]
+                    .into_iter()
+                    .enumerate()
+                {
+                    let type_id = node_type_id(name).unwrap();
+                    manifest.routes_by_type[type_id as usize].push(CompiledRoute {
+                        id: id as u32,
+                        node_type_id: type_id,
+                        side: VisitSide::Enter,
+                        predicates: Vec::new(),
+                        payload_field_ids: Vec::new(),
+                        payload_mask: FieldMask::none(),
+                        comments_inner: false,
+                    });
+                }
+                let output = materialize_routed_program(
+                    source,
+                    &allocator,
+                    &parsed.program,
+                    &manifest,
+                    None,
+                )
+                .unwrap();
+                let offset = u32::from_le_bytes(output[24..28].try_into().unwrap()) as usize;
+                let bounds = output[offset..]
+                    .chunks_exact(36)
+                    .map(|record| {
+                        let start = u32::from_le_bytes(record[0..4].try_into().unwrap());
+                        let end = u32::from_le_bytes(record[20..24].try_into().unwrap());
+                        (start, end)
+                    })
+                    .collect::<Vec<_>>();
+                assert_eq!(bounds, [(1, 5), (4, 5), (5, 9), (8, 9)]);
+            }
+        }
     }
 }

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { expect, test } from 'vitest';
 
+import { dispatchRoutedEvents } from '../../protocol/events';
 import { packRouteManifest } from '../../protocol/manifest';
 import { NativeTransformSession } from '../session';
 
@@ -60,4 +61,40 @@ test('retained sessions close repeatedly and reject cached event/query/children 
   expect(() => session.event(program.id)).toThrow('session-closed');
   expect(() => session.query(request)).toThrow('session-closed');
   expect(() => session.children(program.id)).toThrow('session-closed');
+});
+
+test('node-root routing preserves the separate coordinate-query contract', () => {
+  const source = 'import {value} from "pkg";value;';
+  const session = openRetained(source, 'input.mjs');
+  const target = session.nodes(['Identifier'])[0]!;
+  const manifest = packRouteManifest(
+    ['Identifier', 'ImportSpecifier'].map((nodeType, id) => ({
+      id,
+      pluginId: 0,
+      nodeType,
+      side: 'enter' as const,
+      order: 0,
+      predicates: {},
+      payloadFields: [],
+    })),
+    false,
+    false,
+  );
+  const collect = (root: { id: number } | { start: number; end: number }) => {
+    const events: { id: number; type: string }[] = [];
+    const receive = (event: { id: number; type: string }) => {
+      events.push({ id: event.id, type: event.type });
+    };
+    dispatchRoutedEvents(session.nextRoutedPacked(manifest, root), [receive, receive]);
+    return events;
+  };
+  expect(collect({ start: target.start, end: target.end }).map(event => event.type)).toEqual([
+    'ImportSpecifier',
+    'Identifier',
+    'Identifier',
+  ]);
+  expect(collect({ id: target.id })).toEqual([{ id: target.id, type: 'Identifier' }]);
+  expect(collect({ id: 999 })).toEqual([]);
+  session.close();
+  expect(() => collect({ id: target.id })).toThrow('session-closed');
 });

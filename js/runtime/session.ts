@@ -43,6 +43,7 @@ export class NativeTransformSession {
   #native: NativeIndexedSessionBinding | null = null;
   #nativeFilename: string;
   #scopeParents: Uint32Array | null = null;
+  #traversalIntervals: Uint32Array | null = null;
   #scopeMetadata: Uint32Array | null = null;
   #ownedScopes = new Map<number, number>();
   #linePrefixPage = -1;
@@ -81,10 +82,28 @@ export class NativeTransformSession {
   retentionDebugSummary(): ReturnType<NativeIndexedSessionBinding['retentionDebugSummary']> {
     return this.#binding('retention.debug').retentionDebugSummary();
   }
-  nextRoutedPacked(manifest: Buffer, root?: { start: number; end: number }): RoutedEventBatch {
+  nextRoutedPacked(
+    manifest: Buffer,
+    root?: { start: number; end: number } | { id: number },
+  ): RoutedEventBatch {
     this.#assertOpen();
-    const buffer = this.#binding('route.next').nextRoutedPacked(manifest, root?.start, root?.end);
+    const coordinates = root != null && 'start' in root ? root : undefined;
+    const rootId = root != null && 'id' in root ? root.id : undefined;
+    const buffer = this.#binding('route.next').nextRoutedPacked(
+      manifest,
+      coordinates?.start,
+      coordinates?.end,
+      rootId,
+    );
     return decodeRoutedEnvelope(buffer);
+  }
+  traversalIntervals(): Uint32Array {
+    this.#assertOpen();
+    if (this.#traversalIntervals == null) {
+      const data = this.#binding('traversal-intervals').traversalIntervalsBuffer();
+      this.#traversalIntervals = new Uint32Array(data.buffer, data.byteOffset, data.byteLength / 4);
+    }
+    return this.#traversalIntervals;
   }
   cacheEvent(event: NativeEvent): void {
     if (event.side === 'enter') {
@@ -710,6 +729,7 @@ export class NativeTransformSession {
   close(): void {
     this.#globalBindingReferencesCache.clear();
     this.#sourceText = null;
+    this.#traversalIntervals = null;
     if (!this.#closed && this.#native) {
       this.#native.close();
     }

@@ -35,7 +35,14 @@ export function packRouteManifest(
   ancestorTypes: readonly string[] = [],
   ancestorChildParentTypes: readonly string[] = [],
   ancestryDepth = includeParent ? Number.POSITIVE_INFINITY : 0,
+  includeTraversal = false,
 ): Buffer {
+  if (
+    !Number.isInteger(retentionCapabilities) ||
+    retentionCapabilities < 0 ||
+    retentionCapabilities > 0xff
+  )
+    throw new Error('invalid retention capabilities');
   if (routes.length > MAX_COMPILED_ROUTES) throw new Error('compiled route limit exceeded');
   const concreteChildRetention = new Map<string, { wildcard: boolean; roleIds: number[] }>();
   for (const [type, requestedRoles] of Object.entries(childRetention)) {
@@ -114,7 +121,10 @@ export function packRouteManifest(
   };
   const words: number[] = [
     ROUTE_MANIFEST_MAGIC,
-    Number(includeParent) | (Number(includeScope) << 1) | (retentionCapabilities << 2),
+    Number(includeParent) |
+      (Number(includeScope) << 1) |
+      (retentionCapabilities << 2) |
+      (Number(includeTraversal) << 10),
     routes.length,
     0,
     0,

@@ -3,8 +3,18 @@ use napi::{Result, bindgen_prelude::Buffer};
 use super::constants::ROUTED_TAPE_MAGIC;
 use super::manifest::CompiledManifest;
 
+/// Indexed routing can leave bounds absent and use its lazy bulk table instead.
+/// This keeps skip declarations from eagerly allocating per-node index caches.
+pub(crate) fn routed_shape_flags(manifest: &CompiledManifest, inline_bounds: bool) -> u32 {
+    u32::from(manifest.include_parent)
+        | (u32::from(manifest.include_scope) << 1)
+        | (u32::from(manifest.include_exit) << 2)
+        | (u32::from(manifest.needs_comments) << 3)
+        | (u32::from(inline_bounds) << 4)
+}
+
 pub(crate) fn encode_routed_envelope(
-    manifest: &CompiledManifest,
+    shape_flags: u32,
     node_count: u32,
     strings: Vec<String>,
     data: Vec<u8>,
@@ -17,10 +27,6 @@ pub(crate) fn encode_routed_envelope(
         .map(|value| 4 + value.len() + (4 - value.len() % 4) % 4)
         .sum();
     let records_offset = 32 + strings_size + parent_summaries.len() * 4;
-    let shape_flags = u32::from(manifest.include_parent)
-        | (u32::from(manifest.include_scope) << 1)
-        | (u32::from(manifest.include_exit) << 2)
-        | (u32::from(manifest.needs_comments) << 3);
     let mut output = Vec::with_capacity(records_offset + data.len());
     for word in [
         ROUTED_TAPE_MAGIC,
@@ -51,6 +57,14 @@ pub(crate) struct PackedWords(Vec<u8>);
 impl PackedWords {
     pub(crate) fn with_capacity(capacity: usize) -> Self {
         Self(Vec::with_capacity(capacity))
+    }
+
+    pub(crate) fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    pub(crate) fn patch(&mut self, offset: usize, word: u32) {
+        self.0[offset..offset + 4].copy_from_slice(&word.to_le_bytes());
     }
 
     pub(crate) fn push(&mut self, word: u32) {

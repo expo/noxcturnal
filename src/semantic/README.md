@@ -22,3 +22,7 @@ A default initializer can share a property's source anchor without becoming its
 target. Shorthand object properties inside defaults retain their own rename role.
 Import/export token-sharing checks describe immutable source spelling, rather
 than declaration ownership.
+
+Subtree intervals are derived from the retained traversal tape and parent links,
+including when some exit carriers are omitted. Neither node-ID numeric order nor
+source coordinates determine ancestry. The interval cache belongs to this index.

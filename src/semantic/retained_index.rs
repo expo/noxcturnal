@@ -38,6 +38,7 @@ pub struct RetainedIndex {
     traversal_records: Vec<u32>,
     traversal_ranges: OnceCell<TraversalRanges>,
     traversal_sequences: OnceCell<TraversalSequences>,
+    subtree_ranges: OnceCell<Vec<(u32, u32)>>,
     pending_child_edges: Option<Vec<ChildEdge>>,
     child_offsets: Option<Vec<u32>>,
     child_edges: Vec<ChildEdge>,
@@ -360,6 +361,7 @@ impl RetainedIndex {
             traversal_records: Vec::new(),
             traversal_ranges: OnceCell::new(),
             traversal_sequences: OnceCell::new(),
+            subtree_ranges: OnceCell::new(),
             pending_child_edges: child_role_mask_by_parent_type.map(|_| Vec::new()),
             child_offsets: None,
             child_edges: Vec::new(),
@@ -1175,6 +1177,7 @@ impl RetainedIndex {
     ) {
         self.traversal_ranges.take();
         self.traversal_sequences.take();
+        self.subtree_ranges.take();
         self.node_type_index.take();
         let index = node_id as usize;
         if index >= self.type_ids.len() {
@@ -1285,12 +1288,14 @@ impl RetainedIndex {
     pub fn record_enter(&mut self, node_id: u32) {
         self.traversal_ranges.take();
         self.traversal_sequences.take();
+        self.subtree_ranges.take();
         self.traversal_records.push(node_id);
     }
 
     pub fn record_exit(&mut self, node_id: u32) {
         self.traversal_ranges.take();
         self.traversal_sequences.take();
+        self.subtree_ranges.take();
         self.traversal_records.push(node_id | 0x8000_0000);
     }
 
@@ -1315,6 +1320,55 @@ impl RetainedIndex {
 
     pub fn scope_id(&self, node_id: u32) -> u32 {
         self.scope_ids[node_id as usize]
+    }
+
+    /// Exact tape intervals follow node ancestry, independently of source coordinates.
+    /// Some routes omit exit carriers, so parent links close those subtrees on the
+    /// next enter or retained ancestor exit. IDs need not encode traversal order.
+    fn subtree_ranges(&self) -> &[(u32, u32)] {
+        self.subtree_ranges.get_or_init(|| {
+            let mut ranges = vec![(0, 0); self.len()];
+            let mut stack = Vec::<u32>::new();
+            for (offset, &record) in self.traversal_records.iter().enumerate() {
+                let id = record & 0x7fff_ffff;
+                let offset = offset as u32;
+                if record & 0x8000_0000 == 0 {
+                    let parent = self.parent_id(id);
+                    while stack.last().copied() != parent {
+                        let Some(closed) = stack.pop() else { break };
+                        ranges[closed as usize].1 = offset;
+                    }
+                    ranges[id as usize].0 = offset;
+                    stack.push(id);
+                } else {
+                    while let Some(closed) = stack.pop() {
+                        ranges[closed as usize].1 = offset + u32::from(closed == id);
+                        if closed == id {
+                            break;
+                        }
+                    }
+                }
+            }
+            for id in stack {
+                ranges[id as usize].1 = self.traversal_records.len() as u32;
+            }
+            ranges
+        })
+    }
+
+    pub fn subtree_range(&self, node_id: u32) -> std::ops::Range<usize> {
+        self.subtree_ranges()
+            .get(node_id as usize)
+            .map_or(0..0, |&(start, end)| start as usize..end as usize)
+    }
+
+    pub fn traversal_intervals_buffer(&self) -> Buffer {
+        let mut bytes = Vec::with_capacity(self.len() * 8);
+        for &(start, end) in self.subtree_ranges() {
+            bytes.extend_from_slice(&start.to_le_bytes());
+            bytes.extend_from_slice(&end.to_le_bytes());
+        }
+        bytes.into()
     }
 
     pub fn traversal_records(&self) -> &[u32] {
@@ -1727,6 +1781,10 @@ impl RetainedIndex {
             + self.parent_ids.capacity() * size_of::<u32>()
             + self.scope_ids.capacity() * size_of::<u32>()
             + self.traversal_records.capacity() * size_of::<u32>()
+            + self
+                .subtree_ranges
+                .get()
+                .map_or(0, |ranges| ranges.capacity() * size_of::<(u32, u32)>())
             + self.traversal_ranges.get().map_or(0, |ranges| {
                 ranges.bounds.capacity() * size_of::<(u32, u32)>()
             })
@@ -2072,6 +2130,52 @@ mod tests {
             index.record_semantics(kind, semantic.scoping(), id, scope, true, false);
         }
         index
+    }
+
+    #[test]
+    fn subtree_intervals_follow_ancestry_with_sparse_exits_and_reordered_ids() {
+        for shared in [false, true] {
+            let mut index = RetainedIndex::default();
+            for (id, parent) in [
+                (3, None),
+                (1, Some(3)),
+                (4, Some(1)),
+                (0, Some(4)),
+                (2, Some(3)),
+            ] {
+                let span = if shared {
+                    (0, 0)
+                } else {
+                    (100 - id * 10, 105 - id * 10)
+                };
+                index.record(id, 0, span.0, span.1, parent, 0);
+            }
+            for record in [3, 1, 4, 0, 0x8000_0000, 0x8000_0001, 2, 0x8000_0003] {
+                if record & 0x8000_0000 == 0 {
+                    index.record_enter(record);
+                } else {
+                    index.record_exit(record & 0x7fff_ffff);
+                }
+            }
+            assert_eq!(
+                index.subtree_ranges(),
+                &[(3, 5), (1, 6), (6, 7), (0, 8), (2, 5)]
+            );
+            assert_eq!(
+                &index.traversal_records()[index.subtree_range(1)],
+                &[1, 4, 0, 0x8000_0000, 0x8000_0001]
+            );
+            assert_eq!(
+                &index.traversal_records()[index.subtree_range(0)],
+                &[0, 0x8000_0000]
+            );
+            assert!(index.subtree_range(99).is_empty());
+            index.clear();
+            index.record(0, 0, 0, 0, None, 0);
+            index.record_enter(0);
+            index.record_exit(0);
+            assert_eq!(index.subtree_ranges(), &[(0, 2)]);
+        }
     }
 
     #[test]

@@ -789,6 +789,7 @@ function compilePhaseRoutes(
     [...retained.ancestorTypes],
     [...retained.ancestorChildParentTypes],
     retained.ancestryDepth,
+    plugins.some(plugin => plans.get(plugin)?.controlFlow?.includes('skip')),
   );
   return { routes, dispatchRoutes, manifest };
 }

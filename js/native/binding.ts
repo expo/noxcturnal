@@ -139,7 +139,13 @@ interface NativeBinding {
     buildInitialRoute?: boolean,
   ) => {
     generateUid(name: string): string | null;
-    nextRoutedPacked(manifest: Buffer, rootStart?: number, rootEnd?: number): Buffer;
+    nextRoutedPacked(
+      manifest: Buffer,
+      rootStart?: number,
+      rootEnd?: number,
+      rootId?: number,
+    ): Buffer;
+    traversalIntervalsBuffer(): Buffer;
     queryGlobalsBuffer(names: string[]): Buffer;
     globalBindingReferencesBuffer(name: string): Buffer;
     queryBindingsBatch(

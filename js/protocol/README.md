@@ -9,3 +9,10 @@ The layout is private to a release. Update both sides together when changing tag
 Edit coordinates use UTF-16 to match JavaScript string offsets. Structured edit parts preserve source provenance, so flatten them only when they contain no mapping information.
 
 String transport must preserve JavaScript values that ordinary UTF-8 cannot represent, including lone surrogates. Its encoding is separate from constant evaluation, which may intentionally refuse to fold those values.
+
+Skip-capable manifests opt into structural bounds (manifest flag 10, routed shape
+flag 4). Stateless collection then adds one word to enter records after their source end:
+the exclusive subtree end in event-sequence coordinates. The existing sequence
+word is the start. Exit records preserve their enter start for later skip calls. This
+metadata is not a retention capability and must not force a retained index.
+Indexed collection leaves the shape flag unset and preserves lazy table loading.

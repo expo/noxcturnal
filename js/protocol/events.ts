@@ -27,6 +27,9 @@ export interface PackedEventBatch {
   includeExit?: boolean;
 }
 
+/** Private routed metadata: sequence is the enter bound; exits preserve it here. */
+export type TraversalEvent = NativeEvent & { traversalStart?: number; traversalEnd?: number };
+
 const EMPTY_FIELDS = Object.freeze([]) as unknown as NativeEvent['fields'];
 
 export interface RoutedEventBatch {
@@ -43,6 +46,7 @@ export interface RoutedEventBatch {
   includeScope: boolean;
   includeExit: boolean;
   includeComments: boolean;
+  includeTraversal: boolean;
 }
 
 export function decodeRoutedEnvelope(buffer: Buffer): RoutedEventBatch {
@@ -86,6 +90,7 @@ export function decodeRoutedEnvelope(buffer: Buffer): RoutedEventBatch {
     includeScope: (flags & 2) !== 0,
     includeExit: (flags & 4) !== 0,
     includeComments: (flags & 8) !== 0,
+    includeTraversal: (flags & 16) !== 0,
   };
 }
 
@@ -127,11 +132,12 @@ export function dispatchRoutedEvents(
       offset += routeCount;
       const enter = enterEvents?.[id];
       if (!enter) throw new Error(`routed exit event ${id} has no enter record`);
-      const event: NativeEvent = {
+      const event: TraversalEvent = {
         ...enter,
         sequence: sequenceWord & TAG_INDEX,
         side: 'exit',
       };
+      if (batch.includeTraversal) event.traversalStart = enter.sequence;
       onEvent?.(event);
       for (let index = routeStart + routeCount - 1; index >= routeStart; index--)
         handlers[words[index]](event);
@@ -143,24 +149,42 @@ export function dispatchRoutedEvents(
     if (!type) throw new Error('invalid routed node type');
     const start = words[offset++];
     const end = words[offset++];
+    const traversalEnd = batch.includeTraversal ? words[offset++] : undefined;
     const parentId = batch.includeParent ? words[offset++] : -1;
     const parentTypeId = batch.includeParent ? words[offset++] : -1;
     const scopeId = batch.includeScope ? words[offset++] : 0;
     const scopeParentId = batch.includeScope ? words[offset++] : -1;
     const fieldCount = words[offset++];
-    const event: NativeEvent = {
-      sequence,
-      side: 'enter',
-      id,
-      type,
-      start,
-      end,
-      parentId: parentId === -1 ? undefined : parentId,
-      parentType: parentTypeId === -1 ? undefined : NODE_TYPES[parentTypeId],
-      scopeId,
-      scopeParentId: scopeParentId === -1 ? undefined : scopeParentId,
-      fields: EMPTY_FIELDS,
-    };
+    // Separate literals keep ordinary routes unchanged and avoid adding a
+    // property backing store for every skip-capable enter event.
+    const event: TraversalEvent = batch.includeTraversal
+      ? {
+          sequence,
+          side: 'enter',
+          id,
+          type,
+          start,
+          end,
+          parentId: parentId === -1 ? undefined : parentId,
+          parentType: parentTypeId === -1 ? undefined : NODE_TYPES[parentTypeId],
+          scopeId,
+          scopeParentId: scopeParentId === -1 ? undefined : scopeParentId,
+          fields: EMPTY_FIELDS,
+          traversalEnd,
+        }
+      : {
+          sequence,
+          side: 'enter',
+          id,
+          type,
+          start,
+          end,
+          parentId: parentId === -1 ? undefined : parentId,
+          parentType: parentTypeId === -1 ? undefined : NODE_TYPES[parentTypeId],
+          scopeId,
+          scopeParentId: scopeParentId === -1 ? undefined : scopeParentId,
+          fields: EMPTY_FIELDS,
+        };
     const node = event as NativeEvent & Record<string, unknown>;
     for (let field = 0; field < fieldCount; field++) {
       const key = FIELD_KEYS[words[offset++]];

@@ -1,3 +1,4 @@
+import type { TraversalEvent } from '../protocol/events';
 import { native } from '../native/binding';
 import { EDIT_OWNER, type OwnedEdit } from './editor';
 import { CHILD_ROLES, FIELD_KEY_IDS } from '../generated/event-schema';
@@ -52,27 +53,33 @@ function patternField(type: string): 'name' | 'memberPath' | undefined {
 
 export function eventIsSkipped(event: NativeEvent, skipped: SkipState | undefined): boolean {
   if (!skipped) return false;
+  const position =
+    (event as TraversalEvent).traversalEnd != null
+      ? event.sequence
+      : skipped.intervals?.[event.id * 2];
+  if (position == null) throw new Error('missing structural skip bounds');
   const active = skipped.active;
   if (active) {
-    if (event.id > active.id && event.start >= active.start && event.end <= active.end) return true;
+    if (position > active.start && position < active.end) return true;
     if (event.side === 'exit' && event.id === active.id) {
       skipped.active = undefined;
       return false;
     }
   }
   const ranges = skipped.ranges;
-  while (skipped.cursor < ranges.length && ranges[skipped.cursor].end <= event.start) {
+  while (skipped.cursor < ranges.length && ranges[skipped.cursor].end <= position) {
     skipped.cursor++;
   }
   const range = ranges[skipped.cursor];
-  if (!range || event.start < range.start || event.end > range.end) return false;
+  if (!range || position < range.start || position >= range.end) return false;
   skipped.active = range;
-  if (event.id <= range.id) return false;
+  if (position === range.start) return false;
   return true;
 }
 
 export type SkipRange = { id: number; start: number; end: number };
 export type SkipState = {
+  intervals?: Uint32Array;
   ranges: SkipRange[];
   cursor: number;
   active?: SkipRange;
@@ -84,32 +91,39 @@ export function resetSkippedTraversal(skipped: SkipState | undefined): void {
   skipped.active = undefined;
 }
 
-function addSkippedRange(state: PathState, id: number, start: number, end: number): void {
+function addSkippedRange(
+  state: PathState,
+  id: number,
+  start: number,
+  end: number,
+  intervals?: Uint32Array,
+): void {
   const skipped = (state.skipped ??= { ranges: [], cursor: 0 });
+  if (intervals) skipped.intervals = intervals;
   const ranges = skipped.ranges;
   const last = ranges.at(-1);
   if (!last || last.end <= start) {
     const range = { id, start, end };
     ranges.push(range);
     skipped.active = range;
-    skipped.cursor = ranges.length;
+    skipped.cursor = Math.min(skipped.cursor, ranges.length - 1);
     return;
   }
   if (last.start <= start) {
-    last.id = Math.min(last.id, id);
+    // The existing interval owns the earlier traversal root.
     if (end > last.end) last.end = end;
     skipped.active = last;
-    skipped.cursor = ranges.length;
+    skipped.cursor = Math.min(skipped.cursor, ranges.length - 1);
     return;
   }
-  let index = ranges.findIndex(range => range.end >= start);
+  let index = ranges.findIndex(range => range.end > start);
   if (index < 0) index = ranges.length;
   let mergedId = id;
   let mergedStart = start;
   let mergedEnd = end;
   let removeEnd = index;
   while (removeEnd < ranges.length && ranges[removeEnd].start < mergedEnd) {
-    mergedId = Math.min(mergedId, ranges[removeEnd].id);
+    if (ranges[removeEnd].start < mergedStart) mergedId = ranges[removeEnd].id;
     mergedStart = Math.min(mergedStart, ranges[removeEnd].start);
     mergedEnd = Math.max(mergedEnd, ranges[removeEnd].end);
     removeEnd++;
@@ -117,7 +131,7 @@ function addSkippedRange(state: PathState, id: number, start: number, end: numbe
   const range = { id: mergedId, start: mergedStart, end: mergedEnd };
   ranges.splice(index, removeEnd - index, range);
   skipped.active = range;
-  skipped.cursor = index + 1;
+  skipped.cursor = Math.min(skipped.cursor, index);
 }
 
 export type PathState = { stopped: boolean; skipped?: SkipState };
@@ -721,7 +735,26 @@ export class NodePathImpl implements NativeNodePath {
   }
   skip(): void {
     this.runtime.assertControl('skip');
-    addSkippedRange(this.runtime.state, this.event.id, this.event.start, this.event.end);
+    const event = this.event as TraversalEvent;
+    if (event.traversalEnd != null) {
+      addSkippedRange(
+        this.runtime.state,
+        event.id,
+        event.traversalStart ?? event.sequence,
+        event.traversalEnd,
+      );
+    } else {
+      // Indexed routes, including projected children and ancestors, load their
+      // bulk table once on demand, never through per-node native queries.
+      const intervals = this.runtime.session.traversalIntervals();
+      addSkippedRange(
+        this.runtime.state,
+        event.id,
+        intervals[event.id * 2]!,
+        intervals[event.id * 2 + 1]!,
+        intervals,
+      );
+    }
   }
   stop(): void {
     this.runtime.assertControl('stop');
