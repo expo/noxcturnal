@@ -202,8 +202,7 @@ impl<'a> EventCollector<'a> {
             );
         }
         if self.retain_scopes && self.retention_capabilities & RETAIN_IDENTIFIERS != 0 {
-            self.retained_index
-                .record_rename_roles(kind, self.nodes, scope_id.index() as u32);
+            self.retained_index.record_rename_roles(kind, self.nodes);
         }
         self.retained_index.record_semantics(
             kind,

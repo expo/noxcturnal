@@ -4,9 +4,9 @@ use oxc_ast::AstKind;
 use oxc_semantic::{AstNodes, Scoping};
 use oxc_span::GetSpan;
 use rustc_hash::{FxHashMap, FxHashSet};
-use std::cell::OnceCell;
 #[cfg(test)]
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::cell::Cell;
+use std::cell::OnceCell;
 
 use super::value_transport::{TransportConstant, constant};
 use crate::generated::event_schema::{
@@ -18,7 +18,9 @@ use crate::protocol::manifest::ChildRoleMask;
 pub const ABSENT_ID: u32 = u32::MAX;
 
 #[cfg(test)]
-static CAPTURE_RECORDS_MATERIALIZED: AtomicUsize = AtomicUsize::new(0);
+thread_local! {
+    static CAPTURE_RECORDS_MATERIALIZED: Cell<usize> = const { Cell::new(0) };
+}
 
 /// Compact, session-owned structural facts keyed by Oxc node ID.
 ///
@@ -58,7 +60,7 @@ pub struct RetainedIndex {
     comments: Option<Vec<RetainedComment>>,
     scope_metadata: Vec<[u32; 5]>,
     rename_kinds: FxHashMap<u32, u32>,
-    exported_declarations: Vec<(u32, u32)>,
+    declaration_exports: FxHashMap<u32, u32>,
     rename_exports: OnceCell<Box<FxHashMap<u32, Vec<u32>>>>,
 }
 
@@ -379,7 +381,7 @@ impl RetainedIndex {
             comments: None,
             scope_metadata: Vec::new(),
             rename_kinds: FxHashMap::default(),
-            exported_declarations: Vec::new(),
+            declaration_exports: FxHashMap::default(),
             rename_exports: OnceCell::new(),
         }
     }
@@ -502,10 +504,29 @@ impl RetainedIndex {
         }
     }
 
-    pub fn record_rename_roles(&mut self, kind: AstKind<'_>, nodes: &AstNodes<'_>, scope_id: u32) {
-        if let AstKind::ExportDeclaration(_) = kind {
-            self.exported_declarations
-                .push((kind.node_id().index() as u32, scope_id));
+    pub fn record_rename_roles(&mut self, kind: AstKind<'_>, nodes: &AstNodes<'_>) {
+        if let AstKind::ExportDeclaration(export) = kind {
+            let export_id = kind.node_id().index() as u32;
+            // Register only names actually declared by this export. Initializer
+            // expressions, function parameters/bodies, and class bodies do not
+            // contribute exported bindings, even with coincident source anchors.
+            match &export.declaration {
+                oxc_ast::ast::Declaration::VariableDeclaration(declaration) => {
+                    for declarator in &declaration.declarations {
+                        declarator.id.all_binding_identifiers(&mut |identifier| {
+                            self.declaration_exports
+                                .insert(identifier.node_id.get().index() as u32, export_id);
+                            true
+                        });
+                    }
+                }
+                declaration => {
+                    if let Some(identifier) = declaration.id() {
+                        self.declaration_exports
+                            .insert(identifier.node_id.get().index() as u32, export_id);
+                    }
+                }
+            }
             return;
         }
         if !matches!(
@@ -520,13 +541,17 @@ impl RetainedIndex {
         }
         let role = match parent {
             AstKind::BindingProperty(property)
-                if property.shorthand && property.key.span().start == kind.span().start =>
+                if property.shorthand
+                    && property
+                        .value
+                        .get_binding_identifier()
+                        .is_some_and(|binding| binding.node_id() == kind.node_id()) =>
             {
                 1
             }
             AstKind::ObjectProperty(property) if property.shorthand => 1,
             AstKind::AssignmentTargetPropertyIdentifier(property)
-                if property.binding.span.start == kind.span().start =>
+                if property.binding.node_id() == kind.node_id() =>
             {
                 1
             }
@@ -583,29 +608,24 @@ impl RetainedIndex {
                 kind: self.rename_kinds.get(&id).copied().unwrap_or(0),
             })
             .collect();
-        let mut exports = self
+        let mut export_ids = self
             .binding_declarations(binding)
             .filter_map(|id| self.export_for_declaration(scope_id, id))
+            .collect::<Vec<_>>();
+        export_ids.dedup();
+        let exports = export_ids
+            .into_iter()
             .map(|id| NativeRenameExport {
                 start: self.starts[id as usize],
                 end: self.ends[id as usize],
             })
-            .collect::<Vec<_>>();
-        exports.dedup_by_key(|declaration| declaration.start);
+            .collect();
         NativeRenamePlan { targets, exports }
     }
 
-    /// Exports are recorded in source order. A binding declared by an export
-    /// precedes any exports nested in a namespace body, so its preceding export
-    /// must contain the declaration and belong to the same semantic scope.
     fn export_for_declaration(&self, scope: u32, declaration: u32) -> Option<u32> {
-        let start = self.starts[declaration as usize];
-        let position = self
-            .exported_declarations
-            .partition_point(|(id, _)| self.starts[*id as usize] <= start);
-        let &(id, owner_scope) = self.exported_declarations.get(position.checked_sub(1)?)?;
-        (owner_scope == scope && self.ends[declaration as usize] <= self.ends[id as usize])
-            .then_some(id)
+        let &export = self.declaration_exports.get(&declaration)?;
+        (self.scope_ids[export as usize] == scope).then_some(export)
     }
 
     pub fn rename_export_names(&self, start: u32) -> Vec<String> {
@@ -795,8 +815,8 @@ impl RetainedIndex {
         }
         struct RequestedFunction {
             id: u32,
-            start: u32,
-            end: u32,
+            scope_entry: u32,
+            scope_exit: u32,
             scope_id: u32,
             program_scope_id: u32,
             program_bindings: Option<bool>,
@@ -804,6 +824,9 @@ impl RetainedIndex {
             references: Vec<NativeCaptureReference>,
         }
 
+        // These intervals encode the scope tree, never source coordinates. Moved
+        // references and generated functions can have shared or unrelated anchors.
+        let (scope_entries, scope_exits) = scope_intervals(scope_parents);
         let mut functions = function_ids
             .iter()
             .copied()
@@ -820,8 +843,8 @@ impl RetainedIndex {
                 }
                 Some(RequestedFunction {
                     id,
-                    start: *self.starts.get(index)?,
-                    end: *self.ends.get(index)?,
+                    scope_entry: *scope_entries.get(scope_id as usize)?,
+                    scope_exit: *scope_exits.get(scope_id as usize)?,
                     scope_id,
                     program_scope_id,
                     program_bindings,
@@ -830,12 +853,14 @@ impl RetainedIndex {
                 })
             })
             .collect::<Vec<_>>();
-        functions.sort_unstable_by_key(|function| (function.start, u32::MAX - function.end));
+        functions.sort_unstable_by_key(|function| {
+            (function.scope_entry, u32::MAX - function.scope_exit)
+        });
         let mut stack = Vec::<usize>::new();
         for index in 0..functions.len() {
             while stack
                 .last()
-                .is_some_and(|parent| functions[*parent].end < functions[index].end)
+                .is_some_and(|parent| functions[*parent].scope_exit < functions[index].scope_exit)
             {
                 stack.pop();
             }
@@ -843,7 +868,6 @@ impl RetainedIndex {
             stack.push(index);
         }
 
-        let (scope_entries, scope_exits) = scope_intervals(scope_parents);
         let contains_scope = |ancestor: u32, child: u32| {
             let ancestor = ancestor as usize;
             let child_entry = scope_entries[child as usize];
@@ -855,14 +879,14 @@ impl RetainedIndex {
                 let node_id = reference.node_id();
                 let start = self.starts[node_id as usize];
                 let end = self.ends[node_id as usize];
-                let insertion = functions.partition_point(|function| function.start <= start);
+                let reference_entry = scope_entries[reference.scope_id as usize];
+                let insertion =
+                    functions.partition_point(|function| function.scope_entry <= reference_entry);
                 let mut candidate = insertion.checked_sub(1);
                 while let Some(index) = candidate {
-                    let function_end = functions[index].end;
                     let function_scope_id = functions[index].scope_id;
                     candidate = functions[index].parent;
-                    if end <= function_end
-                        && function_scope_id != binding_scope_id
+                    if function_scope_id != binding_scope_id
                         && contains_scope(function_scope_id, reference.scope_id)
                         && !contains_scope(function_scope_id, binding_scope_id)
                         && functions[index]
@@ -873,7 +897,7 @@ impl RetainedIndex {
                             })
                     {
                         #[cfg(test)]
-                        CAPTURE_RECORDS_MATERIALIZED.fetch_add(1, Ordering::Relaxed);
+                        CAPTURE_RECORDS_MATERIALIZED.with(|count| count.set(count.get() + 1));
                         functions[index].references.push(NativeCaptureReference {
                             id: node_id,
                             start,
@@ -1695,7 +1719,7 @@ impl RetainedIndex {
                         .sum::<usize>()
             })
             + self.rename_kinds.capacity() * size_of::<(u32, u32)>()
-            + self.exported_declarations.capacity() * size_of::<(u32, u32)>()
+            + self.declaration_exports.capacity() * size_of::<(u32, u32)>()
             + self.scope_metadata.capacity() * size_of::<[u32; 5]>()
             + self.type_ids.capacity() * size_of::<u32>()
             + self.starts.capacity() * size_of::<u32>()
@@ -2029,6 +2053,251 @@ mod tests {
         }
     }
 
+    fn rename_index(semantic: &oxc_semantic::Semantic<'_>) -> RetainedIndex {
+        let nodes = semantic.nodes();
+        let mut index = RetainedIndex::with_node_count(nodes.len(), None, false, false);
+        for (id, node) in nodes.iter_enumerated() {
+            let kind = node.kind();
+            let id = id.index() as u32;
+            let scope = node.scope_id().index() as u32;
+            index.record(
+                id,
+                crate::generated::event_schema::ast_kind_protocol_id(kind),
+                kind.span().start,
+                kind.span().end,
+                (id != 0).then(|| nodes.parent_id(kind.node_id()).index() as u32),
+                scope,
+            );
+            index.record_rename_roles(kind, nodes);
+            index.record_semantics(kind, semantic.scoping(), id, scope, true, false);
+        }
+        index
+    }
+
+    #[test]
+    fn shorthand_rename_roles_follow_targets_instead_of_source_anchors() {
+        use oxc_ast_visit::VisitMut;
+        use oxc_span::Span;
+        struct Anchors(bool);
+        impl<'a> VisitMut<'a> for Anchors {
+            fn visit_span(&mut self, span: &mut Span) {
+                *span = if self.0 {
+                    Span::default()
+                } else {
+                    Span::new(1_000 - span.end, 1_000 - span.start)
+                };
+            }
+        }
+        for (source, shorthand_count, fallback_role) in [
+            ("let fallback=1;function f({value=fallback}){}", 1, 0),
+            ("let value,fallback=1;({value=fallback}=input);", 1, 0),
+            ("function f({value}){}", 1, 0),
+            ("let value;({value}=input);", 1, 0),
+            ("let fallback=1;function f({source:value=fallback}){}", 0, 0),
+            (
+                "let value,fallback=1;({source:value=fallback}=input);",
+                0,
+                0,
+            ),
+            (
+                "let fallback=1;function f({outer:{value=fallback}}){}",
+                1,
+                0,
+            ),
+            ("let fallback=1;function f({value={fallback}}){}", 2, 1),
+        ] {
+            let mut expected = None;
+            for anchors in ["parsed", "shared", "reversed"] {
+                let allocator = oxc_allocator::Allocator::default();
+                let mut parsed =
+                    oxc_parser::Parser::new(&allocator, source, oxc_span::SourceType::mjs())
+                        .parse();
+                assert!(parsed.diagnostics.is_empty());
+                match anchors {
+                    "shared" => Anchors(true).visit_program(&mut parsed.program),
+                    "reversed" => Anchors(false).visit_program(&mut parsed.program),
+                    _ => {}
+                }
+                let built = oxc_semantic::SemanticBuilder::new()
+                    .with_build_nodes(true)
+                    .build(&parsed.program);
+                assert!(built.diagnostics.is_empty());
+                let index = rename_index(&built.semantic);
+                for (id, node) in built.semantic.nodes().iter_enumerated() {
+                    if let AstKind::IdentifierReference(reference) = node.kind()
+                        && reference.name == "fallback"
+                    {
+                        assert_eq!(
+                            index
+                                .rename_kinds
+                                .get(&(id.index() as u32))
+                                .copied()
+                                .unwrap_or(0),
+                            fallback_role,
+                            "fallback: {anchors}: {source}"
+                        );
+                    }
+                }
+                assert_eq!(
+                    index
+                        .rename_kinds
+                        .values()
+                        .filter(|role| **role == 1)
+                        .count(),
+                    shorthand_count,
+                    "shorthand targets: {anchors}: {source}"
+                );
+                if let Some(expected) = &expected {
+                    assert_eq!(&index.rename_kinds, expected, "{anchors}: {source}");
+                } else {
+                    expected = Some(index.rename_kinds);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn rename_export_ownership_uses_ast_identity_with_shared_or_moved_anchors() {
+        use oxc_ast_visit::VisitMut;
+        use oxc_span::Span;
+        struct SharedAnchors;
+        impl<'a> VisitMut<'a> for SharedAnchors {
+            fn visit_span(&mut self, span: &mut Span) {
+                *span = Span::default();
+            }
+        }
+        for mode in ["parsed", "shared", "moved"] {
+            let source = "export var value=1,sibling=2; var value; export function read(parameter){let local;return parameter;} export class Model {} const plain=3;";
+            let allocator = oxc_allocator::Allocator::default();
+            let mut parsed =
+                oxc_parser::Parser::new(&allocator, source, oxc_span::SourceType::mjs()).parse();
+            assert!(parsed.diagnostics.is_empty());
+            if mode == "shared" {
+                SharedAnchors.visit_program(&mut parsed.program);
+            }
+            if mode == "moved" {
+                parsed.program.body.reverse();
+            }
+            let semantic = oxc_semantic::SemanticBuilder::new()
+                .with_build_nodes(true)
+                .build(&parsed.program)
+                .semantic;
+            let nodes = semantic.nodes();
+            let index = rename_index(&semantic);
+            let mut expected_exports = FxHashMap::default();
+            for (id, node) in nodes.iter_enumerated() {
+                let kind = node.kind();
+                let id = id.index() as u32;
+                if let AstKind::ExportDeclaration(export) = kind {
+                    let label = match &export.declaration {
+                        oxc_ast::ast::Declaration::VariableDeclaration(_) => "variables",
+                        oxc_ast::ast::Declaration::FunctionDeclaration(_) => "function",
+                        oxc_ast::ast::Declaration::ClassDeclaration(_) => "class",
+                        _ => unreachable!(),
+                    };
+                    expected_exports.insert(label, id);
+                }
+            }
+            for (id, node) in nodes.iter_enumerated() {
+                let AstKind::BindingIdentifier(identifier) = node.kind() else {
+                    continue;
+                };
+                let scope = semantic
+                    .scoping()
+                    .symbol_scope_id(identifier.symbol_id.get().unwrap())
+                    .index() as u32;
+                let expected = match identifier.name.as_str() {
+                    "value" if matches!(nodes.parent_kind(id), AstKind::VariableDeclarator(declarator) if declarator.init.is_some()) => {
+                        Some(expected_exports["variables"])
+                    }
+                    "sibling" => Some(expected_exports["variables"]),
+                    "read" => Some(expected_exports["function"]),
+                    "Model" => Some(expected_exports["class"]),
+                    _ => None,
+                };
+                assert_eq!(
+                    index.export_for_declaration(scope, id.index() as u32),
+                    expected,
+                    "{mode}: {}",
+                    identifier.name
+                );
+            }
+            let scope = semantic.scoping().root_scope_id().index() as u32;
+            assert_eq!(index.rename_plan("value", scope).exports.len(), 1, "{mode}");
+            assert!(
+                index.rename_plan("plain", scope).exports.is_empty(),
+                "{mode}"
+            );
+            if mode != "shared" {
+                let start = index.start(expected_exports["variables"]);
+                assert_eq!(index.rename_export_names(start), ["sibling", "value"]);
+            }
+        }
+    }
+
+    #[test]
+    fn rename_export_ownership_preserves_typescript_declarations_and_overloads() {
+        use oxc_ast_visit::VisitMut;
+        use oxc_span::Span;
+        struct SharedAnchors;
+        impl<'a> VisitMut<'a> for SharedAnchors {
+            fn visit_span(&mut self, span: &mut Span) {
+                *span = Span::default();
+            }
+        }
+        for shared in [false, true] {
+            let source = "export namespace N { export let value=1; export function read(){return value;} } export enum Choice { A } export type Pair<T> = {value:T}; export interface Item<T> {value:T;} export import Alias = N; export function overloaded(x:string):string; export function overloaded(x:number):number; export function overloaded(x:any){return x;}";
+            let allocator = oxc_allocator::Allocator::default();
+            let source_type =
+                oxc_span::SourceType::from_path(std::path::Path::new("input.ts")).unwrap();
+            let mut parsed = oxc_parser::Parser::new(&allocator, source, source_type).parse();
+            assert!(parsed.diagnostics.is_empty());
+            if shared {
+                SharedAnchors.visit_program(&mut parsed.program);
+            }
+            let result = oxc_semantic::SemanticBuilder::new()
+                .with_build_nodes(true)
+                .build(&parsed.program);
+            assert!(result.diagnostics.is_empty());
+            let semantic = result.semantic;
+            let index = rename_index(&semantic);
+            let root = semantic.scoping().root_scope_id().index() as u32;
+            for name in ["N", "Choice", "Pair", "Item", "Alias"] {
+                assert_eq!(
+                    index.rename_plan(name, root).exports.len(),
+                    1,
+                    "shared={shared}: {name}"
+                );
+            }
+            // Each overload is a distinct declaration even when all text ranges coincide.
+            assert_eq!(index.rename_plan("overloaded", root).exports.len(), 3);
+            for (id, node) in semantic.nodes().iter_enumerated() {
+                let AstKind::BindingIdentifier(identifier) = node.kind() else {
+                    continue;
+                };
+                let scope = semantic
+                    .scoping()
+                    .symbol_scope_id(identifier.symbol_id.get().unwrap())
+                    .index() as u32;
+                match identifier.name.as_str() {
+                    "value" | "read" => {
+                        let export = index
+                            .export_for_declaration(scope, id.index() as u32)
+                            .unwrap();
+                        assert_eq!(index.scope_ids[export as usize], scope);
+                        assert_ne!(scope, root);
+                    }
+                    "T" | "x" => assert!(
+                        index
+                            .export_for_declaration(scope, id.index() as u32)
+                            .is_none()
+                    ),
+                    _ => {}
+                }
+            }
+        }
+    }
+
     #[test]
     fn semantic_uid_names_use_bits_instead_of_another_string_inventory() {
         let source = (0..1_000)
@@ -2297,6 +2566,112 @@ mod tests {
     }
 
     #[test]
+    fn captures_follow_scope_ancestry_with_shared_and_moved_anchors() {
+        use oxc_ast_visit::VisitMut;
+        use oxc_span::Span;
+        struct Anchors(bool);
+        impl<'a> VisitMut<'a> for Anchors {
+            fn visit_span(&mut self, span: &mut Span) {
+                *span = if self.0 {
+                    Span::default()
+                } else {
+                    Span::new(1_000 - span.end, 1_000 - span.start)
+                };
+            }
+        }
+        struct MovedReferences;
+        impl<'a> VisitMut<'a> for MovedReferences {
+            fn visit_identifier_reference(
+                &mut self,
+                id: &mut oxc_ast::ast::IdentifierReference<'a>,
+            ) {
+                id.span = Span::default();
+            }
+        }
+        let source = "let global=1;function outer(param){let local=2;function inner(){return [global,param,local];}const arrow=()=>inner();return arrow;}function sibling(){return global;}";
+        for anchors in ["parsed", "shared", "moved", "reversed"] {
+            let allocator = oxc_allocator::Allocator::default();
+            let mut parsed =
+                oxc_parser::Parser::new(&allocator, source, oxc_span::SourceType::mjs()).parse();
+            assert!(parsed.diagnostics.is_empty());
+            match anchors {
+                "shared" => Anchors(true).visit_program(&mut parsed.program),
+                "moved" => MovedReferences.visit_program(&mut parsed.program),
+                "reversed" => Anchors(false).visit_program(&mut parsed.program),
+                _ => {}
+            }
+            let semantic = oxc_semantic::SemanticBuilder::new()
+                .with_build_nodes(true)
+                .build(&parsed.program)
+                .semantic;
+            let mut index = rename_index(&semantic);
+            let mut functions = FxHashMap::default();
+            for (id, node) in semantic.nodes().iter_enumerated() {
+                let (name, scope_id) = match node.kind() {
+                    AstKind::Function(function) => (
+                        function.id.as_ref().unwrap().name.as_str(),
+                        function.scope_id(),
+                    ),
+                    AstKind::ArrowFunctionExpression(arrow) => ("arrow", arrow.scope_id()),
+                    _ => continue,
+                };
+                index.scope_ids[id.index()] = scope_id.index() as u32;
+                functions.insert(name, id.index() as u32);
+            }
+            let scopes = semantic.scoping();
+            let parents = scopes
+                .scope_descendants_from_root()
+                .map(|id| {
+                    scopes
+                        .scope_parent_id(id)
+                        .map_or(ABSENT_ID, |id| id.index() as u32)
+                })
+                .collect::<Vec<_>>();
+            let ids = [
+                functions["sibling"],
+                functions["inner"],
+                functions["outer"],
+                functions["arrow"],
+            ];
+            for filter in [None, Some(true), Some(false)] {
+                let groups = index.captures_batch(&ids, &[filter; 4], &parents);
+                assert_eq!(groups.len(), 4);
+                for (name, expected) in [
+                    ("outer", vec!["global"]),
+                    ("inner", vec!["global", "local", "param"]),
+                    ("arrow", vec!["inner"]),
+                    ("sibling", vec!["global"]),
+                ] {
+                    let group = groups
+                        .iter()
+                        .find(|group| group.function_id == functions[name])
+                        .unwrap();
+                    let mut actual = group
+                        .references
+                        .iter()
+                        .map(|reference| reference.name.as_str())
+                        .collect::<Vec<_>>();
+                    actual.sort_unstable();
+                    let expected = expected
+                        .into_iter()
+                        .filter(|name| filter.is_none_or(|program| program == (*name == "global")))
+                        .collect::<Vec<_>>();
+                    assert_eq!(actual, expected, "{anchors}, {name}, {filter:?}");
+                    for reference in &group.references {
+                        assert_eq!(
+                            (reference.start, reference.end),
+                            (
+                                index.starts[reference.id as usize],
+                                index.ends[reference.id as usize]
+                            )
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
     fn capture_batch_groups_many_functions() {
         const COUNT: usize = 128;
         let mut index = RetainedIndex {
@@ -2346,14 +2721,14 @@ mod tests {
         assert_eq!(groups.len(), COUNT);
         assert!(groups.iter().all(|group| group.references.len() == 1));
 
-        CAPTURE_RECORDS_MATERIALIZED.store(0, Ordering::Relaxed);
+        CAPTURE_RECORDS_MATERIALIZED.set(0);
         let filtered = index.captures_batch(&[0], &[Some(false)], &scope_parents);
         assert!(filtered[0].references.is_empty());
-        assert_eq!(CAPTURE_RECORDS_MATERIALIZED.load(Ordering::Relaxed), 0);
+        assert_eq!(CAPTURE_RECORDS_MATERIALIZED.get(), 0);
 
         let retained = index.captures_batch(&[0], &[Some(true)], &scope_parents);
         assert_eq!(retained[0].references.len(), 1);
-        assert_eq!(CAPTURE_RECORDS_MATERIALIZED.load(Ordering::Relaxed), 1);
+        assert_eq!(CAPTURE_RECORDS_MATERIALIZED.get(), 1);
     }
 
     #[test]
