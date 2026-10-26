@@ -9,3 +9,8 @@ A session retains the facts requested by the phase's visitor contracts. It suppo
 The input parse can serve selection and function-map collection before it is consumed by traversal or validation. Do not reuse consumed session or parsed-program handles.
 
 Reuse indexes only when the source and requested facts still match. A no-edit phase can retain its index, while changes that invalidate bindings require new semantic analysis. Source-map failures remain fatal even when code generation succeeded.
+
+Path-owned traversals select exact retained subtrees by node ID and tape interval.
+The separate source-range routing API keeps its coordinate-filtering contract;
+identical spans can include multiple nodes there. Nested traversal and
+`subscribeWithin` must use the node-root route, including its own enter/exit events.

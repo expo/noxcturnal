@@ -469,8 +469,7 @@ export function createDispatcher(
           const compiled = services.compileNestedVisitor(nested);
           replayCustomRouted(
             session.nextRoutedPacked(services.nestedManifest(plugin, plans.get(plugin), compiled), {
-              start: target.start,
-              end: target.end,
+              id: target.id,
             }),
             nested,
             plugin,
@@ -484,7 +483,7 @@ export function createDispatcher(
       widen(target, types, scopeOnly) {
         entry.delivered ??= new Map();
         const expanded = expandSubscriptions(types);
-        const root = scopeOnly ? undefined : { start: target.start, end: target.end };
+        const root = scopeOnly ? undefined : { id: target.id };
         const filter = (candidate: NativeEvent) =>
           candidate.sequence > target.sequence &&
           (!scopeOnly || candidate.scopeId === target.scopeId);
@@ -633,7 +632,7 @@ export function createDispatcher(
     entry: DispatcherEntry,
     context: PluginContext,
     types: readonly string[],
-    root: { start: number; end: number } | undefined,
+    root: { id: number } | undefined,
     filter: (event: NativeEvent) => boolean,
   ): void => {
     const pluginIndex = activePlugins.indexOf(plugin);

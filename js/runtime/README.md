@@ -20,3 +20,17 @@ an edit commit or reparse. Source ranges remain the correct coordinates for text
 edits and source fragments because every plugin in the phase observes that same
 immutable input. They do not identify nodes in a native AST after structural
 rewriting; see [native identity rules](../../src/preflight/README.md#identity-during-rewriting).
+
+The `skip` contract requests structural bounds in routed events, without forcing
+a retained index. Stateless collection backpatches exclusive subtree ends during
+the same walk, retaining only emitted ancestors until they close. Indexed routes
+load their bulk interval table only when skip is called. These bounds are opaque
+within their session;
+never compare them with node IDs or source coordinates. Projected children or
+ancestors may have only summaries; their contracts already retain an index, and
+skipping them loads one bulk interval table. Descendant checks and replay never
+use source ranges or per-node native queries. Siblings can share source spans.
+
+`path.traverse` and `subscribeWithin` send the owning node ID to native routing.
+Their bounds are structural, including when parents and siblings share the same
+source coordinates. Explicit coordinate queries keep their range semantics.

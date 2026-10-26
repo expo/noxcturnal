@@ -305,3 +305,89 @@ test('bounded nested enter and exit routes hydrate ancestors outside the queried
   expect(result.code).toBe(source);
   expect(seen).toEqual(['enter:outer', 'enter:inner', 'exit:value', 'exit:inner', 'exit:outer']);
 });
+
+for (const source of [
+  'import {value} from "pkg";value;',
+  'const value=1;const object={value};',
+  'const {value}=input;value;',
+  'const value=1;export {value};',
+]) {
+  test.each([false, true])(
+    `nested traversal stays in the selected node: ${source}, exits=%s`,
+    exits => {
+      const entered: number[] = [];
+      const exited: number[] = [];
+      let target: number | undefined;
+      const nested = [
+        defineVisitor(
+          'Identifier',
+          {},
+          exits
+            ? {
+                enter: path => {
+                  entered.push(path.node.id);
+                },
+                exit: path => {
+                  exited.push(path.node.id);
+                },
+              }
+            : path => {
+                entered.push(path.node.id);
+              },
+        ),
+        defineVisitor('ImportSpecifier|ExportSpecifier', {}, path => {
+          entered.push(path.node.id);
+        }),
+      ];
+      const plugin = defineNativePlugin({
+        name: 'nested-identity',
+        visitors: [
+          defineVisitor('Identifier', { controlFlow: ['nested-traverse'], nested }, path => {
+            if (target == null && path.start === source.indexOf('{') + 1) {
+              target = path.node.id;
+              path.traverse(nested);
+            }
+          }),
+        ],
+      });
+      const result = transform(
+        source,
+        'input.mjs',
+        defineNativePipeline({ phases: [{ name: 'nested', plugins: [plugin] }] }),
+      );
+      expect(result.status).toBe('complete');
+      expect(target).toBeDefined();
+      expect(entered).toEqual([target]);
+      expect(exited).toEqual(exits ? [target] : []);
+    },
+  );
+
+  test(`within subscription excludes coincident siblings: ${source}`, () => {
+    const seen: number[] = [];
+    let immediate: number[] | undefined;
+    let selected = false;
+    const plugin = defineNativePlugin({
+      name: 'within-identity',
+      visitors: [
+        defineVisitor('Identifier', { controlFlow: ['dynamic-subscriptions'] }, path => {
+          seen.push(path.node.id);
+          if (!selected && path.start === source.indexOf('{') + 1) {
+            selected = true;
+            const before = seen.length;
+            path.subscribeWithin('Identifier');
+            immediate = seen.slice(before);
+          }
+        }),
+      ],
+    });
+    const result = transform(
+      source,
+      'input.mjs',
+      defineNativePipeline({ phases: [{ name: 'within', plugins: [plugin] }] }),
+    );
+    expect(result.status).toBe('complete');
+    expect(immediate).toEqual([]);
+    expect(seen.length).toBeGreaterThanOrEqual(3);
+    expect(new Set(seen).size).toBe(seen.length);
+  });
+}

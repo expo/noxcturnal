@@ -5,7 +5,7 @@ use crate::generated::event_schema::field_key_name;
 use crate::protocol::manifest::{
     CompiledManifest, CompiledPredicate, CompiledRoute, CompiledScalar, VisitSide,
 };
-use crate::protocol::routed::{PackedWords, encode_routed_envelope};
+use crate::protocol::routed::{PackedWords, encode_routed_envelope, routed_shape_flags};
 use crate::semantic::retained_index::{RetainedFieldValue, RetainedIndex};
 
 use super::RoutedCounts;
@@ -21,6 +21,31 @@ pub(crate) fn routed_buffer_from_index(
         || 0..index.traversal_records().len(),
         |(start, end)| index.traversal_range(start, end),
     );
+    routed_buffer_from_range(manifest, index, scope_parents, root, range)
+}
+
+pub(crate) fn routed_subtree_buffer_from_index(
+    manifest: &CompiledManifest,
+    index: &RetainedIndex,
+    scope_parents: &[u32],
+    root_id: u32,
+) -> Result<Buffer> {
+    routed_buffer_from_range(
+        manifest,
+        index,
+        scope_parents,
+        None,
+        index.subtree_range(root_id),
+    )
+}
+
+fn routed_buffer_from_range(
+    manifest: &CompiledManifest,
+    index: &RetainedIndex,
+    scope_parents: &[u32],
+    root: Option<(u32, u32)>,
+    range: std::ops::Range<usize>,
+) -> Result<Buffer> {
     let mut writer = RetainedRouteWriter::with_capacity(range.len().saturating_mul(8));
     if range.start > 0 {
         writer.sequence = index.traversal_sequence_before(
@@ -271,7 +296,7 @@ impl RetainedRouteWriter {
                 strings[id as usize] = value;
             }
             return encode_routed_envelope(
-                manifest,
+                routed_shape_flags(manifest, false),
                 node_count,
                 strings,
                 data,
@@ -382,7 +407,7 @@ impl RetainedRouteWriter {
             strings[id as usize] = value;
         }
         encode_routed_envelope(
-            manifest,
+            routed_shape_flags(manifest, false),
             node_count,
             strings,
             data,

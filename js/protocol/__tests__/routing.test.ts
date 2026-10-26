@@ -921,3 +921,71 @@ test('retained child, inspection and node responses use independent local string
     assert.throws(() => session.inspectPackedBuffer([]), /session-closed/);
   }
 });
+
+test('structural bounds are opt-in and Program-only collection closes at the full node count', () => {
+  const source = 'function outer(value){return inner(value)} trailing;';
+  for (const includeTraversal of [false, true]) {
+    for (const programOnly of [false, true]) {
+      const routes = (programOnly ? ['Program'] : ['Program', 'Identifier'])
+        .flatMap(nodeType => (['enter', 'exit'] as const).map(side => ({ nodeType, side })))
+        .map((route, id) => ({
+          ...route,
+          id,
+          pluginId: 0,
+          order: 0,
+          predicates: {},
+          payloadFields: [],
+        }));
+      const manifest = packRouteManifest(
+        routes,
+        false,
+        false,
+        0,
+        {},
+        {},
+        {},
+        [],
+        [],
+        0,
+        includeTraversal,
+      );
+      const batch = decodeRoutedEnvelope(
+        native.materializeRoutedBuffer(source, 'input.js', manifest),
+      );
+      const events: import('../events').TraversalEvent[] = [];
+      dispatchRoutedEvents(
+        batch,
+        routes.map(() => event => {
+          events.push(event);
+        }),
+      );
+      assert.equal(batch.includeTraversal, includeTraversal);
+      assert.equal(events[0].type, 'Program');
+      assert.ok(batch.nodeCount > 10);
+      for (const event of events) {
+        if (includeTraversal) {
+          const start = event.traversalStart ?? event.sequence;
+          assert.ok(start < event.traversalEnd!);
+          assert.ok(event.traversalEnd! <= events[0].traversalEnd!);
+        } else {
+          assert.equal(event.traversalStart, undefined);
+          assert.equal(event.traversalEnd, undefined);
+        }
+      }
+      const roots = events.filter(event => event.type === 'Program');
+      assert.equal(roots.length, 2);
+      for (const root of roots) {
+        assert.equal(root.traversalStart, includeTraversal && root.side === 'exit' ? 0 : undefined);
+        assert.equal(root.traversalEnd, includeTraversal ? roots[1].sequence : undefined);
+        if (programOnly && includeTraversal) assert.equal(root.traversalEnd, batch.nodeCount);
+      }
+    }
+  }
+});
+
+test('retention capabilities cannot alias the structural-bounds flag', () => {
+  assert.throws(
+    () => packRouteManifest([], false, false, 1 << 8),
+    /invalid retention capabilities/,
+  );
+});

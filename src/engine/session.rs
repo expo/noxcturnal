@@ -14,7 +14,7 @@ use crate::semantic::retained_index::{
 use crate::syntax::source_text::UidAllocator;
 
 use super::collect::{materialize_with_scope_parents, parse_program_body_offsets};
-use super::retained::routed_buffer_from_index;
+use super::retained::{routed_buffer_from_index, routed_subtree_buffer_from_index};
 use super::{MaterializedSessionParts, decode_route_manifest};
 
 #[napi(object)]
@@ -131,8 +131,24 @@ impl NativeIndexedSession {
         manifest: Buffer,
         root_start: Option<u32>,
         root_end: Option<u32>,
+        root_id: Option<u32>,
     ) -> Result<Buffer> {
         self.ensure_open()?;
+        if let Some(root_id) = root_id {
+            if root_start.is_some() || root_end.is_some() {
+                return Err(Error::new(
+                    Status::InvalidArg,
+                    "node root cannot be combined with a source range",
+                ));
+            }
+            let manifest = decode_route_manifest(&manifest)?;
+            return routed_subtree_buffer_from_index(
+                &manifest,
+                &self.retained_index,
+                &self.scope_parents,
+                root_id,
+            );
+        }
         // The precompiled initial tape is moved out on its first request; afterwards every
         // request recomputes from the retained index, so no served flag is needed.
         if root_start.is_none() && root_end.is_none() && self.initial_routed_buffer.is_some() {
@@ -407,8 +423,14 @@ impl NativeIndexedSession {
             .filter(|parent| *parent != u32::MAX))
     }
 
-    /// The complete scope-parent table as little-endian u32 words, so JavaScript can
-    /// perform scope-chain walks without one N-API call per level.
+    /// Bulk traversal intervals for declared control-flow capabilities.
+    #[napi]
+    pub fn traversal_intervals_buffer(&self) -> Result<Buffer> {
+        self.ensure_open()?;
+        Ok(self.retained_index.traversal_intervals_buffer())
+    }
+
+    /// The complete scope-parent table avoids one N-API call per scope-chain level.
     #[napi]
     pub fn scope_parents_buffer(&self) -> Result<Buffer> {
         self.ensure_open()?;

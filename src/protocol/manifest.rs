@@ -46,6 +46,7 @@ pub(crate) struct CompiledManifest {
     pub(crate) include_parent: bool,
     pub(crate) include_scope: bool,
     pub(crate) include_exit: bool,
+    pub(crate) include_traversal: bool,
     pub(crate) retention_capabilities: u32,
     pub(crate) child_role_mask_by_parent_type: Vec<ChildRoleMask>,
     /// Union of route payload/predicate and retained-plan fields per node type,
@@ -107,7 +108,7 @@ pub(crate) fn decode_route_manifest(
         ));
     }
     let flags = word(1);
-    if flags & !0x3ff != 0 {
+    if flags & !0x7ff != 0 {
         return Err(Error::new(
             Status::InvalidArg,
             "unknown routed manifest flags",
@@ -551,7 +552,8 @@ pub(crate) fn decode_route_manifest(
         include_parent,
         include_scope,
         include_exit,
-        retention_capabilities: flags >> 2,
+        include_traversal: flags & (1 << 10) != 0,
+        retention_capabilities: (flags >> 2) & 0xff,
         child_role_mask_by_parent_type,
         merged_field_mask_by_type,
         ancestor_field_mask_by_type,
