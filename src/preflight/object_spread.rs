@@ -59,6 +59,10 @@ pub(super) fn run<'a>(
 
 /// Exact AST origins, rather than a source-text prefix: other transforms can
 /// generate calls whose larger spans start at the same JSX element.
+// Source-origin classification, deliberately not a unique live-node index:
+// Oxc replaces JSX nodes with calls, so their NodeIds cannot link the two trees.
+// Several generated nodes may inherit the same origin; only eligible props calls
+// are selected below. Keep this distinct from transform mutation bookkeeping.
 #[derive(Default)]
 pub(super) struct JsxOrigins(FxHashSet<Span>);
 

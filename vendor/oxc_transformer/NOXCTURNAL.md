@@ -13,6 +13,10 @@ archive omits it.
 
 Local patches:
 
+- `common/helper_loader.rs` and `lib.rs`: return the exact semantic reference IDs
+  created for external helper objects, so host materialization does not infer
+  helper ownership from a name or synthetic source anchor.
+
 - `typescript/class.rs`: initialize parameter properties and loose fields after a
   successful try-wrapped or conditional super call. Keep one initializer AST and
   reparent its scopes instead of cloning reference/scope identities.
@@ -73,3 +77,7 @@ infer index-file display names. Development fragments omit optional receiver
 metadata; source locations use sparse JavaScript/UTF-16 checkpoints. The transform
 result exposes its effective JSX runtime so local classic props completion honors
 runtime directives without implementing a second directive parser.
+
+Runtime helper loading exposes the generated binding IDs alongside external helper
+reference IDs, so host loose-rest completion can select imports and requires without
+matching source anchors or user-written module strings.

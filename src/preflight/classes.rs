@@ -33,7 +33,7 @@ use crate::generated::inline_helpers::{
 use crate::preflight::helpers::CustomHelperRequests;
 
 pub(super) struct AstPlan {
-    direct: FxHashMap<(u32, u32), DirectClassPlan>,
+    direct: FxHashMap<NodeId, DirectClassPlan>,
     helper_requests: Option<ClassHelperPlan>,
 }
 
@@ -46,7 +46,7 @@ struct DirectClassPlan {
     new_target_name: Option<String>,
     super_call_name: Option<String>,
     private_keys: FxHashMap<String, (String, String)>,
-    computed_keys: FxHashMap<(u32, u32), String>,
+    computed_keys: FxHashMap<NodeId, String>,
     private_methods: FxHashMap<String, String>,
     initializer_name: String,
     constructor_parameters: Vec<String>,
@@ -70,21 +70,24 @@ struct ClassFacts {
 
 fn collect_class_facts(semantic: &Semantic<'_>) -> FxHashMap<NodeId, ClassFacts> {
     let mut facts = FxHashMap::default();
-    let mut active = Vec::<(NodeId, u32)>::new();
-    for (node_id, node) in semantic.nodes().iter_enumerated() {
-        let start = node.kind().span().start;
-        while active.last().is_some_and(|(_, end)| start >= *end) {
-            active.pop();
+    let nodes = semantic.nodes();
+    let mut ancestry = Vec::<(NodeId, Option<NodeId>)>::new();
+    for (node_id, node) in nodes.iter_enumerated() {
+        let parent = nodes.parent_id(node_id);
+        while ancestry.last().is_some_and(|(id, _)| *id != parent) {
+            ancestry.pop();
         }
-        if let AstKind::Class(class) = node.kind() {
+        let owner = if matches!(node.kind(), AstKind::Class(_)) {
             facts.insert(node_id, ClassFacts::default());
-            active.push((node_id, class.span.end));
-            continue;
-        }
-        let Some((class_id, _)) = active.last() else {
+            Some(node_id)
+        } else {
+            ancestry.last().and_then(|(_, owner)| *owner)
+        };
+        ancestry.push((node_id, owner));
+        let Some(class_id) = owner else {
             continue;
         };
-        let class_facts = facts.get_mut(class_id).unwrap();
+        let class_facts = facts.get_mut(&class_id).unwrap();
         match node.kind() {
             AstKind::Super(_) => class_facts.super_reference_ids.push(node_id),
             AstKind::PrivateInExpression(_) => class_facts.has_private_in = true,
@@ -219,9 +222,9 @@ fn direct_class_candidates(
     private_in_loose: Option<bool>,
     helper_names: &ClassHelperNames,
     reserved: &mut FxHashSet<String>,
-) -> FxHashMap<(u32, u32), DirectClassPlan> {
+) -> FxHashMap<NodeId, DirectClassPlan> {
     let nodes = semantic.nodes();
-    let mut direct: FxHashMap<(u32, u32), DirectClassPlan> = FxHashMap::default();
+    let mut direct: FxHashMap<NodeId, DirectClassPlan> = FxHashMap::default();
     for (node_id, node) in nodes.iter_enumerated() {
         let AstKind::Class(class) = node.kind() else {
             continue;
@@ -266,12 +269,14 @@ fn direct_class_candidates(
             if suspension.0 {
                 for ancestor in nodes.ancestor_ids(node_id) {
                     if let AstKind::Class(parent) = nodes.kind(ancestor)
-                        && let Some(plan) = direct.get(&(parent.span.start, parent.span.end))
+                        && let Some(plan) = direct.get(&ancestor)
                         && parent.body.body.iter().any(|element| {
                             element.computed()
                                 && element.property_key().is_some_and(|key| {
-                                    let span = key.span();
-                                    span.start <= class.span.start && span.end >= class.span.end
+                                    // The class can be the computed key itself.
+                                    let key_id = key.node_id();
+                                    key_id == node_id
+                                        || nodes.ancestor_ids(node_id).any(|id| id == key_id)
                                 })
                         })
                     {
@@ -323,10 +328,9 @@ fn direct_class_candidates(
             || reserve("_Class", reserved),
             |identifier| identifier.name.to_string(),
         );
-        // This is an internal placeholder that is replaced with the original
-        // heritage expression after lowering. It must not consume `_super`:
-        // the legacy general-derived template reserves that spelling for its
-        // local constructor thunk.
+        // This spelling is only a seed. prepare_ast reserves the actual
+        // parameter after member name planning. Keep `_super` available for
+        // the legacy general-derived template's local constructor thunk.
         let super_name =
             derived.then(|| format!("__nox_super_{}_{}", class.span.start, class.span.end));
         let receiver_name = derived.then(|| local_name("_this", reserved));
@@ -354,11 +358,14 @@ fn direct_class_candidates(
                 ClassElement::MethodDefinition(method) => &method.key,
                 ClassElement::PropertyDefinition(property) => &property.key,
                 ClassElement::AccessorProperty(accessor) => {
-                    let synthetic = format!("\0accessor:{}", accessor.span.start);
+                    let synthetic = format!("\0accessor:{}", accessor.node_id.get().index());
                     private_keys.entry(synthetic).or_insert_with(|| {
                         (
                             reserve("_accessor", reserved),
-                            format!("__accessor_{}_{}", name, accessor.span.start),
+                            reserve(
+                                &format!("__accessor_{}_{}", name, accessor.span.start),
+                                reserved,
+                            ),
                         )
                     });
                     &accessor.key
@@ -380,22 +387,13 @@ fn direct_class_candidates(
         for element in &class.body.body {
             match element {
                 ClassElement::PropertyDefinition(property) if property.computed => {
-                    computed_keys.insert(
-                        (property.span.start, property.span.end),
-                        reserve("_key", reserved),
-                    );
+                    computed_keys.insert(property.node_id.get(), reserve("_key", reserved));
                 }
                 ClassElement::MethodDefinition(method) if method.computed => {
-                    computed_keys.insert(
-                        (method.span.start, method.span.end),
-                        reserve("_key", reserved),
-                    );
+                    computed_keys.insert(method.node_id.get(), reserve("_key", reserved));
                 }
                 ClassElement::AccessorProperty(accessor) if accessor.computed => {
-                    computed_keys.insert(
-                        (accessor.span.start, accessor.span.end),
-                        reserve("_key", reserved),
-                    );
+                    computed_keys.insert(accessor.node_id.get(), reserve("_key", reserved));
                 }
                 _ => {}
             }
@@ -409,7 +407,7 @@ fn direct_class_candidates(
             usage.visit_class_body(&class.body);
         }
         direct.insert(
-            (class.span.start, class.span.end),
+            node_id,
             DirectClassPlan {
                 name,
                 inferred_name,
@@ -517,7 +515,7 @@ pub(super) fn prepare_ast(
         check_in_rhs_runtime: reserve("_checkInRHS2", &mut reserved),
         private_runtime: reserve("_classPrivateFieldLooseBase2", &mut reserved),
     };
-    let direct = direct_class_candidates(
+    let mut direct = direct_class_candidates(
         semantic,
         &class_facts,
         lower_all_classes,
@@ -528,7 +526,24 @@ pub(super) fn prepare_ast(
         &helper_names,
         &mut reserved,
     );
-    let direct_spans = direct.keys().copied().collect::<FxHashSet<_>>();
+    // Superclass parameters are used only during lowering. Allocate them after
+    // member names, against both bindings and unresolved globals, so their
+    // source-based spelling never supplies identity or captures a user name.
+    reserved.extend(
+        semantic
+            .scoping()
+            .root_unresolved_references()
+            .keys()
+            .map(|name| name.to_string()),
+    );
+    let mut class_ids = direct.keys().copied().collect::<Vec<_>>();
+    class_ids.sort_unstable_by_key(|id| id.index());
+    for id in class_ids {
+        if let Some(name) = &mut direct.get_mut(&id).unwrap().super_name {
+            *name = reserve(name, &mut reserved);
+        }
+    }
+    let direct_ids = direct.keys().copied().collect::<FxHashSet<_>>();
     for (node_id, node) in semantic.nodes().iter_enumerated() {
         let AstKind::Class(class) = node.kind() else {
             continue;
@@ -542,7 +557,7 @@ pub(super) fn prepare_ast(
         }) && private_methods_loose.is_some();
         let owns_private_in = private_in_loose.is_some() && class_facts[&node_id].has_private_in;
         if !(lower_all_classes || owns_private_method || owns_private_in)
-            || direct_spans.contains(&(class.span.start, class.span.end))
+            || direct_ids.contains(&node_id)
         {
             continue;
         }
@@ -610,7 +625,7 @@ pub(super) fn run_ast<'a>(
 
 struct ClassAstLowerer<'a> {
     allocator: &'a Allocator,
-    direct: FxHashMap<(u32, u32), DirectClassPlan>,
+    direct: FxHashMap<NodeId, DirectClassPlan>,
     construct_assert: bool,
     changed: bool,
     error: Option<&'static str>,
@@ -701,17 +716,19 @@ impl<'a> VisitMut<'a> for ClassAstLowerer<'a> {
         let mut index = 0;
         while index < statements.len() {
             let span = statements[index].span();
-            let default_class_span = match &statements[index] {
+            let default_class = match &statements[index] {
                 Statement::ExportDefaultDeclaration(declaration) => {
                     match &declaration.declaration {
-                        ExportDefaultDeclarationKind::ClassDeclaration(class) => Some(class.span),
+                        ExportDefaultDeclarationKind::ClassDeclaration(class) => {
+                            Some((class.node_id.get(), class.span))
+                        }
                         _ => None,
                     }
                 }
                 _ => None,
             };
-            if let Some(class_span) = default_class_span
-                && let Some(plan) = self.direct.remove(&(class_span.start, class_span.end))
+            if let Some((class_id, class_span)) = default_class
+                && let Some(plan) = self.direct.remove(&class_id)
             {
                 let ast = AstBuilder::new(self.allocator);
                 let Statement::ExportDefaultDeclaration(declaration) =
@@ -777,7 +794,7 @@ impl<'a> VisitMut<'a> for ClassAstLowerer<'a> {
                 }
             }
             if matches!(statements[index], Statement::ClassDeclaration(_))
-                && let Some(plan) = self.direct.remove(&(span.start, span.end))
+                && let Some(plan) = self.direct.remove(&statements[index].node_id())
             {
                 let ast = AstBuilder::new(self.allocator);
                 let Statement::ClassDeclaration(class) = statements[index].take_in(&ast) else {
@@ -821,9 +838,8 @@ impl<'a> VisitMut<'a> for ClassAstLowerer<'a> {
     }
 
     fn visit_expression(&mut self, expression: &mut Expression<'a>) {
-        let span = expression.span();
         if matches!(expression, Expression::ClassExpression(_))
-            && let Some(plan) = self.direct.remove(&(span.start, span.end))
+            && let Some(plan) = self.direct.remove(&expression.node_id())
         {
             let ast = AstBuilder::new(self.allocator);
             let Expression::ClassExpression(class) = expression.take_in(&ast) else {
@@ -858,8 +874,7 @@ impl<'a> VisitMut<'a> for ClassAstLowerer<'a> {
             walk_mut::walk_export_default_declaration(self, declaration);
             return;
         };
-        let span = class.span;
-        let Some(plan) = self.direct.remove(&(span.start, span.end)) else {
+        let Some(plan) = self.direct.remove(&class.node_id.get()) else {
             walk_mut::walk_export_default_declaration(self, declaration);
             return;
         };
@@ -892,7 +907,7 @@ impl<'a> VisitMut<'a> for ClassAstLowerer<'a> {
             return;
         };
         let span = class.span;
-        let Some(plan) = self.direct.remove(&(span.start, span.end)) else {
+        let Some(plan) = self.direct.remove(&class.node_id.get()) else {
             walk_mut::walk_export_declaration(self, declaration);
             return;
         };
@@ -3502,10 +3517,7 @@ fn lower_simple_class<'a>(
                 if method.value.body.is_none() {
                     continue;
                 }
-                if let Some(binding) = plan
-                    .computed_keys
-                    .get(&(method.span.start, method.span.end))
-                {
+                if let Some(binding) = plan.computed_keys.get(&method.node_id.get()) {
                     let key = method.key.take_in(&ast).into_expression();
                     computed_key_initializers.push((binding.clone(), key, method.span));
                     method.key = PropertyKey::from(oxc_ast::ast::Expression::new_identifier(
@@ -3680,10 +3692,7 @@ fn lower_simple_class<'a>(
                         .key
                         .static_name()
                         .is_some_and(|key| matches!(key.as_ref(), "name" | "length"));
-                let computed_binding = plan
-                    .computed_keys
-                    .get(&(property.span.start, property.span.end))
-                    .cloned();
+                let computed_binding = plan.computed_keys.get(&property.node_id.get()).cloned();
                 if let Some(binding) = computed_binding.as_ref() {
                     let key = property.key.take_in(&ast).into_expression();
                     computed_key_initializers.push((binding.clone(), key, property.span));
@@ -3725,7 +3734,7 @@ fn lower_simple_class<'a>(
             }
             ClassElement::AccessorProperty(accessor) => {
                 let mut accessor = accessor.unbox();
-                let synthetic = format!("\0accessor:{}", accessor.span.start);
+                let synthetic = format!("\0accessor:{}", accessor.node_id.get().index());
                 let backing = plan
                     .private_keys
                     .get(&synthetic)
@@ -3751,10 +3760,7 @@ fn lower_simple_class<'a>(
                         .visit_expression(value);
                     }
                 }
-                let computed_binding = plan
-                    .computed_keys
-                    .get(&(accessor.span.start, accessor.span.end))
-                    .cloned();
+                let computed_binding = plan.computed_keys.get(&accessor.node_id.get()).cloned();
                 if let Some(binding) = computed_binding.as_ref() {
                     let key = accessor.key.take_in(&ast).into_expression();
                     computed_key_initializers.push((binding.clone(), key, accessor.span));
@@ -5290,6 +5296,101 @@ mod tests {
     use std::path::Path;
 
     #[test]
+    fn classes_and_computed_keys_distinguish_shared_source_anchors() {
+        struct SharedAnchors;
+        impl<'a> VisitMut<'a> for SharedAnchors {
+            fn visit_span(&mut self, span: &mut Span) {
+                *span = Span::default();
+            }
+        }
+        let source =
+            "class A { [first()]() {} [second()]() {} accessor a=1; accessor b=2; } class B {}";
+        let allocator = Allocator::default();
+        let mut parsed = Parser::new(&allocator, source, SourceType::default()).parse();
+        SharedAnchors.visit_program(&mut parsed.program);
+        let semantic = SemanticBuilder::new()
+            .with_build_nodes(true)
+            .build(&parsed.program);
+        let plan = prepare_ast(
+            &semantic.semantic,
+            true,
+            Some(true),
+            false,
+            Some(true),
+            Some(true),
+            true,
+        )
+        .unwrap();
+        assert_eq!(plan.direct.len(), 2);
+        let keys = plan
+            .direct
+            .values()
+            .flat_map(|class| class.computed_keys.values().cloned())
+            .collect::<Vec<_>>();
+        assert_eq!(keys.len(), 2);
+        assert_ne!(keys[0], keys[1]);
+        let backing = plan
+            .direct
+            .values()
+            .flat_map(|class| {
+                class
+                    .private_keys
+                    .values()
+                    .map(|(binding, _)| binding.clone())
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(backing.len(), 2);
+        assert_ne!(backing[0], backing[1]);
+        drop(semantic);
+        assert!(run_ast(&allocator, &mut parsed.program, plan).unwrap().0);
+        let code = Codegen::new().build(&parsed.program).code;
+        assert!(!code.contains("class A"), "{code}");
+        assert!(!code.contains("class B"), "{code}");
+        assert_eq!(code.matches("first()").count(), 1, "{code}");
+        assert_eq!(code.matches("second()").count(), 1, "{code}");
+        for key in keys {
+            assert!(code.contains(&format!("A.prototype, {key},")), "{code}");
+        }
+        for binding in backing {
+            assert!(code.contains(&format!("this[{binding}]")), "{code}");
+        }
+    }
+
+    #[test]
+    fn superclass_parameters_are_unique_with_shared_source_anchors() {
+        struct SharedAnchors;
+        impl<'a> VisitMut<'a> for SharedAnchors {
+            fn visit_span(&mut self, span: &mut Span) {
+                *span = Span::default();
+            }
+        }
+        let allocator = Allocator::default();
+        let mut parsed = Parser::new(
+            &allocator,
+            "class A extends Base { read(){return __nox_super_0_0;} } class B extends A {}",
+            SourceType::default(),
+        )
+        .parse();
+        SharedAnchors.visit_program(&mut parsed.program);
+        let semantic = SemanticBuilder::new()
+            .with_build_nodes(true)
+            .build(&parsed.program);
+        let plan = prepare_ast(&semantic.semantic, true, None, false, None, None, true).unwrap();
+        let parameters = plan
+            .direct
+            .values()
+            .filter_map(|plan| plan.super_name.as_deref())
+            .collect::<Vec<_>>();
+        assert_eq!(parameters.len(), 2);
+        assert_ne!(parameters[0], parameters[1]);
+        assert!(parameters.iter().all(|name| *name != "__nox_super_0_0"));
+        drop(semantic);
+        assert!(run_ast(&allocator, &mut parsed.program, plan).unwrap().0);
+        let code = Codegen::new().build(&parsed.program).code;
+        assert!(code.contains("return __nox_super_0_0;"), "{code}");
+    }
+
+    #[test]
     fn class_declaration_mutates_in_place() {
         let source = "class Value {}";
         let allocator = Allocator::default();
@@ -5373,28 +5474,39 @@ mod tests {
     #[test]
     fn nested_class_facts_belong_to_the_nearest_class() {
         let source = "class Outer extends Base { method(){ super.x; return class Inner extends Base { method(){ super.y; return #value in this; } #value; }; } }";
-        let allocator = Allocator::default();
-        let parsed = Parser::new(
-            &allocator,
-            source,
-            SourceType::from_path(Path::new("x.js")).unwrap(),
-        )
-        .parse();
-        let semantic = SemanticBuilder::new()
-            .with_build_nodes(true)
-            .build(&parsed.program);
-        let mut facts = collect_class_facts(&semantic.semantic)
-            .into_values()
-            .map(|facts| {
-                (
-                    facts.super_reference_ids.len(),
-                    facts.has_private_in,
-                    facts.uses_private_helper,
-                )
-            })
-            .collect::<Vec<_>>();
-        facts.sort_unstable();
-        assert_eq!(facts, [(1, false, false), (1, true, false)]);
+        struct SharedAnchors;
+        impl<'a> VisitMut<'a> for SharedAnchors {
+            fn visit_span(&mut self, span: &mut Span) {
+                *span = Span::default();
+            }
+        }
+        for shared_anchors in [false, true] {
+            let allocator = Allocator::default();
+            let mut parsed = Parser::new(
+                &allocator,
+                source,
+                SourceType::from_path(Path::new("x.js")).unwrap(),
+            )
+            .parse();
+            if shared_anchors {
+                SharedAnchors.visit_program(&mut parsed.program);
+            }
+            let semantic = SemanticBuilder::new()
+                .with_build_nodes(true)
+                .build(&parsed.program);
+            let mut facts = collect_class_facts(&semantic.semantic)
+                .into_values()
+                .map(|facts| {
+                    (
+                        facts.super_reference_ids.len(),
+                        facts.has_private_in,
+                        facts.uses_private_helper,
+                    )
+                })
+                .collect::<Vec<_>>();
+            facts.sort_unstable();
+            assert_eq!(facts, [(1, false, false), (1, true, false)]);
+        }
     }
 
     #[test]

@@ -359,7 +359,6 @@ export const cases = [
   };
   for (var val of [10, 20, 30]) {
     _loopResult = _loop(val);
-    val = _loopResult.vars[0];
   }
   expect(funcs[0]()).toBe(10);
   expect(funcs[1]()).toBe(20);
@@ -409,7 +408,6 @@ export const cases = [
   };
   for (var prop in target) {
     _loopResult = _loop(prop);
-    prop = _loopResult.vars[0];
   }
   expect(copy.a).toBe('a');
   expect(copy.b).toBe('b');
@@ -1259,7 +1257,6 @@ function _readOnlyError(r) {
   };
   for (var item of ['a', 'b', 'c']) {
     _loopResult = _loop(item);
-    item = _loopResult.vars[0];
   }
   expect(tasks.map(t => t())).toEqual(['a', 'b', 'c']);
 };`,
@@ -1416,7 +1413,6 @@ function _readOnlyError(r) {
   };
   for (var key in target) {
     _loopResult = _loop(key);
-    key = _loopResult.vars[0];
   }
   expect(proxy.x).toBe(10);
   expect(proxy.y).toBe(20);
@@ -1915,7 +1911,6 @@ function _readOnlyError(r) {
   };
   for (var x of [1, 2, 3, 4, 5]) {
     _loopResult = _loop(x);
-    x = _loopResult.vars[0];
     if (_loopResult.type === 'break') break;
   }
   expect(funcs.length).toBe(3);

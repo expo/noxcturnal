@@ -16,7 +16,7 @@ use oxc_ast::{
 use oxc_ast_visit::{VisitMut, walk_mut};
 #[cfg(test)]
 use oxc_parser::Parser;
-use oxc_semantic::Semantic;
+use oxc_semantic::{NodeId, Semantic};
 #[cfg(test)]
 use oxc_span::SourceType;
 use oxc_span::{GetSpan, Span};
@@ -34,10 +34,10 @@ use crate::preflight::helpers::CustomHelperRequests;
 pub(super) struct AstPlan {
     declarations: FxHashMap<Address, AstDeclaratorPlan>,
     oxc_declarations: FxHashSet<Address>,
-    catches: FxHashMap<u32, AstCatchPlan>,
-    assignments: FxHashMap<u32, AstAssignmentPlan>,
-    loop_assignments: FxHashMap<u32, AstAssignmentPlan>,
-    temporary_declarations: FxHashMap<u32, Vec<String>>,
+    catches: FxHashMap<NodeId, AstCatchPlan>,
+    assignments: FxHashMap<NodeId, AstAssignmentPlan>,
+    loop_assignments: FxHashMap<NodeId, AstAssignmentPlan>,
+    temporary_declarations: FxHashMap<NodeId, Vec<String>>,
     helper_requests: CustomHelperRequests,
     helper_names: HelperNames,
     base_reserved: FxHashSet<String>,
@@ -293,7 +293,7 @@ pub(super) fn prepare_ast(
     let mut catches = FxHashMap::default();
     let mut assignments = FxHashMap::default();
     let mut loop_assignments = FxHashMap::default();
-    let mut temporary_declarations: FxHashMap<u32, Vec<String>> = FxHashMap::default();
+    let mut temporary_declarations: FxHashMap<NodeId, Vec<String>> = FxHashMap::default();
     let mut helper_usage = HelperUsage::default();
     // Preserve source order while planning only selected patterns against one
     // temporary-name set; unrelated semantic nodes need no further visits.
@@ -332,7 +332,7 @@ pub(super) fn prepare_ast(
                 let reservation_checkpoint = reserved.checkpoint();
                 plan_binding_names(&param.pattern, &mut reserved, &mut helper_usage);
                 catches.insert(
-                    clause.span.start,
+                    node_id,
                     AstCatchPlan {
                         caught,
                         anchor: param.span,
@@ -349,23 +349,23 @@ pub(super) fn prepare_ast(
                 let reservation_checkpoint = reserved.checkpoint();
                 plan_assignment_names(&assignment.left, &mut reserved, &mut helper_usage);
                 assignments.insert(
-                    assignment.span.start,
+                    node_id,
                     AstAssignmentPlan {
                         root,
                         anchor: assignment.span,
                         reservation_checkpoint,
                     },
                 );
-                let scope_start = assignment_temporary_scope_start(semantic, node_id);
+                let scope_id = assignment_temporary_scope(semantic, node_id);
                 temporary_declarations
-                    .entry(scope_start)
+                    .entry(scope_id)
                     .or_default()
                     .extend(reserved.allocations[before..].iter().cloned());
             }
             kind @ (AstKind::ForOfStatement(_) | AstKind::ForInStatement(_)) => {
-                let (span, left) = match kind {
-                    AstKind::ForOfStatement(statement) => (statement.span, &statement.left),
-                    AstKind::ForInStatement(statement) => (statement.span, &statement.left),
+                let left = match kind {
+                    AstKind::ForOfStatement(statement) => &statement.left,
+                    AstKind::ForInStatement(statement) => &statement.left,
                     _ => unreachable!(),
                 };
                 let Some(target) = left.as_assignment_target() else {
@@ -376,16 +376,16 @@ pub(super) fn prepare_ast(
                 let reservation_checkpoint = reserved.checkpoint();
                 plan_assignment_names(target, &mut reserved, &mut helper_usage);
                 loop_assignments.insert(
-                    span.start,
+                    node_id,
                     AstAssignmentPlan {
                         root,
                         anchor: left.span(),
                         reservation_checkpoint,
                     },
                 );
-                let scope_start = assignment_temporary_scope_start(semantic, node_id);
+                let scope_id = assignment_temporary_scope(semantic, node_id);
                 temporary_declarations
-                    .entry(scope_start)
+                    .entry(scope_id)
                     .or_default()
                     .extend(reserved.allocations[before..].iter().cloned());
             }
@@ -496,35 +496,35 @@ pub(super) fn run_ast<'a>(
     Ok((pass.changed, plan.helper_requests))
 }
 
-fn assignment_temporary_scope_start(semantic: &Semantic<'_>, node_id: oxc_semantic::NodeId) -> u32 {
+fn assignment_temporary_scope(semantic: &Semantic<'_>, node_id: NodeId) -> NodeId {
     let nodes = semantic.nodes();
     let mut child = node_id;
     for ancestor in nodes.ancestor_ids(node_id) {
         match nodes.kind(ancestor) {
-            AstKind::FunctionBody(body) => return body.span.start,
+            AstKind::FunctionBody(_) => return ancestor,
             AstKind::ArrowFunctionExpression(arrow)
                 if arrow.is_expression()
                     && !matches!(nodes.kind(child), AstKind::FormalParameters(_)) =>
             {
-                return arrow.body.span().start;
+                return ancestor;
             }
-            AstKind::StaticBlock(block) => return block.span.start,
-            AstKind::Program(program) => return program.span.start,
+            AstKind::StaticBlock(_) => return ancestor,
+            AstKind::Program(_) => return ancestor,
             _ => {}
         }
         child = ancestor;
     }
-    0
+    unreachable!("destructuring assignment has an enclosing scope")
 }
 
 struct DestructuringDeclaratorLowerer<'a> {
     allocator: &'a Allocator,
     declarations: FxHashMap<Address, AstDeclaratorPlan>,
     oxc_declarations: FxHashSet<Address>,
-    catches: FxHashMap<u32, AstCatchPlan>,
-    assignments: FxHashMap<u32, AstAssignmentPlan>,
-    loop_assignments: FxHashMap<u32, AstAssignmentPlan>,
-    temporary_declarations: FxHashMap<u32, Vec<String>>,
+    catches: FxHashMap<NodeId, AstCatchPlan>,
+    assignments: FxHashMap<NodeId, AstAssignmentPlan>,
+    loop_assignments: FxHashMap<NodeId, AstAssignmentPlan>,
+    temporary_declarations: FxHashMap<NodeId, Vec<String>>,
     helper_names: HelperNames,
     base_reserved: FxHashSet<String>,
     planned_allocations: FxHashMap<String, usize>,
@@ -1066,11 +1066,11 @@ impl<'a> DestructuringDeclaratorLowerer<'a> {
 impl<'a> DestructuringDeclaratorLowerer<'a> {
     fn lower_loop_head(
         &mut self,
-        span: Span,
+        node_id: NodeId,
         left: &mut ForStatementLeft<'a>,
         body: &mut Statement<'a>,
     ) {
-        if let Some(plan) = self.loop_assignments.remove(&span.start) {
+        if let Some(plan) = self.loop_assignments.remove(&node_id) {
             let ast = self.ast();
             let old_left = (*left).take_in(&ast);
             let target = match AssignmentTarget::try_from(old_left) {
@@ -1190,7 +1190,7 @@ impl<'a> DestructuringDeclaratorLowerer<'a> {
 
 impl<'a> VisitMut<'a> for DestructuringDeclaratorLowerer<'a> {
     fn visit_program(&mut self, program: &mut Program<'a>) {
-        if let Some(names) = self.temporary_declarations.remove(&program.span.start) {
+        if let Some(names) = self.temporary_declarations.remove(&program.node_id.get()) {
             match parse_var_declaration(self.allocator, &names, program.span) {
                 Ok(declaration) => program.body.insert(0, declaration),
                 Err(error) => {
@@ -1203,7 +1203,7 @@ impl<'a> VisitMut<'a> for DestructuringDeclaratorLowerer<'a> {
     }
 
     fn visit_static_block(&mut self, block: &mut oxc_ast::ast::StaticBlock<'a>) {
-        if let Some(names) = self.temporary_declarations.remove(&block.span.start) {
+        if let Some(names) = self.temporary_declarations.remove(&block.node_id.get()) {
             match parse_var_declaration(self.allocator, &names, block.span) {
                 Ok(declaration) => block.body.insert(0, declaration),
                 Err(error) => {
@@ -1290,17 +1290,25 @@ impl<'a> VisitMut<'a> for DestructuringDeclaratorLowerer<'a> {
     }
 
     fn visit_for_of_statement(&mut self, statement: &mut oxc_ast::ast::ForOfStatement<'a>) {
-        self.lower_loop_head(statement.span, &mut statement.left, &mut statement.body);
+        self.lower_loop_head(
+            statement.node_id.get(),
+            &mut statement.left,
+            &mut statement.body,
+        );
         walk_mut::walk_for_of_statement(self, statement);
     }
 
     fn visit_for_in_statement(&mut self, statement: &mut oxc_ast::ast::ForInStatement<'a>) {
-        self.lower_loop_head(statement.span, &mut statement.left, &mut statement.body);
+        self.lower_loop_head(
+            statement.node_id.get(),
+            &mut statement.left,
+            &mut statement.body,
+        );
         walk_mut::walk_for_in_statement(self, statement);
     }
 
     fn visit_catch_clause(&mut self, clause: &mut oxc_ast::ast::CatchClause<'a>) {
-        if let Some(plan) = self.catches.remove(&clause.span.start) {
+        if let Some(plan) = self.catches.remove(&clause.node_id.get()) {
             let Some(old_param) = clause.param.take() else {
                 self.error = Some("destructuring-catch-parameter-missing");
                 return;
@@ -1354,21 +1362,25 @@ impl<'a> VisitMut<'a> for DestructuringDeclaratorLowerer<'a> {
         arrow: &mut oxc_ast::ast::ArrowFunctionExpression<'a>,
     ) {
         if arrow.is_expression()
-            && self
-                .temporary_declarations
-                .contains_key(&arrow.body.span().start)
+            && let Some(names) = self.temporary_declarations.remove(&arrow.node_id.get())
         {
             let ast = self.ast();
             let span = arrow.body.span();
             let expression = arrow.body.take_in(&ast).into_expression();
+            let declaration = match parse_var_declaration(self.allocator, &names, span) {
+                Ok(declaration) => declaration,
+                Err(error) => {
+                    self.error = Some(error);
+                    return;
+                }
+            };
             arrow.body = oxc_ast::ast::ArrowFunctionBody::FunctionBody(FunctionBody::boxed(
                 span,
                 [],
-                [Statement::new_return_statement(
-                    span,
-                    Some(expression),
-                    &ast,
-                )],
+                [
+                    declaration,
+                    Statement::new_return_statement(span, Some(expression), &ast),
+                ],
                 &ast,
             ));
         }
@@ -1376,7 +1388,7 @@ impl<'a> VisitMut<'a> for DestructuringDeclaratorLowerer<'a> {
     }
 
     fn visit_function_body(&mut self, body: &mut FunctionBody<'a>) {
-        if let Some(names) = self.temporary_declarations.remove(&body.span.start) {
+        if let Some(names) = self.temporary_declarations.remove(&body.node_id.get()) {
             match parse_var_declaration(self.allocator, &names, body.span) {
                 Ok(declaration) => body.statements.insert(0, declaration),
                 Err(error) => {
@@ -1393,7 +1405,7 @@ impl<'a> VisitMut<'a> for DestructuringDeclaratorLowerer<'a> {
         let Expression::AssignmentExpression(assignment) = expression else {
             return;
         };
-        let Some(plan) = self.assignments.remove(&assignment.span.start) else {
+        let Some(plan) = self.assignments.remove(&assignment.node_id.get()) else {
             return;
         };
         let ast = self.ast();
@@ -1700,6 +1712,52 @@ mod tests {
     use super::*;
     use oxc_codegen::Codegen;
     use oxc_semantic::SemanticBuilder;
+
+    #[test]
+    fn assignment_catch_and_loop_plans_distinguish_shared_source_anchors() {
+        struct SharedAnchors;
+        impl<'a> VisitMut<'a> for SharedAnchors {
+            fn visit_span(&mut self, span: &mut Span) {
+                *span = Span::default();
+            }
+        }
+        for (source, expected) in [
+            (
+                "var a,b; ({a}=first); ({b}=second);",
+                ["a = _obj.a", "b = _obj"],
+            ),
+            (
+                "try {} catch ({a}) { use(a); } try {} catch ({b}) { use(b); }",
+                ["a = _obj.a", "b = _obj"],
+            ),
+            (
+                "var a,b; for ({a} in first) use(a); for ({b} of second) use(b);",
+                ["a = _obj.a", "b = _obj"],
+            ),
+        ] {
+            let allocator = Allocator::default();
+            let mut parsed = Parser::new(&allocator, source, SourceType::default()).parse();
+            SharedAnchors.visit_program(&mut parsed.program);
+            let semantic = SemanticBuilder::new()
+                .with_build_nodes(true)
+                .build(&parsed.program);
+            assert!(semantic.diagnostics.is_empty());
+            let plan = prepare_ast(&semantic.semantic, true, false, false).unwrap();
+            assert_eq!(
+                plan.assignments.len() + plan.catches.len() + plan.loop_assignments.len(),
+                2,
+                "{source}"
+            );
+            drop(semantic);
+            assert!(run_ast(&allocator, &mut parsed.program, plan).unwrap().0);
+            let code = Codegen::new().build(&parsed.program).code;
+            for expected in expected {
+                assert!(code.contains(expected), "{code}");
+            }
+            assert!(!code.contains("{ a }"), "{code}");
+            assert!(!code.contains("{ b }"), "{code}");
+        }
+    }
 
     #[test]
     fn flat_array_declarator_mutates_in_place() {

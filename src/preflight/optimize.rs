@@ -1,5 +1,5 @@
 use oxc_allocator::GetAllocator;
-use oxc_allocator::{Allocator, TakeIn};
+use oxc_allocator::{Address, Allocator, GetAddress, TakeIn};
 use oxc_ast::builder::GetAstBuilder;
 use oxc_ast::{
     ast::{
@@ -48,7 +48,9 @@ pub(super) fn run<'a>(
 
 struct ConstantFolder<'a> {
     ast: AstBuilder<'a>,
-    failed: FxHashSet<(u32, u32)>,
+    // Parser-only and newly built expressions have no unique semantic IDs.
+    // Boxed expression addresses remain stable during this arena traversal.
+    failed: FxHashSet<Address>,
     addition_depth: usize,
 }
 
@@ -129,26 +131,26 @@ impl<'a> VisitMut<'a> for ConstantFolder<'a> {
             return;
         }
         let span = expression.span();
+        let address = expression.address();
         match expression {
             Expression::UnaryExpression(_) | Expression::BinaryExpression(_) => {
                 if expression_has_failed_operand(expression, &self.failed) {
-                    self.failed.insert((span.start, span.end));
+                    self.failed.insert(address);
                 } else if let Some(value) = evaluate_expression(expression) {
                     if let Some(literal) = self.literal(span, value) {
                         *expression = literal;
                     }
                 } else {
-                    self.failed.insert((span.start, span.end));
+                    self.failed.insert(address);
                 }
             }
             Expression::LogicalExpression(logical) => {
-                let left_span = logical.left.span();
-                if self.failed.contains(&(left_span.start, left_span.end)) {
-                    self.failed.insert((span.start, span.end));
+                if self.failed.contains(&logical.left.address()) {
+                    self.failed.insert(address);
                     return;
                 }
                 let Some(left) = evaluate_expression(&logical.left) else {
-                    self.failed.insert((span.start, span.end));
+                    self.failed.insert(address);
                     return;
                 };
                 let use_right = match logical.operator {
@@ -166,13 +168,12 @@ impl<'a> VisitMut<'a> for ConstantFolder<'a> {
                 *expression = self.value(selected);
             }
             Expression::ConditionalExpression(conditional) => {
-                let test_span = conditional.test.span();
-                if self.failed.contains(&(test_span.start, test_span.end)) {
-                    self.failed.insert((span.start, span.end));
+                if self.failed.contains(&conditional.test.address()) {
+                    self.failed.insert(address);
                     return;
                 }
                 let Some(test) = evaluate_expression(&conditional.test) else {
-                    self.failed.insert((span.start, span.end));
+                    self.failed.insert(address);
                     return;
                 };
                 let selected = if test.truthy() {
@@ -191,7 +192,7 @@ impl<'a> VisitMut<'a> for ConstantFolder<'a> {
                 if expression_has_failed_operand(expression, &self.failed)
                     || evaluate_expression(expression).is_none() =>
             {
-                self.failed.insert((span.start, span.end));
+                self.failed.insert(address);
             }
             // Only recursive evaluations need failure memoization. Literals
             // and unsupported expressions are constant-time leaves for the
@@ -313,14 +314,8 @@ impl<'a> Visit<'a> for HoistedBindingCollector<'_, 'a> {
     fn visit_class(&mut self, _class: &Class<'a>) {}
 }
 
-fn expression_has_failed_operand(
-    expression: &Expression<'_>,
-    failed: &FxHashSet<(u32, u32)>,
-) -> bool {
-    let failed = |expression: &Expression<'_>| {
-        let span = expression.span();
-        failed.contains(&(span.start, span.end))
-    };
+fn expression_has_failed_operand(expression: &Expression<'_>, failed: &FxHashSet<Address>) -> bool {
+    let failed = |expression: &Expression<'_>| failed.contains(&expression.address());
     match expression {
         Expression::UnaryExpression(unary) => failed(&unary.argument),
         Expression::BinaryExpression(binary) => failed(&binary.left) || failed(&binary.right),
@@ -643,5 +638,35 @@ impl<'a> VisitMut<'a> for DeadFunctionRemover {
             Statement::VariableDeclaration(declaration) => !declaration.declarations.is_empty(),
             _ => true,
         });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use oxc_span::{SourceType, Span};
+
+    #[test]
+    fn failure_memoization_distinguishes_shared_source_anchors_without_semantic_ids() {
+        struct SharedAnchors;
+        impl<'a> VisitMut<'a> for SharedAnchors {
+            fn visit_span(&mut self, span: &mut Span) {
+                *span = Span::default();
+            }
+        }
+        let allocator = Allocator::default();
+        let mut parsed = oxc_parser::Parser::new(
+            &allocator,
+            "var a=unknown+1; var b=(1+2)*3; var c=true?4:5;",
+            SourceType::default(),
+        )
+        .parse();
+        SharedAnchors.visit_program(&mut parsed.program);
+        // This pass also accepts parser-only ASTs: semantic IDs are unassigned.
+        run(&allocator, &mut parsed.program, true, false, false, None);
+        let code = oxc_codegen::Codegen::new().build(&parsed.program).code;
+        assert!(code.contains("a = unknown + 1"), "{code}");
+        assert!(code.contains("b = 9"), "{code}");
+        assert!(code.contains("c = 4"), "{code}");
     }
 }

@@ -16,7 +16,9 @@ use oxc_ast::{
 use oxc_ast_visit::{Visit, VisitMut, walk, walk_mut};
 use oxc_semantic::{NodeId, ScopeId, Semantic, SymbolId};
 use oxc_span::{GetSpan, Span};
-use oxc_syntax::{operator::AssignmentOperator, scope::ScopeFlags, symbol::SymbolFlags};
+use oxc_syntax::{
+    operator::AssignmentOperator, reference::ReferenceId, scope::ScopeFlags, symbol::SymbolFlags,
+};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::generated::inline_helpers::INLINE_READ_ONLY_ERROR_HELPER_DESCRIPTOR;
@@ -27,6 +29,7 @@ mod header;
 
 struct HeaderBinding {
     name: String,
+    is_const: bool,
     // Extraction must retain const write errors instead of making this a writable parameter.
     protect_writes: bool,
     parameter_alias: Option<String>,
@@ -46,27 +49,27 @@ struct CapturedLoop {
 struct PendingCapturedLoop {
     captured: CapturedLoop,
     statement_root: NodeId,
-    exit_labels: FxHashMap<(u32, u32), String>,
+    exit_labels: FxHashMap<NodeId, String>,
     content_start: u32,
     content_end: u32,
-    returns: FxHashSet<(u32, u32)>,
-    breaks: FxHashSet<(u32, u32)>,
-    continues: FxHashSet<(u32, u32)>,
+    returns: FxHashSet<NodeId>,
+    breaks: FxHashSet<NodeId>,
+    continues: FxHashSet<NodeId>,
     has_await: bool,
     has_yield: bool,
     has_finally: bool,
     has_yielding_finally: bool,
-    arguments_references: FxHashSet<(u32, u32)>,
+    arguments_references: FxHashSet<NodeId>,
     local_var_declarations: Vec<NodeId>,
 }
 
 pub(super) struct CapturedLoopAstPlan {
-    roots: FxHashMap<(u32, u32), Vec<CapturedLoopMutation>>,
+    roots: FxHashMap<NodeId, Vec<CapturedLoopMutation>>,
 }
 
 struct CapturedLoopMutation {
     extract_body: bool,
-    loop_span: Span,
+    loop_id: NodeId,
     insertion_anchor: Span,
     anchor: Span,
     dispatch_anchor: Span,
@@ -74,15 +77,15 @@ struct CapturedLoopMutation {
     helper: String,
     result: String,
     record: Option<String>,
-    exit_labels: FxHashMap<(u32, u32), String>,
-    returns: FxHashSet<(u32, u32)>,
-    breaks: FxHashSet<(u32, u32)>,
-    continues: FxHashSet<(u32, u32)>,
+    exit_labels: FxHashMap<NodeId, String>,
+    returns: FxHashSet<NodeId>,
+    breaks: FxHashSet<NodeId>,
+    continues: FxHashSet<NodeId>,
     has_await: bool,
     has_yield: bool,
     defer_bindings: bool,
     arguments_alias: Option<String>,
-    arguments_references: FxHashSet<(u32, u32)>,
+    arguments_references: FxHashSet<NodeId>,
     local_var_declarations: Vec<NodeId>,
     header: Option<header::Plan>,
 }
@@ -128,7 +131,7 @@ pub(super) fn run_captured_loop_ast<'a>(
 
 struct CapturedLoopAstLowerer<'a> {
     allocator: &'a Allocator,
-    roots: FxHashMap<(u32, u32), Vec<CapturedLoopMutation>>,
+    roots: FxHashMap<NodeId, Vec<CapturedLoopMutation>>,
     changed: bool,
     error: Option<&'static str>,
 }
@@ -137,10 +140,10 @@ impl<'a> VisitMut<'a> for CapturedLoopAstLowerer<'a> {
     fn visit_statements(&mut self, statements: &mut ArenaVec<'a, Statement<'a>>) {
         let mut index = 0;
         while index < statements.len() {
-            let span = statements[index].span();
-            if let Some(mut mutations) = self.roots.remove(&(span.start, span.end)) {
+            let node_id = statements[index].node_id();
+            if let Some(mut mutations) = self.roots.remove(&node_id) {
                 mutations
-                    .sort_unstable_by_key(|mutation| std::cmp::Reverse(mutation.loop_span.start));
+                    .sort_unstable_by_key(|mutation| std::cmp::Reverse(mutation.loop_id.index()));
                 let mut helpers = ArenaVec::new_in(&self.allocator);
                 for mutation in mutations {
                     match mutate_captured_loop(self.allocator, &mut statements[index], mutation) {
@@ -174,7 +177,7 @@ fn mutate_captured_loop<'a>(
         header::prepare(
             AstBuilder::new(allocator),
             root,
-            mutation.loop_span,
+            mutation.loop_id,
             &mutation.bindings,
             plan,
         )
@@ -431,16 +434,13 @@ fn binding_declaration<'a>(
 
 struct ArgumentsRewriter<'a, 'p> {
     alias: &'p str,
-    references: &'p FxHashSet<(u32, u32)>,
+    references: &'p FxHashSet<NodeId>,
     ast: AstBuilder<'a>,
 }
 
 impl<'a> VisitMut<'a> for ArgumentsRewriter<'a, '_> {
     fn visit_identifier_reference(&mut self, identifier: &mut IdentifierReference<'a>) {
-        if self
-            .references
-            .contains(&(identifier.span.start, identifier.span.end))
-        {
+        if self.references.contains(&identifier.node_id.get()) {
             identifier.name = self.ast.allocator().alloc_str(self.alias).into();
         }
     }
@@ -455,8 +455,7 @@ struct CapturedLoopBodyMover<'a, 'p> {
 
 impl<'a> VisitMut<'a> for CapturedLoopBodyMover<'a, '_> {
     fn visit_statement(&mut self, statement: &mut Statement<'a>) {
-        let span = statement.span();
-        if span == self.mutation.loop_span {
+        if statement.node_id() == self.mutation.loop_id {
             let body = match statement {
                 Statement::ForStatement(statement) => &mut statement.body,
                 Statement::ForInStatement(statement) => &mut statement.body,
@@ -785,7 +784,9 @@ fn captured_loop_dispatch<'a>(
         ));
     }
     for (index, binding) in mutation.bindings.iter().enumerate() {
-        if binding.protect_writes {
+        // Immutable loop bindings never need copy-back. These generated writes
+        // must not rely on source spans to escape const-write protection.
+        if binding.is_const {
             continue;
         }
         let target = oxc_ast::ast::SimpleAssignmentTarget::new_assignment_target_identifier(
@@ -824,6 +825,14 @@ fn captured_loop_dispatch<'a>(
     if !mutation.returns.is_empty() {
         exits.push(("return", None));
     }
+    if mutation
+        .header
+        .as_ref()
+        .is_some_and(|plan| plan.first.is_some())
+    {
+        // Relocated tests emit their completion directly; no AST node to match.
+        exits.push(("break", None));
+    }
     for (kind, spans) in [
         ("break", &mutation.breaks),
         ("continue", &mutation.continues),
@@ -836,7 +845,11 @@ fn captured_loop_dispatch<'a>(
         labels.dedup();
         exits.extend(labels.into_iter().map(|label| (kind, label)));
     }
+    let mut seen_exits = FxHashSet::default();
     for (kind, label) in exits {
+        if !seen_exits.insert((kind, label)) {
+            continue;
+        }
         let tag = label.map_or_else(|| kind.to_owned(), |label| format!("{kind}:{label}"));
         let result_type = Expression::from(
             oxc_ast::ast::MemberExpression::new_static_member_expression(
@@ -916,9 +929,9 @@ fn captured_loop_dispatch<'a>(
 }
 
 fn captured_loop_mutations(
-    source: &str,
+    _source: &str,
     semantic: &Semantic<'_>,
-) -> Option<FxHashMap<(u32, u32), Vec<CapturedLoopMutation>>> {
+) -> Option<FxHashMap<NodeId, Vec<CapturedLoopMutation>>> {
     let nodes = semantic.nodes();
     let scoping = semantic.scoping();
     let loops = classify_captured_loops(semantic);
@@ -948,10 +961,20 @@ fn captured_loop_mutations(
                 }
                 statement_root = ancestor;
             }
-            let body_is_block =
-                source.as_bytes().get(captured.body_span.start as usize) == Some(&b'{');
-            let content_start = captured.body_span.start + u32::from(body_is_block);
-            let content_end = captured.body_span.end - u32::from(body_is_block);
+            let body_is_block = matches!(
+                nodes.kind(captured.body_node_id),
+                AstKind::BlockStatement(_)
+            );
+            let content_start = captured
+                .body_span
+                .start
+                .saturating_add(u32::from(body_is_block))
+                .min(captured.body_span.end);
+            let content_end = captured
+                .body_span
+                .end
+                .saturating_sub(u32::from(body_is_block))
+                .max(content_start);
             let local_var_declarations = if captured.body_capture || captured.header_capture {
                 body::local_declarations(semantic, captured.body_node_id)
             } else {
@@ -975,115 +998,87 @@ fn captured_loop_mutations(
             }
         })
         .collect::<Vec<_>>();
-    pending.sort_unstable_by_key(|loop_plan| loop_plan.content_start);
-    // Initializer-only rewrites leave control flow and lexical arguments in place.
-    let mut bodies = pending
-        .iter_mut()
-        .filter(|plan| plan.captured.body_capture || plan.captured.header_capture);
-    let mut current = bodies.next();
-    let mut active_functions = Vec::<u32>::new();
-    let mut active_iterations = Vec::<(NodeId, u32)>::new();
-    let mut active_breakables = Vec::<(NodeId, u32)>::new();
+    pending.sort_unstable_by_key(|plan| plan.captured.node_id.index());
+    // Regions are the subtrees moved into helpers, including relocated headers.
+    // Semantic preorder follows the live AST, whose spans may overlap or run
+    // backwards after an earlier transform.
+    let mut regions = FxHashMap::default();
+    for (index, plan) in pending.iter().enumerate() {
+        if !(plan.captured.body_capture || plan.captured.header_capture) {
+            continue;
+        }
+        regions.insert(plan.captured.body_node_id, index);
+        if plan.captured.header_capture
+            && let AstKind::ForStatement(statement) = nodes.kind(plan.captured.node_id)
+        {
+            for expression in statement.test.iter().chain(statement.update.iter()) {
+                regions.insert(expression.node_id(), index);
+            }
+        }
+    }
+    // Carry body context down parent links, including exit targets, so deeply
+    // nested unlabelled exits do not walk their ancestors again for each node.
+    #[derive(Clone, Copy, Default)]
+    struct BodyContext {
+        owner: Option<usize>,
+        functions: usize,
+        nested_iteration: bool,
+        nested_breakable: bool,
+    }
+    let mut ancestry = Vec::<(NodeId, BodyContext)>::new();
     for (node_id, node) in nodes.iter_enumerated() {
-        let span = node.kind().span();
-        while current
-            .as_ref()
-            .is_some_and(|plan| span.start >= plan.content_end)
-        {
-            current = bodies.next();
-            active_functions.clear();
-            active_iterations.clear();
-            active_breakables.clear();
+        let parent = nodes.parent_id(node_id);
+        while ancestry.last().is_some_and(|(id, _)| *id != parent) {
+            ancestry.pop();
         }
-        let Some(loop_plan) = current.as_deref_mut() else {
-            break;
+        let mut context = ancestry
+            .last()
+            .map_or_else(BodyContext::default, |(_, context)| *context);
+        if let Some(index) = regions.get(&node_id) {
+            context = BodyContext {
+                owner: Some(*index),
+                ..BodyContext::default()
+            };
+        }
+        context.functions += usize::from(node.kind().is_function_like());
+        context.nested_iteration |= node.kind().is_iteration_statement();
+        context.nested_breakable |= node.kind().is_iteration_statement()
+            || matches!(node.kind(), AstKind::SwitchStatement(_));
+        ancestry.push((node_id, context));
+        let Some(index) = context.owner else {
+            continue;
         };
-        let in_header = if loop_plan.captured.header_capture
-            && let AstKind::ForStatement(statement) = nodes.kind(loop_plan.captured.node_id)
-        {
-            statement
-                .test
-                .iter()
-                .chain(statement.update.iter())
-                .any(|expression| {
-                    let header_span = expression.span();
-                    span.start >= header_span.start && span.end <= header_span.end
-                })
-        } else {
-            false
-        };
-        if !in_header && (span.start < loop_plan.content_start || span.end > loop_plan.content_end)
-        {
-            continue;
-        }
-        while active_functions
-            .last()
-            .is_some_and(|end| span.start >= *end)
-        {
-            active_functions.pop();
-        }
-        while active_iterations
-            .last()
-            .is_some_and(|(_, end)| span.start >= *end)
-        {
-            active_iterations.pop();
-        }
-        while active_breakables
-            .last()
-            .is_some_and(|(_, end)| span.start >= *end)
-        {
-            active_breakables.pop();
-        }
-        if node.kind().is_function_like() {
-            active_functions.push(span.end);
-            continue;
-        }
-        if node.kind().is_iteration_statement() {
-            active_iterations.push((node_id, span.end));
-            active_breakables.push((node_id, span.end));
-            continue;
-        }
-        if matches!(node.kind(), AstKind::SwitchStatement(_)) {
-            active_breakables.push((node_id, span.end));
-            continue;
-        }
-        let belongs_to_body = active_functions.is_empty();
-        // A label is local only when its target moves into the same helper.
-        // Include a labeled statement that is itself the loop body.
-        let label_leaves_body = |name: &str| {
+        let loop_plan = &mut pending[index];
+        let belongs_to_body = context.functions == 0;
+        let ancestors = || {
             nodes
                 .ancestor_ids(node_id)
                 .take_while(|id| *id != loop_plan.captured.node_id)
-                .all(|id| {
-                    !matches!(nodes.kind(id), AstKind::LabeledStatement(target)
-                    if target.label.name == name)
-                })
+        };
+        let label_leaves_body = |name: &str| {
+            ancestors().all(|id| !matches!(nodes.kind(id), AstKind::LabeledStatement(target) if target.label.name == name))
         };
         match node.kind() {
             AstKind::IdentifierReference(identifier) if identifier.name == "arguments" => {
-                // The range check already limits this to the extracted body/header.
-                // Arrows inherit arguments; functions and static blocks do not.
-                let inherited = nodes
-                    .ancestor_ids(node_id)
-                    .take_while(|id| *id != loop_plan.captured.node_id)
-                    .all(|id| {
-                        !matches!(
-                            nodes.kind(id),
-                            AstKind::Function(_) | AstKind::StaticBlock(_)
-                        )
-                    });
+                let inherited = ancestors().all(|id| {
+                    !matches!(
+                        nodes.kind(id),
+                        AstKind::Function(_) | AstKind::StaticBlock(_)
+                    )
+                });
                 let local = identifier
                     .reference_id
                     .get()
                     .and_then(|id| scoping.get_reference(id).symbol_id())
                     .is_some_and(|id| {
-                        let span = scoping.symbol_span(id);
-                        span.start >= loop_plan.content_start && span.end <= loop_plan.content_end
+                        let declaration = scoping.symbol_declaration(id);
+                        declaration == loop_plan.captured.body_node_id
+                            || nodes
+                                .ancestor_ids(declaration)
+                                .any(|id| id == loop_plan.captured.body_node_id)
                     });
                 if inherited && !local {
-                    loop_plan
-                        .arguments_references
-                        .insert((span.start, span.end));
+                    loop_plan.arguments_references.insert(node_id);
                 }
             }
             AstKind::TryStatement(statement)
@@ -1096,58 +1091,42 @@ fn captured_loop_mutations(
             }
             AstKind::YieldExpression(_) if belongs_to_body => {
                 loop_plan.has_yield = true;
-                loop_plan.has_yielding_finally |= nodes
-                    .ancestor_ids(node_id)
-                    .take_while(|id| *id != loop_plan.captured.node_id)
-                    .any(|id| {
-                        matches!(nodes.kind(id), AstKind::TryStatement(statement)
-                        if statement.finalizer.as_ref().is_some_and(|finalizer|
-                            finalizer.span.start <= span.start && span.end <= finalizer.span.end))
-                    });
+                // A finalizer is a real ancestor block, not a containing range.
+                loop_plan.has_yielding_finally |= ancestors().any(|id| {
+                    let AstKind::BlockStatement(_) = nodes.kind(id) else { return false; };
+                    matches!(nodes.parent_kind(id), AstKind::TryStatement(statement)
+                        if statement.finalizer.as_ref().is_some_and(|block| block.node_id.get() == id))
+                });
             }
-            AstKind::ReturnStatement(statement) if belongs_to_body => {
-                loop_plan
-                    .returns
-                    .insert((statement.span.start, statement.span.end));
+            AstKind::ReturnStatement(_) if belongs_to_body => {
+                loop_plan.returns.insert(node_id);
             }
             AstKind::BreakStatement(statement)
                 if belongs_to_body
                     && statement.label.as_ref().map_or_else(
-                        || {
-                            active_breakables
-                                .last()
-                                .is_none_or(|(target, _)| *target == loop_plan.captured.node_id)
-                        },
+                        || !context.nested_breakable,
                         |label| label_leaves_body(label.name.as_str()),
                     ) =>
             {
-                loop_plan
-                    .breaks
-                    .insert((statement.span.start, statement.span.end));
+                loop_plan.breaks.insert(node_id);
                 if let Some(label) = &statement.label {
                     loop_plan
                         .exit_labels
-                        .insert((span.start, span.end), label.name.to_string());
+                        .insert(node_id, label.name.to_string());
                 }
             }
             AstKind::ContinueStatement(statement)
                 if belongs_to_body
                     && statement.label.as_ref().map_or_else(
-                        || {
-                            active_iterations
-                                .last()
-                                .is_none_or(|(target, _)| *target == loop_plan.captured.node_id)
-                        },
+                        || !context.nested_iteration,
                         |label| label_leaves_body(label.name.as_str()),
                     ) =>
             {
-                loop_plan
-                    .continues
-                    .insert((statement.span.start, statement.span.end));
+                loop_plan.continues.insert(node_id);
                 if let Some(label) = &statement.label {
                     loop_plan
                         .exit_labels
-                        .insert((span.start, span.end), label.name.to_string());
+                        .insert(node_id, label.name.to_string());
                 }
             }
             _ => {}
@@ -1160,7 +1139,7 @@ fn captured_loop_mutations(
             .keys()
             .map(ToString::to_string),
     );
-    let mut roots: FxHashMap<(u32, u32), Vec<CapturedLoopMutation>> = FxHashMap::default();
+    let mut roots: FxHashMap<NodeId, Vec<CapturedLoopMutation>> = FxHashMap::default();
     for loop_plan in pending {
         let PendingCapturedLoop {
             mut captured,
@@ -1169,7 +1148,7 @@ fn captured_loop_mutations(
             content_start,
             content_end,
             returns,
-            mut breaks,
+            breaks,
             continues,
             has_await,
             has_yield,
@@ -1193,27 +1172,20 @@ fn captured_loop_mutations(
                 .iter()
                 .any(|binding| !binding.protect_writes);
         let extract_body = captured.body_capture || captured.header_capture;
-        let header = (captured.header_capture || captured.init_capture).then(|| {
-            // Only relocated tests introduce a synthetic break.
-            if captured.header_capture {
-                breaks.insert((captured.span.start, captured.span.start));
-            }
-            header::Plan {
-                first: captured
-                    .header_capture
-                    .then(|| reserve_name("_first", &mut reserved)),
-                initial: captured
-                    .init_capture
-                    .then(|| reserve_name("_initial", &mut reserved)),
-            }
+        let header = (captured.header_capture || captured.init_capture).then(|| header::Plan {
+            first: captured
+                .header_capture
+                .then(|| reserve_name("_first", &mut reserved)),
+            initial: captured
+                .init_capture
+                .then(|| reserve_name("_initial", &mut reserved)),
         });
-        let root_span = nodes.kind(statement_root).span();
         roots
-            .entry((root_span.start, root_span.end))
+            .entry(statement_root)
             .or_default()
             .push(CapturedLoopMutation {
                 extract_body,
-                loop_span: captured.span,
+                loop_id: captured.node_id,
                 insertion_anchor: Span::new(captured.span.start, captured.span.start),
                 anchor: Span::new(content_start, content_start),
                 dispatch_anchor: Span::new(content_end, content_end),
@@ -1311,15 +1283,17 @@ fn classify_captured_loops(semantic: &Semantic<'_>) -> FxHashMap<NodeId, Capture
                     .iter()
                     .any(|binding| binding.name == identifier.name.as_str())
             {
-                let protect_writes = scoping
+                let is_const = scoping
                     .symbol_flags(symbol_id)
-                    .contains(SymbolFlags::ConstVariable)
+                    .contains(SymbolFlags::ConstVariable);
+                let protect_writes = is_const
                     && scoping
                         .get_resolved_reference_ids(symbol_id)
                         .iter()
                         .any(|id| scoping.get_reference(*id).is_write());
                 loop_fact.header_bindings.push(HeaderBinding {
                     name: identifier.name.to_string(),
+                    is_const,
                     protect_writes,
                     parameter_alias: None,
                 });
@@ -1453,12 +1427,9 @@ pub(super) fn prepare_with_reserved<'a>(
             .push(symbol_id);
     }
     for symbols in symbols_by_name.values_mut() {
-        symbols.sort_unstable_by_key(|symbol_id| {
-            (
-                scope_index[&scoping.symbol_scope_id(*symbol_id)],
-                scoping.symbol_span(*symbol_id).start,
-            )
-        });
+        // One name has at most one symbol per scope. Scope order alone is
+        // sufficient for the ancestry sweep, even when anchors coincide.
+        symbols.sort_unstable_by_key(|symbol_id| scope_index[&scoping.symbol_scope_id(*symbol_id)]);
         let mut active = Vec::<(usize, ScopeId)>::new();
         let mut active_targets = FxHashMap::<ScopeId, usize>::default();
         for symbol_id in symbols.iter().copied() {
@@ -1509,13 +1480,15 @@ pub(super) fn prepare_with_reserved<'a>(
         // preserve it even when its declaration appears after the lexical one.
         // Otherwise preserve the shallowest lexical binding, matching Babel's
         // choice of the binding that already belongs closest to the var scope.
+        // Equal-depth scopes follow the live semantic traversal, not source
+        // locations: rewrites can move declarations or give them shared anchors.
         symbols.sort_unstable_by_key(|symbol_id| {
             (
                 !scoping
                     .symbol_flags(*symbol_id)
                     .contains(SymbolFlags::FunctionScopedVariable),
                 scope_depth[&scoping.symbol_scope_id(*symbol_id)],
-                scoping.symbol_span(*symbol_id).start,
+                scope_index[&scoping.symbol_scope_id(*symbol_id)],
             )
         });
         for (index, symbol_id) in symbols
@@ -1549,42 +1522,13 @@ pub(super) fn prepare_with_reserved<'a>(
         }
     }
 
-    let binding_renames = renames
-        .iter()
-        .map(|(symbol_id, replacement)| {
-            let span = scoping.symbol_span(*symbol_id);
-            (
-                (
-                    span.start,
-                    span.end,
-                    scoping.symbol_name(*symbol_id).to_owned(),
-                ),
-                replacement.clone(),
-            )
-        })
-        .collect();
     let reference_renames = renames
         .iter()
         .flat_map(|(symbol_id, replacement)| {
             scoping
                 .get_resolved_reference_ids(*symbol_id)
                 .iter()
-                .filter_map(|reference_id| {
-                    let reference = scoping.get_reference(*reference_id);
-                    let AstKind::IdentifierReference(identifier) =
-                        semantic.nodes().kind(reference.node_id())
-                    else {
-                        return None;
-                    };
-                    Some((
-                        (
-                            identifier.span.start,
-                            identifier.span.end,
-                            identifier.name.to_string(),
-                        ),
-                        replacement.clone(),
-                    ))
-                })
+                .map(|reference_id| (*reference_id, replacement.clone()))
         })
         .collect();
     let loop_reset_declarations = collect_loop_reset_declarations(semantic);
@@ -1599,23 +1543,18 @@ pub(super) fn prepare_with_reserved<'a>(
             if !reference.is_write() {
                 continue;
             }
-            let write_span =
-                semantic
-                    .nodes()
-                    .ancestor_ids(reference.node_id())
-                    .find_map(|ancestor| match semantic.nodes().kind(ancestor) {
-                        AstKind::AssignmentExpression(expression) => Some(expression.span),
-                        AstKind::UpdateExpression(expression) => Some(expression.span),
-                        _ => None,
-                    });
-            if let Some(expression_span) = write_span {
-                let reference_span = semantic.nodes().kind(reference.node_id()).span();
-                if expression_span != reference_span {
-                    const_write_expressions.insert(
-                        (expression_span.start, expression_span.end),
-                        scoping.symbol_name(symbol_id).to_owned(),
-                    );
-                }
+            let write_node = semantic
+                .nodes()
+                .ancestor_ids(reference.node_id())
+                .find(|ancestor| {
+                    matches!(
+                        semantic.nodes().kind(*ancestor),
+                        AstKind::AssignmentExpression(_) | AstKind::UpdateExpression(_)
+                    )
+                });
+            if let Some(write_node) = write_node {
+                const_write_expressions
+                    .insert(write_node, scoping.symbol_name(symbol_id).to_owned());
             }
         }
     }
@@ -1629,7 +1568,7 @@ pub(super) fn prepare_with_reserved<'a>(
         )
     };
     Ok(BlockScopingPlan {
-        binding_renames,
+        binding_renames: renames,
         reference_renames,
         loop_reset_declarations,
         const_write_expressions,
@@ -1642,20 +1581,31 @@ pub(super) fn prepare_with_reserved<'a>(
 /// getter-only private accessors. Hermes V1 keeps private syntax, so this
 /// belongs in the active block-scoping pass rather than requiring the disabled
 /// private-method transform.
-fn collect_read_only_private_writes(semantic: &Semantic<'_>) -> FxHashMap<(u32, u32), String> {
+fn collect_read_only_private_writes(semantic: &Semantic<'_>) -> FxHashMap<NodeId, String> {
     struct PrivateClass {
-        end: u32,
+        node_id: NodeId,
         names: FxHashMap<String, bool>,
     }
 
     let nodes = semantic.nodes();
     let mut writes = FxHashMap::default();
+    if !nodes
+        .iter_enumerated()
+        .any(|(_, node)| matches!(node.kind(), AstKind::PrivateFieldExpression(_)))
+    {
+        return writes;
+    }
     let mut classes = Vec::<PrivateClass>::new();
+    let mut ancestry = Vec::<NodeId>::new();
     for (node_id, node) in nodes.iter_enumerated() {
-        let span = node.kind().span();
-        while classes.last().is_some_and(|class| span.start >= class.end) {
-            classes.pop();
+        let parent = nodes.parent_id(node_id);
+        while ancestry.last().is_some_and(|id| *id != parent) {
+            let exited = ancestry.pop().unwrap();
+            if classes.last().is_some_and(|class| class.node_id == exited) {
+                classes.pop();
+            }
         }
+        ancestry.push(node_id);
         // Heritage runs in the enclosing private environment. Activate the new
         // declarations only at the body, retaining writable names for shadowing.
         if let AstKind::ClassBody(class) = node.kind() {
@@ -1692,10 +1642,7 @@ fn collect_read_only_private_writes(semantic: &Semantic<'_>) -> FxHashMap<(u32, 
                     Some((key.name.to_string(), read_only))
                 })
                 .collect();
-            classes.push(PrivateClass {
-                end: class.span.end,
-                names,
-            });
+            classes.push(PrivateClass { node_id, names });
             continue;
         }
         let AstKind::PrivateFieldExpression(field) = node.kind() else {
@@ -1716,25 +1663,19 @@ fn collect_read_only_private_writes(semantic: &Semantic<'_>) -> FxHashMap<(u32, 
                 if matches!(
                     &expression.left,
                     AssignmentTarget::PrivateFieldExpression(target)
-                        if target.span == field.span
+                        if target.node_id.get() == node_id
                 ) =>
             {
-                writes.insert(
-                    (expression.span.start, expression.span.end),
-                    field.field.name.to_string(),
-                );
+                writes.insert(parent_id, field.field.name.to_string());
             }
             AstKind::UpdateExpression(expression)
                 if matches!(
                     &expression.argument,
                     SimpleAssignmentTarget::PrivateFieldExpression(target)
-                        if target.span == field.span
+                        if target.node_id.get() == node_id
                 ) =>
             {
-                writes.insert(
-                    (expression.span.start, expression.span.end),
-                    field.field.name.to_string(),
-                );
+                writes.insert(parent_id, field.field.name.to_string());
             }
             _ => {}
         }
@@ -1742,83 +1683,42 @@ fn collect_read_only_private_writes(semantic: &Semantic<'_>) -> FxHashMap<(u32, 
     writes
 }
 
-/// Find uninitialized lexical declarations that execute repeatedly in loop
-/// bodies. Semantic nodes are in source preorder, so each loop/function enters
-/// and leaves these stacks once instead of walking ancestors per declaration.
-fn collect_loop_reset_declarations(semantic: &Semantic<'_>) -> FxHashSet<(u32, u32)> {
-    #[derive(Clone, Copy)]
-    struct ActiveLoop {
-        end: u32,
-        boundary_depth: usize,
-    }
-
+/// Find declarations that need a fresh undefined value on every loop entry.
+/// Track AST ancestry in linear time; generated/moved nodes need not have
+/// distinct or source-ordered mapping anchors.
+fn collect_loop_reset_declarations(semantic: &Semantic<'_>) -> FxHashSet<NodeId> {
     let nodes = semantic.nodes();
+    if !nodes
+        .iter_enumerated()
+        .any(|(_, node)| node.kind().is_iteration_statement())
+    {
+        return FxHashSet::default();
+    }
+    let mut ancestors = Vec::<(NodeId, bool)>::new();
     let mut resets = FxHashSet::default();
-    let mut pending_loops = Vec::<(u32, ActiveLoop)>::new();
-    let mut active_loops = Vec::<ActiveLoop>::new();
-    let mut active_boundaries = Vec::<u32>::new();
-
     for (node_id, node) in nodes.iter_enumerated() {
-        let span = node.kind().span();
-        while active_loops
-            .last()
-            .is_some_and(|loop_| span.start >= loop_.end)
-        {
-            active_loops.pop();
+        let parent = nodes.parent_id(node_id);
+        while ancestors.last().is_some_and(|(id, _)| *id != parent) {
+            ancestors.pop();
         }
-        while active_boundaries
-            .last()
-            .is_some_and(|end| span.start >= *end)
-        {
-            active_boundaries.pop();
-        }
-        while pending_loops
-            .last()
-            .is_some_and(|(start, _)| span.start >= *start)
-        {
-            let (_, loop_) = pending_loops.pop().unwrap();
-            active_loops.push(loop_);
-        }
-
-        if node.kind().is_function_like() {
-            active_boundaries.push(span.end);
-        }
-        if let Some(body) = loop_body(node.kind()) {
-            let body_span = body.span();
-            pending_loops.push((
-                body_span.start,
-                ActiveLoop {
-                    end: body_span.end,
-                    boundary_depth: active_boundaries.len(),
-                },
-            ));
-        }
-
+        let in_loop = !node.kind().is_function_like()
+            && (loop_body(nodes.kind(parent)).is_some_and(|body| body.node_id() == node_id)
+                || ancestors.last().is_some_and(|(_, in_loop)| *in_loop));
+        ancestors.push((node_id, in_loop));
         let AstKind::VariableDeclarator(declarator) = node.kind() else {
             continue;
         };
         let declaration_id = nodes.parent_id(node_id);
-        if declarator.init.is_none()
-            && matches!(
-                nodes.parent_kind(node_id),
-                AstKind::VariableDeclaration(declaration)
-                    if matches!(
-                        declaration.kind,
-                        VariableDeclarationKind::Let | VariableDeclarationKind::Const
-                    )
-            )
+        if in_loop
+            && declarator.init.is_none()
+            && matches!(nodes.parent_kind(node_id), AstKind::VariableDeclaration(declaration)
+                if matches!(declaration.kind, VariableDeclarationKind::Let | VariableDeclarationKind::Const))
             && !matches!(
                 nodes.parent_kind(declaration_id),
                 AstKind::ForInStatement(_) | AstKind::ForOfStatement(_)
             )
-            && !pending_loops.last().is_some_and(|(body_start, loop_)| {
-                span.start < *body_start && loop_.boundary_depth == active_boundaries.len()
-            })
-            && active_loops
-                .last()
-                .is_some_and(|loop_| loop_.boundary_depth == active_boundaries.len())
         {
-            resets.insert((declarator.span.start, declarator.span.end));
+            resets.insert(node_id);
         }
     }
     resets
@@ -1862,10 +1762,10 @@ fn has_captured_loop_binding(semantic: &Semantic<'_>) -> bool {
 }
 
 pub(super) struct BlockScopingPlan {
-    binding_renames: FxHashMap<(u32, u32, String), String>,
-    reference_renames: FxHashMap<(u32, u32, String), String>,
-    loop_reset_declarations: FxHashSet<(u32, u32)>,
-    const_write_expressions: FxHashMap<(u32, u32), String>,
+    binding_renames: FxHashMap<SymbolId, String>,
+    reference_renames: FxHashMap<ReferenceId, String>,
+    loop_reset_declarations: FxHashSet<NodeId>,
+    const_write_expressions: FxHashMap<NodeId, String>,
     read_only_helper: Option<String>,
     read_only_temp: Option<String>,
 }
@@ -1997,12 +1897,12 @@ impl<'a> VisitMut<'a> for BlockScopingLowerer<'a> {
             walk_mut::walk_assignment_target_property(self, property);
             return;
         };
-        let key = (
-            shorthand.binding.span.start,
-            shorthand.binding.span.end,
-            shorthand.binding.name.to_string(),
-        );
-        let Some(replacement) = self.plan.reference_renames.get(&key) else {
+        let Some(replacement) = shorthand
+            .binding
+            .reference_id
+            .get()
+            .and_then(|id| self.plan.reference_renames.get(&id))
+        else {
             walk_mut::walk_assignment_target_property(self, property);
             return;
         };
@@ -2039,7 +1939,7 @@ impl<'a> VisitMut<'a> for BlockScopingLowerer<'a> {
         let Some(name) = self
             .plan
             .const_write_expressions
-            .get(&(span.start, span.end))
+            .get(&expression.node_id())
             .cloned()
         else {
             walk_mut::walk_expression(self, expression);
@@ -2137,7 +2037,7 @@ impl<'a> VisitMut<'a> for BlockScopingLowerer<'a> {
                     && self
                         .plan
                         .loop_reset_declarations
-                        .contains(&(declarator.span.start, declarator.span.end))
+                        .contains(&declarator.node_id.get())
                 {
                     let span = declarator.span;
                     declarator.init =
@@ -2150,21 +2050,21 @@ impl<'a> VisitMut<'a> for BlockScopingLowerer<'a> {
     }
 
     fn visit_binding_identifier(&mut self, identifier: &mut BindingIdentifier<'a>) {
-        if let Some(replacement) = self.plan.binding_renames.get(&(
-            identifier.span.start,
-            identifier.span.end,
-            identifier.name.to_string(),
-        )) {
+        if let Some(replacement) = identifier
+            .symbol_id
+            .get()
+            .and_then(|id| self.plan.binding_renames.get(&id))
+        {
             identifier.name = self.allocator.alloc_str(replacement).into();
         }
     }
 
     fn visit_identifier_reference(&mut self, identifier: &mut IdentifierReference<'a>) {
-        if let Some(replacement) = self.plan.reference_renames.get(&(
-            identifier.span.start,
-            identifier.span.end,
-            identifier.name.to_string(),
-        )) {
+        if let Some(replacement) = identifier
+            .reference_id
+            .get()
+            .and_then(|id| self.plan.reference_renames.get(&id))
+        {
             identifier.name = self.allocator.alloc_str(replacement).into();
         }
     }
@@ -2176,6 +2076,102 @@ mod tests {
     use oxc_parser::Parser;
     use oxc_semantic::SemanticBuilder;
     use oxc_span::SourceType;
+
+    #[test]
+    fn renames_distinguish_bindings_and_references_with_shared_source_anchors() {
+        struct SharedAnchors;
+        impl<'a> VisitMut<'a> for SharedAnchors {
+            fn visit_binding_identifier(&mut self, identifier: &mut BindingIdentifier<'a>) {
+                identifier.span = Span::default();
+            }
+
+            fn visit_identifier_reference(&mut self, identifier: &mut IdentifierReference<'a>) {
+                identifier.span = Span::default();
+            }
+        }
+
+        let source = "let value = 1; { let value = 2; use(value); } use(value);";
+        let allocator = Allocator::default();
+        let mut parsed = Parser::new(&allocator, source, SourceType::default()).parse();
+        assert!(parsed.diagnostics.is_empty());
+        SharedAnchors.visit_program(&mut parsed.program);
+        let semantic = SemanticBuilder::new()
+            .with_build_nodes(true)
+            .build(&parsed.program);
+        assert!(semantic.diagnostics.is_empty());
+        let plan = prepare(&semantic.semantic).unwrap();
+        drop(semantic);
+        run(&allocator, &mut parsed.program, plan, true);
+        let code = oxc_codegen::Codegen::new().build(&parsed.program).code;
+        assert_eq!(
+            code,
+            "var value = 1;\n{\n\tvar _value = 2;\n\tuse(_value);\n}\nuse(value);\n"
+        );
+    }
+
+    #[test]
+    fn rename_priority_follows_scope_order_with_shared_or_moved_anchors() {
+        struct Anchors(bool);
+        impl<'a> VisitMut<'a> for Anchors {
+            fn visit_span(&mut self, span: &mut Span) {
+                *span = if self.0 {
+                    Span::default()
+                } else {
+                    Span::new(1_000 - span.end, 1_000 - span.start)
+                };
+            }
+        }
+        for (name, source, move_blocks, expected) in [
+            (
+                "sibling scopes",
+                "{let value=function(){return 1};observe(value)}{let value=function(){return 2};observe(value)}",
+                false,
+                "{var value=function(){return 1};observe(value)}{var _value=function(){return 2};observe(_value)}",
+            ),
+            (
+                "moved sibling scopes",
+                "{let value=function(){return 1};observe(value)}{let value=function(){return 2};observe(value)}",
+                true,
+                "{var value=function(){return 2};observe(value)}{var _value=function(){return 1};observe(_value)}",
+            ),
+            (
+                "function-scoped binding keeps priority",
+                "{let value=1;observe(value)}var value=2;observe(value)",
+                false,
+                "{var _value=1;observe(_value)}var value=2;observe(value)",
+            ),
+            (
+                "shallowest lexical binding keeps priority",
+                "{{let value=1;observe(value)}}{let value=2;observe(value)}",
+                false,
+                "{{var _value=1;observe(_value)}}{var value=2;observe(value)}",
+            ),
+        ] {
+            for anchors in ["parsed", "shared", "reversed"] {
+                let allocator = Allocator::default();
+                let mut parsed = Parser::new(&allocator, source, SourceType::default()).parse();
+                assert!(parsed.diagnostics.is_empty());
+                if move_blocks {
+                    parsed.program.body.reverse();
+                }
+                if anchors != "parsed" {
+                    Anchors(anchors == "shared").visit_program(&mut parsed.program);
+                }
+                let semantic = SemanticBuilder::new()
+                    .with_build_nodes(true)
+                    .build(&parsed.program);
+                assert!(semantic.diagnostics.is_empty(), "{name}: {anchors}");
+                let plan = prepare(&semantic.semantic).unwrap();
+                drop(semantic);
+                run(&allocator, &mut parsed.program, plan, true);
+                let output = oxc_codegen::Codegen::new().build(&parsed.program).code;
+                let expected = Parser::new(&allocator, expected, SourceType::default()).parse();
+                assert!(expected.diagnostics.is_empty());
+                let expected = oxc_codegen::Codegen::new().build(&expected.program).code;
+                assert_eq!(output, expected, "{name}: {anchors}");
+            }
+        }
+    }
 
     #[test]
     fn captured_loop_classifies_all_siblings() {
@@ -2261,6 +2257,91 @@ mod tests {
     }
 
     #[test]
+    fn private_write_scopes_follow_ancestry_with_shared_source_anchors() {
+        struct SharedAnchors;
+        impl<'a> VisitMut<'a> for SharedAnchors {
+            fn visit_span(&mut self, span: &mut Span) {
+                *span = Span::default();
+            }
+        }
+        let source = "class A { #m() {} f(){ this.#m=1; return class B { #m=0; f(){this.#m=2;} }; } } class C { #m=0; f(){this.#m=3;} }";
+        let allocator = Allocator::default();
+        let mut parsed = Parser::new(&allocator, source, SourceType::default()).parse();
+        SharedAnchors.visit_program(&mut parsed.program);
+        let semantic = SemanticBuilder::new()
+            .with_build_nodes(true)
+            .build(&parsed.program);
+        assert!(semantic.diagnostics.is_empty());
+        let writes = collect_read_only_private_writes(&semantic.semantic);
+        assert_eq!(writes.len(), 1);
+        let id = *writes.keys().next().unwrap();
+        let AstKind::AssignmentExpression(assignment) = semantic.semantic.nodes().kind(id) else {
+            panic!("expected write");
+        };
+        assert!(
+            matches!(&assignment.right, Expression::NumericLiteral(literal) if literal.value == 1.0)
+        );
+    }
+
+    #[test]
+    fn captured_completions_follow_ancestry_with_shared_source_anchors() {
+        struct SharedAnchors;
+        impl<'a> VisitMut<'a> for SharedAnchors {
+            fn visit_span(&mut self, span: &mut Span) {
+                *span = Span::default();
+            }
+        }
+        let source = "function f() { for(let i=0;i<2;i++){ use(()=>i); if(i) return i; function g(){ return 9; } while(test()) { break; } continue; } }";
+        let allocator = Allocator::default();
+        let mut parsed = Parser::new(&allocator, source, SourceType::default()).parse();
+        SharedAnchors.visit_program(&mut parsed.program);
+        let semantic = SemanticBuilder::new()
+            .with_build_nodes(true)
+            .build(&parsed.program);
+        assert!(semantic.diagnostics.is_empty());
+        let plan = prepare_captured_loop_ast(source, &semantic.semantic).unwrap();
+        let mutation = &plan.roots.values().next().unwrap()[0];
+        assert_eq!(mutation.returns.len(), 1);
+        assert_eq!(mutation.continues.len(), 1);
+        assert!(mutation.breaks.is_empty());
+        drop(semantic);
+        assert!(run_captured_loop_ast(&allocator, &mut parsed.program, plan).unwrap());
+        let code = oxc_codegen::Codegen::new().build(&parsed.program).code;
+        assert!(code.contains("return 9;"), "{code}");
+        assert!(code.contains("break;"), "{code}");
+        assert!(code.contains("type: \"return\""), "{code}");
+        assert!(code.contains("type: \"continue\""), "{code}");
+    }
+
+    #[test]
+    fn loop_resets_follow_ancestry_with_shared_source_anchors() {
+        struct SharedAnchors;
+        impl<'a> VisitMut<'a> for SharedAnchors {
+            fn visit_span(&mut self, span: &mut Span) {
+                *span = Span::default();
+            }
+        }
+        let source =
+            "let outside; for (let header; test();) { let body; function nested() { let local; } }";
+        let allocator = Allocator::default();
+        let mut parsed = Parser::new(&allocator, source, SourceType::default()).parse();
+        SharedAnchors.visit_program(&mut parsed.program);
+        let semantic = SemanticBuilder::new()
+            .with_build_nodes(true)
+            .build(&parsed.program);
+        assert!(semantic.diagnostics.is_empty());
+        let plan = prepare(&semantic.semantic).unwrap();
+        drop(semantic);
+        run(&allocator, &mut parsed.program, plan, true);
+        let code = oxc_codegen::Codegen::new().build(&parsed.program).code;
+        assert!(code.contains("var body = void 0"), "{code}");
+        assert!(code.contains("var outside;"), "{code}");
+        assert!(code.contains("for (var header;"), "{code}");
+        assert!(code.contains("var local;"), "{code}");
+        assert_eq!(code.matches("void 0").count(), 1, "{code}");
+    }
+
+    #[test]
     fn resets_uninitialized_lexical_declarations_in_loop_bodies_only() {
         let source = "for (;;) { let bodyValue; for (let headerValue of values) use(headerValue); const nested = () => { let functionValue; }; }";
         let allocator = Allocator::default();
@@ -2270,8 +2351,9 @@ mod tests {
             .build(&parsed.program);
         let plan = prepare(&semantic.semantic).unwrap();
         assert_eq!(plan.loop_reset_declarations.len(), 1);
-        let &(start, end) = plan.loop_reset_declarations.iter().next().unwrap();
-        assert_eq!(&source[start as usize..end as usize], "bodyValue");
+        let &id = plan.loop_reset_declarations.iter().next().unwrap();
+        let span = semantic.semantic.nodes().kind(id).span();
+        assert_eq!(&source[span.start as usize..span.end as usize], "bodyValue");
     }
 
     #[test]

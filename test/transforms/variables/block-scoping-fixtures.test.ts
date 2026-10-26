@@ -2165,7 +2165,6 @@ async function* c() {
   };
   for (var a of [1]) {
     _loopResult = _loop(a);
-    a = _loopResult.vars[0];
     if (_loopResult.type === 'continue') continue;
   }
 }).not.toThrow();`,
@@ -2220,7 +2219,6 @@ var _loop = a => {
 };
 for (var a of [1]) {
   _loopResult = _loop(a);
-  a = _loopResult.vars[0];
   if (_loopResult.type === 'continue') continue;
 }`,
     modes: [
@@ -3082,8 +3080,6 @@ var _loop = (foo, bar) => {
 };
 for (var { foo, ...bar } of {}) {
   _loopResult = _loop(foo, bar);
-  foo = _loopResult.vars[0];
-  bar = _loopResult.vars[1];
 }`,
     modes: [
       {
@@ -3518,7 +3514,7 @@ expect(count).toBe(2);
     output: `var count = 0;
 for (var outer = 0; outer < 2; outer++) {
   do {
-    for (var done; !done; done = true) {
+    for (var done = void 0; !done; done = true) {
       count++;
     }
   } while (false);
@@ -3553,7 +3549,7 @@ expect(count).toBe(2);
     output: `var count = 0;
 for (var outer = 0; outer < 2; outer++) {
   do {
-    for (var done; !done; done = true) {
+    for (var done = void 0; !done; done = true) {
       count++;
     }
   } while (false);
@@ -3585,7 +3581,7 @@ expect(count).toBe(2);
     filename: 'exec.js',
     output: `var count = 0;
 for (var outer = 0; outer < 2; outer++) {
-  for (var done; !done; done = true) {
+  for (var done = void 0; !done; done = true) {
     count++;
   }
 }
@@ -3616,7 +3612,7 @@ expect(count).toBe(2);
     filename: 'input.js',
     output: `var count = 0;
 for (var outer = 0; outer < 2; outer++) {
-  for (var done; !done; done = true) {
+  for (var done = void 0; !done; done = true) {
     count++;
   }
 }

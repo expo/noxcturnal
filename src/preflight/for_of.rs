@@ -1,6 +1,5 @@
 use oxc_allocator::GetAllocator;
 use oxc_ast::builder::GetAstBuilder;
-use std::collections::VecDeque;
 
 use oxc_allocator::{Allocator, Box as ArenaBox, TakeIn, Vec as ArenaVec};
 use oxc_ast::{
@@ -13,7 +12,7 @@ use oxc_ast::{
     builder::AstBuilder,
 };
 use oxc_ast_visit::{VisitMut, walk_mut};
-use oxc_semantic::Semantic;
+use oxc_semantic::{NodeId, Semantic};
 use oxc_span::{GetSpan, Span};
 use oxc_syntax::operator::{AssignmentOperator, UnaryOperator};
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -22,7 +21,7 @@ use super::helpers::CustomHelperRequests;
 use crate::generated::inline_helpers::INLINE_FOR_OF_HELPER_DESCRIPTOR;
 
 pub(super) struct Plan {
-    names: FxHashMap<(u32, u32), VecDeque<ForOfNames>>,
+    names: FxHashMap<NodeId, ForOfNames>,
     helper: String,
     shadowed_global: bool,
 }
@@ -54,43 +53,40 @@ pub(super) fn prepare(semantic: &Semantic<'_>) -> Plan {
             .is_some()
     });
     let helper = reserve("_createForOfIteratorHelper", &mut reserved);
-    let mut names = FxHashMap::<(u32, u32), VecDeque<ForOfNames>>::default();
-    let mut depth_buckets = Vec::<Vec<&ForOfStatement<'_>>>::new();
-    let mut active_loop_ends = Vec::<u32>::new();
-    for (_, node) in nodes.iter_enumerated() {
-        let AstKind::ForOfStatement(statement) = node.kind() else {
-            continue;
-        };
-        while active_loop_ends
-            .last()
-            .is_some_and(|end| statement.span.start >= *end)
-        {
-            active_loop_ends.pop();
+    let mut names = FxHashMap::<NodeId, ForOfNames>::default();
+    let mut depth_buckets = Vec::<Vec<NodeId>>::new();
+    let mut ancestry = Vec::<(NodeId, usize)>::new();
+    for (node_id, node) in nodes.iter_enumerated() {
+        let parent = nodes.parent_id(node_id);
+        while ancestry.last().is_some_and(|(id, _)| *id != parent) {
+            ancestry.pop();
         }
-        if statement.r#await {
+        let depth = ancestry.last().map_or(0, |(_, depth)| *depth);
+        let selected =
+            matches!(node.kind(), AstKind::ForOfStatement(statement) if !statement.r#await);
+        ancestry.push((node_id, depth + usize::from(selected)));
+        if !selected {
             continue;
         }
-        let depth = active_loop_ends.len();
         if depth_buckets.len() == depth {
             depth_buckets.push(Vec::new());
         }
-        depth_buckets[depth].push(statement);
-        active_loop_ends.push(statement.span.end);
+        depth_buckets[depth].push(node_id);
     }
     // The text implementation transformed only outermost loops, reparsed, and
     // repeated. Within each round it allocated names in Semantic NodeId order.
     // Retain that allocation order while the mutator reaches every retained
     // loop in one walk by planning depth rounds up front.
     for bucket in depth_buckets {
-        for statement in bucket {
-            names
-                .entry((statement.span.start, statement.span.end))
-                .or_default()
-                .push_back(ForOfNames {
+        for node_id in bucket {
+            names.insert(
+                node_id,
+                ForOfNames {
                     iterator: reserve("_iterator", &mut reserved),
                     step: reserve("_step", &mut reserved),
                     caught: reserve("_iteratorError2", &mut reserved),
-                });
+                },
+            );
         }
     }
     Plan {
@@ -151,7 +147,7 @@ pub(super) fn run<'a>(
 
 struct ForOfLowerer<'a> {
     ast: AstBuilder<'a>,
-    names: FxHashMap<(u32, u32), VecDeque<ForOfNames>>,
+    names: FxHashMap<NodeId, ForOfNames>,
     helper: String,
     changed: bool,
     error: Option<&'static str>,
@@ -164,14 +160,9 @@ impl<'a> ForOfLowerer<'a> {
         labels: Vec<String>,
         enclosing_span: Span,
     ) -> Result<Statement<'a>, &'static str> {
-        let key = (statement.span.start, statement.span.end);
-        let Some(plans) = self.names.get_mut(&key) else {
+        let Some(names) = self.names.remove(&statement.node_id.get()) else {
             return Err("for-of-ast-target-missing");
         };
-        let names = plans.pop_front().expect("nonempty for-of plan bucket");
-        if plans.is_empty() {
-            self.names.remove(&key);
-        }
         let ForOfNames {
             iterator,
             step,
@@ -471,6 +462,49 @@ mod tests {
     use oxc_parser::Parser;
     use oxc_semantic::SemanticBuilder;
     use oxc_span::SourceType;
+
+    #[test]
+    fn loop_plans_distinguish_shared_source_anchors() {
+        struct SharedAnchors;
+        impl<'a> VisitMut<'a> for SharedAnchors {
+            fn visit_span(&mut self, span: &mut Span) {
+                *span = Span::default();
+            }
+        }
+        let source = "for(const a of first) { for(const b of second) use(a,b); } for(const c of third) use(c);";
+        let allocator = Allocator::default();
+        let mut parsed = Parser::new(&allocator, source, SourceType::default()).parse();
+        SharedAnchors.visit_program(&mut parsed.program);
+        let semantic = SemanticBuilder::new()
+            .with_build_nodes(true)
+            .build(&parsed.program);
+        let plan = prepare(&semantic.semantic);
+        assert_eq!(plan.names.len(), 3);
+        let loops = semantic
+            .semantic
+            .nodes()
+            .iter_enumerated()
+            .filter_map(|(id, node)| {
+                matches!(node.kind(), AstKind::ForOfStatement(_)).then_some(id)
+            })
+            .collect::<Vec<_>>();
+        let expected = loops
+            .iter()
+            .map(|id| plan.names[id].iterator.clone())
+            .collect::<Vec<_>>();
+        // Preserve depth-round name allocation when source anchors coincide.
+        assert!(expected[0] < expected[2] && expected[2] < expected[1]);
+        drop(semantic);
+        assert!(run(&allocator, &mut parsed.program, plan, true).unwrap().0);
+        let code = oxc_codegen::Codegen::new().build(&parsed.program).code;
+        for (iterator, input) in expected.iter().zip(["first", "second", "third"]) {
+            assert!(
+                code.contains(&format!("{iterator} = _createForOfIteratorHelper({input})")),
+                "{code}"
+            );
+        }
+        assert!(!code.contains(" of "), "{code}");
+    }
 
     #[test]
     fn nested_loop_depth_plans_all_loops() {

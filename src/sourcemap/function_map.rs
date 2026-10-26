@@ -1,5 +1,5 @@
 use napi_derive::napi;
-use oxc_allocator::Allocator;
+use oxc_allocator::{Allocator, GetAddress};
 use oxc_ast::{
     AstKind,
     ast::{Expression, MethodDefinitionKind},
@@ -268,7 +268,7 @@ impl<'a> FunctionMapCollector<'a> {
                     if let Some(argument_index) = call
                         .arguments
                         .iter()
-                        .position(|argument| argument.span() == kind.span())
+                        .position(|argument| argument.address() == kind.address())
                     {
                         let callee = self.callee_name(&call.callee);
                         if argument_index == 0
@@ -287,7 +287,7 @@ impl<'a> FunctionMapCollector<'a> {
                     if let Some(argument_index) = call
                         .arguments
                         .iter()
-                        .position(|argument| argument.span() == kind.span())
+                        .position(|argument| argument.address() == kind.address())
                     {
                         return format!(
                             "{}$argument_{argument_index}",
@@ -633,6 +633,49 @@ fn position_greater(left: Position, right: Position) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn argument_names_distinguish_shared_function_anchors() {
+        use oxc_ast::ast::{Argument, Function, Statement};
+        use oxc_ast_visit::{VisitMut, walk_mut};
+        use oxc_syntax::scope::ScopeFlags;
+        struct SharedAnchors;
+        impl<'a> VisitMut<'a> for SharedAnchors {
+            fn visit_function(&mut self, function: &mut Function<'a>, flags: ScopeFlags) {
+                function.span = Span::default();
+                walk_mut::walk_function(self, function, flags);
+            }
+        }
+        let source = "call(function(){},function(){}); new Construct(function(){},function(){});";
+        let allocator = Allocator::default();
+        let mut parsed = Parser::new(&allocator, source, oxc_span::SourceType::default()).parse();
+        SharedAnchors.visit_program(&mut parsed.program);
+        for statement in &parsed.program.body {
+            let Statement::ExpressionStatement(statement) = statement else {
+                panic!()
+            };
+            let (parent, arguments, name) = match &statement.expression {
+                Expression::CallExpression(call) => {
+                    (AstKind::CallExpression(call), &call.arguments, "call")
+                }
+                Expression::NewExpression(call) => {
+                    (AstKind::NewExpression(call), &call.arguments, "Construct")
+                }
+                _ => panic!(),
+            };
+            let mut collector = FunctionMapCollector::new(source, "input.js");
+            collector.ancestors.push(parent);
+            for (index, argument) in arguments.iter().enumerate() {
+                let Argument::FunctionExpression(function) = argument else {
+                    panic!()
+                };
+                assert_eq!(
+                    collector.frame_name(AstKind::Function(function)),
+                    format!("{name}$argument_{index}")
+                );
+            }
+        }
+    }
 
     #[test]
     fn interning_preserves_first_emission_order_and_skips_unused_names() {

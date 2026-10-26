@@ -72,7 +72,7 @@ use serde::Deserialize;
 
 use oxc_allocator::{ArenaBox, ArenaVec};
 use oxc_ast::ast::{Argument, CallExpression, Expression, IdentifierName};
-use oxc_semantic::{ReferenceFlags, SymbolFlags};
+use oxc_semantic::{ReferenceFlags, ReferenceId, SymbolFlags};
 use oxc_span::SPAN;
 use oxc_str::{Str, static_ident};
 use oxc_traverse::BoundIdentifier;
@@ -249,8 +249,9 @@ pub struct HelperLoaderStore<'a> {
     module_name: Cow<'static, str>,
     mode: HelperLoaderMode,
     /// Loaded helpers, determined what helpers are loaded and what imports should be added.
-    loaded_helpers: FxHashMap<Helper, BoundIdentifier<'a>>,
+    pub(crate) loaded_helpers: FxHashMap<Helper, BoundIdentifier<'a>>,
     pub(crate) used_helpers: FxHashMap<Helper, String>,
+    pub(crate) external_helper_references: Vec<ReferenceId>,
 }
 
 impl HelperLoaderStore<'_> {
@@ -260,6 +261,7 @@ impl HelperLoaderStore<'_> {
             mode: options.mode,
             loaded_helpers: FxHashMap::default(),
             used_helpers: FxHashMap::default(),
+            external_helper_references: Vec::new(),
         }
     }
 }
@@ -337,6 +339,11 @@ impl<'a> HelperLoaderStore<'a> {
         let helper_var = static_ident!("babelHelpers");
         let symbol_id = ctx.scoping().find_binding(ctx.current_scope_id(), helper_var);
         let object = ctx.create_ident_expr(SPAN, helper_var, symbol_id, ReferenceFlags::Read);
+        let Expression::Identifier(reference) = &object else { unreachable!() };
+        ctx.state
+            .helper_loader
+            .external_helper_references
+            .push(reference.reference_id.get().unwrap());
         let property = IdentifierName::new(SPAN, helper.name(), ctx);
         Expression::new_static_member_expression(SPAN, object, property, false, ctx)
     }

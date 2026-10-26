@@ -6,6 +6,17 @@ import { compile, execute } from './runtime';
 // too so each expected value is independently grounded in JavaScript semantics.
 const cases = [
   {
+    name: 'nested loop initializer resets on each outer iteration',
+    source: `
+      const seen = [];
+      for (let i = 0; i < 2; i++) {
+        for (let value; seen.push(value), value === undefined;) { value = i; }
+      }
+      globalThis.result = seen;
+    `,
+    expected: [undefined, 0, undefined, 1],
+  },
+  {
     name: 'for-in iterable functions have private locals and run once',
     source: `
       const reads = []; let calls = 0;

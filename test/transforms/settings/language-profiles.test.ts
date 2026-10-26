@@ -79,7 +79,7 @@ test('composes the native portion of the legacy Hermes language profile in one p
       function _initialize() {
         Object.defineProperty(this, _value, { writable: true, value: 1 });
       }
-      var _Reader = function _Reader() {
+      var _Reader = function Reader() {
         if (!new.target) throw new TypeError(\`Cannot call a class as a function\`);
         _initialize.call(this);
       };

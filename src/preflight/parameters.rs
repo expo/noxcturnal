@@ -1,5 +1,4 @@
 use oxc_ast::builder::GetAstBuilder;
-use std::collections::VecDeque;
 
 use oxc_allocator::{Allocator, Box as ArenaBox, CloneIn, TakeIn, Vec as ArenaVec};
 use oxc_ast::{
@@ -23,18 +22,11 @@ use oxc_span::{GetSpan, Span};
 use oxc_syntax::operator::{
     AssignmentOperator, BinaryOperator, LogicalOperator, UnaryOperator, UpdateOperator,
 };
-use oxc_syntax::symbol::SymbolFlags;
 use rustc_hash::{FxHashMap, FxHashSet};
 
-struct SymbolFact<'a> {
-    span: Span,
-    name: &'a str,
-    flags: SymbolFlags,
-}
-
 pub(super) struct AstPlan {
-    functions: FxHashMap<u32, VecDeque<AstFunctionPlan>>,
-    arrows: FxHashMap<u32, VecDeque<AstArrowPlan>>,
+    functions: FxHashMap<NodeId, AstFunctionPlan>,
+    arrows: FxHashMap<NodeId, AstArrowPlan>,
     hoists: FxHashMap<NodeId, Vec<CaptureAliases>>,
 }
 
@@ -76,9 +68,9 @@ struct CaptureAliases {
     deferred_this: bool,
     arguments_name: Option<String>,
     new_target_name: Option<String>,
-    this_spans: FxHashSet<(u32, u32)>,
-    arguments_spans: FxHashSet<(u32, u32)>,
-    new_target_spans: FxHashSet<(u32, u32)>,
+    this_nodes: FxHashSet<NodeId>,
+    arguments_nodes: FxHashSet<NodeId>,
+    new_target_nodes: FxHashSet<NodeId>,
 }
 
 impl CaptureAliases {
@@ -124,17 +116,8 @@ fn prepare_selected(
         });
     }
     let scoping = semantic.scoping();
-    let mut symbols = scoping
-        .symbol_ids()
-        .map(|symbol_id| SymbolFact {
-            span: scoping.symbol_span(symbol_id),
-            name: scoping.symbol_name(symbol_id),
-            flags: scoping.symbol_flags(symbol_id),
-        })
-        .collect::<Vec<_>>();
-    symbols.sort_unstable_by_key(|symbol| symbol.span.start);
-    let mut functions: FxHashMap<u32, VecDeque<AstFunctionPlan>> = FxHashMap::default();
-    let mut arrows: FxHashMap<u32, VecDeque<AstArrowPlan>> = FxHashMap::default();
+    let mut functions: FxHashMap<NodeId, AstFunctionPlan> = FxHashMap::default();
+    let mut arrows: FxHashMap<NodeId, AstArrowPlan> = FxHashMap::default();
     let mut hoists: FxHashMap<NodeId, Vec<CaptureAliases>> = FxHashMap::default();
     let mut reserved: FxHashSet<String> = scoping
         .symbol_names()
@@ -173,7 +156,7 @@ fn prepare_selected(
     // Only lowered arrows and generator wrappers consume capture facts. Ordinary
     // functions need their parameter/body binding analysis, but no capture walk.
     let (arrow_facts, function_facts, planning_nodes) = if needs_lexical_facts {
-        collect_lexical_facts_selected(semantic, &symbols, only_object_rest)
+        collect_lexical_facts_selected(semantic, only_object_rest)
     } else {
         (FxHashMap::default(), FxHashMap::default(), planning_nodes)
     };
@@ -185,7 +168,7 @@ fn prepare_selected(
                 let Some(body) = &function.body else {
                     continue;
                 };
-                if !ast_eligible(source, function, body, &symbols)
+                if !ast_eligible(source, function, body)
                     || (only_object_rest && !parameters_have_object_rest(&function.params))
                 {
                     continue;
@@ -196,14 +179,9 @@ fn prepare_selected(
                     .scope_id
                     .get()
                     .is_some_and(|scope_id| scoping.scope_flags(scope_id).is_set_accessor());
-                let param_bindings = parameter_binding_names(&symbols, &function.params);
-                let (wrapper, wrapper_arguments) = body_scope_wrapper_plan(
-                    source,
-                    &symbols,
-                    &function.params,
-                    body,
-                    &param_bindings,
-                );
+                let param_bindings = parameter_binding_names(&function.params);
+                let (wrapper, wrapper_arguments) =
+                    body_scope_wrapper_plan(source, &function.params, body, &param_bindings);
                 // Oxc can lower a single flat rest parameter without moving
                 // initializers across parameter/body environments. Keep scope
                 // collisions, eval, generators, and ordered parameter lists here.
@@ -244,17 +222,17 @@ fn prepare_selected(
                 let length_placeholders = (0..placeholder_count)
                     .map(|_| reserve_name("_arg", &mut reserved))
                     .collect();
-                functions
-                    .entry(function.span.start)
-                    .or_default()
-                    .push_back(AstFunctionPlan {
+                functions.insert(
+                    node_id,
+                    AstFunctionPlan {
                         length_placeholders,
                         anchor: body.span,
                         wrapper,
                         wrapper_arguments,
                         captures,
                         rest_names,
-                    });
+                    },
+                );
             }
             AstKind::ArrowFunctionExpression(arrow) => {
                 if non_simple(&arrow.params).is_none()
@@ -282,10 +260,9 @@ fn prepare_selected(
                     |body| {
                         body_scope_wrapper_plan(
                             source,
-                            &symbols,
                             &arrow.params,
                             body,
-                            &parameter_binding_names(&symbols, &arrow.params),
+                            &parameter_binding_names(&arrow.params),
                         )
                     },
                 );
@@ -305,10 +282,9 @@ fn prepare_selected(
                         .or_default()
                         .push(capture.aliases.clone());
                 }
-                arrows
-                    .entry(arrow.span.start)
-                    .or_default()
-                    .push_back(AstArrowPlan {
+                arrows.insert(
+                    node_id,
+                    AstArrowPlan {
                         anchor: arrow.span,
                         boundary,
                         wrapper,
@@ -317,7 +293,8 @@ fn prepare_selected(
                         captures: capture.aliases,
                         capture_in_place: capture.in_place,
                         retain_arrow,
-                    });
+                    },
+                );
             }
             _ => {}
         }
@@ -351,8 +328,8 @@ pub(super) fn run_ast<'a>(
 
 struct OrdinaryParameterLowerer<'a> {
     allocator: &'a Allocator,
-    functions: FxHashMap<u32, VecDeque<AstFunctionPlan>>,
-    arrows: FxHashMap<u32, VecDeque<AstArrowPlan>>,
+    functions: FxHashMap<NodeId, AstFunctionPlan>,
+    arrows: FxHashMap<NodeId, AstArrowPlan>,
     hoists: FxHashMap<NodeId, Vec<CaptureAliases>>,
     changed: bool,
     error: Option<&'static str>,
@@ -954,18 +931,18 @@ struct CaptureRewriter<'a, 'p> {
 impl<'a> VisitMut<'a> for CaptureRewriter<'a, '_> {
     fn visit_expression(&mut self, expression: &mut Expression<'a>) {
         let span = expression.span();
-        let key = (span.start, span.end);
+        let key = expression.node_id();
         let name = match expression {
-            Expression::ThisExpression(_) if self.aliases.this_spans.contains(&key) => {
+            Expression::ThisExpression(_) if self.aliases.this_nodes.contains(&key) => {
                 self.aliases.this_name.as_deref()
             }
             Expression::Identifier(identifier)
                 if identifier.name == "arguments"
-                    && self.aliases.arguments_spans.contains(&key) =>
+                    && self.aliases.arguments_nodes.contains(&key) =>
             {
                 self.aliases.arguments_name.as_deref()
             }
-            Expression::NewTarget(_) if self.aliases.new_target_spans.contains(&key) => {
+            Expression::NewTarget(_) if self.aliases.new_target_nodes.contains(&key) => {
                 self.aliases.new_target_name.as_deref()
             }
             _ => None,
@@ -979,7 +956,7 @@ impl<'a> VisitMut<'a> for CaptureRewriter<'a, '_> {
                     ast.builder(),
                 );
                 *expression =
-                    if self.aliases.deferred_this && self.aliases.this_spans.contains(&key) {
+                    if self.aliases.deferred_this && self.aliases.this_nodes.contains(&key) {
                         oxc_ast::ast::Expression::new_call_expression(
                             span,
                             reference,
@@ -1028,12 +1005,8 @@ impl<'a> VisitMut<'a> for OrdinaryParameterLowerer<'a> {
     fn visit_expression(&mut self, expression: &mut oxc_ast::ast::Expression<'a>) {
         if let oxc_ast::ast::Expression::ArrowFunctionExpression(arrow) = expression
             && non_simple(&arrow.params).is_some()
-            && let Some(plans) = self.arrows.get_mut(&arrow.span.start)
+            && let Some(plan) = self.arrows.remove(&arrow.node_id.get())
         {
-            let plan = plans.pop_front().expect("nonempty parameter plan bucket");
-            if plans.is_empty() {
-                self.arrows.remove(&arrow.span.start);
-            }
             let ast = self.ast();
             let old = expression.take_in(&ast);
             let oxc_ast::ast::Expression::ArrowFunctionExpression(arrow) = old else {
@@ -1059,12 +1032,8 @@ impl<'a> VisitMut<'a> for OrdinaryParameterLowerer<'a> {
         flags: oxc_syntax::scope::ScopeFlags,
     ) {
         if non_simple(&function.params).is_some()
-            && let Some(plans) = self.functions.get_mut(&function.span.start)
+            && let Some(plan) = self.functions.remove(&function.node_id.get())
         {
-            let plan = plans.pop_front().expect("nonempty parameter plan bucket");
-            if plans.is_empty() {
-                self.functions.remove(&function.span.start);
-            }
             let Some(body) = &mut function.body else {
                 self.error = Some("parameters-body-missing");
                 return;
@@ -1262,12 +1231,7 @@ fn parse_wrapper_statement<'a>(
     ))
 }
 
-fn ast_eligible(
-    source: &str,
-    function: &Function<'_>,
-    _body: &FunctionBody<'_>,
-    _symbols: &[SymbolFact<'_>],
-) -> bool {
+fn ast_eligible(source: &str, function: &Function<'_>, _body: &FunctionBody<'_>) -> bool {
     let Some(_) = non_simple(&function.params) else {
         return false;
     };
@@ -1279,27 +1243,25 @@ fn ast_eligible(
 struct ArrowFacts {
     has_super: bool,
     derived_constructor: bool,
-    this_spans: Vec<(u32, u32)>,
-    arguments_spans: Vec<(u32, u32)>,
-    new_target_spans: Vec<(u32, u32)>,
+    this_nodes: Vec<NodeId>,
+    arguments_nodes: Vec<NodeId>,
+    new_target_nodes: Vec<NodeId>,
     statement_insertion: Option<NodeId>,
 }
 
 #[cfg(test)]
 fn collect_lexical_facts(
     semantic: &Semantic<'_>,
-    symbols: &[SymbolFact<'_>],
 ) -> (
     FxHashMap<NodeId, ArrowFacts>,
     FxHashMap<NodeId, ArrowFacts>,
     Vec<NodeId>,
 ) {
-    collect_lexical_facts_selected(semantic, symbols, false)
+    collect_lexical_facts_selected(semantic, false)
 }
 
 fn collect_lexical_facts_selected(
     semantic: &Semantic<'_>,
-    symbols: &[SymbolFact<'_>],
     only_object_rest: bool,
 ) -> (
     FxHashMap<NodeId, ArrowFacts>,
@@ -1309,29 +1271,44 @@ fn collect_lexical_facts_selected(
     let mut direct_arrow_facts = FxHashMap::default();
     let mut function_facts = FxHashMap::default();
     let mut planning_nodes = Vec::new();
-    let mut active_functions = Vec::<(NodeId, u32, usize)>::new();
-    let mut active_arrows = Vec::<(NodeId, u32)>::new();
+    let mut active_functions = Vec::<(NodeId, usize)>::new();
+    let mut active_arrows = Vec::<NodeId>::new();
     let mut arrow_parents = FxHashMap::<NodeId, Option<NodeId>>::default();
     let mut arrow_order = Vec::new();
-    let mut argument_shadow_ends = Vec::<u32>::new();
+    let mut argument_shadows = Vec::<NodeId>::new();
+    let mut ancestors = Vec::<NodeId>::new();
     let node_count = semantic.nodes().len();
     let mut statement_insertions = vec![None; node_count];
     let mut class_boundaries = vec![None; node_count];
     let mut derived_contexts = vec![false; node_count];
     for (node_id, node) in semantic.nodes().iter_enumerated() {
-        let span = node.kind().span();
         let parent_id = semantic.nodes().parent_id(node_id);
         let parent = semantic.nodes().kind(parent_id);
+        // Earlier rewrites can move source-later nodes ahead of source-earlier
+        // siblings. Parent IDs, not source offsets, determine when scopes end.
+        while ancestors.last().is_some_and(|id| *id != parent_id) {
+            let exited = ancestors.pop().unwrap();
+            if active_arrows.last() == Some(&exited) {
+                active_arrows.pop();
+            }
+            if active_functions.last().is_some_and(|(id, _)| *id == exited) {
+                active_functions.pop();
+            }
+            if argument_shadows.last() == Some(&exited) {
+                argument_shadows.pop();
+            }
+        }
+        ancestors.push(node_id);
         let initializer_boundary = matches!(node.kind(), AstKind::StaticBlock(_))
             || match parent {
                 AstKind::PropertyDefinition(property) => property
                     .value
                     .as_ref()
-                    .is_some_and(|value| value.span() == span),
+                    .is_some_and(|value| value.node_id() == node_id),
                 AstKind::AccessorProperty(property) => property
                     .value
                     .as_ref()
-                    .is_some_and(|value| value.span() == span),
+                    .is_some_and(|value| value.node_id() == node_id),
                 _ => false,
             };
         let boundary = if initializer_boundary {
@@ -1366,24 +1343,6 @@ fn collect_lexical_facts_selected(
             }
         };
         statement_insertions[node_id.index()] = statement_insertion;
-        while active_arrows
-            .last()
-            .is_some_and(|(_, end)| span.start >= *end)
-        {
-            active_arrows.pop();
-        }
-        while active_functions
-            .last()
-            .is_some_and(|(_, end, _)| span.start >= *end)
-        {
-            active_functions.pop();
-        }
-        while argument_shadow_ends
-            .last()
-            .is_some_and(|end| span.start >= *end)
-        {
-            argument_shadow_ends.pop();
-        }
         match node.kind() {
             AstKind::Function(function) => {
                 if function.body.is_some()
@@ -1393,14 +1352,14 @@ fn collect_lexical_facts_selected(
                     planning_nodes.push(node_id);
                     function_facts.insert(node_id, ArrowFacts::default());
                 }
-                active_functions.push((node_id, function.span.end, active_arrows.len()));
+                active_functions.push((node_id, active_arrows.len()));
                 continue;
             }
             AstKind::ArrowFunctionExpression(arrow) => {
                 let selected = non_simple(&arrow.params).is_some()
                     && (!only_object_rest || parameters_have_object_rest(&arrow.params));
-                if parameter_binding_names(symbols, &arrow.params).contains("arguments") {
-                    argument_shadow_ends.push(arrow.span.end);
+                if parameter_binding_names(&arrow.params).contains("arguments") {
+                    argument_shadows.push(node_id);
                 }
                 if selected {
                     direct_arrow_facts.insert(
@@ -1413,14 +1372,14 @@ fn collect_lexical_facts_selected(
                     );
                     let arrow_base = active_functions
                         .last()
-                        .map_or(0, |(_, _, arrow_base)| *arrow_base);
+                        .map_or(0, |(_, arrow_base)| *arrow_base);
                     arrow_parents.insert(
                         node_id,
-                        (active_arrows.len() > arrow_base).then(|| active_arrows.last().unwrap().0),
+                        (active_arrows.len() > arrow_base).then(|| *active_arrows.last().unwrap()),
                     );
                     arrow_order.push(node_id);
                     planning_nodes.push(node_id);
-                    active_arrows.push((node_id, arrow.span.end));
+                    active_arrows.push(node_id);
                 }
                 continue;
             }
@@ -1435,7 +1394,7 @@ fn collect_lexical_facts_selected(
         };
         // Class initializer bodies introduce their own receiver/new.target. Computed
         // keys and heritage stay in the enclosing evaluation environment.
-        if let Some((arrow_id, _)) = active_arrows.last() {
+        if let Some(arrow_id) = active_arrows.last() {
             if class_boundaries[arrow_id.index()] != boundary {
                 continue;
             }
@@ -1445,39 +1404,37 @@ fn collect_lexical_facts_selected(
                     .reference_id
                     .get()
                     .and_then(|id| semantic.scoping().get_reference(id).symbol_id())
-                && semantic
-                    .nodes()
-                    .kind(*arrow_id)
-                    .span()
-                    .contains_inclusive(semantic.scoping().symbol_span(symbol))
+                && matches!(semantic.nodes().kind(*arrow_id), AstKind::ArrowFunctionExpression(arrow)
+                    if semantic.scoping().scope_ancestors(semantic.scoping().symbol_scope_id(symbol))
+                        .any(|scope| Some(scope) == arrow.scope_id.get()))
             {
                 continue;
             }
         }
-        if lexical_kind == 2 && !argument_shadow_ends.is_empty() {
+        if lexical_kind == 2 && !argument_shadows.is_empty() {
             continue;
         }
         let arrow_base = active_functions
             .last()
-            .map_or(0, |(_, _, arrow_base)| *arrow_base);
+            .map_or(0, |(_, arrow_base)| *arrow_base);
         if active_arrows.len() > arrow_base
-            && let Some((arrow_id, _)) = active_arrows.last()
+            && let Some(arrow_id) = active_arrows.last()
         {
             let arrow_facts = direct_arrow_facts.get_mut(arrow_id).unwrap();
             match lexical_kind {
                 0 => arrow_facts.has_super = true,
-                1 => arrow_facts.this_spans.push((span.start, span.end)),
-                2 => arrow_facts.arguments_spans.push((span.start, span.end)),
-                _ => arrow_facts.new_target_spans.push((span.start, span.end)),
+                1 => arrow_facts.this_nodes.push(node_id),
+                2 => arrow_facts.arguments_nodes.push(node_id),
+                _ => arrow_facts.new_target_nodes.push(node_id),
             }
         }
-        if let Some((function_id, _, _)) = active_functions.last()
+        if let Some((function_id, _)) = active_functions.last()
             && class_boundaries[function_id.index()] == boundary
             && let Some(function_facts) = function_facts.get_mut(function_id)
         {
             match lexical_kind {
-                2 => function_facts.arguments_spans.push((span.start, span.end)),
-                3 => function_facts.new_target_spans.push((span.start, span.end)),
+                2 => function_facts.arguments_nodes.push(node_id),
+                3 => function_facts.new_target_nodes.push(node_id),
                 _ => {}
             }
         }
@@ -1516,9 +1473,9 @@ fn collect_lexical_facts_selected(
         );
         if let Some(owner) = owner {
             let aggregate = facts.get_mut(&owner).unwrap();
-            aggregate.this_spans.extend(direct.this_spans);
-            aggregate.arguments_spans.extend(direct.arguments_spans);
-            aggregate.new_target_spans.extend(direct.new_target_spans);
+            aggregate.this_nodes.extend(direct.this_nodes);
+            aggregate.arguments_nodes.extend(direct.arguments_nodes);
+            aggregate.new_target_nodes.extend(direct.new_target_nodes);
         }
     }
     (facts, function_facts, planning_nodes)
@@ -1526,17 +1483,17 @@ fn collect_lexical_facts_selected(
 
 fn plan_function_capture(facts: &ArrowFacts, reserved: &mut FxHashSet<String>) -> CaptureAliases {
     let mut aliases = CaptureAliases::default();
-    if !facts.arguments_spans.is_empty() {
+    if !facts.arguments_nodes.is_empty() {
         aliases.arguments_name = Some(reserve_name("_arguments", reserved));
         aliases
-            .arguments_spans
-            .extend(facts.arguments_spans.iter().copied());
+            .arguments_nodes
+            .extend(facts.arguments_nodes.iter().copied());
     }
-    if !facts.new_target_spans.is_empty() {
+    if !facts.new_target_nodes.is_empty() {
         aliases.new_target_name = Some(reserve_name("_newtarget", reserved));
         aliases
-            .new_target_spans
-            .extend(facts.new_target_spans.iter().copied());
+            .new_target_nodes
+            .extend(facts.new_target_nodes.iter().copied());
     }
     aliases
 }
@@ -1552,21 +1509,21 @@ fn plan_arrow_capture(facts: &ArrowFacts, reserved: &mut FxHashSet<String>) -> A
         deferred_this: facts.derived_constructor,
         ..CaptureAliases::default()
     };
-    if !facts.this_spans.is_empty() {
+    if !facts.this_nodes.is_empty() {
         aliases.this_name = Some(reserve_name("_this", reserved));
-        aliases.this_spans.extend(facts.this_spans.iter().copied());
+        aliases.this_nodes.extend(facts.this_nodes.iter().copied());
     }
-    if !facts.arguments_spans.is_empty() {
+    if !facts.arguments_nodes.is_empty() {
         aliases.arguments_name = Some(reserve_name("_arguments", reserved));
         aliases
-            .arguments_spans
-            .extend(facts.arguments_spans.iter().copied());
+            .arguments_nodes
+            .extend(facts.arguments_nodes.iter().copied());
     }
-    if !facts.new_target_spans.is_empty() {
+    if !facts.new_target_nodes.is_empty() {
         aliases.new_target_name = Some(reserve_name("_newtarget", reserved));
         aliases
-            .new_target_spans
-            .extend(facts.new_target_spans.iter().copied());
+            .new_target_nodes
+            .extend(facts.new_target_nodes.iter().copied());
     }
     if aliases.is_empty() {
         return ArrowCapturePlan {
@@ -1604,29 +1561,28 @@ fn non_simple(params: &FormalParameters<'_>) -> Option<usize> {
         .or_else(|| params.rest.as_ref().map(|_| params.items.len()))
 }
 
-fn parameter_binding_names(
-    symbols: &[SymbolFact<'_>],
-    params: &FormalParameters<'_>,
-) -> FxHashSet<String> {
-    symbols_in(symbols, params.span)
-        .filter(|symbol| {
-            symbol.span.end <= params.span.end && symbol.flags.intersects(SymbolFlags::Variable)
-        })
-        .map(|symbol| symbol.name.to_owned())
-        .collect()
+fn parameter_binding_names(params: &FormalParameters<'_>) -> FxHashSet<String> {
+    let mut names = FxHashSet::default();
+    let mut collect = |identifier: &BindingIdentifier<'_>| {
+        names.insert(identifier.name.to_string());
+        true
+    };
+    for parameter in &params.items {
+        parameter.pattern.all_binding_identifiers(&mut collect);
+    }
+    if let Some(rest) = &params.rest {
+        rest.rest.argument.all_binding_identifiers(&mut collect);
+    }
+    names
 }
 
 fn body_scope_wrapper_plan(
     source: &str,
-    symbols: &[SymbolFact<'_>],
     params: &FormalParameters<'_>,
     body: &FunctionBody<'_>,
     param_bindings: &FxHashSet<String>,
 ) -> (bool, Vec<String>) {
-    let mut body_names: FxHashSet<&str> = symbols_in(symbols, body.span)
-        .filter(|symbol| symbol.span.start > body.span.start && symbol.span.end < body.span.end)
-        .map(|symbol| symbol.name)
-        .collect();
+    let mut body_names: FxHashSet<&str> = FxHashSet::default();
     // Semantic analysis merges `var` and function declarations with a
     // same-named non-simple parameter and retains only the parameter's symbol
     // span. Collect body bindings from the AST as well so those declarations
@@ -1726,16 +1682,6 @@ impl<'a> Visit<'a> for BodyBindingCollector<'a> {
     }
 }
 
-fn symbols_in<'a>(
-    symbols: &'a [SymbolFact<'a>],
-    span: Span,
-) -> impl Iterator<Item = &'a SymbolFact<'a>> {
-    let start = symbols.partition_point(|symbol| symbol.span.start < span.start);
-    symbols[start..]
-        .iter()
-        .take_while(move |symbol| symbol.span.start <= span.end)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1816,6 +1762,60 @@ mod tests {
     }
 
     #[test]
+    fn parameter_plans_distinguish_shared_source_anchors() {
+        struct SharedAnchors;
+        impl<'a> VisitMut<'a> for SharedAnchors {
+            fn visit_span(&mut self, span: &mut Span) {
+                *span = Span::default();
+            }
+        }
+        let source = "function a(x,y=1){return y;} function b(z=2){return z;} const c=(w,q=3)=>q; const d=(r=4)=>r;";
+        let allocator = Allocator::default();
+        let mut parsed = Parser::new(&allocator, source, SourceType::default()).parse();
+        SharedAnchors.visit_program(&mut parsed.program);
+        let semantic = oxc_semantic::SemanticBuilder::new()
+            .with_build_nodes(true)
+            .build(&parsed.program);
+        let plan = prepare_ast(source, &semantic.semantic).unwrap();
+        drop(semantic);
+        // Moving nodes must not associate them with a sibling's plan.
+        parsed.program.body.swap(0, 1);
+        parsed.program.body.swap(2, 3);
+        assert!(run_ast(&allocator, &mut parsed.program, plan).unwrap());
+        let code = Codegen::new().build(&parsed.program).code;
+        assert!(code.contains("function b()"), "{code}");
+        assert!(!code.contains("function a()"), "{code}");
+        for fallback in [" : 1", " : 2", " : 3", " : 4"] {
+            assert!(code.contains(fallback), "{code}");
+        }
+    }
+
+    #[test]
+    fn lexical_captures_distinguish_expressions_with_shared_source_anchors() {
+        struct SharedAnchors;
+        impl<'a> VisitMut<'a> for SharedAnchors {
+            fn visit_this_expression(&mut self, expression: &mut oxc_ast::ast::ThisExpression) {
+                expression.span = Span::default();
+            }
+        }
+
+        let source = "function outer(){return (value=1)=>[this.x,function(){return this.x;}];}";
+        let allocator = Allocator::default();
+        let parsed = Parser::new(&allocator, source, SourceType::default()).parse();
+        let mut program = parsed.program;
+        SharedAnchors.visit_program(&mut program);
+        let semantic = oxc_semantic::SemanticBuilder::new()
+            .with_build_nodes(true)
+            .build(&program);
+        assert!(semantic.diagnostics.is_empty());
+        let plan = prepare_ast(source, &semantic.semantic).unwrap();
+        assert!(run_ast(&allocator, &mut program, plan).unwrap());
+        let code = Codegen::new().build(&program).code;
+        assert_eq!(code.matches("_this.x").count(), 1, "{code}");
+        assert!(code.contains("return this.x;"), "{code}");
+    }
+
+    #[test]
     fn lexical_arrow_captures_mutate_in_place() {
         let source =
             "function outer(){return (value=1)=>this.x+value+arguments.length+new.target;}";
@@ -1847,7 +1847,7 @@ mod tests {
             .with_build_nodes(true)
             .build(&program);
         let plan = prepare_ast(source, &semantic.semantic).unwrap();
-        assert_eq!(plan.arrows.values().map(VecDeque::len).sum::<usize>(), 2);
+        assert_eq!(plan.arrows.len(), 2);
         assert_eq!(plan.hoists.values().map(Vec::len).sum::<usize>(), 1);
         assert!(run_ast(&allocator, &mut program, plan).unwrap());
         let code = Codegen::new().build(&program).code;
@@ -1883,19 +1883,9 @@ mod tests {
         let semantic = oxc_semantic::SemanticBuilder::new()
             .with_build_nodes(true)
             .build(&parsed.program);
-        let symbols = semantic
-            .semantic
-            .scoping()
-            .symbol_ids()
-            .map(|symbol_id| SymbolFact {
-                span: semantic.semantic.scoping().symbol_span(symbol_id),
-                name: semantic.semantic.scoping().symbol_name(symbol_id),
-                flags: semantic.semantic.scoping().symbol_flags(symbol_id),
-            })
-            .collect::<Vec<_>>();
-        let (facts, _, _) = collect_lexical_facts(&semantic.semantic, &symbols);
+        let (facts, _, _) = collect_lexical_facts(&semantic.semantic);
         assert_eq!(facts.len(), 128);
-        assert!(facts.values().all(|facts| facts.this_spans.len() == 1));
+        assert!(facts.values().all(|facts| facts.this_nodes.len() == 1));
     }
 
     #[test]
@@ -1907,7 +1897,7 @@ mod tests {
                 .with_build_nodes(true)
                 .build(&parsed.program);
             let plan = prepare_ast(source, &semantic.semantic).unwrap();
-            plan.functions.values().next().unwrap()[0].wrapper
+            plan.functions.values().next().unwrap().wrapper
         };
         assert!(!wrapper(
             "function read(value = object.body) { let body = 1; return value; }"
@@ -1937,25 +1927,14 @@ mod tests {
             let semantic = oxc_semantic::SemanticBuilder::new()
                 .with_build_nodes(true)
                 .build(&parsed.program);
-            let mut symbols = semantic
-                .semantic
-                .scoping()
-                .symbol_ids()
-                .map(|symbol_id| SymbolFact {
-                    span: semantic.semantic.scoping().symbol_span(symbol_id),
-                    name: semantic.semantic.scoping().symbol_name(symbol_id),
-                    flags: semantic.semantic.scoping().symbol_flags(symbol_id),
-                })
-                .collect::<Vec<_>>();
-            symbols.sort_unstable_by_key(|symbol| symbol.span.start);
-            let (facts, _, _) = collect_lexical_facts(&semantic.semantic, &symbols);
+            let (facts, _, _) = collect_lexical_facts(&semantic.semantic);
             facts
                 .values()
                 .map(|facts| {
                     (
-                        facts.this_spans.len(),
-                        facts.arguments_spans.len(),
-                        facts.new_target_spans.len(),
+                        facts.this_nodes.len(),
+                        facts.arguments_nodes.len(),
+                        facts.new_target_nodes.len(),
                     )
                 })
                 .collect::<Vec<_>>()
