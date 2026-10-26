@@ -35,12 +35,15 @@ use oxc_ast::ast::*;
 use oxc_ast_visit::Visit;
 
 use crate::scope::{ReferenceId, SymbolId};
+use oxc_semantic::NodeId;
 
 use crate::react_compiler_lowering::FunctionNode;
 
 /// Source location data for a resolved identifier reference.
 pub struct IdentifierLocEntry {
     pub span: Span,
+    /// Order in the current AST walk, independent of source provenance.
+    pub order: usize,
     /// For JSX element-name identifiers, the enclosing `JSXOpeningElement`'s
     /// span (which spans the full tag).
     pub opening_element_span: Option<Span>,
@@ -60,6 +63,14 @@ impl IdentifierLocEntry {
     }
 }
 
+/// The first declaration site recorded by the identifier walker.
+#[derive(Clone, Copy)]
+pub struct DeclarationLocEntry {
+    pub span: Span,
+    pub node_id: NodeId,
+    pub order: usize,
+}
+
 /// Identifier locations for a function's AST, keyed by semantic identity.
 ///
 /// Only identifiers the original Babel walker visited are recorded, so
@@ -72,7 +83,7 @@ pub struct IdentifierLocIndex {
     refs: FxHashMap<ReferenceId, IdentifierLocEntry>,
     /// Declaration (binding) identifier spans, keyed by their `symbol_id` cell.
     /// First declaration wins for redeclared symbols.
-    decl_spans: FxHashMap<SymbolId, Span>,
+    decl_spans: FxHashMap<SymbolId, DeclarationLocEntry>,
 }
 
 impl IdentifierLocIndex {
@@ -80,8 +91,12 @@ impl IdentifierLocIndex {
         self.refs.get(&reference_id)
     }
 
+    pub fn declaration(&self, symbol_id: SymbolId) -> Option<&DeclarationLocEntry> {
+        self.decl_spans.get(&symbol_id)
+    }
+
     pub fn declaration_span(&self, symbol_id: SymbolId) -> Option<Span> {
-        self.decl_spans.get(&symbol_id).copied()
+        self.declaration(symbol_id).map(|entry| entry.span)
     }
 }
 
@@ -99,8 +114,10 @@ impl IdentifierLocVisitor {
     /// element name, so it doubles as the is-JSX signal.
     fn record_reference(&mut self, ident: &IdentifierReference<'_>) {
         let Some(reference_id) = ident.reference_id.get() else { return };
+        let order = self.index.refs.len() + self.index.decl_spans.len();
         self.index.refs.entry(reference_id).or_insert(IdentifierLocEntry {
             span: ident.span,
+            order,
             opening_element_span: self.current_opening_element_span,
             in_type_annotation: self.type_depth > 0,
         });
@@ -108,7 +125,12 @@ impl IdentifierLocVisitor {
 
     fn record_declaration(&mut self, ident: &BindingIdentifier<'_>) {
         let Some(symbol_id) = ident.symbol_id.get() else { return };
-        self.index.decl_spans.entry(symbol_id).or_insert(ident.span);
+        let order = self.index.refs.len() + self.index.decl_spans.len();
+        self.index.decl_spans.entry(symbol_id).or_insert(DeclarationLocEntry {
+            span: ident.span,
+            node_id: ident.node_id(),
+            order,
+        });
     }
 
     /// Record the JSX element name identifiers (and only those) while the

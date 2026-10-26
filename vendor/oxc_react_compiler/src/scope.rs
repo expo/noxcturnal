@@ -5,7 +5,7 @@ use oxc_ast::ast::{
     PropertyKind,
 };
 use oxc_semantic::{AstNodes, NodeId, Scoping, Semantic};
-use oxc_span::{GetSpan, Span};
+use oxc_span::Span;
 use oxc_str::{Ident, Str};
 use oxc_syntax::scope::ScopeFlags;
 use oxc_syntax::symbol::SymbolFlags;
@@ -114,16 +114,6 @@ pub struct ScopeResolver<'s, 'a> {
     allocator: &'a Allocator,
     /// All Function-kind scopes, in scope-tree order.
     function_scopes: Vec<ScopeId>,
-    /// `(start, end)` source windows of Function-kind scopes, used by the
-    /// hoisting analysis's position checks. Object methods get an extra window
-    /// starting at the enclosing ObjectProperty (Babel's ObjectMethod spans the
-    /// whole property, including `get `/`set ` prefixes and computed keys).
-    function_scope_ranges: Vec<(u32, u32)>,
-    /// Non-empty lexical scope ranges sorted by effective source start and then depth.
-    /// Switch scopes start after their discriminant, matching semantic traversal.
-    /// This supports position lookups in `O(log S + depth)` without rescanning
-    /// all scopes for every JSX tag that lacks a semantic reference.
-    scopes_by_start: Vec<(u32, u32, usize, ScopeId)>,
 }
 
 impl<'s, 'a> ScopeResolver<'s, 'a> {
@@ -133,65 +123,13 @@ impl<'s, 'a> ScopeResolver<'s, 'a> {
         // the `Semantic` borrow so the resolver needs no third lifetime.
         let nodes: &'s AstNodes<'s> = semantic.nodes();
 
-        let mut resolver = Self {
-            scoping,
-            nodes,
-            allocator,
-            function_scopes: Vec::new(),
-            function_scope_ranges: Vec::new(),
-            scopes_by_start: Vec::new(),
-        };
+        let mut resolver = Self { scoping, nodes, allocator, function_scopes: Vec::new() };
 
-        let mut scope_depths = Vec::new();
         for scope_id in scoping.scope_descendants_from_root() {
-            let depth = scoping
-                .scope_parent_id(scope_id)
-                .map_or(0, |parent| scope_depths[parent.index()] + 1);
-            if scope_depths.len() <= scope_id.index() {
-                scope_depths.resize(scope_id.index() + 1, 0);
-            }
-            scope_depths[scope_id.index()] = depth;
-
-            let node = nodes.get_node(scoping.get_node_id(scope_id));
-            let span = node.kind().span();
-            let scope_start = match node.kind() {
-                AstKind::SwitchStatement(stmt) => stmt.discriminant.span().end,
-                _ => span.start,
-            };
-            if span.end > scope_start {
-                resolver.scopes_by_start.push((scope_start, span.end, depth, scope_id));
-            }
-
-            if resolver.scope_kind(scope_id) != ScopeKind::Function {
-                continue;
-            }
-            resolver.function_scopes.push(scope_id);
-            if span.end > span.start {
-                resolver.function_scope_ranges.push((span.start, span.end));
-            }
-            // For function scopes inside object methods, also record a window from
-            // the parent ObjectProperty's start, so range checks match Babel's
-            // ObjectMethod extent (which starts at the property, not the function).
-            if let AstKind::Function(_) = node.kind() {
-                let parent = nodes.parent_node(node.id());
-                if let AstKind::ObjectProperty(prop) = parent.kind()
-                    && is_object_method_property(prop)
-                {
-                    let prop_start = parent.kind().span().start;
-                    if prop_start != span.start {
-                        resolver.function_scope_ranges.push((prop_start, span.end));
-                    }
-                }
+            if resolver.scope_kind(scope_id) == ScopeKind::Function {
+                resolver.function_scopes.push(scope_id);
             }
         }
-
-        resolver.scopes_by_start.sort_unstable_by(|a, b| {
-            a.0.cmp(&b.0)
-                .then(a.2.cmp(&b.2))
-                // Prefer the narrower range when starts and depths match.
-                .then(b.1.cmp(&a.1))
-                .then(a.3.index().cmp(&b.3.index()))
-        });
 
         resolver
     }
@@ -479,84 +417,42 @@ impl<'s, 'a> ScopeResolver<'s, 'a> {
         self.scoping().find_binding(scope_id, name.into())
     }
 
-    /// Look up a binding by name while preserving the separate parameter and
-    /// function-body environments used at runtime. Oxc stores both environments
-    /// in one function scope after semantic traversal, so a body declaration must
-    /// not shadow an outer binding while a parameter initializer is evaluated.
-    fn find_binding_from_scope_at_position(
-        &self,
-        scope_id: ScopeId,
-        name: &str,
-        position: u32,
-    ) -> Option<SymbolId> {
-        self.ancestors(scope_id).find_map(|scope_id| {
-            let symbol_id = self.get_binding(scope_id, name)?;
-            let node = self.nodes.get_node(self.scoping().get_node_id(scope_id));
-            let body_start = match node.kind() {
-                AstKind::Function(function) => function.body.as_ref().map(|body| body.span.start),
-                AstKind::ArrowFunctionExpression(arrow) => arrow.get_expression().map_or_else(
-                    || arrow.get_function_body().map(|body| body.span.start),
-                    |expression| Some(expression.span().start),
-                ),
-                _ => None,
-            };
-            let Some(body_start) = body_start else {
-                return Some(symbol_id);
-            };
-            if position >= body_start {
-                return Some(symbol_id);
-            }
-
-            // Parameters and named function-expression bindings are declared
-            // before the body. Body-level `var` and function declarations are not
-            // visible until parameter initialization has completed.
-            self.scoping
-                .symbol_declarations(symbol_id)
-                .any(|declaration_id| {
-                    self.nodes.get_node(declaration_id).kind().span().start < body_start
-                })
-                .then_some(symbol_id)
-        })
-    }
-
-    /// Look up a binding by name from the innermost lexical scope containing
-    /// `position`, limited to scopes within `ancestor`.
-    ///
-    /// Lexical scope ranges are properly nested. Start with the last scope that
-    /// begins at or before the position, then walk through its ancestors until
-    /// one contains the position. This avoids scanning every scope for each
-    /// position lookup.
-    pub fn find_binding_at_position(
+    /// Resolve a name at an actual AST occurrence. Parameter initializers cannot
+    /// see body declarations, even when Oxc stores both in one function scope.
+    pub fn find_binding_at_node(
         &self,
         name: &str,
         ancestor: ScopeId,
-        position: u32,
+        node_id: NodeId,
     ) -> Option<SymbolId> {
-        let index = self
-            .scopes_by_start
-            .partition_point(|&(start, _, _, _)| start <= position)
-            .checked_sub(1);
-        let Some(index) = index else {
-            return self.find_binding_from_scope_at_position(ancestor, name, position);
-        };
-
-        let mut scope_id = self.scopes_by_start[index].3;
-        loop {
-            let node_id = self.scoping().get_node_id(scope_id);
-            let span = self.nodes.get_node(node_id).kind().span();
-            if position >= span.start && position < span.end {
-                if self.ancestors(scope_id).any(|id| id == ancestor) {
-                    return self.find_binding_from_scope_at_position(scope_id, name, position);
-                }
-                break;
-            }
-            let Some(parent) = self.scope_parent(scope_id) else {
-                break;
-            };
-            scope_id = parent;
+        let scope_id = self.nodes.get_node(node_id).scope_id();
+        if !self.ancestors(scope_id).any(|scope| scope == ancestor) {
+            return None;
         }
-
-        self.find_binding_from_scope_at_position(ancestor, name, position)
+        self.ancestors(scope_id).find_map(|scope_id| {
+            let symbol_id = self.get_binding(scope_id, name)?;
+            let node = self.nodes.get_node(self.scoping().get_node_id(scope_id));
+            let (parameters, function_name) = match node.kind() {
+                AstKind::Function(function) => (
+                    function.params.node_id(),
+                    function
+                        .is_expression()
+                        .then(|| function.id.as_ref().and_then(|id| id.symbol_id.get()))
+                        .flatten(),
+                ),
+                AstKind::ArrowFunctionExpression(arrow) => (arrow.params.node_id(), None),
+                _ => return Some(symbol_id),
+            };
+            if !self.node_within(node_id, parameters) {
+                return Some(symbol_id);
+            }
+            (function_name == Some(symbol_id)
+                || self
+                    .scoping
+                    .symbol_declarations(symbol_id)
+                    .any(|declaration| self.node_within(declaration, parameters)))
+            .then_some(symbol_id)
+        })
     }
 
     /// Whether `name` is referenced as a global (unresolved reference) anywhere in the file.
@@ -585,12 +481,6 @@ impl<'s, 'a> ScopeResolver<'s, 'a> {
             }
         }
         symbols
-    }
-
-    /// `(start, end)` source windows of Function-kind scopes, for the hoisting
-    /// analysis's position checks.
-    pub fn function_scope_ranges(&self) -> &[(u32, u32)] {
-        &self.function_scope_ranges
     }
 
     /// All Function-kind scopes, in scope-tree order.
@@ -624,6 +514,23 @@ impl<'s, 'a> ScopeResolver<'s, 'a> {
     /// Whether `node_id` is `root` or one of its descendants.
     pub fn node_within(&self, node_id: NodeId, root: NodeId) -> bool {
         node_id == root || self.nodes.ancestor_ids(node_id).any(|id| id == root)
+    }
+
+    /// Whether a node belongs to a nested function within this subtree. Include
+    /// the root itself and Babel's ObjectMethod extent (including computed keys).
+    pub fn node_in_nested_function(&self, node_id: NodeId, root: NodeId) -> bool {
+        let mut in_function = false;
+        for id in std::iter::once(node_id).chain(self.nodes.ancestor_ids(node_id)) {
+            in_function |= match self.nodes.kind(id) {
+                AstKind::Function(_) | AstKind::ArrowFunctionExpression(_) => true,
+                AstKind::ObjectProperty(prop) => is_object_method_property(prop),
+                _ => false,
+            };
+            if id == root {
+                return in_function;
+            }
+        }
+        false
     }
 
     /// Scopes of the functions lexically containing `node_id`, innermost first.

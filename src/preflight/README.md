@@ -49,12 +49,22 @@ Spans also remain appropriate for source maps, diagnostics, and slicing immutabl
 source. Document deliberate origin classification when several generated nodes
 can relate to one source construct; it must not select a unique live node.
 
+React Compiler hoisting and capture collection use semantic node identity, AST
+ancestry, and identifier traversal order. They retain spans only as source locations;
+shared declaration/reference anchors must not suppress a capture.
+
 The vendored Oxc TypeScript enum/namespace passes match redeclarations by the
 declaration node IDs retained in Oxc scoping, including when the full node store
 is disabled. TypeScript import erasure likewise removes the exact import-specifier
 node through the vendored semantic crate, preserving merged runtime declarations.
 Its `infer` syntax validation follows the actual conditional extends subtree by
 arena identity while semantic IDs are still being assigned.
+
+React Compiler's experimental derived-effect lint identifies setter
+uses by owning function, instruction slot, and operand. Its use sets belong to one
+immutable HIR snapshot; spans only locate diagnostics. Captured bindings transport
+values into functions, while dependency evaluation owns both its array operands
+and the loads that produce them.
 
 ## Completion and failure
 

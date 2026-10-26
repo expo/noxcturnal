@@ -27,9 +27,9 @@ use crate::react_compiler_hir::visitors::{
 };
 use crate::react_compiler_hir::{
     ArrayElement, BlockId, Effect, EvaluationOrder, FunctionId, HirFunction, Identifier,
-    IdentifierId, IdentifierName, InstructionValue, ParamPattern, PlaceOrSpread, ReactFunctionType,
-    ReturnVariant, Type, TypeId, is_set_state_type, is_use_effect_hook_type, is_use_ref_type,
-    is_use_state_type,
+    IdentifierId, IdentifierName, InstructionId, InstructionValue, ParamPattern, PlaceOrSpread,
+    ReactFunctionType, ReturnVariant, Type, TypeId, is_set_state_type, is_use_effect_hook_type,
+    is_use_ref_type, is_use_state_type,
 };
 use oxc_span::Span;
 
@@ -61,10 +61,20 @@ struct EffectMetadata {
     dep_elements: Vec<DepElement>,
 }
 
+/// Identity within the immutable HIR snapshot. The component is not stored in
+/// `env.functions`, so `None` distinguishes it from nested FunctionIds.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+enum SetStateUse {
+    Declaration,
+    Operand { owner: Option<FunctionId>, instruction: InstructionId, operand: usize },
+}
+
 #[derive(Debug, Clone)]
 struct DepElement {
     identifier: IdentifierId,
     span: Option<Span>,
+    // Only the experimental validator compares dependency-use identities.
+    usage: Option<SetStateUse>,
 }
 
 struct ValidationContext<'a> {
@@ -75,7 +85,8 @@ struct ValidationContext<'a> {
     derivation_cache: DerivationCache<'a>,
     effects_cache: FxHashMap<IdentifierId, EffectMetadata>,
     set_state_loads: FxHashMap<IdentifierId, Option<IdentifierId>>,
-    set_state_usages: FxHashMap<IdentifierId, FxHashSet<Span>>,
+    set_state_load_uses: FxHashMap<IdentifierId, SetStateUse>,
+    set_state_usages: FxHashMap<IdentifierId, FxHashSet<SetStateUse>>,
 }
 
 #[derive(Debug, Clone)]
@@ -226,7 +237,8 @@ fn maybe_record_set_state_for_instr(
     instr: &Instruction,
     env: &Environment,
     set_state_loads: &mut FxHashMap<IdentifierId, Option<IdentifierId>>,
-    set_state_usages: &mut FxHashMap<IdentifierId, FxHashSet<Span>>,
+    set_state_usages: &mut FxHashMap<IdentifierId, FxHashSet<SetStateUse>>,
+    include_declaration: bool,
 ) {
     let identifiers = &env.identifiers;
     let types = &env.types;
@@ -258,7 +270,10 @@ fn maybe_record_set_state_for_instr(
         if let Some(root_id) = root {
             set_state_usages.entry(root_id).or_insert_with(|| {
                 let mut set = FxHashSet::default();
-                set.insert(instr.lvalue.span.unwrap_or_default());
+                // Only the component-wide totals include the declaration itself.
+                if include_declaration {
+                    set.insert(SetStateUse::Declaration);
+                }
                 set
             });
         }
@@ -285,6 +300,7 @@ pub fn validate_no_derived_computations_in_effects_exp(
         derivation_cache: DerivationCache::new(),
         effects_cache: FxHashMap::default(),
         set_state_loads: FxHashMap::default(),
+        set_state_load_uses: FxHashMap::default(),
         set_state_usages: FxHashMap::default(),
     };
 
@@ -330,7 +346,7 @@ pub fn validate_no_derived_computations_in_effects_exp(
             record_phi_derivations(block, &mut context, env);
             for &instr_id in &block.instructions {
                 let instr = &func.instructions[instr_id.index()];
-                record_instruction_derivations(instr, &mut context, env)?;
+                record_instruction_derivations(instr, None, instr_id, &mut context, env)?;
             }
         }
 
@@ -394,6 +410,8 @@ fn record_phi_derivations<'a>(
 
 fn record_instruction_derivations<'a>(
     instr: &Instruction,
+    owner: Option<FunctionId>,
+    instruction_id: InstructionId,
     context: &mut ValidationContext<'a>,
     env: &Environment<'a>,
 ) -> Result<(), OxcDiagnostic> {
@@ -408,14 +426,27 @@ fn record_instruction_derivations<'a>(
         env,
         &mut context.set_state_loads,
         &mut context.set_state_usages,
+        true,
     );
+
+    if matches!(
+        instr.value,
+        InstructionValue::LoadLocal { .. } | InstructionValue::LoadContext { .. }
+    ) && context.set_state_loads.contains_key(&lvalue_id)
+    {
+        context.set_state_load_uses.insert(
+            lvalue_id,
+            SetStateUse::Operand { owner, instruction: instruction_id, operand: 0 },
+        );
+    }
 
     let mut type_of_value = TypeOfValue::Ignored;
     let is_source = false;
     let mut sources: FxIndexSet<IdentifierId> = FxIndexSet::default();
 
     match &instr.value {
-        InstructionValue::FunctionExpression { lowered_func, .. } => {
+        InstructionValue::FunctionExpression { lowered_func, .. }
+        | InstructionValue::ObjectMethod { lowered_func, .. } => {
             context.functions.insert(lvalue_id, lowered_func.func);
             // Recurse into the inner function
             let inner_func = &functions[lowered_func.func];
@@ -423,7 +454,13 @@ fn record_instruction_derivations<'a>(
                 record_phi_derivations(block, context, env);
                 for &inner_instr_id in &block.instructions {
                     let inner_instr = &inner_func.instructions[inner_instr_id.index()];
-                    record_instruction_derivations(inner_instr, context, env)?;
+                    record_instruction_derivations(
+                        inner_instr,
+                        Some(lowered_func.func),
+                        inner_instr_id,
+                        context,
+                        env,
+                    )?;
                 }
             }
         }
@@ -490,10 +527,18 @@ fn record_instruction_derivations<'a>(
         InstructionValue::ArrayExpression { elements, .. } => {
             let dep_elements: Vec<DepElement> = elements
                 .iter()
-                .filter_map(|el| match el {
-                    ArrayElement::Place(p) => {
-                        Some(DepElement { identifier: p.identifier, span: p.span })
-                    }
+                .filter(|element| !matches!(element, ArrayElement::Hole))
+                .enumerate()
+                .filter_map(|(operand, element)| match element {
+                    ArrayElement::Place(place) => Some(DepElement {
+                        identifier: place.identifier,
+                        span: place.span,
+                        usage: Some(SetStateUse::Operand {
+                            owner,
+                            instruction: instruction_id,
+                            operand,
+                        }),
+                    }),
                     _ => None,
                 })
                 .collect();
@@ -503,15 +548,21 @@ fn record_instruction_derivations<'a>(
     }
 
     // Collect operand derivations
-    for (operand_id, operand_span) in each_instruction_operand(instr, env) {
+    for (operand, (operand_id, _)) in each_instruction_operand(instr, env).into_iter().enumerate() {
         // Track setState usages
-        if context.set_state_loads.contains_key(&operand_id) {
+        // Captured context operands transport a binding into a function; its
+        // actual uses are counted when visiting that function's instructions.
+        if !matches!(
+            instr.value,
+            InstructionValue::FunctionExpression { .. } | InstructionValue::ObjectMethod { .. }
+        ) && context.set_state_loads.contains_key(&operand_id)
+        {
             let root =
                 get_root_set_state(operand_id, &context.set_state_loads, &mut FxHashSet::default());
             if let Some(root_id) = root
                 && let Some(usages) = context.set_state_usages.get_mut(&root_id)
             {
-                usages.insert(operand_span.unwrap_or_default());
+                usages.insert(SetStateUse::Operand { owner, instruction: instruction_id, operand });
             }
         }
 
@@ -754,7 +805,7 @@ fn validate_effect<'a>(
     }
 
     let mut effect_derived_set_state_calls: Vec<DerivedSetStateCall> = Vec::new();
-    let mut effect_set_state_usages: FxHashMap<IdentifierId, FxHashSet<Span>> =
+    let mut effect_set_state_usages: FxHashMap<IdentifierId, FxHashSet<SetStateUse>> =
         FxHashMap::default();
 
     // Consider setStates in the effect's dependency array as being part of effectSetStateUsages
@@ -762,9 +813,18 @@ fn validate_effect<'a>(
         let root =
             get_root_set_state(dep.identifier, &context.set_state_loads, &mut FxHashSet::default());
         if let Some(root_id) = root {
-            let mut set = FxHashSet::default();
-            set.insert(dep.span.unwrap_or_default());
-            effect_set_state_usages.insert(root_id, set);
+            let usages = effect_set_state_usages.entry(root_id).or_default();
+            usages.insert(dep.usage.expect("experimental dependency has an IR use identity"));
+            // Dependency evaluation also owns the loads producing its operand.
+            // They are distinct IR uses even when they share one source anchor.
+            let mut loaded = dep.identifier;
+            let mut visited = FxHashSet::default();
+            while visited.insert(loaded) {
+                let Some(usage) = context.set_state_load_uses.get(&loaded) else { break };
+                usages.insert(*usage);
+                let Some(Some(parent)) = context.set_state_loads.get(&loaded) else { break };
+                loaded = *parent;
+            }
         }
     }
 
@@ -801,11 +861,19 @@ fn validate_effect<'a>(
                 env,
                 &mut context.set_state_loads,
                 &mut effect_set_state_usages,
+                false,
             );
 
             // Track setState usages for operands
-            for (operand_id, operand_span) in each_instruction_operand(instr, env) {
-                if context.set_state_loads.contains_key(&operand_id) {
+            for (operand, (operand_id, _)) in
+                each_instruction_operand(instr, env).into_iter().enumerate()
+            {
+                if !matches!(
+                    instr.value,
+                    InstructionValue::FunctionExpression { .. }
+                        | InstructionValue::ObjectMethod { .. }
+                ) && context.set_state_loads.contains_key(&operand_id)
+                {
                     let root = get_root_set_state(
                         operand_id,
                         &context.set_state_loads,
@@ -814,7 +882,11 @@ fn validate_effect<'a>(
                     if let Some(root_id) = root
                         && let Some(usages) = effect_set_state_usages.get_mut(&root_id)
                     {
-                        usages.insert(operand_span.unwrap_or_default());
+                        usages.insert(SetStateUse::Operand {
+                            owner: Some(effect_func_id),
+                            instruction: instr_id,
+                            operand,
+                        });
                     }
                 }
             }
@@ -881,13 +953,11 @@ fn validate_effect<'a>(
             &mut FxHashSet::default(),
         );
         if let Some(root_id) = root_set_state_call {
-            let effect_usage_count =
-                effect_set_state_usages.get(&root_id).map(|s| s.len()).unwrap_or(0);
-            let total_usage_count =
-                context.set_state_usages.get(&root_id).map(|s| s.len()).unwrap_or(0);
-            if effect_set_state_usages.contains_key(&root_id)
-                && context.set_state_usages.contains_key(&root_id)
-                && effect_usage_count == total_usage_count - 1
+            if let (Some(effect_uses), Some(total_uses)) =
+                (effect_set_state_usages.get(&root_id), context.set_state_usages.get(&root_id))
+                && total_uses.len() == effect_uses.len() + 1
+                && total_uses.contains(&SetStateUse::Declaration)
+                && effect_uses.is_subset(total_uses)
             {
                 let mut props_set: IdentIndexSet = IdentIndexSet::default();
                 let mut state_set: IdentIndexSet = IdentIndexSet::default();
@@ -989,9 +1059,11 @@ pub fn validate_no_derived_computations_in_effects(
                         let deps: Vec<DepElement> = elements
                             .iter()
                             .filter_map(|e| match e {
-                                ArrayElement::Place(p) => {
-                                    Some(DepElement { identifier: p.identifier, span: p.span })
-                                }
+                                ArrayElement::Place(p) => Some(DepElement {
+                                    identifier: p.identifier,
+                                    span: p.span,
+                                    usage: None,
+                                }),
                                 _ => None,
                             })
                             .collect();
@@ -1022,6 +1094,7 @@ pub fn validate_no_derived_computations_in_effects(
                                         .copied()
                                         .unwrap_or(dep.identifier),
                                     span: dep.span,
+                                    usage: dep.usage,
                                 })
                                 .collect();
                             result.push((func_id, resolved));
@@ -1047,6 +1120,7 @@ pub fn validate_no_derived_computations_in_effects(
                                         .copied()
                                         .unwrap_or(dep.identifier),
                                     span: dep.span,
+                                    usage: dep.usage,
                                 })
                                 .collect();
                             result.push((func_id, resolved));
