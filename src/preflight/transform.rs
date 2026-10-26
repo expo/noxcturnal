@@ -3021,6 +3021,296 @@ mod tests {
     }
 
     #[test]
+    fn typescript_infer_validation_uses_extends_subtree_ownership() {
+        struct Anchors(bool);
+        impl<'a> VisitMut<'a> for Anchors {
+            fn visit_span(&mut self, span: &mut Span) {
+                *span = if self.0 {
+                    Span::default()
+                } else {
+                    Span::new(1_000 - span.end, 1_000 - span.start)
+                };
+            }
+        }
+        struct MovedInfer;
+        impl<'a> VisitMut<'a> for MovedInfer {
+            fn visit_ts_infer_type(&mut self, infer: &mut oxc_ast::ast::TSInferType<'a>) {
+                infer.span = Span::default();
+                walk_mut::walk_ts_infer_type(self, infer);
+            }
+        }
+        for (source, valid) in [
+            ("type X<T> = T extends infer U ? U : never;", true),
+            ("type X<T> = T extends string ? infer U : never;", false),
+            ("type X<T> = T extends string ? never : infer U;", false),
+            ("type X<T> = (infer U) extends T ? true : false;", false),
+            ("type X = infer U;", false),
+            ("type X<T> = T extends Array<infer U> ? U : never;", true),
+            (
+                "type X<T> = (T extends infer U ? U : never) extends string ? true : false;",
+                true,
+            ),
+            (
+                "type X<T> = T extends (T extends string ? infer U : never) ? U : never;",
+                true,
+            ),
+            (
+                "type X<T> = T extends string ? (T extends number ? infer U : never) : never;",
+                false,
+            ),
+        ] {
+            for anchors in ["parsed", "shared", "moved", "reversed"] {
+                for build_nodes in [false, true] {
+                    let allocator = Allocator::default();
+                    let mut parsed = Parser::new(&allocator, source, SourceType::ts()).parse();
+                    assert!(parsed.diagnostics.is_empty());
+                    match anchors {
+                        "shared" => Anchors(true).visit_program(&mut parsed.program),
+                        "moved" => MovedInfer.visit_program(&mut parsed.program),
+                        "reversed" => Anchors(false).visit_program(&mut parsed.program),
+                        _ => {}
+                    }
+                    let checked = SemanticBuilder::new_compiler()
+                        .with_build_nodes(build_nodes)
+                        .build(&parsed.program);
+                    assert_eq!(
+                        checked.diagnostics.is_empty(),
+                        valid,
+                        "{anchors}, build_nodes={build_nodes}: {source}\n{:?}",
+                        checked.diagnostics
+                    );
+                    if !valid {
+                        assert_eq!(checked.diagnostics.len(), 1);
+                        assert!(checked.diagnostics.iter().all(|diagnostic| {
+                            diagnostic.to_string().contains("'infer' declarations")
+                        }));
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn typescript_import_removal_preserves_surviving_declaration_identity() {
+        struct ReversedAnchors;
+        impl<'a> VisitMut<'a> for ReversedAnchors {
+            fn visit_span(&mut self, span: &mut Span) {
+                *span = Span::new(1_000 - span.end, 1_000 - span.start);
+            }
+        }
+        for source in [
+            "import type {N} from 'pkg';const N=1;",
+            "import {type N} from 'pkg';let N=1;",
+            "import type N from 'pkg';const N=1;",
+            "import type * as N from 'pkg';const N=1;",
+            "import type {N} from 'pkg';var N=1;var N;",
+            "const N=1;import type {N} from 'pkg';",
+            "import type {N} from 'pkg';function N(){}",
+            "function N(){}import type {N} from 'pkg';",
+            "import type {N,M} from 'pkg';const N=1;",
+        ] {
+            for anchors in ["parsed", "shared", "reversed"] {
+                for build_nodes in [false, true] {
+                    let allocator = Allocator::default();
+                    let mut parsed = Parser::new(&allocator, source, SourceType::ts()).parse();
+                    assert!(parsed.diagnostics.is_empty());
+                    match anchors {
+                        "shared" => SyntheticSpanZeroer.visit_program(&mut parsed.program),
+                        "reversed" => ReversedAnchors.visit_program(&mut parsed.program),
+                        _ => {}
+                    }
+                    let built = SemanticBuilder::new()
+                        .with_build_nodes(build_nodes)
+                        .build(&parsed.program);
+                    assert!(
+                        built.diagnostics.is_empty(),
+                        "{source}: {:?}",
+                        built.diagnostics
+                    );
+                    let symbol = built
+                        .semantic
+                        .scoping()
+                        .symbol_ids()
+                        .find(|id| built.semantic.scoping().symbol_name(*id) == "N")
+                        .unwrap();
+                    let surviving = built
+                        .semantic
+                        .scoping()
+                        .symbol_redeclarations(symbol)
+                        .iter()
+                        .filter(|declaration| {
+                            !declaration
+                                .flags
+                                .intersects(SymbolFlags::Import | SymbolFlags::TypeImport)
+                        })
+                        .map(|declaration| {
+                            (declaration.declaration, declaration.flags, declaration.span)
+                        })
+                        .collect::<Vec<_>>();
+                    assert!(!surviving.is_empty(), "{source}");
+                    let flags = surviving
+                        .iter()
+                        .fold(SymbolFlags::None, |flags, (_, next, _)| flags | *next);
+                    let options = TransformOptions::default();
+                    let transformed = Transformer::new(&allocator, Path::new("input.ts"), &options)
+                        .build_with_scoping(built.semantic.into_scoping(), &mut parsed.program);
+                    assert!(transformed.diagnostics.is_empty());
+                    assert_eq!(
+                        transformed.scoping.symbol_declaration(symbol),
+                        surviving[0].0,
+                        "declaration: {anchors}, build_nodes={build_nodes}: {source}"
+                    );
+                    assert_eq!(
+                        transformed.scoping.symbol_flags(symbol),
+                        flags,
+                        "flags: {anchors}, build_nodes={build_nodes}: {source}"
+                    );
+                    assert_eq!(transformed.scoping.symbol_span(symbol), surviving[0].2);
+                    let redeclarations = transformed
+                        .scoping
+                        .symbol_redeclarations(symbol)
+                        .iter()
+                        .map(|declaration| {
+                            (declaration.declaration, declaration.flags, declaration.span)
+                        })
+                        .collect::<Vec<_>>();
+                    assert_eq!(
+                        redeclarations.as_slice(),
+                        if surviving.len() > 1 {
+                            surviving.as_slice()
+                        } else {
+                            &[]
+                        },
+                        "redeclarations: {anchors}, build_nodes={build_nodes}: {source}"
+                    );
+                    if source.contains("N,M") {
+                        assert!(
+                            transformed
+                                .scoping
+                                .get_binding(transformed.scoping.root_scope_id(), "M".into())
+                                .is_none()
+                        );
+                    }
+                    let code = Codegen::new().build(&parsed.program).code;
+                    assert!(!code.contains("pkg"), "{code}");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn typescript_merging_preserves_declaration_identity_across_source_anchors() {
+        struct ReversedAnchors;
+        impl<'a> VisitMut<'a> for ReversedAnchors {
+            fn visit_span(&mut self, span: &mut Span) {
+                *span = Span::new(1_000 - span.end, 1_000 - span.start);
+            }
+        }
+        for source in [
+            "function f(){enum E{A=1}enum E{B=2}return [E.A,E.B];}",
+            "namespace N{export const a=1;}namespace N{export const b=2;}",
+            "namespace N{export type T=number;}namespace N{export const b=2;}",
+            "enum E{A=1}namespace E{export const b=2;}",
+            "function N(){} namespace N{export const b=2;}",
+        ] {
+            let mut expected_code = None;
+            for anchors in ["parsed", "shared", "reversed"] {
+                for build_nodes in [false, true] {
+                    let allocator = Allocator::default();
+                    let mut parsed = Parser::new(&allocator, source, SourceType::ts()).parse();
+                    assert!(parsed.diagnostics.is_empty());
+                    match anchors {
+                        "shared" => SyntheticSpanZeroer.visit_program(&mut parsed.program),
+                        "reversed" => ReversedAnchors.visit_program(&mut parsed.program),
+                        _ => {}
+                    }
+                    let built = SemanticBuilder::new()
+                        .with_build_nodes(build_nodes)
+                        .with_enum_eval(true)
+                        .build(&parsed.program);
+                    assert!(built.diagnostics.is_empty());
+                    let options = TransformOptions::default();
+                    let transformed = Transformer::new(&allocator, Path::new("input.ts"), &options)
+                        .build_with_scoping(built.semantic.into_scoping(), &mut parsed.program);
+                    assert!(transformed.diagnostics.is_empty());
+                    let code = Codegen::new().build(&parsed.program).code;
+                    assert!(!code.contains("namespace ") && !code.contains("enum "));
+                    if let Some(expected) = &expected_code {
+                        assert_eq!(
+                            &code, expected,
+                            "{anchors}, build_nodes={build_nodes}: {source}"
+                        );
+                    } else {
+                        expected_code = Some(code.clone());
+                    }
+                    let output = Parser::new(&allocator, &code, SourceType::mjs()).parse();
+                    assert!(output.diagnostics.is_empty());
+                    let checked = SemanticBuilder::new_compiler().build(&output.program);
+                    assert!(
+                        checked.diagnostics.is_empty(),
+                        "{anchors}, build_nodes={build_nodes}: {source}\n{code}\n{:?}",
+                        checked.diagnostics
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn resource_redeclarations_use_body_ownership_instead_of_source_anchors() {
+        struct MovedBindings;
+        impl<'a> VisitMut<'a> for MovedBindings {
+            fn visit_binding_identifier(&mut self, id: &mut oxc_ast::ast::BindingIdentifier<'a>) {
+                id.span = Span::default();
+            }
+        }
+        for source in [
+            "function f(){'use strict';using r=null;var read;function read(){return 2;}return read();}",
+            "function f(){using r=null;function read(){return 1;}function read(){return 2;}return read();}",
+            "function f(){using r=null;{var read;}function read(){return 2;}return read();}",
+            "function f(read){using r=null;function read(){return 2;}return read();}",
+            "function f(read){using r=null;var read;function read(){return 2;}return read();}",
+            "function f(){using r=null;function read(){return 2;}function nested(){var read;}return read();}",
+            "function f(){using r=null;function read(){return 2;}const nested=()=>{var read;};return read();}",
+            "function f(){using r=null;function read(){return 2;}class C{static{var read;}}return read();}",
+        ] {
+            let mut expected_code = None;
+            for anchors in ["parsed", "moved", "shared"] {
+                let allocator = Allocator::default();
+                let mut parsed = Parser::new(&allocator, source, SourceType::mjs()).parse();
+                assert!(parsed.diagnostics.is_empty());
+                match anchors {
+                    "moved" => MovedBindings.visit_program(&mut parsed.program),
+                    "shared" => SyntheticSpanZeroer.visit_program(&mut parsed.program),
+                    _ => {}
+                }
+                let built = SemanticBuilder::new_compiler().build(&parsed.program);
+                assert!(built.diagnostics.is_empty());
+                let mut options = TransformOptions::default();
+                options.env.es2026.explicit_resource_management = true;
+                let transformed = Transformer::new(&allocator, Path::new("input.js"), &options)
+                    .build_with_scoping(built.semantic.into_scoping(), &mut parsed.program);
+                assert!(transformed.diagnostics.is_empty());
+                let code = Codegen::new().build(&parsed.program).code;
+                assert!(!code.contains("using r"));
+                let output = Parser::new(&allocator, &code, SourceType::mjs()).parse();
+                assert!(output.diagnostics.is_empty());
+                let checked = SemanticBuilder::new_compiler().build(&output.program);
+                assert!(
+                    checked.diagnostics.is_empty(),
+                    "{anchors}: {source}\n{code}\n{:?}",
+                    checked.diagnostics
+                );
+                if let Some(expected) = &expected_code {
+                    assert_eq!(&code, expected, "{anchors}: {source}");
+                } else {
+                    expected_code = Some(code);
+                }
+            }
+        }
+    }
+
+    #[test]
     fn fatal_locations_use_utf16_columns_and_javascript_line_breaks() {
         let source = "first\r\n😀 value";
         let start = source.find("value").unwrap() as u32;
