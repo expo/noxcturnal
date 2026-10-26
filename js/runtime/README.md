@@ -13,3 +13,10 @@ The React Compiler reads the caller's original file, so it bails when Flow erasu
 Parsed data can be reused only while its source and the phase's requirements still agree. A phase with no edits can retain its index; a phase that changes bindings may require fresh semantic analysis. The [pipeline planner](../pipeline/README.md) declares these demands.
 
 Preserve structured source fragments through edits so the native commit can retain their mappings.
+
+Visitor node IDs and semantic handles belong to the current phase's parsed input.
+Use them to identify nodes and bindings within that phase; do not carry them across
+an edit commit or reparse. Source ranges remain the correct coordinates for text
+edits and source fragments because every plugin in the phase observes that same
+immutable input. They do not identify nodes in a native AST after structural
+rewriting; see [native identity rules](../../src/preflight/README.md#identity-during-rewriting).

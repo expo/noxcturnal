@@ -170,6 +170,38 @@ test('push separates ASI-sensitive statements and original body', () => {
   ]);
   expect(run(code)).toEqual([1, 3]);
 });
+test('export renames preserve destructured values and function/class exports without exporting locals', async () => {
+  const code = edit(
+    `/* 🦉 */
+      export const {value} = {value: 1}, sibling = 2;
+      export function read(parameter) { let local = parameter + value; return local; }
+      export class Model { read() { return value; } }
+    `,
+    [
+      defineVisitor('Program', { scope: true }, path => {
+        path.scope.rename('value', 'renamedValue');
+        path.scope.rename('read', 'renamedRead');
+        path.scope.rename('Model', 'RenamedModel');
+      }),
+      defineVisitor('Function', { scope: true }, path => {
+        if (path.scope.hasBinding('parameter')) {
+          path.scope.rename('parameter', 'renamedParameter');
+          path.scope.rename('local', 'renamedLocal');
+        }
+      }),
+    ],
+  );
+  const module = await import(
+    `data:text/javascript;base64,${Buffer.from(code).toString('base64')}#${crypto.randomUUID()}`
+  );
+  expect(Object.keys(module).sort()).toEqual(['Model', 'read', 'sibling', 'value']);
+  expect([module.value, module.sibling, module.read(3), new module.Model().read()]).toEqual([
+    1, 2, 4, 1,
+  ]);
+  expect(code).toContain('renamedParameter');
+  expect(code).toContain('renamedLocal');
+});
+
 test('distinct plugins share one export rewrite for one declaration', async () => {
   const plugin = (pluginName: string, name: string, target: string) =>
     defineNativePlugin({

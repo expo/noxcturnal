@@ -1,8 +1,8 @@
+use oxc_allocator::{Address, GetAddress};
 use oxc_ast::{
     AstKind,
     ast::{Expression, IdentifierReference},
 };
-use oxc_span::GetSpan;
 use rustc_hash::FxHashMap;
 
 use crate::generated::event_schema::{field_ids, node_type_name};
@@ -142,39 +142,39 @@ pub(crate) fn mutation_target_child(
     parent: AstKind<'_>,
     parent_is_target: bool,
 ) -> bool {
-    let span = child.span();
+    let address = child.address();
     match parent {
-        AstKind::AssignmentExpression(expression) => expression.left.span() == span,
-        AstKind::UpdateExpression(expression) => expression.argument.span() == span,
+        AstKind::AssignmentExpression(expression) => expression.left.address() == address,
+        AstKind::UpdateExpression(expression) => expression.argument.address() == address,
         AstKind::UnaryExpression(expression) => {
-            expression.operator.as_str() == "delete" && expression.argument.span() == span
+            expression.operator.as_str() == "delete" && expression.argument.address() == address
         }
-        AstKind::ForInStatement(statement) => statement.left.span() == span,
-        AstKind::ForOfStatement(statement) => statement.left.span() == span,
+        AstKind::ForInStatement(statement) => statement.left.address() == address,
+        AstKind::ForOfStatement(statement) => statement.left.address() == address,
         AstKind::ParenthesizedExpression(expression) => {
-            parent_is_target && expression.expression.span() == span
+            parent_is_target && expression.expression.address() == address
         }
         AstKind::TSAsExpression(expression) => {
-            parent_is_target && expression.expression.span() == span
+            parent_is_target && expression.expression.address() == address
         }
         AstKind::TSSatisfiesExpression(expression) => {
-            parent_is_target && expression.expression.span() == span
+            parent_is_target && expression.expression.address() == address
         }
         AstKind::TSNonNullExpression(expression) => {
-            parent_is_target && expression.expression.span() == span
+            parent_is_target && expression.expression.address() == address
         }
         AstKind::TSTypeAssertion(expression) => {
-            parent_is_target && expression.expression.span() == span
+            parent_is_target && expression.expression.address() == address
         }
         AstKind::ChainExpression(expression) => {
-            parent_is_target && expression.expression.span() == span
+            parent_is_target && expression.expression.address() == address
         }
-        AstKind::AssignmentTargetRest(rest) => parent_is_target && rest.target.span() == span,
+        AstKind::AssignmentTargetRest(rest) => parent_is_target && rest.target.address() == address,
         AstKind::AssignmentTargetWithDefault(default) => {
-            parent_is_target && default.binding.span() == span
+            parent_is_target && default.binding.address() == address
         }
         AstKind::AssignmentTargetPropertyProperty(property) => {
-            parent_is_target && property.binding.span() == span
+            parent_is_target && property.binding.address() == address
         }
         AstKind::ArrayAssignmentTarget(_) | AstKind::ObjectAssignmentTarget(_) => parent_is_target,
         _ => false,
@@ -192,17 +192,17 @@ pub(crate) fn member_write_root_child(
     if !parent_member_write && !parent_is_member_root {
         return false;
     }
-    let span = child.span();
+    let address = child.address();
     match parent {
-        AstKind::StaticMemberExpression(expression) => expression.object.span() == span,
-        AstKind::ComputedMemberExpression(expression) => expression.object.span() == span,
-        AstKind::PrivateFieldExpression(expression) => expression.object.span() == span,
-        AstKind::ParenthesizedExpression(expression) => expression.expression.span() == span,
-        AstKind::TSAsExpression(expression) => expression.expression.span() == span,
-        AstKind::TSSatisfiesExpression(expression) => expression.expression.span() == span,
-        AstKind::TSNonNullExpression(expression) => expression.expression.span() == span,
-        AstKind::TSTypeAssertion(expression) => expression.expression.span() == span,
-        AstKind::ChainExpression(expression) => expression.expression.span() == span,
+        AstKind::StaticMemberExpression(expression) => expression.object.address() == address,
+        AstKind::ComputedMemberExpression(expression) => expression.object.address() == address,
+        AstKind::PrivateFieldExpression(expression) => expression.object.address() == address,
+        AstKind::ParenthesizedExpression(expression) => expression.expression.address() == address,
+        AstKind::TSAsExpression(expression) => expression.expression.address() == address,
+        AstKind::TSSatisfiesExpression(expression) => expression.expression.address() == address,
+        AstKind::TSNonNullExpression(expression) => expression.expression.address() == address,
+        AstKind::TSTypeAssertion(expression) => expression.expression.address() == address,
+        AstKind::ChainExpression(expression) => expression.expression.address() == address,
         _ => false,
     }
 }
@@ -254,7 +254,9 @@ impl<'a> MemberWriteStack<'a> {
 #[derive(Default)]
 pub(crate) struct MemberPathInterner {
     transitions: FxHashMap<(u32, u8), u32>,
-    expressions: FxHashMap<(u32, u32, u8), Option<u32>>,
+    // Collectors can run on parser-only trees without semantic IDs. Arena
+    // identity distinguishes nodes even when their source anchors coincide.
+    expressions: FxHashMap<Address, Option<u32>>,
     expected: FxHashMap<(usize, usize), u32>,
 }
 
@@ -325,14 +327,15 @@ impl MemberPathInterner {
         let mut pending = Vec::new();
         let mut state = loop {
             expression = member_expression(expression);
-            let span = expression.span();
-            let tag = match expression {
-                Expression::Identifier(_) => 0,
-                Expression::StaticMemberExpression(_) => 1,
-                Expression::ComputedMemberExpression(_) => 2,
-                _ => break None,
-            };
-            let key = (span.start, span.end, tag);
+            if !matches!(
+                expression,
+                Expression::Identifier(_)
+                    | Expression::StaticMemberExpression(_)
+                    | Expression::ComputedMemberExpression(_)
+            ) {
+                break None;
+            }
+            let key = expression.address();
             if let Some(state) = self.expressions.get(&key) {
                 break *state;
             }
@@ -365,12 +368,13 @@ impl MemberPathInterner {
     }
 
     pub(crate) fn kind(&mut self, kind: AstKind<'_>) -> Option<u32> {
-        let (span, tag) = match kind {
-            AstKind::StaticMemberExpression(member) => (member.span, 1),
-            AstKind::ComputedMemberExpression(member) => (member.span, 2),
-            _ => return None,
-        };
-        let cache_key = (span.start, span.end, tag);
+        if !matches!(
+            kind,
+            AstKind::StaticMemberExpression(_) | AstKind::ComputedMemberExpression(_)
+        ) {
+            return None;
+        }
+        let cache_key = kind.address();
         if let Some(state) = self.expressions.get(&cache_key) {
             return *state;
         }
@@ -401,5 +405,76 @@ impl MemberPathInterner {
         let state = self.bytes(Self::ROOT, path.as_bytes());
         self.expected.insert(key, state);
         state
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use oxc_ast::ast::{AssignmentTarget, Statement};
+    use oxc_ast_visit::VisitMut;
+    use oxc_span::{SourceType, Span};
+
+    #[test]
+    fn member_identity_does_not_depend_on_spans_or_assigned_semantic_ids() {
+        struct SharedAnchors;
+        impl<'a> VisitMut<'a> for SharedAnchors {
+            fn visit_span(&mut self, span: &mut Span) {
+                *span = Span::default();
+            }
+        }
+        let allocator = oxc_allocator::Allocator::default();
+        let mut parsed = oxc_parser::Parser::new(
+            &allocator,
+            "target[key] = other; left.deep.value; right.deep.value;",
+            SourceType::default(),
+        )
+        .parse();
+        SharedAnchors.visit_program(&mut parsed.program);
+        let Statement::ExpressionStatement(statement) = &parsed.program.body[0] else {
+            panic!()
+        };
+        let Expression::AssignmentExpression(assignment) = &statement.expression else {
+            panic!()
+        };
+        let AssignmentTarget::ComputedMemberExpression(member) = &assignment.left else {
+            panic!()
+        };
+        let Expression::Identifier(other) = &assignment.right else {
+            panic!()
+        };
+        let Expression::Identifier(key) = &member.expression else {
+            panic!()
+        };
+        assert!(!mutation_target_child(
+            AstKind::IdentifierReference(other),
+            AstKind::AssignmentExpression(assignment),
+            false
+        ));
+        assert!(mutation_target_child(
+            AstKind::ComputedMemberExpression(member),
+            AstKind::AssignmentExpression(assignment),
+            false
+        ));
+        assert!(!member_write_root_child(
+            AstKind::IdentifierReference(key),
+            AstKind::ComputedMemberExpression(member),
+            true,
+            false
+        ));
+        let mut paths = MemberPathInterner::default();
+        for (statement, expected) in parsed.program.body[1..]
+            .iter()
+            .zip(["left.deep.value", "right.deep.value"])
+        {
+            let Statement::ExpressionStatement(statement) = statement else {
+                panic!()
+            };
+            let Expression::StaticMemberExpression(member) = &statement.expression else {
+                panic!()
+            };
+            let actual = paths.kind(AstKind::StaticMemberExpression(member));
+            assert_eq!(actual, Some(paths.expected(expected)));
+        }
     }
 }

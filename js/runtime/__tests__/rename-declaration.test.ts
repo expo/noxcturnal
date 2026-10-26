@@ -33,6 +33,22 @@ const cases = [
     source: 'let value;({value=9}={value:3});globalThis.result=value;',
   },
   {
+    name: 'binding default target',
+    source: 'const {value=3}={};globalThis.result=value;',
+  },
+  {
+    name: 'binding default reference',
+    source: 'let value=3;const {other=value}={};globalThis.result=other;',
+  },
+  {
+    name: 'assignment default reference',
+    source: 'let value=3,other;({other=value}={});globalThis.result=other;',
+  },
+  {
+    name: 'shorthand object inside a default',
+    source: 'let value=3;const {other={value}}={};globalThis.result=other.value;',
+  },
+  {
     name: 'assignment explicit',
     source: 'let value;({key:value}={key:3});globalThis.result=value;',
   },
