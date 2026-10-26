@@ -1,5 +1,15 @@
 # noxcturnal
 
+## 0.1.10
+
+### Patch Changes
+
+- ⚠️ Fix legacy class default exports and preserve bindings, captures, temporary owners, and helper initialization when native transforms reuse source locations, by [@kitten](https://github.com/kitten) (See [#70](https://github.com/expo/noxcturnal/pull/70))
+- Preserve merged TypeScript declarations and validate infer types and resource redeclarations using AST ownership instead of source locations, by [@kitten](https://github.com/kitten) (See [#71](https://github.com/expo/noxcturnal/pull/71))
+- ⚠️ Fix React Compiler hoisting, JSX binding resolution, and derived-effect validation for nodes that share source locations, by [@kitten](https://github.com/kitten) (See [#73](https://github.com/expo/noxcturnal/pull/73))
+- Preserve export ownership, capture queries, shorthand renames, and member facts for nodes that share source locations, by [@kitten](https://github.com/kitten) (See [#74](https://github.com/expo/noxcturnal/pull/74))
+- Keep path.skip(), path.traverse(), and subscribeWithin() within their owning AST subtrees when source locations coincide, without retaining an index for skip-only visitors, by [@kitten](https://github.com/kitten) (See [#75](https://github.com/expo/noxcturnal/pull/75))
+
 ## 0.1.9
 
 ### Patch Changes
