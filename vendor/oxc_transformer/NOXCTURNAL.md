@@ -49,12 +49,18 @@ Local patches:
 - `lib.rs`, `state.rs`, and pass wiring: erase transparent TypeScript wrappers before
   capture conversion; pass iterator provenance to the host runtime.
 - `typescript/annotations.rs`: JSX fragments retain both their factory and fragment roots.
+  Import erasure removes merged declarations by their import-specifier node IDs
+  through the vendored semantic crate, preserving surviving runtime metadata.
 - `typescript/module.rs`: propagate erased alias dependencies independently of declaration order.
 - `typescript/enum.rs`: annotate initialization as pure only when semantic constant evaluation proves it safe.
+- `typescript/enum.rs` and `typescript/namespace.rs`: match merged declarations and
+  their immutable flags by semantic declaration node ID, preserving shared and moved
+  source anchors even when semantic analysis omits the full node store.
 - `es2026/explicit_resource_management.rs`: initialize colliding function declarations
   as hoisted function expressions inside disposal scopes, preserving lexical captures
   and leaving TypeScript overload signatures available for erasure; lower executable
-  top-level enums before partitioning resource module statements.
+  top-level enums before partitioning resource module statements. Detect body
+  redeclarations by symbol identity and AST ownership rather than source positions.
 - `typescript/enum.rs` and `typescript/mod.rs`: expose the existing enum lowering
   within the crate for reuse by resource module ordering. Enum semantics and helper
   implementations are unchanged.

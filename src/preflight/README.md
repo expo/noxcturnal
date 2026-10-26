@@ -49,6 +49,13 @@ Spans also remain appropriate for source maps, diagnostics, and slicing immutabl
 source. Document deliberate origin classification when several generated nodes
 can relate to one source construct; it must not select a unique live node.
 
+The vendored Oxc TypeScript enum/namespace passes match redeclarations by the
+declaration node IDs retained in Oxc scoping, including when the full node store
+is disabled. TypeScript import erasure likewise removes the exact import-specifier
+node through the vendored semantic crate, preserving merged runtime declarations.
+Its `infer` syntax validation follows the actual conditional extends subtree by
+arena identity while semantic IDs are still being assigned.
+
 ## Completion and failure
 
 An intentional compatibility boundary declines without returning partial code or mappings. Invalid input or configuration throws. A failed postcondition after rewriting is fatal: later passes must not continue with a tree that fails the rewrite's postconditions. The [runtime](../../js/runtime/README.md) turns declines into bailouts with the caller's original source.

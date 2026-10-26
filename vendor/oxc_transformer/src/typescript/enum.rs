@@ -241,7 +241,7 @@ impl<'a> TypeScriptEnum {
         // Foo[Foo["X"] = 0] = "X";
         let redeclarations = ctx.scoping().symbol_redeclarations(enum_symbol_id);
         let is_already_declared =
-            redeclarations.first().map_or_else(|| false, |rd| rd.span != decl.id.span);
+            redeclarations.first().map_or_else(|| false, |rd| rd.declaration != decl.node_id());
 
         let arguments = if (is_export || is_not_top_scope) && !is_already_declared {
             // }({});

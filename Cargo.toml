@@ -1,6 +1,6 @@
 [workspace]
 members = ["crates/*"]
-exclude = ["vendor/oxc_transformer", "vendor/oxc_react_compiler"]
+exclude = ["vendor/oxc_transformer", "vendor/oxc_react_compiler", "vendor/oxc_semantic"]
 
 # Shared by every crate in the workspace through `[lints] workspace = true`, so
 # the sub-crates are held to the same baseline as the napi boundary.
@@ -87,3 +87,4 @@ codegen-units = 1
 [patch.crates-io]
 oxc_transformer = { path = "vendor/oxc_transformer" }
 oxc_react_compiler = { path = "vendor/oxc_react_compiler" }
+oxc_semantic = { path = "vendor/oxc_semantic" }

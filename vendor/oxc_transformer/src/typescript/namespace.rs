@@ -3,9 +3,10 @@ use oxc_ast::ast::*;
 use oxc_ecmascript::BoundNames;
 use oxc_span::{SPAN, Span};
 use oxc_syntax::{
+    node::NodeId,
     operator::{AssignmentOperator, LogicalOperator},
     scope::{ScopeFlags, ScopeId},
-    symbol::SymbolFlags,
+    symbol::{SymbolFlags, SymbolId},
 };
 use oxc_traverse::{BoundIdentifier, Traverse};
 
@@ -128,6 +129,7 @@ impl<'a> TypeScriptNamespace {
             return;
         }
 
+        let declaration_id = decl.node_id();
         let TSNamespaceDeclaration { span, id: ident, body, scope_id, .. } = decl.unbox();
 
         // Return early if this declaration is empty or only contains type declarations —
@@ -169,7 +171,7 @@ impl<'a> TypeScriptNamespace {
             // Only the `ValueModule` declaration emits JS; a `NameSpaceModule`
             // declaration is type-only.
             let current_declaration_flags =
-                redeclarations.iter().find(|rd| rd.span == ident.span).unwrap().flags;
+                redeclarations.iter().find(|rd| rd.declaration == declaration_id).unwrap().flags;
             if current_declaration_flags.is_namespace_module() {
                 return;
             }
@@ -283,7 +285,7 @@ impl<'a> TypeScriptNamespace {
         // The symbol flags now describe the emitted JS. Updating them right away is
         // fine — the type-only check above reads per-declaration flags, so later
         // declarations of a merged namespace don't depend on the old flags.
-        if Self::is_redeclaration_namespace(&ident, ctx) {
+        if Self::is_redeclaration_namespace(symbol_id, declaration_id, ctx) {
             // Lowered to an assignment to the existing runtime binding — drop only the
             // module bits and keep the flags describing that binding.
             *ctx.scoping_mut().symbol_flags_mut(symbol_id) -=
@@ -316,7 +318,9 @@ impl<'a> TypeScriptNamespace {
 
         let redeclarations = ctx.scoping().symbol_redeclarations(symbol_id);
         if !redeclarations.iter().any(|redeclaration| redeclaration.flags.is_enum())
-            && redeclarations.last().is_some_and(|redeclaration| redeclaration.span == ident.span)
+            && redeclarations
+                .last()
+                .is_some_and(|redeclaration| redeclaration.declaration == declaration_id)
         {
             ctx.scoping_mut().clear_symbol_redeclarations(symbol_id);
         }
@@ -543,11 +547,17 @@ impl<'a> TypeScriptNamespace {
     }
 
     /// Check the namespace binding identifier if it is a redeclaration
-    fn is_redeclaration_namespace(id: &BindingIdentifier<'a>, ctx: &TraverseCtx<'a>) -> bool {
-        let symbol_id = id.symbol_id();
+    fn is_redeclaration_namespace(
+        symbol_id: SymbolId,
+        declaration_id: NodeId,
+        ctx: &TraverseCtx<'a>,
+    ) -> bool {
         let redeclarations = ctx.scoping().symbol_redeclarations(symbol_id);
         // Find first value declaration because only value declaration will emit JS code.
-        redeclarations.iter().find(|rd| rd.flags.is_value()).is_some_and(|rd| rd.span != id.span)
+        redeclarations
+            .iter()
+            .find(|rd| rd.flags.is_value())
+            .is_some_and(|rd| rd.declaration != declaration_id)
     }
 }
 

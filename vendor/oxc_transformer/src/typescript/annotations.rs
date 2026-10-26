@@ -1,7 +1,7 @@
 use oxc_allocator::{ArenaVec, ReplaceWith, TakeIn};
 use oxc_ast::ast::*;
 use oxc_diagnostics::OxcDiagnostic;
-use oxc_semantic::{Reference, SymbolFlags};
+use oxc_semantic::{NodeId, Reference, SymbolFlags};
 use oxc_span::{GetSpan, SPAN, Span};
 use oxc_str::Str;
 use oxc_syntax::{
@@ -108,10 +108,11 @@ impl<'a> Traverse<'a, TransformState<'a>> for TypeScriptAnnotations<'a> {
                             true
                         } else {
                             specifiers.retain(|specifier| {
+                                let declaration = specifier.node_id();
                                 let id = match specifier {
                                     ImportDeclarationSpecifier::ImportSpecifier(s) => {
                                         if s.import_kind.is_type() {
-                                            Self::remove_binding(&s.local, ctx);
+                                            Self::remove_binding(&s.local, s.node_id(), ctx);
                                             return false;
                                         }
                                         &s.local
@@ -128,7 +129,7 @@ impl<'a> Traverse<'a, TransformState<'a>> for TypeScriptAnnotations<'a> {
                                 if self.only_remove_type_imports || self.has_value_reference(id, ctx) {
                                     true
                                 } else {
-                                    Self::remove_binding(id, ctx);
+                                    Self::remove_binding(id, declaration, ctx);
                                     false
                                 }
                             });
@@ -571,24 +572,28 @@ impl<'a> TypeScriptAnnotations<'a> {
             for specifier in specifiers {
                 match specifier {
                     ImportDeclarationSpecifier::ImportSpecifier(specifier) => {
-                        Self::remove_binding(&specifier.local, ctx);
+                        Self::remove_binding(&specifier.local, specifier.node_id(), ctx);
                     }
                     ImportDeclarationSpecifier::ImportDefaultSpecifier(specifier) => {
-                        Self::remove_binding(&specifier.local, ctx);
+                        Self::remove_binding(&specifier.local, specifier.node_id(), ctx);
                     }
                     ImportDeclarationSpecifier::ImportNamespaceSpecifier(specifier) => {
-                        Self::remove_binding(&specifier.local, ctx);
+                        Self::remove_binding(&specifier.local, specifier.node_id(), ctx);
                     }
                 }
             }
         }
     }
 
-    fn remove_binding(ident: &BindingIdentifier<'a>, ctx: &mut TraverseCtx<'a>) {
+    fn remove_binding(
+        ident: &BindingIdentifier<'a>,
+        declaration: NodeId,
+        ctx: &mut TraverseCtx<'a>,
+    ) {
         let symbol_id = ident.symbol_id();
         let flags = ctx.scoping().symbol_flags(symbol_id);
         if (flags - SymbolFlags::Import - SymbolFlags::TypeImport).is_value() {
-            ctx.scoping_mut().remove_symbol_declaration(symbol_id, ident.span);
+            ctx.scoping_mut().remove_symbol_declaration_by_id(symbol_id, declaration);
             return;
         }
 

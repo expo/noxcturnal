@@ -39,6 +39,7 @@ use rustc_hash::FxHashMap;
 
 use oxc_allocator::{Address, ArenaBox, ArenaVec, GetAddress, ReplaceWith, TakeIn};
 use oxc_ast::ast::*;
+use oxc_ast_visit::{Visit, walk};
 use oxc_ecmascript::BoundNames;
 use oxc_semantic::{NodeId, ScopeFlags, ScopeId, SymbolFlags, SymbolId};
 use oxc_span::{GetSpan, SPAN, Span};
@@ -48,6 +49,48 @@ use oxc_traverse::{BoundIdentifier, Traverse};
 use crate::{
     Helper, common::helper_loader::helper_load, context::TraverseCtx, state::TransformState,
 };
+
+/// Declarations in this function's body environment. Parameters and declarations
+/// inside nested functions/classes belong to other environments, regardless of anchors.
+#[derive(Default)]
+struct BodyDeclarations {
+    counts: FxHashMap<SymbolId, usize>,
+}
+
+impl BodyDeclarations {
+    fn collect<'a>(statements: &ArenaVec<'a, Statement<'a>>) -> Self {
+        let mut declarations = Self::default();
+        for statement in statements {
+            if let Statement::FunctionDeclaration(function) = statement
+                && function.body.is_some()
+                && let Some(id) = &function.id
+            {
+                *declarations.counts.entry(id.symbol_id()).or_default() += 1;
+            }
+        }
+        if !declarations.counts.is_empty() {
+            declarations.visit_statements(statements);
+        }
+        declarations
+    }
+}
+
+impl<'a> Visit<'a> for BodyDeclarations {
+    fn visit_variable_declaration(&mut self, declaration: &VariableDeclaration<'a>) {
+        if declaration.kind == VariableDeclarationKind::Var {
+            declaration.bound_names(&mut |id| {
+                if let Some(count) = self.counts.get_mut(&id.symbol_id()) {
+                    *count += 1;
+                }
+            });
+        }
+        walk::walk_variable_declaration(self, declaration);
+    }
+
+    fn visit_function(&mut self, _function: &Function<'a>, _flags: ScopeFlags) {}
+    fn visit_arrow_function_expression(&mut self, _arrow: &ArrowFunctionExpression<'a>) {}
+    fn visit_class(&mut self, _class: &Class<'a>) {}
+}
 
 pub struct ExplicitResourceManagement<'a> {
     top_level_using: FxHashMap<Address, /* is await-using */ bool>,
@@ -256,6 +299,7 @@ impl<'a> Traverse<'a, TransformState<'a>> for ExplicitResourceManagement<'a> {
             // Redeclarations with `var` (including nested var declarations) or another
             // function would then be invalid. Initialize only those functions at the
             // start of the try, retaining access to its resource/lexical bindings.
+            let declarations = BodyDeclarations::collect(&new_stmts);
             let mut hoisted = ArenaVec::new_in(ctx);
             new_stmts.retain_mut(|stmt| {
                 let Statement::FunctionDeclaration(function) = stmt else {
@@ -267,14 +311,7 @@ impl<'a> Traverse<'a, TransformState<'a>> for ExplicitResourceManagement<'a> {
                 }
                 let id = function.id.as_ref().expect("function declaration has a name");
                 let symbol_id = id.symbol_id();
-                let scoping = ctx.scoping();
-                let redeclarations = scoping.symbol_redeclarations(symbol_id);
-                let conflicts = !redeclarations.is_empty()
-                    && (scoping.symbol_span(symbol_id).start >= body.span.start
-                        || redeclarations.iter().any(|decl| {
-                            decl.span.start >= body.span.start
-                                && decl.flags.contains(SymbolFlags::FunctionScopedVariable)
-                        }));
+                let conflicts = declarations.counts.get(&symbol_id).is_some_and(|&count| count > 1);
                 if !conflicts {
                     return true;
                 }

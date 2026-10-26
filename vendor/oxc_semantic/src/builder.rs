@@ -1,0 +1,3037 @@
+//! Semantic Builder
+
+use std::{
+    cell::{Cell, RefCell},
+    mem,
+};
+
+use rustc_hash::FxHashMap;
+use smallvec::SmallVec;
+
+use oxc_allocator::{Address, ArenaVec};
+use oxc_ast::{AstKind, ast::*};
+use oxc_ast_visit::Visit;
+#[cfg(feature = "cfg")]
+use oxc_cfg::{
+    ControlFlowGraphBuilder, CtxCursor, CtxFlags, EdgeType, ErrorEdgeKind, InstructionKind,
+    IterationInstructionKind, ReturnInstructionKind,
+};
+use oxc_diagnostics::{Diagnostics, OxcDiagnostic};
+use oxc_span::{SourceType, Span};
+use oxc_str::Ident;
+use oxc_syntax::{
+    node::{NodeFlags, NodeId},
+    reference::{Reference, ReferenceFlags, ReferenceId},
+    scope::{ScopeFlags, ScopeId},
+    symbol::{SymbolFlags, SymbolId},
+};
+
+use crate::{
+    Semantic,
+    binder::{Binder, ModuleInstanceState},
+    checker,
+    class::ClassTableBuilder,
+    diagnostics::redeclaration,
+    label::UnusedLabels,
+    node::{Ancestry, AstNodeStore, AstNodeStoreKind},
+    scoping::{Bindings, Scoping},
+    stats::Stats,
+    unresolved_stack::{UnresolvedReference, UnresolvedReferences},
+};
+#[cfg(feature = "jsdoc")]
+use oxc_jsdoc::JSDocBuilder;
+
+#[cfg(feature = "cfg")]
+macro_rules! control_flow {
+    ($self:ident, |$cfg:tt| $body:expr) => {
+        if let Some($cfg) = &mut $self.cfg { $body } else { Default::default() }
+    };
+}
+
+#[cfg(not(feature = "cfg"))]
+macro_rules! control_flow {
+    ($self:ident, |$cfg:tt| $body:expr) => {{
+        #[expect(clippy::unused_unit)]
+        {
+            let _ = $self; // Suppress unused variable warning
+            ()
+        }
+    }};
+}
+
+/// Semantic Builder
+///
+/// Traverses a parsed AST and builds a [`Semantic`] representation of the
+/// program.
+///
+/// The main API is the [`build`] method.
+///
+/// [`build`]: SemanticBuilder::build
+pub struct SemanticBuilder<'a> {
+    /// source code of the parsed program
+    pub(crate) source_text: &'a str,
+
+    /// source type of the parsed program
+    pub(crate) source_type: SourceType,
+
+    /// Semantic early errors such as redeclaration errors.
+    pub(crate) errors: RefCell<Diagnostics>,
+
+    // states
+    pub(crate) current_scope_id: ScopeId,
+    pub(crate) module_instance_state_cache: FxHashMap<Address, ModuleInstanceState>,
+    current_reference_flags: ReferenceFlags,
+    /// Nesting depth of TypeScript ambient contexts.
+    ambient_depth: u32,
+    /// Symbols that have been hoisted out of a scope (e.g. `var` declarations hoisted to
+    /// the enclosing function scope, or Annex B function declarations hoisted to the var scope).
+    /// Keyed by the `(original scope, name)` the symbol was declared in, so that future
+    /// declarations in that scope can still detect redeclarations via `check_redeclaration`.
+    /// A single flat map avoids allocating a per-scope inner map for every hoisting scope.
+    pub(crate) hoisting_variables: FxHashMap<(ScopeId, Ident<'a>), SymbolId>,
+
+    // builders
+    /// Node-id counter, current-node cursor/flags, and the node storage (full
+    /// store or ancestry stack). See [`AstNodeStore`].
+    pub(crate) node_store: AstNodeStore<'a>,
+    pub(crate) scoping: Scoping,
+
+    pub(crate) unresolved_references: UnresolvedReferences<'a>,
+
+    unused_labels: UnusedLabels<'a>,
+    #[cfg(feature = "jsdoc")]
+    jsdoc: JSDocBuilder<'a>,
+    stats: Option<Stats>,
+    excess_capacity: f64,
+
+    /// Should enum member values be evaluated?
+    enum_eval: bool,
+
+    /// Should additional syntax checks be performed?
+    ///
+    /// See: [`crate::checker::check`]
+    check_syntax_error: bool,
+
+    #[cfg(feature = "cfg")]
+    pub(crate) cfg: Option<ControlFlowGraphBuilder<'a>>,
+    #[cfg(not(feature = "cfg"))]
+    #[expect(unused)]
+    pub(crate) cfg: (),
+
+    pub(crate) class_table_builder: ClassTableBuilder<'a>,
+
+    #[cfg(feature = "cfg")]
+    ast_node_records: Vec<NodeId>,
+}
+
+/// Data returned by [`SemanticBuilder::build`].
+pub struct SemanticBuilderReturn<'a> {
+    /// Built semantic model.
+    pub semantic: Semantic<'a>,
+    /// Diagnostics collected during semantic analysis.
+    pub diagnostics: Diagnostics,
+}
+
+impl Default for SemanticBuilder<'_> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<'a> SemanticBuilder<'a> {
+    /// Create a new semantic builder with default settings.
+    pub fn new() -> Self {
+        let scoping = Scoping::default();
+        let current_scope_id = scoping.root_scope_id();
+
+        Self {
+            source_text: "",
+            source_type: SourceType::default(),
+            errors: RefCell::new(Diagnostics::new()),
+            current_reference_flags: ReferenceFlags::empty(),
+            ambient_depth: 0,
+            current_scope_id,
+            module_instance_state_cache: FxHashMap::default(),
+            node_store: AstNodeStore::default(),
+            hoisting_variables: FxHashMap::default(),
+            scoping,
+            unresolved_references: UnresolvedReferences::new(),
+            unused_labels: UnusedLabels::default(),
+            #[cfg(feature = "jsdoc")]
+            jsdoc: JSDocBuilder::default(),
+            stats: None,
+            excess_capacity: 0.0,
+            enum_eval: false,
+            check_syntax_error: false,
+            #[cfg(feature = "cfg")]
+            cfg: None,
+            #[cfg(not(feature = "cfg"))]
+            cfg: (),
+            class_table_builder: ClassTableBuilder::new(),
+            #[cfg(feature = "cfg")]
+            ast_node_records: Vec::new(),
+        }
+    }
+
+    /// Create a builder configured for the **compiler pipeline** (the
+    /// [`Compiler`], transformer, codegen, minifier, napi bindings, ...).
+    ///
+    /// Enables syntax error checking. Does **not** build the full [`AstNodes`](crate::AstNodes)
+    /// store — ancestry is served from the lightweight ancestry stack instead.
+    /// Use this whenever you only need [`Scoping`] and diagnostics, not random
+    /// access to [`AstNodes`](crate::AstNodes). Individual options can still be overridden with
+    /// the `with_*` methods.
+    ///
+    /// [`Compiler`]: https://docs.rs/oxc/latest/oxc/struct.Compiler.html
+    #[must_use]
+    pub fn new_compiler() -> Self {
+        Self::new().with_build_nodes(false).with_check_syntax_error(true)
+    }
+
+    /// Create a builder configured for the **linter**.
+    ///
+    /// Enables everything the linter requires: the full [`AstNodes`](crate::AstNodes) store
+    /// (random access to nodes), the control flow graph, the class table, and
+    /// syntax error checking. JSDoc is built whenever the `jsdoc` feature is
+    /// enabled, which the `linter` feature turns on. Individual options can still
+    /// be overridden with the `with_*` methods.
+    ///
+    /// Tools that need the node store but not the linter analyses or syntax
+    /// checking (e.g. the mangler) should use `new().with_build_nodes(true)`
+    /// instead.
+    #[must_use]
+    pub fn new_linter() -> Self {
+        Self::new()
+            .with_build_nodes(true)
+            .with_cfg(true)
+            .with_class_table(true)
+            .with_check_syntax_error(true)
+    }
+
+    /// Enable/disable additional syntax checks.
+    ///
+    /// Set this to `true` to enable additional syntax checks. Without these,
+    /// there is no guarantee that the parsed program follows the ECMAScript
+    /// spec.
+    ///
+    /// By default, this is `false`.
+    #[must_use]
+    pub fn with_check_syntax_error(mut self, yes: bool) -> Self {
+        self.check_syntax_error = yes;
+        self
+    }
+
+    /// Enable or disable building the full [`AstNodes`](crate::AstNodes) store.
+    ///
+    /// Disabled by default: [`Semantic::nodes`] is empty and only the ancestry
+    /// stack and node-id counter are maintained while traversing — cheaper for
+    /// the compiler pipeline, which does not need random access to nodes. Enable
+    /// it for the linter and mangler, which read [`Semantic::nodes`].
+    #[must_use]
+    pub fn with_build_nodes(mut self, yes: bool) -> Self {
+        self.node_store.set_build_nodes(yes);
+        self
+    }
+
+    /// Enable or disable evaluation of TypeScript enum member values.
+    ///
+    /// When enabled, enum member values are computed during semantic analysis
+    /// and stored in [`Scoping`], allowing the transformer to inline const enum
+    /// member accesses.
+    ///
+    /// By default, this is `false`.
+    #[must_use]
+    pub fn with_enum_eval(mut self, yes: bool) -> Self {
+        self.enum_eval = yes;
+        self
+    }
+
+    /// Enable or disable building a [`ControlFlowGraph`].
+    ///
+    /// [`ControlFlowGraph`]: oxc_cfg::ControlFlowGraph
+    #[must_use]
+    #[cfg(feature = "cfg")]
+    pub fn with_cfg(mut self, cfg: bool) -> Self {
+        self.cfg = if cfg { Some(ControlFlowGraphBuilder::default()) } else { None };
+        self
+    }
+
+    #[cfg(not(feature = "cfg"))]
+    #[must_use]
+    /// No-op when `cfg` feature is disabled.
+    pub fn with_cfg(self, _cfg: bool) -> Self {
+        self
+    }
+
+    /// Enable/disable building the class table.
+    #[must_use]
+    pub fn with_class_table(mut self, yes: bool) -> Self {
+        self.class_table_builder.enabled = yes;
+        self
+    }
+
+    /// Provide statistics about AST to optimize memory usage of semantic analysis.
+    ///
+    /// Accurate statistics can greatly improve performance, especially for large ASTs.
+    /// If no stats are provided, [`SemanticBuilder::build`] will compile stats by performing
+    /// a complete AST traversal.
+    /// If semantic analysis has already been performed on this AST, get the existing stats with
+    /// [`Semantic::stats`], and pass them in with this method, to avoid the stats collection AST pass.
+    #[must_use]
+    pub fn with_stats(mut self, stats: Stats) -> Self {
+        self.stats = Some(stats);
+        self
+    }
+
+    /// Request `SemanticBuilder` to allocate excess capacity for scopes, symbols, and references.
+    ///
+    /// `excess_capacity` is provided as a fraction.
+    /// e.g. to over-allocate by 20%, pass `0.2` as `excess_capacity`.
+    ///
+    /// Has no effect if a `Stats` object is provided with [`SemanticBuilder::with_stats`],
+    /// only if `SemanticBuilder` is calculating stats itself.
+    ///
+    /// This is useful when you intend to modify `Semantic`, adding more `nodes`, `scopes`, `symbols`,
+    /// or `references`. Allocating excess capacity for these additions at the outset prevents
+    /// `Semantic`'s data structures needing to grow later on which involves memory copying.
+    /// For large ASTs with a lot of semantic data, re-allocation can be very costly.
+    #[must_use]
+    pub fn with_excess_capacity(mut self, excess_capacity: f64) -> Self {
+        self.excess_capacity = excess_capacity;
+        self
+    }
+
+    /// Finalize the builder.
+    ///
+    /// # Panics
+    pub fn build(mut self, program: &'a Program<'a>) -> SemanticBuilderReturn<'a> {
+        self.source_text = program.source_text;
+        self.source_type = program.source_type;
+        #[cfg(feature = "jsdoc")]
+        {
+            self.jsdoc = JSDocBuilder::new(self.source_text, &program.comments);
+        }
+
+        // Use counts of nodes, scopes, symbols, and references to pre-allocate sufficient capacity
+        // in `AstNodes`, `ScopeTree` and `SymbolTable`.
+        //
+        // This means that as we traverse the AST and fill up these structures with data,
+        // they never need to grow and reallocate - which is an expensive operation as it
+        // involves copying all the memory from the old allocation to the new one.
+        // For large source files, these structures are very large, so growth is very costly
+        // as it involves copying massive chunks of memory.
+        // Avoiding this growth produces up to 30% perf boost on our benchmarks.
+        //
+        // If user did not provide existing `Stats`, calculate them by visiting AST.
+        #[cfg_attr(not(debug_assertions), expect(unused_variables))]
+        let (stats, check_stats) = if let Some(stats) = self.stats {
+            (stats, None)
+        } else {
+            let stats = Stats::count(program);
+            let stats_with_excess = stats.increase_by(self.excess_capacity);
+            (stats_with_excess, Some(stats))
+        };
+        self.node_store.reserve(stats.nodes as usize);
+        self.scoping.reserve(
+            stats.symbols as usize,
+            stats.references as usize,
+            stats.scopes as usize,
+        );
+        self.unresolved_references.reserve_exact(stats.references as usize);
+
+        self.class_table_builder.enabled |= self.check_syntax_error;
+
+        // Visit AST to generate scopes tree etc
+        self.visit_program(program);
+
+        // Check that estimated counts accurately (unless in release mode)
+        #[cfg(debug_assertions)]
+        if let Some(stats) = check_stats {
+            #[expect(clippy::cast_possible_truncation)]
+            let actual_stats = Stats::new(
+                // `node_count` is the source of truth, valid even when the full
+                // node store is not built.
+                self.node_store.node_count(),
+                self.scoping.scopes_len() as u32,
+                self.scoping.symbols_len() as u32,
+                self.scoping.references.len() as u32,
+            );
+            stats.assert_accurate(actual_stats);
+        }
+
+        // Root unresolved references are already populated by `resolve_all_references()`
+        // which is called at the end of `visit_program()`.
+
+        #[cfg(feature = "jsdoc")]
+        let jsdoc = {
+            let result = self.jsdoc.build();
+            crate::jsdoc::JSDocFinder::new(result.attached, result.not_attached)
+        };
+
+        #[cfg(debug_assertions)]
+        self.unused_labels.assert_empty();
+
+        let node_count = self.node_store.node_count();
+        let semantic = Semantic {
+            source_text: self.source_text,
+            source_type: self.source_type,
+            comments: &program.comments,
+            irregular_whitespaces: [].into(),
+            nodes: self.node_store.into_nodes(),
+            node_count,
+            scoping: self.scoping,
+            classes: self.class_table_builder.build(),
+            #[cfg(feature = "jsdoc")]
+            jsdoc,
+            unused_labels: self.unused_labels.labels,
+            #[cfg(feature = "cfg")]
+            cfg: self.cfg.map(ControlFlowGraphBuilder::build),
+            #[cfg(not(feature = "cfg"))]
+            cfg: (),
+        };
+        SemanticBuilderReturn { semantic, diagnostics: self.errors.into_inner() }
+    }
+
+    /// Push a Syntax Error
+    pub(crate) fn error(&self, error: OxcDiagnostic) {
+        self.errors.borrow_mut().push(error);
+    }
+
+    /// Upward-walking view of the current node's ancestors.
+    ///
+    /// This is the only ancestry information the syntax checker and binder read.
+    /// Reads from the full node store when it is built, otherwise from the
+    /// standalone ancestry stack.
+    #[inline]
+    pub(crate) fn ancestry(&self) -> Ancestry<'a, '_> {
+        self.node_store.ancestry()
+    }
+
+    pub(crate) fn in_ambient_context(&self) -> bool {
+        self.ambient_depth > 0
+    }
+
+    #[inline]
+    fn enter_ambient_context(&mut self, is_ambient: bool) {
+        if is_ambient {
+            self.ambient_depth += 1;
+        }
+    }
+
+    #[inline]
+    fn leave_ambient_context(&mut self, is_ambient: bool) {
+        if is_ambient {
+            debug_assert!(self.ambient_depth > 0);
+            self.ambient_depth -= 1;
+        }
+    }
+
+    fn create_ast_node(&mut self, kind: AstKind<'a>) {
+        #[cfg(not(feature = "jsdoc"))]
+        let flags = NodeFlags::empty();
+        #[cfg(feature = "jsdoc")]
+        let mut flags = NodeFlags::empty();
+        #[cfg(feature = "jsdoc")]
+        if self.jsdoc.retrieve_attached_jsdoc(&kind) {
+            flags |= NodeFlags::JSDoc;
+        }
+
+        // 1. Standalone node-id increment.
+        let node_id = self.node_store.alloc_node_id();
+        kind.set_node_id(node_id);
+        let parent_node_id = self.node_store.current_node_id;
+        self.node_store.current_node_id = node_id;
+
+        // 2 & 3. Either the full node store or the ancestry stack — never both.
+        #[cfg(feature = "cfg")]
+        let cfg_id = control_flow!(self, |cfg| cfg.current_node_ix);
+        let scope_id = self.current_scope_id;
+        match &mut self.node_store.kind {
+            AstNodeStoreKind::Full(nodes) => {
+                nodes.add_node(
+                    node_id,
+                    kind,
+                    scope_id,
+                    parent_node_id,
+                    #[cfg(feature = "cfg")]
+                    cfg_id,
+                    flags,
+                );
+            }
+            AstNodeStoreKind::Ancestry(stack) => stack.push(kind),
+        }
+        self.record_ast_node();
+    }
+
+    #[inline]
+    fn pop_ast_node(&mut self) {
+        // Restore `current_node_id` to the parent from whichever ancestry source
+        // is in use.
+        match &mut self.node_store.kind {
+            AstNodeStoreKind::Full(nodes) => {
+                self.node_store.current_node_id = nodes.parent_id(self.node_store.current_node_id);
+            }
+            AstNodeStoreKind::Ancestry(stack) => {
+                stack.pop();
+                self.node_store.current_node_id = stack.current_node_id();
+            }
+        }
+    }
+
+    #[inline]
+    #[cfg(feature = "cfg")]
+    fn record_ast_nodes(&mut self) {
+        if self.cfg.is_some() {
+            self.ast_node_records.push(NodeId::DUMMY);
+        }
+    }
+
+    #[inline]
+    #[cfg(feature = "cfg")]
+    fn retrieve_recorded_ast_node(&mut self) -> Option<NodeId> {
+        if self.cfg.is_some() {
+            Some(self.ast_node_records.pop().expect("there is no ast node record to stop."))
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[cfg(feature = "cfg")]
+    fn record_ast_node(&mut self) {
+        // The `self.cfg.is_some()` check here could be removed, since `ast_node_records` is empty
+        // if CFG is disabled. But benchmarks showed removing the extra check is a perf regression.
+        // <https://github.com/oxc-project/oxc/pull/4273>
+        if self.cfg.is_some()
+            && let Some(record) = self.ast_node_records.last_mut()
+            && *record == NodeId::DUMMY
+        {
+            *record = self.node_store.current_node_id;
+        }
+    }
+
+    #[inline]
+    #[cfg(not(feature = "cfg"))]
+    #[expect(clippy::unused_self, clippy::needless_pass_by_ref_mut)]
+    fn record_ast_node(&mut self) {}
+
+    #[inline]
+    pub(crate) fn current_scope_flags(&self) -> ScopeFlags {
+        self.scoping.scope_flags(self.current_scope_id)
+    }
+
+    /// Is the current scope in strict mode?
+    #[inline]
+    pub(crate) fn strict_mode(&self) -> bool {
+        self.current_scope_flags().is_strict_mode()
+    }
+
+    /// Declares a `Symbol` for the node, adds it to symbol table, and binds it to the scope.
+    ///
+    /// includes: the `SymbolFlags` that node has in addition to its declaration type (eg: export, ambient, etc.)
+    /// excludes: the flags which node cannot be declared alongside in a symbol table. Used to report forbidden declarations.
+    ///
+    /// Reports errors for conflicting identifier names.
+    pub(crate) fn declare_symbol_on_scope(
+        &mut self,
+        span: Span,
+        name: Ident<'a>,
+        scope_id: ScopeId,
+        includes: SymbolFlags,
+        excludes: SymbolFlags,
+    ) -> SymbolId {
+        if let Some(symbol_id) = self.check_redeclaration(scope_id, span, name, excludes) {
+            self.add_redeclare_variable(symbol_id, includes, span);
+            self.scoping.union_symbol_flag(symbol_id, includes);
+            return symbol_id;
+        }
+
+        self.scoping.create_symbol_with_binding(
+            span,
+            name,
+            includes,
+            scope_id,
+            scope_id,
+            self.node_store.current_node_id,
+        )
+    }
+
+    /// Declare a new symbol on the current scope.
+    pub(crate) fn declare_symbol(
+        &mut self,
+        span: Span,
+        name: Ident<'a>,
+        includes: SymbolFlags,
+        excludes: SymbolFlags,
+    ) -> SymbolId {
+        self.declare_symbol_on_scope(span, name, self.current_scope_id, includes, excludes)
+    }
+
+    /// Check if a symbol with the same name has already been declared in the
+    /// current scope. Returns the symbol ID if it exists and is not excluded by `excludes`.
+    pub(crate) fn check_redeclaration(
+        &self,
+        scope_id: ScopeId,
+        span: Span,
+        name: Ident<'a>,
+        excludes: SymbolFlags,
+    ) -> Option<SymbolId> {
+        let symbol_id = self
+            .scoping
+            .get_binding(scope_id, name)
+            .or_else(|| self.hoisting_variables.get(&(scope_id, name)).copied())?;
+
+        let flags = self.scoping.symbol_flags(symbol_id);
+
+        // A named function expression binds its own name in the function's scope, so a same-named
+        // parameter is not a redeclaration: `(function n(n) {})` - param `n` is fine.
+        if flags.contains(SymbolFlags::FunctionExpression) {
+            return None;
+        }
+
+        if flags.intersects(excludes) {
+            let symbol_span = self.scoping.symbol_span(symbol_id);
+            self.error(redeclaration(&name, symbol_span, span));
+        }
+
+        Some(symbol_id)
+    }
+
+    /// Declare an unresolved reference in the current scope.
+    ///
+    /// # Panics
+    #[inline]
+    pub(crate) fn declare_reference(
+        &mut self,
+        name: Ident<'a>,
+        reference: Reference,
+    ) -> ReferenceId {
+        let lookup_scope_id = reference.scope_id();
+        let reference_id = self.scoping.create_reference(reference);
+        self.unresolved_references.push(UnresolvedReference {
+            name,
+            reference_id,
+            lookup_scope_id,
+        });
+        reference_id
+    }
+
+    /// Declares a `Symbol` for the node, shadowing previous declarations in the same scope.
+    pub(crate) fn declare_shadow_symbol(
+        &mut self,
+        name: Ident<'a>,
+        span: Span,
+        scope_id: ScopeId,
+        includes: SymbolFlags,
+    ) -> SymbolId {
+        self.scoping.create_symbol_with_binding(
+            span,
+            name,
+            includes,
+            self.current_scope_id,
+            scope_id,
+            self.node_store.current_node_id,
+        )
+    }
+
+    /// Resolve all collected references by walking up the scope chain from each
+    /// reference's scope. This replaces the old bubble-up approach where unresolved
+    /// references were merged into parent scope hashmaps on every scope exit.
+    ///
+    /// Walk-up is faster because it only does hashmap lookups (no drain+insert),
+    /// and reference creation is a simple Vec push instead of a hashmap insert.
+    fn resolve_all_references(&mut self) {
+        let root_scope_id = self.scoping.root_scope_id();
+        let refs = self.unresolved_references.take();
+        for unresolved in refs {
+            if !self.resolve_reference(unresolved, root_scope_id) {
+                self.scoping
+                    .add_root_unresolved_reference(unresolved.name, unresolved.reference_id);
+            }
+        }
+    }
+
+    /// Resolve a reference by walking up the scope chain through `last_scope_id`.
+    ///
+    /// Returns `true` when lookup is finished: the reference is resolved, or it belongs to an
+    /// implicit arguments object.
+    #[expect(clippy::inline_always, reason = "Hot path — called for every reference resolution")]
+    #[inline(always)]
+    fn resolve_reference(
+        &mut self,
+        unresolved: UnresolvedReference<'a>,
+        last_scope_id: ScopeId,
+    ) -> bool {
+        if unresolved.name == "arguments" {
+            return self.resolve_arguments_reference(unresolved, last_scope_id);
+        }
+        self.walk_up_resolve_reference(unresolved, last_scope_id)
+    }
+
+    /// Walk up the scope chain through `last_scope_id`.
+    #[expect(clippy::inline_always, reason = "Hot path — called for every reference resolution")]
+    #[inline(always)]
+    fn walk_up_resolve_reference(
+        &mut self,
+        unresolved: UnresolvedReference<'a>,
+        last_scope_id: ScopeId,
+    ) -> bool {
+        let mut current_scope_id = Some(unresolved.lookup_scope_id);
+        while let Some(scope_id) = current_scope_id {
+            if let Some(symbol_id) = self.scoping.get_binding(scope_id, unresolved.name)
+                && self.try_resolve_reference(unresolved.reference_id, symbol_id)
+            {
+                return true;
+            }
+            if scope_id == last_scope_id {
+                return false;
+            }
+            current_scope_id = self.scoping.scope_parent_id(scope_id);
+        }
+        false
+    }
+
+    /// Resolve a reference named `arguments`.
+    ///
+    /// An ordinary function has an implicit arguments object, which has no symbol. A value
+    /// reference therefore ends its lookup at the nearest ordinary function. Unless a parameter
+    /// or declaration of that function binds the name, the reference is recorded as a root
+    /// unresolved reference, so it never resolves to a binding outside the function.
+    ///
+    /// Returns `true` when lookup is finished.
+    #[cold]
+    #[inline(never)]
+    fn resolve_arguments_reference(
+        &mut self,
+        unresolved: UnresolvedReference<'a>,
+        last_scope_id: ScopeId,
+    ) -> bool {
+        // A type named `arguments` is an ordinary type binding.
+        let flags = self.scoping.get_reference(unresolved.reference_id).flags();
+        if !flags.intersects(ReferenceFlags::Value | ReferenceFlags::ValueAsType) {
+            return self.walk_up_resolve_reference(unresolved, last_scope_id);
+        }
+
+        let mut current_scope_id = Some(unresolved.lookup_scope_id);
+        while let Some(scope_id) = current_scope_id {
+            if let Some(symbol_id) = self.scoping.get_binding(scope_id, unresolved.name)
+                // A function expression's own name lies outside its arguments environment.
+                && !self.scoping.symbol_flags(symbol_id).contains(SymbolFlags::FunctionExpression)
+                && self.try_resolve_reference(unresolved.reference_id, symbol_id)
+            {
+                return true;
+            }
+            let scope_flags = self.scoping.scope_flags(scope_id);
+            if scope_flags.is_function() && !scope_flags.is_arrow() {
+                self.scoping
+                    .add_root_unresolved_reference(unresolved.name, unresolved.reference_id);
+                return true;
+            }
+            if scope_id == last_scope_id {
+                return false;
+            }
+            current_scope_id = self.scoping.scope_parent_id(scope_id);
+        }
+        false
+    }
+
+    /// Try to resolve a reference to a symbol. Returns `true` if resolved.
+    fn try_resolve_reference(&mut self, reference_id: ReferenceId, symbol_id: SymbolId) -> bool {
+        let symbol_flags = self.scoping.symbol_flags(symbol_id);
+        let reference = &mut self.scoping.references[reference_id];
+        let flags = reference.flags_mut();
+
+        // Determine whether the symbol can be referenced by this reference.
+        // Namespace-qualified references must resolve to namespace-capable symbols
+        // (modules, namespaces, enums, imports), not arbitrary values or types.
+        let can_resolve = if flags.is_namespace()
+            && !flags.is_value_as_type()
+            && !symbol_flags.can_be_referenced_as_namespace()
+        {
+            false
+        } else {
+            (flags.is_value() && symbol_flags.can_be_referenced_by_value())
+                || (flags.is_type() && symbol_flags.can_be_referenced_by_type())
+                || (flags.is_value_as_type() && symbol_flags.can_be_referenced_by_value_as_type())
+        };
+
+        if !can_resolve {
+            return false;
+        }
+
+        if symbol_flags.is_value() && flags.is_value() {
+            // The non type-only ExportSpecifier can reference both type/value symbols,
+            // if the symbol is a value symbol and reference flag is not type-only,
+            // remove the type flag. For example: `const B = 1; export { B };`
+            *flags -= ReferenceFlags::Type;
+        } else if flags.is_namespace() && flags.is_read() {
+            // TS import-equals module references start as reads so downstream transforms
+            // can decide whether to preserve or erase them based on alias usage.
+            *flags -= ReferenceFlags::Type;
+        } else {
+            // 1. ReferenceFlags::ValueAsType -> ReferenceFlags::Type
+            // `const ident = 0; typeof ident`
+            //                          ^^^^^ -> The ident is a value symbols,
+            //                                   but it used as a type.
+            // 2. ReferenceFlags::Value | ReferenceFlags::Type -> ReferenceFlags::Type
+            // `type ident = string; export default ident;
+            //                                      ^^^^^ We have confirmed the symbol is
+            //                                            not a value symbol, so we need to
+            //                                            make sure the reference is a type only.
+            *flags = ReferenceFlags::Type;
+        }
+        reference.set_symbol_id(symbol_id);
+        self.scoping.add_resolved_reference(symbol_id, reference_id);
+        true
+    }
+
+    /// Early-resolve references collected while visiting the current function or catch parameter
+    /// scope.
+    ///
+    /// Function parameters and bodies currently share one scope. To emulate the separate
+    /// parameter environment, unresolved parameter references resume from the parent scope during
+    /// final resolution. Nested parameter resolution advances this boundary one function at a time,
+    /// so a nested function parameter can still resolve to a later declaration in an enclosing
+    /// function body while skipping declarations in its own body.
+    ///
+    /// This is a workaround until function bodies have separate scopes:
+    /// <https://github.com/oxc-project/backlog/issues/176>.
+    ///
+    /// Resolved references are removed. Unresolved references stay in the flat
+    /// list for later resolution by `resolve_all_references` (which handles
+    /// forward references to declarations not yet visited).
+    fn resolve_references_for_current_scope(&mut self, unresolved_start: usize) {
+        if self.unresolved_references.len() == unresolved_start {
+            return;
+        }
+
+        let current_scope_id = self.current_scope_id;
+        let parent_scope_id = self
+            .scoping
+            .scope_parent_id(current_scope_id)
+            .expect("function and catch parameter scopes always have a parent");
+
+        // Take the list out of `self` while resolving, so the closure can call `&mut self`
+        // methods. Resolution never pushes new unresolved references, so nothing is lost.
+        let mut unresolved_references = mem::take(&mut self.unresolved_references);
+        unresolved_references.retain_from(unresolved_start, |unresolved| {
+            // Parameter decorators are visited in an outer class scope. Leave those references
+            // for final resolution because the current function is not on their scope chain.
+            let lookup_scope_id = unresolved.lookup_scope_id;
+            if lookup_scope_id != current_scope_id
+                && !self.scoping.scope_is_descendant_of(lookup_scope_id, current_scope_id)
+            {
+                return true;
+            }
+            if self.resolve_reference(*unresolved, current_scope_id) {
+                return false;
+            }
+            // Skip this function body during final resolution. An enclosing parameter resolution
+            // may still resolve the reference before advancing the boundary again.
+            unresolved.lookup_scope_id = parent_scope_id;
+            true
+        });
+        self.unresolved_references = unresolved_references;
+    }
+
+    pub(crate) fn add_redeclare_variable(
+        &mut self,
+        symbol_id: SymbolId,
+        flags: SymbolFlags,
+        span: Span,
+    ) {
+        self.scoping.add_symbol_redeclaration(
+            symbol_id,
+            flags,
+            self.node_store.current_node_id,
+            span,
+        );
+    }
+
+    fn visit_parameter_decorators(&mut self, decorators: &ArenaVec<'a, Decorator<'a>>) {
+        if decorators.is_empty() {
+            return;
+        }
+
+        // TypeScript resolves parameter decorators in the enclosing class scope,
+        // not the constructor scope. Both `foo` references below therefore
+        // resolve to the outer binding — the first decorator must not see its
+        // own parameter, and the second must not see the first parameter:
+        //
+        // ```ts
+        // constructor(
+        //   @Inject(foo.KEY) private readonly foo: number,
+        //   @Inject(foo.KEY) private readonly foo2: number,
+        // ) {}
+        // ```
+        //
+        // `reference_identifier` stamps each new reference with `current_scope_id`,
+        // and `walk_up_resolve_reference` later walks from that recorded scope
+        // via `scope_parent_id`. Pointing `current_scope_id` at the class scope
+        // for the decorator visit brands every reference inside it with the
+        // class scope, so resolution skips the constructor's bindings entirely.
+        // Restore on the way back.
+        //
+        // Mirrors the `Decorator` case in TypeScript's `resolveName`:
+        // <https://github.com/microsoft/TypeScript/blob/0105bbb63689372f2cbeec7c884c27906ac0ef7f/src/compiler/utilities.ts#L11772-L11800>.
+        let parent_scope_id = self
+            .scoping
+            .scope_parent_id(self.current_scope_id)
+            .expect("parameter decorators should always be visited from a function scope");
+        let function_scope_id = self.current_scope_id;
+        self.current_scope_id = parent_scope_id;
+        self.visit_decorators(decorators);
+        self.current_scope_id = function_scope_id;
+    }
+}
+
+impl<'a> Visit<'a> for SemanticBuilder<'a> {
+    // NB: Not called for `Program`
+    fn enter_scope(&mut self, flags: ScopeFlags, scope_id: &Cell<Option<ScopeId>>) {
+        let parent_scope_id = self.current_scope_id;
+        let flags = self.scoping.get_new_scope_flags(flags, parent_scope_id);
+        self.current_scope_id =
+            self.scoping.add_scope(Some(parent_scope_id), self.node_store.current_node_id, flags);
+        scope_id.set(Some(self.current_scope_id));
+    }
+
+    // NB: Not called for `Program`
+    fn leave_scope(&mut self) {
+        // `get_parent_id` always returns `Some` because this method is not called for `Program`.
+        // So we could `.unwrap()` here. But that seems to produce a small perf impact, probably because
+        // `leave_scope` then doesn't get inlined because of its larger size due to the panic code.
+        let parent_id = self.scoping.scope_parent_id(self.current_scope_id);
+
+        debug_assert!(parent_id.is_some());
+        if let Some(parent_id) = parent_id {
+            if self.scoping.scope_flags(self.current_scope_id).contains_direct_eval() {
+                self.scoping.scope_flags_mut(parent_id).insert(ScopeFlags::DirectEval);
+            }
+            self.current_scope_id = parent_id;
+        }
+    }
+
+    // NB: Not called for `Program`.
+    fn enter_node(&mut self, kind: AstKind<'a>) {
+        self.create_ast_node(kind);
+    }
+
+    /// Both this function and `checker::check` must be inlined. Each `visit_*` method calls
+    /// `leave_node` with a statically known `AstKind`, so inlining allows the compiler to
+    /// constant-fold `checker::check`'s match, eliminating all non-matching arms.
+    #[expect(
+        clippy::inline_always,
+        reason = "enables compile-time match elimination in checker::check"
+    )]
+    #[inline(always)]
+    fn leave_node(&mut self, kind: AstKind<'a>) {
+        if self.check_syntax_error {
+            checker::check(kind, self);
+        }
+        self.pop_ast_node();
+    }
+
+    fn visit_program(&mut self, program: &Program<'a>) {
+        let kind = AstKind::Program(self.alloc(program));
+        /* cfg */
+        #[cfg(feature = "cfg")]
+        let error_harness = control_flow!(self, |cfg| {
+            let error_harness = cfg.attach_error_harness(ErrorEdgeKind::Implicit);
+            let _program_basic_block = cfg.new_basic_block_normal();
+            error_harness
+        });
+        /* cfg - must be above directives as directives are in cfg */
+
+        // Don't call `enter_node` here as `Program` is a special case - node has itself as `parent_id`.
+        // Inline the specific logic for `Program` here instead.
+        // This avoids `Nodes::add_node` having to handle the special case.
+        // We can also skip calling `self.enter_kind`, `self.record_ast_node`
+        // and `self.jsdoc.retrieve_attached_jsdoc`, as they are all no-ops for `Program`.
+        // 1. Standalone node-id increment: `Program` is always `NodeId::ROOT`.
+        let node_id = self.node_store.alloc_node_id();
+        debug_assert_eq!(node_id, NodeId::ROOT);
+        kind.set_node_id(node_id);
+        self.node_store.current_node_id = node_id;
+        // 2 & 3. Either the full node store or the ancestry stack — never both.
+        #[cfg(feature = "cfg")]
+        let cfg_id = control_flow!(self, |cfg| cfg.current_node_ix);
+        let scope_id = self.current_scope_id;
+        let flags = NodeFlags::empty();
+        match &mut self.node_store.kind {
+            AstNodeStoreKind::Full(nodes) => {
+                nodes.add_program_node(
+                    kind,
+                    scope_id,
+                    #[cfg(feature = "cfg")]
+                    cfg_id,
+                    flags,
+                );
+            }
+            AstNodeStoreKind::Ancestry(stack) => stack.push(kind),
+        }
+
+        let is_ambient = self.source_type.is_typescript_definition();
+        self.enter_ambient_context(is_ambient);
+
+        // Don't call `enter_scope` here as `Program` is a special case - scope has no `parent_id`.
+        // Inline the specific logic for `Program` here instead.
+        // This simplifies logic in `enter_scope`, as it doesn't have to handle the special case.
+        let mut flags = ScopeFlags::Top;
+        if self.source_type.is_strict() || program.has_use_strict_directive() {
+            flags |= ScopeFlags::StrictMode;
+        }
+        self.current_scope_id =
+            self.scoping.add_scope(None, self.node_store.current_node_id, flags);
+        program.scope_id.set(Some(self.current_scope_id));
+        // NB: Don't call `self.unresolved_references.increment_scope_depth()`
+        // as scope depth is initialized as 1 already (the scope depth for `Program`).
+
+        if let Some(hashbang) = &program.hashbang {
+            self.visit_hashbang(hashbang);
+        }
+
+        for directive in &program.directives {
+            self.visit_directive(directive);
+        }
+
+        self.visit_statements(&program.body);
+
+        /* cfg */
+        control_flow!(self, |cfg| cfg.release_error_harness(error_harness));
+        /* cfg */
+
+        // Resolve all remaining unresolved references by walking up the scope chain.
+        // This replaces the old bubble-up approach where references were merged on every scope exit.
+        self.resolve_all_references();
+
+        self.leave_node(kind);
+        self.leave_ambient_context(is_ambient);
+
+        debug_assert_eq!(self.ambient_depth, 0);
+    }
+
+    fn visit_break_statement(&mut self, stmt: &BreakStatement<'a>) {
+        let kind = AstKind::BreakStatement(self.alloc(stmt));
+        self.enter_node(kind);
+        if let Some(label) = &stmt.label {
+            self.unused_labels.reference(label.name);
+        }
+
+        /* cfg */
+        #[cfg(feature = "cfg")]
+        let node_id = self.node_store.current_node_id;
+        /* cfg */
+
+        if let Some(break_target) = &stmt.label {
+            self.visit_label_identifier(break_target);
+        }
+
+        /* cfg */
+        control_flow!(self, |cfg| cfg
+            .append_break(node_id, stmt.label.as_ref().map(|it| it.name.as_str())));
+        /* cfg */
+
+        self.leave_node(kind);
+    }
+
+    fn visit_class(&mut self, class: &Class<'a>) {
+        let kind = AstKind::Class(self.alloc(class));
+        self.enter_node(kind);
+        if class.is_declaration() {
+            class.bind(self);
+        }
+
+        self.visit_decorators(&class.decorators);
+        self.enter_ambient_context(class.declare);
+        self.enter_scope(ScopeFlags::StrictMode, &class.scope_id);
+
+        if class.is_expression() {
+            // We need to bind class expressions in the class scope before visiting the identifier.
+            class.bind(self);
+        }
+
+        if let Some(id) = &class.id {
+            self.visit_binding_identifier(id);
+        }
+
+        if let Some(type_parameters) = &class.type_parameters {
+            self.visit_ts_type_parameter_declaration(type_parameters);
+        }
+        if let Some(heritage) = &class.heritage {
+            if self.in_ambient_context() {
+                self.current_reference_flags = ReferenceFlags::ValueAsType;
+            }
+            self.visit_expression(&heritage.expression);
+            self.current_reference_flags = ReferenceFlags::empty();
+            if let Some(super_type_parameters) = &heritage.type_arguments {
+                self.visit_ts_type_parameter_instantiation(super_type_parameters);
+            }
+        }
+        self.visit_ts_class_implements_list(&class.implements);
+        self.visit_class_body(&class.body);
+
+        self.leave_scope();
+        self.leave_node(kind);
+        self.leave_ambient_context(class.declare);
+        self.class_table_builder.pop_class();
+    }
+
+    fn visit_block_statement(&mut self, it: &BlockStatement<'a>) {
+        let kind = AstKind::BlockStatement(self.alloc(it));
+        self.enter_node(kind);
+        control_flow!(self, |cfg| cfg.enter_statement(self.node_store.current_node_id));
+
+        let parent_scope_id = self.current_scope_id;
+        self.enter_scope(ScopeFlags::empty(), &it.scope_id);
+
+        // Move all bindings from catch clause param scope to catch clause body scope
+        // to make it easier to resolve references and check redeclare errors
+        if self.scoping.scope_flags(parent_scope_id).is_catch_clause() {
+            let parent_bindings = self.scoping.cell.with_dependent_mut(|allocator, cell| {
+                if cell.bindings[parent_scope_id].is_empty() {
+                    None
+                } else {
+                    let mut parent_bindings = Bindings::new_in(allocator);
+                    mem::swap(&mut cell.bindings[parent_scope_id], &mut parent_bindings);
+                    // Collect into a `SmallVec` so the common `catch (e)` (a single binding)
+                    // resolves inline without a heap allocation. The ids must be collected
+                    // here to escape the `with_dependent_mut` borrow before calling
+                    // `set_symbol_scope_id` below.
+                    let parent_symbol_ids =
+                        parent_bindings.values().copied().collect::<SmallVec<[SymbolId; 4]>>();
+                    cell.bindings[self.current_scope_id] = parent_bindings;
+                    Some(parent_symbol_ids)
+                }
+            });
+            if let Some(parent_bindings) = parent_bindings {
+                for symbol_id in parent_bindings {
+                    self.scoping.set_symbol_scope_id(symbol_id, self.current_scope_id);
+                }
+            }
+        }
+
+        self.visit_statements(&it.body);
+
+        self.leave_scope();
+        self.leave_node(kind);
+    }
+
+    fn visit_continue_statement(&mut self, stmt: &ContinueStatement<'a>) {
+        let kind = AstKind::ContinueStatement(self.alloc(stmt));
+        self.enter_node(kind);
+        if let Some(label) = &stmt.label {
+            self.unused_labels.reference(label.name);
+        }
+
+        /* cfg */
+        #[cfg(feature = "cfg")]
+        let node_id = self.node_store.current_node_id;
+        /* cfg */
+
+        if let Some(continue_target) = &stmt.label {
+            self.visit_label_identifier(continue_target);
+        }
+
+        /* cfg */
+        control_flow!(self, |cfg| cfg
+            .append_continue(node_id, stmt.label.as_ref().map(|it| it.name.as_str())));
+        /* cfg */
+
+        self.leave_node(kind);
+    }
+
+    fn visit_do_while_statement(&mut self, stmt: &DoWhileStatement<'a>) {
+        let kind = AstKind::DoWhileStatement(self.alloc(stmt));
+        self.enter_node(kind);
+        control_flow!(self, |cfg| cfg.enter_statement(self.node_store.current_node_id));
+
+        /* cfg */
+        #[cfg(feature = "cfg")]
+        let (before_do_while_stmt_graph_ix, start_body_graph_ix) = control_flow!(self, |cfg| {
+            let before_do_while_stmt_graph_ix = cfg.current_node_ix;
+            let start_body_graph_ix = cfg.new_basic_block_normal();
+            cfg.ctx(None).default().allow_break().allow_continue();
+            (before_do_while_stmt_graph_ix, start_body_graph_ix)
+        });
+        /* cfg */
+
+        self.visit_statement(&stmt.body);
+
+        /* cfg - condition basic block */
+        #[cfg(feature = "cfg")]
+        let (after_body_graph_ix, start_of_condition_graph_ix) = control_flow!(self, |cfg| {
+            let after_body_graph_ix = cfg.current_node_ix;
+            let start_of_condition_graph_ix = cfg.new_basic_block_normal();
+            (after_body_graph_ix, start_of_condition_graph_ix)
+        });
+        /* cfg */
+
+        #[cfg(feature = "cfg")]
+        self.record_ast_nodes();
+        self.visit_expression(&stmt.test);
+        #[cfg(feature = "cfg")]
+        let test_node_id = self.retrieve_recorded_ast_node();
+
+        /* cfg */
+        control_flow!(self, |cfg| {
+            cfg.append_condition_to(start_of_condition_graph_ix, test_node_id);
+            let end_of_condition_graph_ix = cfg.current_node_ix;
+
+            let end_do_while_graph_ix = cfg.new_basic_block_normal();
+
+            // before do while to start of body basic block
+            cfg.add_edge(before_do_while_stmt_graph_ix, start_body_graph_ix, EdgeType::Normal);
+            // body of do-while to start of condition
+            cfg.add_edge(after_body_graph_ix, start_of_condition_graph_ix, EdgeType::Normal);
+            // end of condition to after do while
+            cfg.add_edge(end_of_condition_graph_ix, end_do_while_graph_ix, EdgeType::Normal);
+            // end of condition to after start of body
+            cfg.add_edge(end_of_condition_graph_ix, start_body_graph_ix, EdgeType::Backedge);
+
+            cfg.ctx(None)
+                .mark_break(end_do_while_graph_ix)
+                .mark_continue(start_of_condition_graph_ix)
+                .resolve_with_upper_label();
+        });
+        /* cfg */
+
+        self.leave_node(kind);
+    }
+
+    fn visit_logical_expression(&mut self, expr: &LogicalExpression<'a>) {
+        // logical expressions are short-circuiting, and therefore
+        // also represent control flow.
+        // For example, in:
+        //   foo && bar();
+        // the bar() call will only be executed if foo is truthy.
+        let kind = AstKind::LogicalExpression(self.alloc(expr));
+        self.enter_node(kind);
+
+        /* cfg - condition basic block */
+        #[cfg(feature = "cfg")]
+        let (before_logical_graph_ix, start_of_condition_graph_ix) = control_flow!(self, |cfg| {
+            let before_logical_graph_ix = cfg.current_node_ix;
+            let start_of_condition_graph_ix = cfg.new_basic_block_normal();
+            (before_logical_graph_ix, start_of_condition_graph_ix)
+        });
+        /* cfg */
+
+        #[cfg(feature = "cfg")]
+        self.record_ast_nodes();
+        self.visit_expression(&expr.left);
+        #[cfg(feature = "cfg")]
+        let left_node_id = self.retrieve_recorded_ast_node();
+
+        /* cfg  */
+        #[cfg(feature = "cfg")]
+        let (left_expr_end_ix, right_expr_start_ix) = control_flow!(self, |cfg| {
+            cfg.append_condition_to(start_of_condition_graph_ix, left_node_id);
+            let left_expr_end_ix = cfg.current_node_ix;
+            let right_expr_start_ix = cfg.new_basic_block_normal();
+            (left_expr_end_ix, right_expr_start_ix)
+        });
+        /* cfg  */
+
+        self.visit_expression(&expr.right);
+
+        /* cfg */
+        control_flow!(self, |cfg| {
+            let right_expr_end_ix = cfg.current_node_ix;
+            let after_logical_expr_ix = cfg.new_basic_block_normal();
+
+            cfg.add_edge(before_logical_graph_ix, start_of_condition_graph_ix, EdgeType::Normal);
+            cfg.add_edge(left_expr_end_ix, right_expr_start_ix, EdgeType::Normal);
+            cfg.add_edge(left_expr_end_ix, after_logical_expr_ix, EdgeType::Normal);
+            cfg.add_edge(right_expr_end_ix, after_logical_expr_ix, EdgeType::Normal);
+        });
+        /* cfg */
+
+        self.leave_node(kind);
+    }
+
+    fn visit_assignment_expression(&mut self, expr: &AssignmentExpression<'a>) {
+        // assignment expressions can include an operator, which
+        // can be used to determine the control flow of the expression.
+        // For example, in:
+        //   foo &&= super();
+        // the super() call will only be executed if foo is truthy.
+
+        let kind = AstKind::AssignmentExpression(self.alloc(expr));
+        self.enter_node(kind);
+
+        if !expr.operator.is_assign() {
+            // Only when the operator is not an `=` operator, the left-hand side is both read and write.
+            // <https://tc39.es/ecma262/#sec-assignment-operators-runtime-semantics-evaluation>
+            self.current_reference_flags = ReferenceFlags::read_write();
+        }
+
+        /* cfg - condition basic block */
+        #[cfg(feature = "cfg")]
+        let (before_assignment_graph_ix, start_of_condition_graph_ix) =
+            control_flow!(self, |cfg| {
+                if expr.operator.is_logical() {
+                    let before_assignment_graph_ix = cfg.current_node_ix;
+                    let start_of_condition_graph_ix = cfg.new_basic_block_normal();
+                    (Some(before_assignment_graph_ix), Some(start_of_condition_graph_ix))
+                } else {
+                    (None, None)
+                }
+            });
+        /* cfg */
+
+        #[cfg(feature = "cfg")]
+        if expr.operator.is_logical() {
+            self.record_ast_nodes();
+        }
+        self.visit_assignment_target(&expr.left);
+        #[cfg(feature = "cfg")]
+        let target_node_id =
+            if expr.operator.is_logical() { self.retrieve_recorded_ast_node() } else { None };
+
+        /* cfg  */
+        #[cfg(feature = "cfg")]
+        let cfg_ixs = control_flow!(self, |cfg| {
+            if expr.operator.is_logical() {
+                if let Some(condition_ix) = start_of_condition_graph_ix {
+                    cfg.append_condition_to(condition_ix, target_node_id);
+                }
+                let target_end_ix = cfg.current_node_ix;
+                let expr_start_ix = cfg.new_basic_block_normal();
+                Some((target_end_ix, expr_start_ix))
+            } else {
+                None
+            }
+        });
+        /* cfg  */
+
+        self.visit_expression(&expr.right);
+
+        /* cfg */
+        control_flow!(self, |cfg| {
+            if let Some((target_end_ix, expr_start_ix)) = cfg_ixs {
+                let expr_end_ix = cfg.current_node_ix;
+                let after_assignment_ix = cfg.new_basic_block_normal();
+
+                if let Some((before_ix, condition_ix)) =
+                    before_assignment_graph_ix.zip(start_of_condition_graph_ix)
+                {
+                    cfg.add_edge(before_ix, condition_ix, EdgeType::Normal);
+                }
+                cfg.add_edge(target_end_ix, expr_start_ix, EdgeType::Normal);
+                cfg.add_edge(target_end_ix, after_assignment_ix, EdgeType::Normal);
+                cfg.add_edge(expr_end_ix, after_assignment_ix, EdgeType::Normal);
+            }
+        });
+        /* cfg */
+
+        self.leave_node(kind);
+    }
+
+    fn visit_conditional_expression(&mut self, expr: &ConditionalExpression<'a>) {
+        let kind = AstKind::ConditionalExpression(self.alloc(expr));
+        self.enter_node(kind);
+
+        /* cfg - condition basic block */
+        #[cfg(feature = "cfg")]
+        let (before_conditional_graph_ix, start_of_condition_graph_ix) =
+            control_flow!(self, |cfg| {
+                let before_conditional_graph_ix = cfg.current_node_ix;
+                let start_of_condition_graph_ix = cfg.new_basic_block_normal();
+                (before_conditional_graph_ix, start_of_condition_graph_ix)
+            });
+        /* cfg */
+
+        #[cfg(feature = "cfg")]
+        self.record_ast_nodes();
+        // The test of a conditional is always a pure read — strip MemberWriteTarget
+        // so that `(a ? x : y).foo = 1` doesn't mark `a` as a property-write target.
+        let saved_flags = self.current_reference_flags;
+        self.current_reference_flags -= ReferenceFlags::MemberWriteTarget;
+        self.visit_expression(&expr.test);
+        self.current_reference_flags = saved_flags;
+        #[cfg(feature = "cfg")]
+        let test_node_id = self.retrieve_recorded_ast_node();
+
+        /* cfg */
+        #[cfg(feature = "cfg")]
+        let (after_condition_graph_ix, before_consequent_expr_graph_ix) =
+            control_flow!(self, |cfg| {
+                cfg.append_condition_to(start_of_condition_graph_ix, test_node_id);
+                let after_condition_graph_ix = cfg.current_node_ix;
+                // conditional expression basic block
+                let before_consequent_expr_graph_ix = cfg.new_basic_block_normal();
+                (after_condition_graph_ix, before_consequent_expr_graph_ix)
+            });
+        /* cfg */
+
+        self.visit_expression(&expr.consequent);
+
+        /* cfg */
+        #[cfg(feature = "cfg")]
+        let (after_consequent_expr_graph_ix, start_alternate_graph_ix) =
+            control_flow!(self, |cfg| {
+                let after_consequent_expr_graph_ix = cfg.current_node_ix;
+                let start_alternate_graph_ix = cfg.new_basic_block_normal();
+                (after_consequent_expr_graph_ix, start_alternate_graph_ix)
+            });
+        /* cfg */
+
+        self.visit_expression(&expr.alternate);
+
+        /* cfg */
+        control_flow!(self, |cfg| {
+            let after_alternate_graph_ix = cfg.current_node_ix;
+            /* bb after conditional expression joins consequent and alternate */
+            let after_conditional_graph_ix = cfg.new_basic_block_normal();
+
+            cfg.add_edge(
+                before_conditional_graph_ix,
+                start_of_condition_graph_ix,
+                EdgeType::Normal,
+            );
+
+            cfg.add_edge(
+                after_consequent_expr_graph_ix,
+                after_conditional_graph_ix,
+                EdgeType::Normal,
+            );
+            cfg.add_edge(after_condition_graph_ix, before_consequent_expr_graph_ix, EdgeType::Jump);
+
+            cfg.add_edge(after_condition_graph_ix, start_alternate_graph_ix, EdgeType::Normal);
+            cfg.add_edge(after_alternate_graph_ix, after_conditional_graph_ix, EdgeType::Normal);
+        });
+        /* cfg */
+
+        self.leave_node(kind);
+    }
+
+    fn visit_for_statement(&mut self, stmt: &ForStatement<'a>) {
+        let kind = AstKind::ForStatement(self.alloc(stmt));
+        self.enter_node(kind);
+        control_flow!(self, |cfg| cfg.enter_statement(self.node_store.current_node_id));
+        self.enter_scope(ScopeFlags::empty(), &stmt.scope_id);
+        if let Some(init) = &stmt.init {
+            self.visit_for_statement_init(init);
+        }
+        /* cfg */
+        #[cfg(feature = "cfg")]
+        let (before_for_graph_ix, test_graph_ix) = control_flow!(self, |cfg| {
+            let before_for_graph_ix = cfg.current_node_ix;
+            let test_graph_ix = cfg.new_basic_block_normal();
+            (before_for_graph_ix, test_graph_ix)
+        });
+        /* cfg */
+
+        if let Some(test) = &stmt.test {
+            #[cfg(feature = "cfg")]
+            self.record_ast_nodes();
+            self.visit_expression(test);
+            #[cfg(feature = "cfg")]
+            let test_node_id = self.retrieve_recorded_ast_node();
+
+            /* cfg */
+            control_flow!(self, |cfg| cfg.append_condition_to(test_graph_ix, test_node_id));
+            /* cfg */
+        }
+
+        /* cfg */
+        #[cfg(feature = "cfg")]
+        let (after_test_graph_ix, update_graph_ix) =
+            control_flow!(self, |cfg| (cfg.current_node_ix, cfg.new_basic_block_normal()));
+        /* cfg */
+
+        if let Some(update) = &stmt.update {
+            self.visit_expression(update);
+        }
+
+        /* cfg */
+        #[cfg(feature = "cfg")]
+        let (after_update_graph_ix, before_body_graph_ix) = control_flow!(self, |cfg| {
+            let after_update_graph_ix = cfg.current_node_ix;
+            let before_body_graph_ix = cfg.new_basic_block_normal();
+            cfg.ctx(None).default().allow_break().allow_continue();
+            (after_update_graph_ix, before_body_graph_ix)
+        });
+        /* cfg */
+
+        self.visit_statement(&stmt.body);
+
+        /* cfg */
+        control_flow!(self, |cfg| {
+            let after_body_graph_ix = cfg.current_node_ix;
+            let after_for_stmt = cfg.new_basic_block_normal();
+            cfg.add_edge(before_for_graph_ix, test_graph_ix, EdgeType::Normal);
+            cfg.add_edge(after_test_graph_ix, before_body_graph_ix, EdgeType::Jump);
+            cfg.add_edge(after_body_graph_ix, update_graph_ix, EdgeType::Backedge);
+            cfg.add_edge(after_update_graph_ix, test_graph_ix, EdgeType::Backedge);
+            cfg.add_edge(after_test_graph_ix, after_for_stmt, EdgeType::Normal);
+
+            cfg.ctx(None)
+                .mark_break(after_for_stmt)
+                .mark_continue(update_graph_ix)
+                .resolve_with_upper_label();
+        });
+        /* cfg */
+
+        self.leave_scope();
+        self.leave_node(kind);
+    }
+
+    fn visit_for_in_statement(&mut self, stmt: &ForInStatement<'a>) {
+        let kind = AstKind::ForInStatement(self.alloc(stmt));
+        self.enter_node(kind);
+        control_flow!(self, |cfg| cfg.enter_statement(self.node_store.current_node_id));
+        self.enter_scope(ScopeFlags::empty(), &stmt.scope_id);
+
+        self.visit_for_statement_left(&stmt.left);
+
+        /* cfg */
+        #[cfg(feature = "cfg")]
+        let (before_for_stmt_graph_ix, start_prepare_cond_graph_ix) =
+            control_flow!(self, |cfg| (cfg.current_node_ix, cfg.new_basic_block_normal(),));
+        /* cfg */
+
+        #[cfg(feature = "cfg")]
+        self.record_ast_nodes();
+        self.visit_expression(&stmt.right);
+        #[cfg(feature = "cfg")]
+        let right_node_id = self.retrieve_recorded_ast_node();
+
+        /* cfg */
+        #[cfg(feature = "cfg")]
+        let (end_of_prepare_cond_graph_ix, iteration_graph_ix, body_graph_ix) =
+            control_flow!(self, |cfg| {
+                let end_of_prepare_cond_graph_ix = cfg.current_node_ix;
+                let iteration_graph_ix = cfg.new_basic_block_normal();
+                cfg.append_iteration(right_node_id, IterationInstructionKind::In);
+                let body_graph_ix = cfg.new_basic_block_normal();
+
+                cfg.ctx(None).default().allow_break().allow_continue();
+                (end_of_prepare_cond_graph_ix, iteration_graph_ix, body_graph_ix)
+            });
+        /* cfg */
+
+        self.visit_statement(&stmt.body);
+
+        /* cfg */
+        control_flow!(self, |cfg| {
+            let end_of_body_graph_ix = cfg.current_node_ix;
+            let after_for_graph_ix = cfg.new_basic_block_normal();
+            // connect before for statement to the iterable expression
+            cfg.add_edge(before_for_stmt_graph_ix, start_prepare_cond_graph_ix, EdgeType::Normal);
+            // connect the end of the iterable expression to the basic block with back edge
+            cfg.add_edge(end_of_prepare_cond_graph_ix, iteration_graph_ix, EdgeType::Normal);
+            // connect the basic block with back edge to the start of the body
+            cfg.add_edge(iteration_graph_ix, body_graph_ix, EdgeType::Jump);
+            // connect the end of the body back to the basic block
+            // with back edge for the next iteration
+            cfg.add_edge(end_of_body_graph_ix, iteration_graph_ix, EdgeType::Backedge);
+            // connect the basic block with back edge to the basic block after the for loop
+            // for when there are no more iterations left in the iterable
+            cfg.add_edge(iteration_graph_ix, after_for_graph_ix, EdgeType::Normal);
+
+            cfg.ctx(None)
+                .mark_break(after_for_graph_ix)
+                .mark_continue(iteration_graph_ix)
+                .resolve_with_upper_label();
+        });
+        /* cfg */
+
+        self.leave_scope();
+        self.leave_node(kind);
+    }
+
+    fn visit_for_of_statement(&mut self, stmt: &ForOfStatement<'a>) {
+        let kind = AstKind::ForOfStatement(self.alloc(stmt));
+        self.enter_node(kind);
+        control_flow!(self, |cfg| cfg.enter_statement(self.node_store.current_node_id));
+        self.enter_scope(ScopeFlags::empty(), &stmt.scope_id);
+
+        self.visit_for_statement_left(&stmt.left);
+
+        /* cfg */
+        #[cfg(feature = "cfg")]
+        let (before_for_stmt_graph_ix, start_prepare_cond_graph_ix) =
+            control_flow!(self, |cfg| (cfg.current_node_ix, cfg.new_basic_block_normal()));
+        /* cfg */
+
+        #[cfg(feature = "cfg")]
+        self.record_ast_nodes();
+        self.visit_expression(&stmt.right);
+        #[cfg(feature = "cfg")]
+        let right_node_id = self.retrieve_recorded_ast_node();
+
+        /* cfg */
+        #[cfg(feature = "cfg")]
+        let (end_of_prepare_cond_graph_ix, iteration_graph_ix, body_graph_ix) =
+            control_flow!(self, |cfg| {
+                let end_of_prepare_cond_graph_ix = cfg.current_node_ix;
+                let iteration_graph_ix = cfg.new_basic_block_normal();
+                cfg.append_iteration(right_node_id, IterationInstructionKind::Of);
+                let body_graph_ix = cfg.new_basic_block_normal();
+                cfg.ctx(None).default().allow_break().allow_continue();
+                (end_of_prepare_cond_graph_ix, iteration_graph_ix, body_graph_ix)
+            });
+        /* cfg */
+
+        self.visit_statement(&stmt.body);
+
+        /* cfg */
+        control_flow!(self, |cfg| {
+            let end_of_body_graph_ix = cfg.current_node_ix;
+            let after_for_graph_ix = cfg.new_basic_block_normal();
+            // connect before for statement to the iterable expression
+            cfg.add_edge(before_for_stmt_graph_ix, start_prepare_cond_graph_ix, EdgeType::Normal);
+            // connect the end of the iterable expression to the basic block with back edge
+            cfg.add_edge(end_of_prepare_cond_graph_ix, iteration_graph_ix, EdgeType::Normal);
+            // connect the basic block with back edge to the start of the body
+            cfg.add_edge(iteration_graph_ix, body_graph_ix, EdgeType::Jump);
+            // connect the end of the body back to the basic block
+            // with back edge for the next iteration
+            cfg.add_edge(end_of_body_graph_ix, iteration_graph_ix, EdgeType::Backedge);
+            // connect the basic block with back edge to the basic block after the for loop
+            // for when there are no more iterations left in the iterable
+            cfg.add_edge(iteration_graph_ix, after_for_graph_ix, EdgeType::Normal);
+
+            cfg.ctx(None)
+                .mark_break(after_for_graph_ix)
+                .mark_continue(iteration_graph_ix)
+                .resolve_with_upper_label();
+        });
+        /* cfg */
+
+        self.leave_scope();
+        self.leave_node(kind);
+    }
+
+    fn visit_if_statement(&mut self, stmt: &IfStatement<'a>) {
+        let kind = AstKind::IfStatement(self.alloc(stmt));
+        self.enter_node(kind);
+        control_flow!(self, |cfg| cfg.enter_statement(self.node_store.current_node_id));
+
+        /* cfg - condition basic block */
+        #[cfg(feature = "cfg")]
+        let (before_if_stmt_graph_ix, start_of_condition_graph_ix) =
+            control_flow!(self, |cfg| (cfg.current_node_ix, cfg.new_basic_block_normal(),));
+        /* cfg */
+
+        #[cfg(feature = "cfg")]
+        self.record_ast_nodes();
+        self.visit_expression(&stmt.test);
+        #[cfg(feature = "cfg")]
+        let test_node_id = self.retrieve_recorded_ast_node();
+
+        /* cfg */
+        #[cfg(feature = "cfg")]
+        let (after_test_graph_ix, before_consequent_stmt_graph_ix) = control_flow!(self, |cfg| {
+            cfg.append_condition_to(start_of_condition_graph_ix, test_node_id);
+            (cfg.current_node_ix, cfg.new_basic_block_normal())
+        });
+        /* cfg */
+
+        self.visit_statement(&stmt.consequent);
+
+        /* cfg */
+        #[cfg(feature = "cfg")]
+        let after_consequent_stmt_graph_ix = control_flow!(self, |cfg| cfg.current_node_ix);
+        /* cfg */
+
+        #[cfg(feature = "cfg")]
+        let else_graph_ix = if let Some(alternate) = &stmt.alternate {
+            /* cfg */
+            let else_graph_ix = control_flow!(self, |cfg| cfg.new_basic_block_normal());
+            /* cfg */
+
+            self.visit_statement(alternate);
+
+            control_flow!(self, |cfg| Some((else_graph_ix, cfg.current_node_ix)))
+        } else {
+            None
+        };
+
+        #[cfg(not(feature = "cfg"))]
+        if let Some(alternate) = &stmt.alternate {
+            self.visit_statement(alternate);
+        }
+
+        /* cfg - bb after if statement joins consequent and alternate */
+        control_flow!(self, |cfg| {
+            let after_if_graph_ix = cfg.new_basic_block_normal();
+
+            cfg.add_edge(before_if_stmt_graph_ix, start_of_condition_graph_ix, EdgeType::Normal);
+
+            cfg.add_edge(after_test_graph_ix, before_consequent_stmt_graph_ix, EdgeType::Jump);
+
+            cfg.add_edge(after_consequent_stmt_graph_ix, after_if_graph_ix, EdgeType::Normal);
+
+            if let Some((start_of_alternate_stmt_graph_ix, after_alternate_stmt_graph_ix)) =
+                else_graph_ix
+            {
+                cfg.add_edge(after_test_graph_ix, start_of_alternate_stmt_graph_ix, EdgeType::Jump);
+                cfg.add_edge(after_alternate_stmt_graph_ix, after_if_graph_ix, EdgeType::Normal);
+            } else {
+                cfg.add_edge(after_test_graph_ix, after_if_graph_ix, EdgeType::Jump);
+            }
+        });
+        /* cfg */
+
+        self.leave_node(kind);
+    }
+
+    fn visit_labeled_statement(&mut self, stmt: &LabeledStatement<'a>) {
+        let kind = AstKind::LabeledStatement(self.alloc(stmt));
+        self.enter_node(kind);
+        control_flow!(self, |cfg| cfg.enter_statement(self.node_store.current_node_id));
+        self.unused_labels.add(stmt.label.name, self.node_store.current_node_id);
+
+        /* cfg */
+        #[cfg(feature = "cfg")]
+        let label = &stmt.label.name;
+        control_flow!(self, |cfg| {
+            let ctx = cfg.ctx(Some(label.as_str())).default().allow_break();
+            if stmt.body.is_iteration_statement() {
+                ctx.allow_continue();
+            }
+        });
+        /* cfg */
+
+        self.visit_label_identifier(&stmt.label);
+
+        self.visit_statement(&stmt.body);
+
+        /* cfg */
+        control_flow!(self, |cfg| {
+            let after_body_graph_ix = cfg.current_node_ix;
+            let after_labeled_stmt_graph_ix = cfg.new_basic_block_normal();
+            cfg.add_edge(after_body_graph_ix, after_labeled_stmt_graph_ix, EdgeType::Normal);
+
+            cfg.ctx(Some(label.as_str())).mark_break(after_labeled_stmt_graph_ix).resolve();
+        });
+        /* cfg */
+
+        self.unused_labels.mark_unused();
+        self.leave_node(kind);
+    }
+
+    fn visit_return_statement(&mut self, stmt: &ReturnStatement<'a>) {
+        let kind = AstKind::ReturnStatement(self.alloc(stmt));
+        self.enter_node(kind);
+
+        /* cfg */
+        #[cfg(feature = "cfg")]
+        let node_id = self.node_store.current_node_id;
+        /* cfg */
+
+        #[cfg(feature = "cfg")]
+        let ret_kind = if let Some(arg) = &stmt.argument {
+            self.visit_expression(arg);
+            ReturnInstructionKind::NotImplicitUndefined
+        } else {
+            ReturnInstructionKind::ImplicitUndefined
+        };
+
+        #[cfg(not(feature = "cfg"))]
+        if let Some(arg) = &stmt.argument {
+            self.visit_expression(arg);
+        }
+
+        /* cfg */
+        control_flow!(self, |cfg| {
+            cfg.push_return(ret_kind, Some(node_id));
+            cfg.append_unreachable();
+        });
+        /* cfg */
+
+        self.leave_node(kind);
+    }
+
+    fn visit_switch_statement(&mut self, stmt: &SwitchStatement<'a>) {
+        let kind = AstKind::SwitchStatement(self.alloc(stmt));
+        self.enter_node(kind);
+        control_flow!(self, |cfg| cfg.enter_statement(self.node_store.current_node_id));
+        self.visit_expression(&stmt.discriminant);
+        self.enter_scope(ScopeFlags::empty(), &stmt.scope_id);
+
+        /* cfg */
+        #[cfg(feature = "cfg")]
+        let discriminant_graph_ix = control_flow!(self, |cfg| {
+            let discriminant_graph_ix = cfg.current_node_ix;
+            cfg.ctx(None).default().allow_break();
+            discriminant_graph_ix
+        });
+        #[cfg(feature = "cfg")]
+        let mut switch_case_graph_spans = vec![];
+        #[cfg(feature = "cfg")]
+        let mut have_default_case = false;
+        /* cfg */
+
+        for case in &stmt.cases {
+            #[cfg(feature = "cfg")]
+            let before_case_graph_ix = control_flow!(self, |cfg| cfg.new_basic_block_normal());
+            self.visit_switch_case(case);
+            #[cfg(feature = "cfg")]
+            if case.is_default_case() {
+                have_default_case = true;
+            }
+            control_flow!(self, |cfg| switch_case_graph_spans
+                .push((before_case_graph_ix, cfg.current_node_ix)));
+        }
+
+        /* cfg */
+        // for each switch case
+        control_flow!(self, |cfg| {
+            for i in 0..switch_case_graph_spans.len() {
+                let case_graph_span = switch_case_graph_spans[i];
+
+                // every switch case condition can be skipped,
+                // so there's a possible jump from it to the next switch case condition
+                for y in switch_case_graph_spans.iter().skip(i + 1) {
+                    cfg.add_edge(case_graph_span.0, y.0, EdgeType::Normal);
+                }
+
+                // connect the end of each switch statement to
+                // the condition of the next switch statement
+                if switch_case_graph_spans.len() > i + 1 {
+                    let (_, end_of_switch_case) = switch_case_graph_spans[i];
+                    let (next_switch_statement_condition, _) = switch_case_graph_spans[i + 1];
+
+                    cfg.add_edge(
+                        end_of_switch_case,
+                        next_switch_statement_condition,
+                        EdgeType::Normal,
+                    );
+                }
+
+                cfg.add_edge(discriminant_graph_ix, case_graph_span.0, EdgeType::Normal);
+            }
+
+            let end_of_switch_case_statement = cfg.new_basic_block_normal();
+
+            if let Some(last) = switch_case_graph_spans.last() {
+                cfg.add_edge(last.1, end_of_switch_case_statement, EdgeType::Normal);
+            }
+
+            // if we don't have a default case there should be an edge from discriminant to the end of
+            // the statement.
+            if !have_default_case {
+                cfg.add_edge(discriminant_graph_ix, end_of_switch_case_statement, EdgeType::Normal);
+            }
+
+            cfg.ctx(None).mark_break(end_of_switch_case_statement).resolve();
+        });
+        /* cfg */
+
+        self.leave_scope();
+        self.leave_node(kind);
+    }
+
+    fn visit_switch_case(&mut self, case: &SwitchCase<'a>) {
+        let kind = AstKind::SwitchCase(self.alloc(case));
+        self.enter_node(kind);
+
+        if let Some(expr) = &case.test {
+            #[cfg(feature = "cfg")]
+            let condition_block_ix = control_flow!(self, |cfg| cfg.current_node_ix);
+            #[cfg(feature = "cfg")]
+            self.record_ast_nodes();
+            self.visit_expression(expr);
+            #[cfg(feature = "cfg")]
+            let test_node_id = self.retrieve_recorded_ast_node();
+            control_flow!(self, |cfg| cfg.append_condition_to(condition_block_ix, test_node_id));
+        }
+
+        /* cfg */
+        control_flow!(self, |cfg| {
+            let after_test_graph_ix = cfg.current_node_ix;
+            let statements_in_switch_graph_ix = cfg.new_basic_block_normal();
+            cfg.add_edge(after_test_graph_ix, statements_in_switch_graph_ix, EdgeType::Jump);
+        });
+        /* cfg */
+
+        self.visit_statements(&case.consequent);
+
+        self.leave_node(kind);
+    }
+
+    fn visit_throw_statement(&mut self, stmt: &ThrowStatement<'a>) {
+        let kind = AstKind::ThrowStatement(self.alloc(stmt));
+        self.enter_node(kind);
+
+        /* cfg */
+        #[cfg(feature = "cfg")]
+        let node_id = self.node_store.current_node_id;
+        /* cfg */
+
+        self.visit_expression(&stmt.argument);
+
+        /* cfg */
+        control_flow!(self, |cfg| cfg.append_throw(node_id));
+        /* cfg */
+
+        self.leave_node(kind);
+    }
+
+    fn visit_try_statement(&mut self, stmt: &TryStatement<'a>) {
+        let kind = AstKind::TryStatement(self.alloc(stmt));
+        self.enter_node(kind);
+        control_flow!(self, |cfg| cfg.enter_statement(self.node_store.current_node_id));
+
+        /* cfg */
+
+        #[cfg(feature = "cfg")]
+        let (
+            before_try_statement_graph_ix,
+            error_harness,
+            before_finalizer_graph_ix,
+            before_try_block_graph_ix,
+        ) = control_flow!(self, |cfg| {
+            let before_try_statement_graph_ix = cfg.current_node_ix;
+            let error_harness =
+                stmt.handler.as_ref().map(|_| cfg.attach_error_harness(ErrorEdgeKind::Explicit));
+            let before_finalizer_graph_ix = stmt.finalizer.as_ref().map(|_| cfg.attach_finalizer());
+            let before_try_block_graph_ix = cfg.new_basic_block_normal();
+
+            (
+                before_try_statement_graph_ix,
+                error_harness,
+                before_finalizer_graph_ix,
+                before_try_block_graph_ix,
+            )
+        });
+        /* cfg */
+
+        self.visit_block_statement(&stmt.block);
+
+        /* cfg */
+        #[cfg(feature = "cfg")]
+        let after_try_block_graph_ix = control_flow!(self, |cfg| cfg.current_node_ix);
+        /* cfg */
+
+        #[cfg(feature = "cfg")]
+        let catch_block_end_ix = if let Some(handler) = &stmt.handler {
+            /* cfg */
+            control_flow!(self, |cfg| {
+                let Some(error_harness) = error_harness else {
+                    unreachable!("we always create an error harness if we have a catch block.");
+                };
+                cfg.release_error_harness(error_harness);
+                let catch_block_start_ix = cfg.new_basic_block_normal();
+                cfg.add_edge(error_harness, catch_block_start_ix, EdgeType::Normal);
+            });
+            /* cfg */
+
+            self.visit_catch_clause(handler);
+
+            /* cfg */
+            control_flow!(self, |cfg| Some(cfg.current_node_ix))
+            /* cfg */
+        } else {
+            None
+        };
+
+        #[cfg(not(feature = "cfg"))]
+        if let Some(handler) = &stmt.handler {
+            self.visit_catch_clause(handler);
+        }
+
+        #[cfg(feature = "cfg")]
+        let finally_block_end_ix = if let Some(finalizer) = &stmt.finalizer {
+            /* cfg */
+            control_flow!(self, |cfg| {
+                let Some(before_finalizer_graph_ix) = before_finalizer_graph_ix else {
+                    unreachable!("we always create a finalizer when there is a finally block.");
+                };
+                cfg.release_finalizer(before_finalizer_graph_ix);
+                let start_finally_graph_ix = cfg.new_basic_block_normal();
+                cfg.add_edge(before_finalizer_graph_ix, start_finally_graph_ix, EdgeType::Normal);
+            });
+            /* cfg */
+
+            self.visit_block_statement(finalizer);
+
+            /* cfg */
+            control_flow!(self, |cfg| Some(cfg.current_node_ix))
+            /* cfg */
+        } else {
+            None
+        };
+
+        #[cfg(not(feature = "cfg"))]
+        if let Some(finalizer) = &stmt.finalizer {
+            self.visit_block_statement(finalizer);
+        }
+
+        /* cfg */
+        control_flow!(self, |cfg| {
+            cfg.add_edge(
+                before_try_statement_graph_ix,
+                before_try_block_graph_ix,
+                EdgeType::Normal,
+            );
+            if let Some(catch_block_end_ix) = catch_block_end_ix
+                && finally_block_end_ix.is_none()
+            {
+                let after_try_statement_block_ix = cfg.new_basic_block_normal();
+                cfg.add_edge(
+                    after_try_block_graph_ix,
+                    after_try_statement_block_ix,
+                    EdgeType::Normal,
+                );
+
+                cfg.add_edge(catch_block_end_ix, after_try_statement_block_ix, EdgeType::Normal);
+            }
+            if let Some(finally_block_end_ix) = finally_block_end_ix {
+                let after_try_statement_block_ix = cfg.new_basic_block_normal();
+                if catch_block_end_ix.is_some() {
+                    cfg.add_edge(
+                        finally_block_end_ix,
+                        after_try_statement_block_ix,
+                        EdgeType::Normal,
+                    );
+                } else {
+                    cfg.add_edge(
+                        finally_block_end_ix,
+                        after_try_statement_block_ix,
+                        if cfg.basic_block(after_try_block_graph_ix).is_unreachable() {
+                            EdgeType::Unreachable
+                        } else {
+                            EdgeType::Join
+                        },
+                    );
+                }
+            }
+        });
+        /* cfg */
+
+        self.leave_node(kind);
+    }
+
+    fn visit_while_statement(&mut self, stmt: &WhileStatement<'a>) {
+        let kind = AstKind::WhileStatement(self.alloc(stmt));
+        self.enter_node(kind);
+        control_flow!(self, |cfg| cfg.enter_statement(self.node_store.current_node_id));
+
+        /* cfg - condition basic block */
+        #[cfg(feature = "cfg")]
+        let (before_while_stmt_graph_ix, condition_graph_ix) =
+            control_flow!(self, |cfg| (cfg.current_node_ix, cfg.new_basic_block_normal()));
+        /* cfg */
+
+        #[cfg(feature = "cfg")]
+        self.record_ast_nodes();
+        self.visit_expression(&stmt.test);
+        #[cfg(feature = "cfg")]
+        let test_node_id = self.retrieve_recorded_ast_node();
+
+        /* cfg - body basic block */
+        #[cfg(feature = "cfg")]
+        let (after_test_graph_ix, body_graph_ix) = control_flow!(self, |cfg| {
+            cfg.append_condition_to(condition_graph_ix, test_node_id);
+            let after_test_graph_ix = cfg.current_node_ix;
+            let body_graph_ix = cfg.new_basic_block_normal();
+
+            cfg.ctx(None).default().allow_break().allow_continue();
+            (after_test_graph_ix, body_graph_ix)
+        });
+        /* cfg */
+
+        self.visit_statement(&stmt.body);
+
+        /* cfg - after body basic block */
+        control_flow!(self, |cfg| {
+            let after_body_graph_ix = cfg.current_node_ix;
+            let after_while_graph_ix = cfg.new_basic_block_normal();
+
+            cfg.add_edge(before_while_stmt_graph_ix, condition_graph_ix, EdgeType::Normal);
+            cfg.add_edge(after_test_graph_ix, body_graph_ix, EdgeType::Jump);
+            cfg.add_edge(after_body_graph_ix, condition_graph_ix, EdgeType::Backedge);
+            cfg.add_edge(after_test_graph_ix, after_while_graph_ix, EdgeType::Normal);
+
+            cfg.ctx(None)
+                .mark_break(after_while_graph_ix)
+                .mark_continue(condition_graph_ix)
+                .resolve_with_upper_label();
+        });
+        /* cfg */
+        self.leave_node(kind);
+    }
+
+    fn visit_with_statement(&mut self, stmt: &WithStatement<'a>) {
+        let kind = AstKind::WithStatement(self.alloc(stmt));
+        self.enter_node(kind);
+        control_flow!(self, |cfg| cfg.enter_statement(self.node_store.current_node_id));
+
+        /* cfg - condition basic block */
+        #[cfg(feature = "cfg")]
+        let (before_with_stmt_graph_ix, condition_graph_ix) =
+            control_flow!(self, |cfg| (cfg.current_node_ix, cfg.new_basic_block_normal()));
+        /* cfg */
+
+        self.visit_expression(&stmt.object);
+        self.enter_scope(ScopeFlags::With, &stmt.scope_id);
+
+        /* cfg - body basic block */
+        #[cfg(feature = "cfg")]
+        let body_graph_ix = control_flow!(self, |cfg| cfg.new_basic_block_normal());
+        /* cfg */
+
+        self.visit_statement(&stmt.body);
+
+        /* cfg - after body basic block */
+        control_flow!(self, |cfg| {
+            let after_body_graph_ix = cfg.new_basic_block_normal();
+
+            cfg.add_edge(before_with_stmt_graph_ix, condition_graph_ix, EdgeType::Normal);
+            cfg.add_edge(condition_graph_ix, body_graph_ix, EdgeType::Normal);
+            cfg.add_edge(body_graph_ix, after_body_graph_ix, EdgeType::Normal);
+            cfg.add_edge(condition_graph_ix, after_body_graph_ix, EdgeType::Normal);
+        });
+        /* cfg */
+
+        self.leave_scope();
+        self.leave_node(kind);
+    }
+
+    fn visit_function(&mut self, func: &Function<'a>, flags: ScopeFlags) {
+        /* cfg */
+        // We add a new basic block to the cfg before entering the node
+        // so that the correct cfg_ix is associated with the ast node.
+        #[cfg(feature = "cfg")]
+        let (before_function_graph_ix, error_harness, function_graph_ix) =
+            control_flow!(self, |cfg| {
+                let before_function_graph_ix = cfg.current_node_ix;
+                cfg.push_finalization_stack();
+                let error_harness = cfg.attach_error_harness(ErrorEdgeKind::Implicit);
+                let function_graph_ix = cfg.new_basic_block_function();
+                cfg.ctx(None).new_function();
+                (before_function_graph_ix, error_harness, function_graph_ix)
+            });
+        /* cfg */
+
+        let kind = AstKind::Function(self.alloc(func));
+        self.enter_node(kind);
+        self.enter_ambient_context(func.declare);
+
+        if func.is_declaration() {
+            func.bind(self);
+        }
+
+        self.enter_scope(
+            {
+                let mut flags = flags;
+                if func.has_use_strict_directive() {
+                    flags |= ScopeFlags::StrictMode;
+                }
+                flags
+            },
+            &func.scope_id,
+        );
+
+        if func.is_expression() {
+            // We need to bind function expression in the function scope
+            func.bind(self);
+        }
+
+        if let Some(id) = &func.id {
+            self.visit_binding_identifier(id);
+        }
+
+        /* cfg */
+        control_flow!(self, |cfg| cfg.add_edge(
+            before_function_graph_ix,
+            function_graph_ix,
+            EdgeType::NewFunction
+        ));
+        /* cfg */
+
+        let unresolved_start = self.unresolved_references.len();
+
+        if let Some(type_parameters) = &func.type_parameters {
+            self.visit_ts_type_parameter_declaration(type_parameters);
+        }
+        if let Some(this_param) = &func.this_param {
+            self.visit_ts_this_parameter(this_param);
+        }
+        self.visit_formal_parameters(&func.params);
+        if let Some(return_type) = &func.return_type {
+            self.visit_ts_type_annotation(return_type);
+        }
+
+        // `function foo({bar: identifier_reference}) {}`
+        //                     ^^^^^^^^^^^^^^^^^^^^
+        // `function foo<SomeType>(v: SomeType): SomeType { return v; }`
+        //                            ^^^^^^^^   ^^^^^^^^
+        // `function foo<T extends SomeType>(this: SomeType) {}`
+        //                         ^^^^^^^^        ^^^^^^^^
+        // Parameter initializers must be resolved after all parameters have been declared.
+        // Param types, return type, type parameter constraints and the `this` type must be
+        // resolved after type parameters have been declared.
+        // In all cases, need to avoid binding to variables/types declared inside the function body.
+        self.resolve_references_for_current_scope(unresolved_start);
+
+        if let Some(body) = &func.body {
+            self.visit_function_body(body);
+        }
+
+        /* cfg */
+        control_flow!(self, |cfg| {
+            let c = cfg.current_basic_block();
+            // If the last is an unreachable instruction, it means there is already a explicit
+            // return or throw statement at the end of function body, we don't need to
+            // insert an implicit return.
+            if !matches!(
+                c.instructions().last().map(|inst| &inst.kind),
+                Some(InstructionKind::Unreachable)
+            ) {
+                cfg.push_implicit_return();
+            }
+            cfg.ctx(None).resolve_expect(CtxFlags::FUNCTION);
+            cfg.release_error_harness(error_harness);
+            cfg.pop_finalization_stack();
+            let after_function_graph_ix = cfg.new_basic_block_normal();
+            cfg.add_edge(before_function_graph_ix, after_function_graph_ix, EdgeType::Normal);
+        });
+        /* cfg */
+
+        self.leave_scope();
+        self.leave_node(kind);
+        self.leave_ambient_context(func.declare);
+    }
+
+    fn visit_arrow_function_expression(&mut self, expr: &ArrowFunctionExpression<'a>) {
+        /* cfg */
+        // We add a new basic block to the cfg before entering the node
+        // so that the correct cfg_ix is associated with the ast node.
+        #[cfg(feature = "cfg")]
+        let (current_node_ix, error_harness, function_graph_ix) = control_flow!(self, |cfg| {
+            let current_node_ix = cfg.current_node_ix;
+            cfg.push_finalization_stack();
+            let error_harness = cfg.attach_error_harness(ErrorEdgeKind::Implicit);
+            let function_graph_ix = cfg.new_basic_block_function();
+            cfg.ctx(None).new_function();
+            (current_node_ix, error_harness, function_graph_ix)
+        });
+        /* cfg */
+
+        let kind = AstKind::ArrowFunctionExpression(self.alloc(expr));
+        self.enter_node(kind);
+        self.enter_scope(
+            {
+                let mut flags = ScopeFlags::Function | ScopeFlags::Arrow;
+                if expr.has_use_strict_directive() {
+                    flags |= ScopeFlags::StrictMode;
+                }
+                flags
+            },
+            &expr.scope_id,
+        );
+
+        let unresolved_start = self.unresolved_references.len();
+
+        if let Some(parameters) = &expr.type_parameters {
+            self.visit_ts_type_parameter_declaration(parameters);
+        }
+
+        self.visit_formal_parameters(&expr.params);
+
+        /* cfg */
+        control_flow!(self, |cfg| cfg.add_edge(
+            current_node_ix,
+            function_graph_ix,
+            EdgeType::NewFunction
+        ));
+        /* cfg */
+
+        if let Some(return_type) = &expr.return_type {
+            self.visit_ts_type_annotation(return_type);
+        }
+
+        // `let foo = ({bar: identifier_reference}) => {};`
+        //                   ^^^^^^^^^^^^^^^^^^^^
+        // `let foo = <SomeType>(v: SomeType): SomeType => v;`
+        //                          ^^^^^^^^   ^^^^^^^^
+        // `let foo = <T extends SomeType>() => {};`
+        //                       ^^^^^^^^
+        // Parameter initializers must be resolved after all parameters have been declared.
+        // Param types, return type and type parameter constraints must be resolved after
+        // type parameters have been declared.
+        // In all cases, need to avoid binding to variables/types declared inside the function body.
+        self.resolve_references_for_current_scope(unresolved_start);
+
+        self.visit_arrow_function_body(&expr.body);
+
+        /* cfg */
+        control_flow!(self, |cfg| {
+            let c = cfg.current_basic_block();
+            // If the last is an unreachable instruction, it means there is already a explicit
+            // return or throw statement at the end of function body, we don't need to
+            // insert an implicit return.
+            if !matches!(
+                c.instructions().last().map(|inst| &inst.kind),
+                Some(InstructionKind::Unreachable)
+            ) {
+                cfg.push_implicit_return();
+            }
+            cfg.ctx(None).resolve_expect(CtxFlags::FUNCTION);
+            cfg.release_error_harness(error_harness);
+            cfg.pop_finalization_stack();
+            cfg.current_node_ix = current_node_ix;
+        });
+        /* cfg */
+
+        self.leave_scope();
+        self.leave_node(kind);
+    }
+
+    fn visit_update_expression(&mut self, it: &UpdateExpression<'a>) {
+        let kind = AstKind::UpdateExpression(self.alloc(it));
+        self.enter_node(kind);
+        // `++a` or `a--`
+        //    ^      ^ We always treat `a` as Read and Write reference,
+        self.current_reference_flags = ReferenceFlags::read_write();
+        self.visit_simple_assignment_target(&it.argument);
+        self.leave_node(kind);
+    }
+
+    fn visit_unary_expression(&mut self, it: &UnaryExpression<'a>) {
+        let kind = AstKind::UnaryExpression(self.alloc(it));
+        self.enter_node(kind);
+        // `delete a.foo` — the argument is in a property-write context.
+        // Set Write so `visit_member_expression` can detect it and mark MemberWriteTarget.
+        // Only for member expressions — `delete x` (bare identifier in sloppy mode)
+        // is not a property modification.
+        // `is_member_expression` misses `delete a?.b` (a `ChainExpression`) and
+        // `delete (a.b)` (a `ParenthesizedExpression`). Unwrap those so the
+        // member still sees the write context.
+        if it.operator == UnaryOperator::Delete && is_delete_member_target(&it.argument) {
+            self.current_reference_flags = ReferenceFlags::Write;
+        }
+        self.visit_expression(&it.argument);
+        self.leave_node(kind);
+    }
+
+    fn visit_member_expression(&mut self, it: &MemberExpression<'a>) {
+        // A.B = 1;
+        // ^^^ Can't treat A as a Write reference since it's A's property(B) that changes.
+        // When the member expression is in any write context (simple `=`, compound `+=`,
+        // update `++`, `delete`, for-in/of), mark as MemberWriteTarget so downstream
+        // consumers can identify property-modification-only references.
+        if self.current_reference_flags.is_write() {
+            self.current_reference_flags = ReferenceFlags::Read | ReferenceFlags::MemberWriteTarget;
+        } else {
+            self.current_reference_flags -= ReferenceFlags::Write;
+        }
+
+        match it {
+            MemberExpression::ComputedMemberExpression(it) => {
+                self.visit_computed_member_expression(it);
+            }
+            MemberExpression::StaticMemberExpression(it) => self.visit_static_member_expression(it),
+            MemberExpression::PrivateFieldExpression(it) => self.visit_private_field_expression(it),
+        }
+
+        // Clear any unconsumed flags to prevent leaking to sibling AST nodes.
+        // When the object is `this` or a call expression (not an IdentifierReference),
+        // the flags set above aren't consumed by `resolve_reference_usages`,
+        // and would incorrectly propagate to the next visited identifier (e.g., the RHS).
+        self.current_reference_flags = ReferenceFlags::empty();
+    }
+
+    fn visit_computed_member_expression(&mut self, it: &ComputedMemberExpression<'a>) {
+        let kind = AstKind::ComputedMemberExpression(self.alloc(it));
+        self.enter_node(kind);
+        self.visit_span(&it.span);
+        self.visit_expression(&it.object);
+        // The key expression is a read context, not part of the property write —
+        // strip MemberWriteTarget so it doesn't leak onto identifiers inside the key
+        // (e.g. `key` in `this[key] = 1`, where `this` doesn't consume the flag).
+        self.current_reference_flags -= ReferenceFlags::MemberWriteTarget;
+        self.visit_expression(&it.expression);
+        self.leave_node(kind);
+    }
+
+    fn visit_simple_assignment_target(&mut self, it: &SimpleAssignmentTarget<'a>) {
+        // Except that the read-write flags has been set in visit_assignment_expression
+        // and visit_update_expression, this is always a write-only reference here.
+        if !self.current_reference_flags.is_write() {
+            self.current_reference_flags = ReferenceFlags::Write;
+        }
+
+        match it {
+            SimpleAssignmentTarget::AssignmentTargetIdentifier(it) => {
+                self.visit_identifier_reference(it);
+            }
+            SimpleAssignmentTarget::TSAsExpression(it) => {
+                self.visit_ts_as_expression(it);
+            }
+            SimpleAssignmentTarget::TSSatisfiesExpression(it) => {
+                self.visit_ts_satisfies_expression(it);
+            }
+            SimpleAssignmentTarget::TSNonNullExpression(it) => {
+                self.visit_ts_non_null_expression(it);
+            }
+            SimpleAssignmentTarget::TSTypeAssertion(it) => {
+                self.visit_ts_type_assertion(it);
+            }
+            match_member_expression!(SimpleAssignmentTarget) => {
+                self.visit_member_expression(it.to_member_expression());
+            }
+        }
+    }
+
+    fn visit_assignment_target_property_identifier(
+        &mut self,
+        it: &AssignmentTargetPropertyIdentifier<'a>,
+    ) {
+        let kind = AstKind::AssignmentTargetPropertyIdentifier(self.alloc(it));
+        self.enter_node(kind);
+        self.current_reference_flags = ReferenceFlags::Write;
+        self.visit_identifier_reference(&it.binding);
+        if let Some(init) = &it.init {
+            self.visit_expression(init);
+        }
+        self.leave_node(kind);
+    }
+
+    fn visit_export_default_declaration_kind(&mut self, it: &ExportDefaultDeclarationKind<'a>) {
+        match it {
+            ExportDefaultDeclarationKind::FunctionDeclaration(it) => {
+                let flags = ScopeFlags::Function;
+                self.visit_function(it, flags);
+            }
+            ExportDefaultDeclarationKind::ClassDeclaration(it) => self.visit_class(it),
+            ExportDefaultDeclarationKind::TSInterfaceDeclaration(it) => {
+                self.visit_ts_interface_declaration(it);
+            }
+            ExportDefaultDeclarationKind::Identifier(it) => {
+                // `export default ident`
+                //                 ^^^^^ -> can reference both type/value symbols
+                self.current_reference_flags = ReferenceFlags::Read | ReferenceFlags::Type;
+                self.visit_identifier_reference(it);
+            }
+            match_expression!(ExportDefaultDeclarationKind) => {
+                self.visit_expression(it.to_expression());
+            }
+        }
+    }
+
+    fn visit_export_named_declaration(&mut self, it: &ExportNamedDeclaration<'a>) {
+        let kind = AstKind::ExportNamedDeclaration(self.alloc(it));
+        self.enter_node(kind);
+        self.visit_span(&it.span);
+        for specifier in &it.specifiers {
+            // `export type { a }` or `export { type a }` -> `a` is a type reference
+            if it.export_kind.is_type() || specifier.export_kind.is_type() {
+                self.current_reference_flags = ReferenceFlags::Type;
+            } else {
+                // If the export specifier is not an explicit type export, consider it as a potential
+                // type and value reference. Value references lose the type flag during resolution.
+                self.current_reference_flags = ReferenceFlags::Read | ReferenceFlags::Type;
+            }
+            self.visit_export_specifier(specifier);
+        }
+        self.leave_node(kind);
+    }
+
+    fn visit_export_specifier(&mut self, it: &ExportSpecifier<'a>) {
+        let kind = AstKind::ExportSpecifier(self.alloc(it));
+        self.enter_node(kind);
+        self.visit_span(&it.span);
+
+        self.visit_module_export_name(&it.local);
+        self.visit_module_export_name(&it.exported);
+
+        self.leave_node(kind);
+    }
+
+    fn visit_ts_export_assignment(&mut self, it: &TSExportAssignment<'a>) {
+        let kind = AstKind::TSExportAssignment(self.alloc(it));
+        self.enter_node(kind);
+        self.visit_span(&it.span);
+        // export = a;
+        //          ^ can reference type/value symbols
+        if it.expression.is_identifier_reference() {
+            self.current_reference_flags = ReferenceFlags::Read | ReferenceFlags::Type;
+        }
+        self.visit_expression(&it.expression);
+        self.leave_node(kind);
+    }
+
+    fn visit_catch_parameter(&mut self, param: &CatchParameter<'a>) {
+        let kind = AstKind::CatchParameter(self.alloc(param));
+        self.enter_node(kind);
+        param.bind(self);
+
+        let unresolved_start = self.unresolved_references.len();
+
+        self.visit_span(&param.span);
+        self.visit_binding_pattern(&param.pattern);
+        if let Some(type_annotation) = &param.type_annotation {
+            self.visit_ts_type_annotation(type_annotation);
+        }
+        self.resolve_references_for_current_scope(unresolved_start);
+        self.leave_node(kind);
+    }
+
+    fn visit_ts_type_query(&mut self, ty: &TSTypeQuery<'a>) {
+        let kind = AstKind::TSTypeQuery(self.alloc(ty));
+        self.enter_node(kind);
+        // type A = typeof a;
+        //          ^^^^^^^^
+        self.current_reference_flags = ReferenceFlags::ValueAsType;
+        self.visit_span(&ty.span);
+        self.visit_ts_type_query_expr_name(&ty.expr_name);
+        if let Some(type_arguments) = &ty.type_arguments {
+            self.visit_ts_type_parameter_instantiation(type_arguments);
+        }
+        self.current_reference_flags = ReferenceFlags::empty();
+        self.leave_node(kind);
+    }
+
+    fn visit_ts_property_signature(&mut self, sig: &TSPropertySignature<'a>) {
+        let kind = AstKind::TSPropertySignature(self.alloc(sig));
+        self.enter_node(kind);
+        if sig.key.is_expression() {
+            // interface A { [prop]: string }
+            //               ^^^^^ The property can reference value or [`SymbolFlags::TypeImport`] symbol
+            self.current_reference_flags = ReferenceFlags::ValueAsType;
+        }
+        self.visit_span(&sig.span);
+        self.visit_property_key(&sig.key);
+        if let Some(type_annotation) = &sig.type_annotation {
+            self.visit_ts_type_annotation(type_annotation);
+        }
+        self.current_reference_flags = ReferenceFlags::empty();
+        self.leave_node(kind);
+    }
+
+    fn visit_ts_method_signature(&mut self, sig: &TSMethodSignature<'a>) {
+        let kind = AstKind::TSMethodSignature(self.alloc(sig));
+        self.enter_node(kind);
+        self.visit_span(&sig.span);
+        if sig.computed {
+            // interface A { [prop](): string }
+            //                ^^^^ The property can reference value or [`SymbolFlags::TypeImport`] symbol
+            self.current_reference_flags = ReferenceFlags::ValueAsType;
+        }
+        self.visit_property_key(&sig.key);
+        self.current_reference_flags = ReferenceFlags::empty();
+        self.enter_scope(ScopeFlags::empty(), &sig.scope_id);
+        if let Some(type_parameters) = &sig.type_parameters {
+            self.visit_ts_type_parameter_declaration(type_parameters);
+        }
+        if let Some(this_param) = &sig.this_param {
+            self.visit_ts_this_parameter(this_param);
+        }
+        self.visit_formal_parameters(&sig.params);
+        if let Some(return_type) = &sig.return_type {
+            self.visit_ts_type_annotation(return_type);
+        }
+        self.leave_scope();
+        self.leave_node(kind);
+    }
+
+    fn visit_method_definition(&mut self, method: &MethodDefinition<'a>) {
+        let kind = AstKind::MethodDefinition(self.alloc(method));
+        self.enter_node(kind);
+        self.visit_span(&method.span);
+        self.visit_decorators(&method.decorators);
+        if method.computed && (method.r#type.is_abstract() || self.in_ambient_context()) {
+            // declare class A { [prop](): string }
+            //                    ^^^^  The property can reference value or [`SymbolFlags::TypeImport`] symbol
+            self.current_reference_flags = ReferenceFlags::ValueAsType;
+        }
+        self.visit_property_key(&method.key);
+        self.current_reference_flags = ReferenceFlags::empty();
+        let flags = match method.kind {
+            MethodDefinitionKind::Get => ScopeFlags::Function | ScopeFlags::GetAccessor,
+            MethodDefinitionKind::Set => ScopeFlags::Function | ScopeFlags::SetAccessor,
+            MethodDefinitionKind::Constructor => ScopeFlags::Function | ScopeFlags::Constructor,
+            MethodDefinitionKind::Method => ScopeFlags::Function,
+        };
+        self.visit_function(&method.value, flags);
+        self.leave_node(kind);
+    }
+
+    fn visit_property_definition(&mut self, prop: &PropertyDefinition<'a>) {
+        let kind = AstKind::PropertyDefinition(self.alloc(prop));
+        self.enter_node(kind);
+        self.visit_span(&prop.span);
+        self.visit_decorators(&prop.decorators);
+        self.enter_ambient_context(prop.declare);
+        if prop.computed && (prop.r#type.is_abstract() || self.in_ambient_context()) {
+            // class A { declare [prop]: string }
+            //                   ^^^^^ The property can reference value or [`SymbolFlags::TypeImport`] symbol
+            self.current_reference_flags = ReferenceFlags::ValueAsType;
+        }
+        self.visit_property_key(&prop.key);
+        self.current_reference_flags = ReferenceFlags::empty();
+        if let Some(type_annotation) = &prop.type_annotation {
+            self.visit_ts_type_annotation(type_annotation);
+        }
+        if let Some(value) = &prop.value {
+            self.visit_expression(value);
+        }
+        self.leave_node(kind);
+        self.leave_ambient_context(prop.declare);
+    }
+
+    fn visit_import_specifier(&mut self, specifier: &ImportSpecifier<'a>) {
+        let kind = AstKind::ImportSpecifier(self.alloc(specifier));
+        self.enter_node(kind);
+        specifier.bind(self);
+        self.visit_span(&specifier.span);
+        self.visit_module_export_name(&specifier.imported);
+        self.visit_binding_identifier(&specifier.local);
+        self.leave_node(kind);
+    }
+
+    fn visit_import_default_specifier(&mut self, specifier: &ImportDefaultSpecifier<'a>) {
+        let kind = AstKind::ImportDefaultSpecifier(self.alloc(specifier));
+        self.enter_node(kind);
+        specifier.bind(self);
+        self.visit_span(&specifier.span);
+        self.visit_binding_identifier(&specifier.local);
+        self.leave_node(kind);
+    }
+
+    fn visit_import_namespace_specifier(&mut self, specifier: &ImportNamespaceSpecifier<'a>) {
+        let kind = AstKind::ImportNamespaceSpecifier(self.alloc(specifier));
+        self.enter_node(kind);
+        specifier.bind(self);
+        self.visit_span(&specifier.span);
+        self.visit_binding_identifier(&specifier.local);
+        self.leave_node(kind);
+    }
+
+    fn visit_ts_import_equals_declaration(&mut self, decl: &TSImportEqualsDeclaration<'a>) {
+        let kind = AstKind::TSImportEqualsDeclaration(self.alloc(decl));
+        self.enter_node(kind);
+        decl.bind(self);
+        self.visit_span(&decl.span);
+        self.visit_binding_identifier(&decl.id);
+        self.current_reference_flags = if decl.import_kind.is_type() {
+            ReferenceFlags::Type
+        } else {
+            ReferenceFlags::Read | ReferenceFlags::Type
+        };
+        self.visit_ts_module_reference(&decl.module_reference);
+        // External module references do not contain an identifier reference to consume the flags.
+        self.current_reference_flags = ReferenceFlags::empty();
+        self.leave_node(kind);
+    }
+
+    fn visit_ts_module_reference(&mut self, module_reference: &TSModuleReference<'a>) {
+        match module_reference {
+            TSModuleReference::ExternalModuleReference(reference) => {
+                self.visit_ts_external_module_reference(reference);
+            }
+            TSModuleReference::IdentifierReference(reference) => {
+                self.current_reference_flags |= ReferenceFlags::Namespace;
+                self.visit_identifier_reference(reference);
+            }
+            TSModuleReference::QualifiedName(name) => {
+                self.visit_ts_qualified_name(name);
+            }
+        }
+    }
+
+    fn visit_variable_declarator(&mut self, decl: &VariableDeclarator<'a>) {
+        let kind = AstKind::VariableDeclarator(self.alloc(decl));
+        self.enter_node(kind);
+        decl.bind(self);
+        self.visit_span(&decl.span);
+        self.visit_binding_pattern(&decl.id);
+        if let Some(type_annotation) = &decl.type_annotation {
+            self.visit_ts_type_annotation(type_annotation);
+        }
+        if let Some(init) = &decl.init {
+            self.visit_expression(init);
+        }
+        self.leave_node(kind);
+    }
+
+    fn visit_class_body(&mut self, body: &ClassBody<'a>) {
+        let kind = AstKind::ClassBody(self.alloc(body));
+        self.enter_node(kind);
+        let parent_node_id = self.ancestry().parent_node_id();
+        self.class_table_builder.declare_class_body(body, parent_node_id);
+        self.visit_span(&body.span);
+        self.visit_class_elements(&body.body);
+        self.leave_node(kind);
+    }
+
+    fn visit_private_identifier(&mut self, ident: &PrivateIdentifier<'a>) {
+        let kind = AstKind::PrivateIdentifier(self.alloc(ident));
+        self.enter_node(kind);
+        let parent_kind = self.ancestry().parent_kind();
+        self.class_table_builder.add_private_identifier_reference(
+            ident,
+            self.node_store.current_node_id,
+            parent_kind,
+        );
+        self.visit_span(&ident.span);
+        self.leave_node(kind);
+    }
+
+    fn visit_binding_rest_element(&mut self, element: &BindingRestElement<'a>) {
+        let kind = AstKind::BindingRestElement(self.alloc(element));
+        self.enter_node(kind);
+        element.bind(self);
+        self.visit_span(&element.span);
+        self.visit_binding_pattern(&element.argument);
+        self.leave_node(kind);
+    }
+
+    fn visit_formal_parameter(&mut self, param: &FormalParameter<'a>) {
+        let kind = AstKind::FormalParameter(self.alloc(param));
+        self.enter_node(kind);
+        param.bind(self);
+        self.visit_span(&param.span);
+        self.visit_parameter_decorators(&param.decorators);
+        self.visit_binding_pattern(&param.pattern);
+        if let Some(type_annotation) = &param.type_annotation {
+            self.visit_ts_type_annotation(type_annotation);
+        }
+        if let Some(initializer) = &param.initializer {
+            self.visit_expression(initializer);
+        }
+        self.leave_node(kind);
+    }
+
+    fn visit_formal_parameter_rest(&mut self, param: &FormalParameterRest<'a>) {
+        let kind = AstKind::FormalParameterRest(self.alloc(param));
+        self.enter_node(kind);
+        param.bind(self);
+        self.visit_span(&param.span);
+        self.visit_parameter_decorators(&param.decorators);
+        self.visit_binding_rest_element(&param.rest);
+        if let Some(type_annotation) = &param.type_annotation {
+            self.visit_ts_type_annotation(type_annotation);
+        }
+        self.leave_node(kind);
+    }
+
+    fn visit_ts_external_module_declaration(&mut self, decl: &TSExternalModuleDeclaration<'a>) {
+        let kind = AstKind::TSExternalModuleDeclaration(self.alloc(decl));
+        self.enter_node(kind);
+        self.enter_ambient_context(decl.declare);
+        self.visit_span(&decl.span);
+        self.visit_string_literal(&decl.id);
+        self.enter_scope(
+            {
+                let mut flags = ScopeFlags::TsModuleBlock;
+                if decl.has_use_strict_directive() {
+                    flags |= ScopeFlags::StrictMode;
+                }
+                flags
+            },
+            &decl.scope_id,
+        );
+        if let Some(body) = &decl.body {
+            self.visit_ts_module_block(body);
+        }
+        self.leave_scope();
+        self.leave_node(kind);
+        self.leave_ambient_context(decl.declare);
+    }
+
+    fn visit_ts_namespace_declaration(&mut self, decl: &TSNamespaceDeclaration<'a>) {
+        let kind = AstKind::TSNamespaceDeclaration(self.alloc(decl));
+        self.enter_node(kind);
+        self.enter_ambient_context(decl.declare);
+        decl.bind(self);
+        self.visit_span(&decl.span);
+        self.visit_binding_identifier(&decl.id);
+        self.enter_scope(
+            {
+                let mut flags = ScopeFlags::TsModuleBlock;
+                if decl.has_use_strict_directive() {
+                    flags |= ScopeFlags::StrictMode;
+                }
+                flags
+            },
+            &decl.scope_id,
+        );
+        self.visit_ts_namespace_declaration_body(&decl.body);
+        self.leave_scope();
+        self.leave_node(kind);
+        self.leave_ambient_context(decl.declare);
+    }
+
+    fn visit_ts_global_declaration(&mut self, decl: &TSGlobalDeclaration<'a>) {
+        let kind = AstKind::TSGlobalDeclaration(self.alloc(decl));
+        self.enter_node(kind);
+        self.enter_ambient_context(decl.declare);
+        self.enter_scope(ScopeFlags::TsModuleBlock, &decl.scope_id);
+        self.visit_span(&decl.span);
+        self.visit_span(&decl.global_span);
+        self.visit_ts_module_block(&decl.body);
+        self.leave_scope();
+        self.leave_node(kind);
+        self.leave_ambient_context(decl.declare);
+    }
+
+    fn visit_ts_type_alias_declaration(&mut self, decl: &TSTypeAliasDeclaration<'a>) {
+        let kind = AstKind::TSTypeAliasDeclaration(self.alloc(decl));
+        self.enter_node(kind);
+        self.enter_ambient_context(decl.declare);
+        decl.bind(self);
+        self.visit_span(&decl.span);
+        self.visit_binding_identifier(&decl.id);
+        self.enter_scope(ScopeFlags::empty(), &decl.scope_id);
+        if let Some(type_parameters) = &decl.type_parameters {
+            self.visit_ts_type_parameter_declaration(type_parameters);
+        }
+        self.visit_ts_type(&decl.type_annotation);
+        self.leave_scope();
+        self.leave_node(kind);
+        self.leave_ambient_context(decl.declare);
+    }
+
+    fn visit_ts_interface_declaration(&mut self, decl: &TSInterfaceDeclaration<'a>) {
+        let kind = AstKind::TSInterfaceDeclaration(self.alloc(decl));
+        self.enter_node(kind);
+        self.enter_ambient_context(decl.declare);
+        decl.bind(self);
+        self.visit_span(&decl.span);
+        self.visit_binding_identifier(&decl.id);
+        self.enter_scope(ScopeFlags::empty(), &decl.scope_id);
+        if let Some(type_parameters) = &decl.type_parameters {
+            self.visit_ts_type_parameter_declaration(type_parameters);
+        }
+        self.visit_ts_interface_heritages(&decl.extends);
+        self.visit_ts_interface_body(&decl.body);
+        self.leave_scope();
+        self.leave_node(kind);
+        self.leave_ambient_context(decl.declare);
+    }
+
+    fn visit_ts_enum_declaration(&mut self, decl: &TSEnumDeclaration<'a>) {
+        let kind = AstKind::TSEnumDeclaration(self.alloc(decl));
+        self.enter_node(kind);
+        self.enter_ambient_context(decl.declare);
+        decl.bind(self);
+        self.visit_span(&decl.span);
+        self.visit_binding_identifier(&decl.id);
+        self.visit_ts_enum_body(&decl.body);
+        // Evaluate enum member values after all members are bound
+        if self.enum_eval {
+            crate::ts_enum::eval::evaluate_enum_members(decl, &mut self.scoping);
+        }
+        self.leave_node(kind);
+        self.leave_ambient_context(decl.declare);
+    }
+
+    fn visit_ts_enum_member(&mut self, member: &TSEnumMember<'a>) {
+        let kind = AstKind::TSEnumMember(self.alloc(member));
+        self.enter_node(kind);
+        member.bind(self);
+        self.visit_span(&member.span);
+        self.visit_ts_enum_member_name(&member.id);
+        if let Some(initializer) = &member.initializer {
+            self.visit_expression(initializer);
+        }
+        self.leave_node(kind);
+    }
+
+    fn visit_ts_type_parameter(&mut self, param: &TSTypeParameter<'a>) {
+        let kind = AstKind::TSTypeParameter(self.alloc(param));
+        self.enter_node(kind);
+        param.bind(self);
+        self.visit_span(&param.span);
+        self.visit_binding_identifier(&param.name);
+        if let Some(constraint) = &param.constraint {
+            self.visit_ts_type(constraint);
+        }
+        if let Some(default) = &param.default {
+            self.visit_ts_type(default);
+        }
+        self.leave_node(kind);
+    }
+
+    fn visit_ts_mapped_type(&mut self, it: &TSMappedType<'a>) {
+        let kind = AstKind::TSMappedType(self.alloc(it));
+        self.enter_node(kind);
+        self.enter_scope(ScopeFlags::empty(), &it.scope_id);
+        it.bind(self);
+        self.visit_span(&it.span);
+        self.visit_binding_identifier(&it.key);
+        self.visit_ts_type(&it.constraint);
+        if let Some(name_type) = &it.name_type {
+            self.visit_ts_type(name_type);
+        }
+        if let Some(type_annotation) = &it.type_annotation {
+            self.visit_ts_type(type_annotation);
+        }
+        self.leave_scope();
+        self.leave_node(kind);
+    }
+
+    fn visit_identifier_reference(&mut self, ident: &IdentifierReference<'a>) {
+        let kind = AstKind::IdentifierReference(self.alloc(ident));
+        self.enter_node(kind);
+        self.reference_identifier(ident);
+        self.visit_span(&ident.span);
+        self.leave_node(kind);
+    }
+
+    fn visit_call_expression(&mut self, expr: &CallExpression<'a>) {
+        let kind = AstKind::CallExpression(self.alloc(expr));
+        self.enter_node(kind);
+        if !expr.optional && expr.callee.is_specific_id("eval") {
+            self.scoping.scope_flags_mut(self.current_scope_id).insert(ScopeFlags::DirectEval);
+        }
+        self.visit_span(&expr.span);
+        self.visit_expression(&expr.callee);
+        if let Some(type_arguments) = &expr.type_arguments {
+            self.visit_ts_type_parameter_instantiation(type_arguments);
+        }
+        self.visit_arguments(&expr.arguments);
+        self.leave_node(kind);
+    }
+
+    fn visit_ts_interface_heritage(&mut self, heritage: &TSInterfaceHeritage<'a>) {
+        let kind = AstKind::TSInterfaceHeritage(self.alloc(heritage));
+        self.enter_node(kind);
+        // interface A extends B {}
+        //             ^^^^^^^^^
+        self.current_reference_flags = ReferenceFlags::Type;
+        self.visit_span(&heritage.span);
+        self.visit_ts_type_name(&heritage.type_name);
+        if let Some(type_arguments) = &heritage.type_arguments {
+            self.visit_ts_type_parameter_instantiation(type_arguments);
+        }
+        self.leave_node(kind);
+    }
+
+    fn visit_ts_class_implements(&mut self, implements: &TSClassImplements<'a>) {
+        let kind = AstKind::TSClassImplements(self.alloc(implements));
+        self.enter_node(kind);
+        // class A implements B {}
+        //         ^^^^^^^^^^^^
+        self.current_reference_flags = ReferenceFlags::Type;
+        self.visit_span(&implements.span);
+        self.visit_ts_type_name(&implements.expression);
+        if let Some(type_arguments) = &implements.type_arguments {
+            self.visit_ts_type_parameter_instantiation(type_arguments);
+        }
+        self.leave_node(kind);
+    }
+
+    fn visit_ts_type_reference(&mut self, ty: &TSTypeReference<'a>) {
+        let kind = AstKind::TSTypeReference(self.alloc(ty));
+        self.enter_node(kind);
+        self.current_reference_flags = ReferenceFlags::Type;
+        self.visit_span(&ty.span);
+        self.visit_ts_type_name(&ty.type_name);
+        if let Some(type_arguments) = &ty.type_arguments {
+            self.visit_ts_type_parameter_instantiation(type_arguments);
+        }
+        self.leave_node(kind);
+    }
+
+    fn visit_ts_qualified_name(&mut self, name: &TSQualifiedName<'a>) {
+        let kind = AstKind::TSQualifiedName(self.alloc(name));
+        self.enter_node(kind);
+        self.visit_span(&name.span);
+        // The left side of a qualified name (e.g., `Database` in `Database.Table`)
+        // must resolve to a namespace/module, not a type parameter.
+        // Add Namespace flag to skip type parameters during resolution.
+        // If no flags set yet (namespace context like `import foo = A.B.C`),
+        // also add Read and Type as the default.
+        if self.current_reference_flags.is_empty() {
+            self.current_reference_flags =
+                ReferenceFlags::Read | ReferenceFlags::Type | ReferenceFlags::Namespace;
+        } else {
+            self.current_reference_flags |= ReferenceFlags::Namespace;
+        }
+        self.visit_ts_type_name(&name.left);
+        self.visit_identifier_name(&name.right);
+        self.leave_node(kind);
+    }
+
+    fn visit_expression_statement(&mut self, it: &ExpressionStatement<'a>) {
+        let kind = AstKind::ExpressionStatement(self.alloc(it));
+        self.enter_node(kind);
+        control_flow!(self, |cfg| cfg.enter_statement(self.node_store.current_node_id));
+        self.visit_span(&it.span);
+        self.visit_expression(&it.expression);
+        self.leave_node(kind);
+    }
+
+    fn visit_variable_declaration(&mut self, it: &VariableDeclaration<'a>) {
+        let kind = AstKind::VariableDeclaration(self.alloc(it));
+        self.enter_node(kind);
+        self.enter_ambient_context(it.declare);
+        control_flow!(self, |cfg| cfg.enter_statement(self.node_store.current_node_id));
+        self.visit_span(&it.span);
+        self.visit_variable_declarators(&it.declarations);
+        self.leave_node(kind);
+        self.leave_ambient_context(it.declare);
+    }
+
+    fn visit_empty_statement(&mut self, it: &EmptyStatement) {
+        let kind = AstKind::EmptyStatement(self.alloc(it));
+        self.enter_node(kind);
+        control_flow!(self, |cfg| cfg.enter_statement(self.node_store.current_node_id));
+        self.visit_span(&it.span);
+        self.leave_node(kind);
+    }
+
+    fn visit_debugger_statement(&mut self, it: &DebuggerStatement) {
+        let kind = AstKind::DebuggerStatement(self.alloc(it));
+        self.enter_node(kind);
+        control_flow!(self, |cfg| cfg.enter_statement(self.node_store.current_node_id));
+        self.visit_span(&it.span);
+        self.leave_node(kind);
+    }
+
+    fn visit_export_default_declaration(&mut self, it: &ExportDefaultDeclaration<'a>) {
+        let kind = AstKind::ExportDefaultDeclaration(self.alloc(it));
+        self.enter_node(kind);
+        control_flow!(self, |cfg| cfg.enter_statement(self.node_store.current_node_id));
+        self.visit_span(&it.span);
+        self.visit_export_default_declaration_kind(&it.declaration);
+        self.leave_node(kind);
+    }
+}
+
+/// `delete` only modifies a property when its argument is a member expression.
+///
+/// Optional chains (`delete a?.b`) are `ChainExpression`, and parentheses or
+/// type assertions wrap the member (`delete (a.b)`, `delete (a as T).b`).
+/// Bare `delete x` is not a property modification.
+fn is_delete_member_target(expr: &Expression<'_>) -> bool {
+    match expr.get_inner_expression() {
+        Expression::ChainExpression(chain) => match &chain.expression {
+            ChainElement::StaticMemberExpression(_)
+            | ChainElement::ComputedMemberExpression(_)
+            | ChainElement::PrivateFieldExpression(_) => true,
+            ChainElement::CallExpression(_) | ChainElement::TSNonNullExpression(_) => false,
+        },
+        inner => inner.is_member_expression(),
+    }
+}
+
+impl<'a> SemanticBuilder<'a> {
+    #[inline]
+    fn reference_identifier(&mut self, ident: &IdentifierReference<'a>) {
+        let flags = self.resolve_reference_usages();
+        let reference =
+            Reference::new(self.node_store.current_node_id, self.current_scope_id, flags);
+        let reference_id = self.declare_reference(ident.name, reference);
+        ident.reference_id.set(Some(reference_id));
+    }
+
+    /// Resolve reference flags for the current ast node.
+    #[inline]
+    fn resolve_reference_usages(&mut self) -> ReferenceFlags {
+        if self.current_reference_flags.is_empty() {
+            ReferenceFlags::Read
+        } else {
+            // Take the current reference flags so that we can reset it to empty
+            mem::take(&mut self.current_reference_flags)
+        }
+    }
+}
