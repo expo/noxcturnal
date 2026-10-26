@@ -32,7 +32,7 @@
       rustToolchainConfig = (builtins.fromTOML (builtins.readFile ./rust-toolchain.toml)).toolchain;
       rustManifestHash = "sha256-A1abGIbOtcBSdrUMhDGrER3pRM1hQP4fp9gh3Y4PKc8=";
       pnpmStoreHash = "sha256-7LHeuW1FuFDJ/c8ITHOu8T8zbweHXVK0hrTuSTt8r8g=";
-      cargoVendorHash = "sha256-4gJAEabt5SIHzqofSTZ5OH/O83n5L2bbyGkPvO6HgyI=";
+      cargoVendorHash = "sha256-F6g2S7tM7VsDxhydvIWUhk6Hzt8ohVDITTYno2K9G7w=";
       cleanSource = builtins.path {
         name = "noxcturnal-source";
         path = ./.;
