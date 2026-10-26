@@ -151,7 +151,7 @@ impl<'a> VisitMut<'a> for BodyRewriter<'a, '_> {
             };
         }
         let span = statement.span();
-        let key = (span.start, span.end);
+        let key = statement.node_id();
         let completion = match statement {
             Statement::ReturnStatement(return_) if self.mutation.returns.contains(&key) => {
                 let value = return_

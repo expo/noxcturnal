@@ -1,6 +1,93 @@
 import { beforeAll, describe, expect, test } from 'vitest';
 import { compile, execute } from './runtime';
 
+test.each([false, true])(
+  'destructuring temporaries belong to each field initialization (blockScoping: %s)',
+  blockScoping => {
+    const result = execute<{ result: boolean }>(
+      `
+        let value;
+        let depth = 0;
+        const inner = { value: 'inner' };
+        const outer = {
+          get value() {
+            depth++;
+            if (depth === 1) new Example();
+            return 'outer';
+          },
+        };
+        function source() { return depth === 0 ? outer : inner; }
+        class Example { field = ({ value } = source()); }
+        globalThis.result = new Example().field === outer;
+      `,
+      { transforms: { classes: true, destructuring: true, blockScoping } },
+    );
+    expect(result.result).toBe(true);
+  },
+);
+
+test.each([
+  {
+    name: 'arguments',
+    source: `
+      function read(limit) {
+        let sum = 0;
+        for (let i = 0; i < ((value = arguments[0]) => value)(); i++)
+          sum += ((value = 0) => i)();
+        return sum;
+      }
+      globalThis.result = read(2);
+    `,
+  },
+  {
+    name: 'this',
+    source: `
+      function read() {
+        let sum = 0;
+        for (let i = 0; i < ((value = this.limit) => value)(); i++)
+          sum += ((value = 0) => i)();
+        return sum;
+      }
+      globalThis.result = read.call({ limit: 2 });
+    `,
+  },
+  {
+    name: 'new.target',
+    source: `
+      function Read() {
+        let sum = 0;
+        for (let i = 0; i < ((value = new.target) => value === Read ? 2 : 0)(); i++)
+          sum += ((value = 0) => i)();
+        this.sum = sum;
+      }
+      globalThis.result = new Read().sum;
+    `,
+  },
+])('loop extraction preserves header lexical $name during parameter lowering', ({ source }) => {
+  const result = execute<{ result: number }>(source, {
+    transforms: { parameters: true, blockScoping: true },
+  });
+  expect(result.result).toBe(1);
+});
+
+test('captured-loop planning distinguishes a loop from its generated capture declaration', () => {
+  const result = execute<{ result: number[] }>(
+    `
+      function read() {
+        const values = [];
+        for (let i = 0; i < ((value = this) => 2)(); i++) {
+          function value(input = 1) { return () => input; }
+          values.push(value()());
+        }
+        return values;
+      }
+      globalThis.result = read();
+    `,
+    { transforms: { parameters: true, blockScoping: true } },
+  );
+  expect(result.result).toEqual([1, 1]);
+});
+
 test('block-scoped loop bindings are unique per iteration', () => {
   const result = execute<{ result: number[] }>(
     `
@@ -46,6 +133,35 @@ test('const assignment evaluates its right side before throwing without changing
   );
   expect(result.result).toEqual([1, ['rhs', 'throw'], true]);
 });
+
+test.each([
+  { name: 'shorthand', target: 'fixed' },
+  { name: 'explicit target', target: 'fixed: fixed' },
+])(
+  'const protection distinguishes destructuring temporaries from the protected write: $name',
+  ({ target }) => {
+    const result = execute<{ result: unknown[] }>(
+      `
+      const calls = [];
+      const fixed = 0;
+      let writable = 0;
+      function source() {
+        calls.push('rhs');
+        return {
+          get before() { calls.push('before'); return 1; },
+          get fixed() { calls.push('fixed'); return 2; },
+          get after() { calls.push('after'); return 3; },
+        };
+      }
+      try { ({ before: writable, ${target}, after: writable } = source()); }
+      catch (error) { calls.push(error.name); }
+      globalThis.result = [calls, writable, fixed];
+    `,
+      { transforms: { destructuring: true, blockScoping: true } },
+    );
+    expect(result.result).toEqual([['rhs', 'before', 'fixed', 'TypeError'], 1, 0]);
+  },
+);
 
 test('const writes preserve logical short-circuiting, coercion, and destructuring RHS order', () => {
   const result = execute<{ result: unknown[] }>(

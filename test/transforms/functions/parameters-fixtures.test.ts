@@ -1986,11 +1986,9 @@ var y = function (_arg28) {
   for (var _len26 = arguments.length, bar = [], _key27 = 1; _key27 < _len26; _key27++) {
     bar[_key27 - 1] = arguments[_key27];
   }
-  return (bar => {
-    var x = function z(bar) {
-      bar[1] = 5;
-    };
-  })(bar);
+  var x = function z(bar) {
+    bar[1] = 5;
+  };
 };
 var b = function (_arg31, _arg32) {
   let x = arguments.length > 0 ? arguments[0] : void 0;
@@ -2312,29 +2310,25 @@ function b() {
   for (var _len13 = arguments.length, args = [], _key14 = 0; _key14 < _len13; _key14++) {
     args[_key14 - 0] = arguments[_key14];
   }
-  return (args => {
-    const foo = function () {
-      for (var _len15 = arguments.length, args = [], _key16 = 0; _key16 < _len15; _key16++) {
-        args[_key16 - 0] = arguments[_key16];
-      }
-      return bar(...args);
-    };
-    foo(...args);
-  })(args);
+  const foo = function () {
+    for (var _len15 = arguments.length, args = [], _key16 = 0; _key16 < _len15; _key16++) {
+      args[_key16 - 0] = arguments[_key16];
+    }
+    return bar(...args);
+  };
+  foo(...args);
 }
 function c() {
   for (var _len17 = arguments.length, args = [], _key18 = 0; _key18 < _len17; _key18++) {
     args[_key18 - 0] = arguments[_key18];
   }
-  return (args => {
-    const foo = function () {
-      for (var _len19 = arguments.length, args = [], _key20 = 0; _key20 < _len19; _key20++) {
-        args[_key20 - 0] = arguments[_key20];
-      }
-      return bar(...args);
-    };
-    foo([]);
-  })(args);
+  const foo = function () {
+    for (var _len19 = arguments.length, args = [], _key20 = 0; _key20 < _len19; _key20++) {
+      args[_key20 - 0] = arguments[_key20];
+    }
+    return bar(...args);
+  };
+  foo([]);
 }
 function d(_arg) {
   let thing = arguments.length > 0 ? arguments[0] : void 0;

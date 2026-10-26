@@ -31,6 +31,13 @@ same exact version in one change, then regenerate the protocol outputs.
   per-node native calls. Prefer generated named child roles; use recursive
   wildcards only for genuinely heterogeneous structure.
 
+## AST identity and source locations
+
+Source spans are coordinates and provenance, never node or binding identity.
+Read [Identity during rewriting](src/preflight/README.md#identity-during-rewriting)
+before changing AST bookkeeping, including native collectors. It defines identity
+lifetimes, ancestry rules, valid span uses, and required regression coverage.
+
 ## Tests
 
 Read `test/README.md` before adding, moving, or deleting coverage, and read

@@ -1,28 +1,109 @@
+import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
+import { runInNewContext } from 'node:vm';
 import { beforeAll, describe, expect, test } from 'vitest';
 import { compile, execute, executeModule } from './runtime';
+import { nativePreflightOptions } from '../../js/native/binding';
 
-test('a lowered named default class preserves its exported outer binding', async () => {
-  const module = await executeModule(
-    `export default class DOMException extends Error {
+test('focused private lowering includes a class that is the computed key itself', () => {
+  const source = `
+    function* make() {
+      return class Outer {
+        #method() {}
+        [class Inner {
+          [yield 'key']() { return this.#method; }
+        }]() {}
+      };
+    }
+    const iterator = make();
+    globalThis.result = [iterator.next().value, typeof iterator.next('read').value];
+  `;
+  const control: { result?: unknown } = {};
+  new Function('globalThis', source)(control);
+  expect(control.result).toEqual(['key', 'function']);
+  const require = createRequire(import.meta.url);
+  const binding = Object.keys(require.cache).find(filename =>
+    /noxcturnal\.[^/]+\.node$/.test(filename),
+  );
+  expect(binding).toBeTypeOf('string');
+  const options = nativePreflightOptions({
+    transforms: { privateMethods: true, classProperties: { loose: true } },
+    helpers: { mode: 'inline' },
+  });
+  // Keep a native abort outside the Vitest worker.
+  const child = spawnSync(process.execPath, [], {
+    encoding: 'utf8',
+    timeout: 10_000,
+    input: `
+      const output = require(${JSON.stringify(binding)}).nativePreflightTransform(
+        ${JSON.stringify(source)}, 'input.js', ${JSON.stringify(options)});
+      if (output.status !== 'complete') throw new Error(JSON.stringify(output));
+      if (output.code.includes('#method')) throw new Error('private method was not lowered');
+      const context = {};
+      new Function('globalThis', output.code)(context);
+      process.stdout.write(JSON.stringify(context.result));
+    `,
+  });
+  expect(child.error, child.stderr).toBeUndefined();
+  expect(child.signal, child.stderr).toBeNull();
+  expect(child.status, child.stderr).toBe(0);
+  expect(JSON.parse(child.stdout)).toEqual(['key', 'function']);
+});
+
+describe.each([false, true])('superclass parameter hygiene (blockScoping: %s)', blockScoping => {
+  test.each(['global', 'lexical'] as const)('preserves a colliding %s reference', scope => {
+    // Keep this class's exact [0, 57] span: its old helper spelling is the user name.
+    const declaration = 'class C extends Base { read(){return __nox_super_0_57;} }';
+    const source = `${declaration}
+      function Base() {}
+      ${scope === 'global' ? "globalThis.__nox_super_0_57 = 'sentinel';" : "const __nox_super_0_57 = 'sentinel';"}
+      globalThis.result = new C().read();
+    `;
+    const control: { result?: unknown } = {};
+    runInNewContext(source, control);
+    expect(control.result).toBe('sentinel');
+    const code = compile(source, { transforms: { classes: true, blockScoping } });
+    expect(code).not.toContain('class C');
+    const transformed: { result?: unknown } = {};
+    runInNewContext(code, transformed);
+    expect(transformed.result).toBe('sentinel');
+  });
+});
+
+test('class and block-scoping lowering preserve a named default export', async () => {
+  const module = await executeModule('export default class Example {}', {
+    transforms: { classes: true, blockScoping: true },
+  });
+  const Example = module.default as new () => object;
+  expect(Example.name).toBe('Example');
+  expect(new Example()).toBeInstanceOf(Example);
+});
+
+test.each([false, true])(
+  'a lowered named default class preserves its exported outer binding (blockScoping: %s)',
+  async blockScoping => {
+    const module = await executeModule(
+      `export default class DOMException extends Error {
       #name;
       constructor(message) { super(message); this.#name = 'Error'; }
       get name() { return this.#name; }
     }
     DOMException.code = 1;`,
-    {
-      transforms: {
-        classes: true,
-        classProperties: { loose: true },
-        privateMethods: true,
-        privatePropertyInObject: true,
+      {
+        transforms: {
+          classes: true,
+          blockScoping,
+          classProperties: { loose: true },
+          privateMethods: true,
+          privatePropertyInObject: true,
+        },
       },
-    },
-  );
-  const DOMException = module.default as { new (message: string): Error; code: number };
-  expect(DOMException.code).toBe(1);
-  expect(new DOMException('message').name).toBe('Error');
-});
+    );
+    const DOMException = module.default as { new (message: string): Error; code: number };
+    expect(DOMException.code).toBe(1);
+    expect(new DOMException('message').name).toBe('Error');
+  },
+);
 
 test('auto-accessors retain prototype descriptors and per-instance storage', () => {
   const result = execute<{ result: unknown[] }>(

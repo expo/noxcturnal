@@ -12,13 +12,13 @@ pub(super) struct Plan {
 pub(super) fn prepare<'a>(
     ast: AstBuilder<'a>,
     root: &mut Statement<'a>,
-    span: Span,
+    loop_id: NodeId,
     bindings: &[HeaderBinding],
     plan: &Plan,
 ) -> (Option<Expression<'a>>, Option<Expression<'a>>) {
     let mut pass = HeaderLowerer {
         ast,
-        span,
+        loop_id,
         bindings,
         plan,
         expressions: None,
@@ -29,7 +29,7 @@ pub(super) fn prepare<'a>(
 
 struct HeaderLowerer<'a, 'p> {
     ast: AstBuilder<'a>,
-    span: Span,
+    loop_id: NodeId,
     bindings: &'p [HeaderBinding],
     plan: &'p Plan,
     expressions: Option<(Option<Expression<'a>>, Option<Expression<'a>>)>,
@@ -37,23 +37,23 @@ struct HeaderLowerer<'a, 'p> {
 
 fn labeled_loop<'s, 'a>(
     statement: &'s mut Statement<'a>,
-    span: Span,
+    loop_id: NodeId,
 ) -> Option<&'s mut ForStatement<'a>> {
     match statement {
-        Statement::ForStatement(statement) if statement.span == span => Some(statement),
-        Statement::LabeledStatement(statement) => labeled_loop(&mut statement.body, span),
+        Statement::ForStatement(statement) if statement.node_id.get() == loop_id => Some(statement),
+        Statement::LabeledStatement(statement) => labeled_loop(&mut statement.body, loop_id),
         _ => None,
     }
 }
 
 impl<'a> VisitMut<'a> for HeaderLowerer<'a, '_> {
     fn visit_statement(&mut self, statement: &mut Statement<'a>) {
-        let Some(loop_) = labeled_loop(statement, self.span) else {
+        let Some(loop_) = labeled_loop(statement, self.loop_id) else {
             walk_mut::walk_statement(self, statement);
             return;
         };
         let ast = AstBuilder::new(self.ast.allocator());
-        let anchor = Span::new(self.span.start, self.span.start);
+        let anchor = Span::new(loop_.span.start, loop_.span.start);
         self.expressions = Some((None, None));
         if let Some(first) = &self.plan.first {
             self.expressions = Some((loop_.test.take(), loop_.update.take()));

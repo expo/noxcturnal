@@ -14,7 +14,7 @@ const modes = [
 ];
 function moduleImports(code: string) {
   return code.replace(
-    /from\s+(["'])(@babel\/runtime\/[^"']+)\1/g,
+    /from\s*(["'])(@babel\/runtime\/[^"']+)\1/g,
     (_m, _q, path) => `from ${JSON.stringify(pathToFileURL(require.resolve(path)).href)}`,
   );
 }
@@ -99,6 +99,54 @@ describe.each(modes)('helper globals $mode $version', helpers => {
     runInNewContext(code, context);
     expect(context.result).toEqual(['user', 'external', { value: 1 }]);
   });
+  test.each([false, true])(
+    'user namespace retains helper-like references, compact=%s',
+    async compact => {
+      const code = compile(
+        `namespace babelHelpers {
+        export const value = 7;
+      }
+      async function read() { return babelHelpers.value; }
+      globalThis.result = read();`,
+        { typescript: 'strip', compact, transforms: { asyncFunctions: true }, helpers },
+        'input.ts',
+      );
+      expect(code).not.toMatch(/namespace |async function/);
+      const context = { require, result: undefined };
+      runInNewContext(code, context);
+      expect(await context.result).toBe(7);
+    },
+  );
+  for (const privateClass of [false, true]) {
+    test.each([false, true])(
+      `helpers initialize before top-level disposal, privateClass=${privateClass}, compact=%s`,
+      async compact => {
+        const source = `#!/usr/bin/env node
+"use helper-order";
+export const events = [];
+using resource = {
+  [Symbol.dispose || Symbol.for("Symbol.dispose")]() { events.push("disposed"); }
+};
+${privateClass ? 'class Box { #value = 7; read() { return this.#value; } }' : ''}
+export const result = ${privateClass ? 'new Box().read()' : '7'};`;
+        const code = compile(
+          source,
+          {
+            compact,
+            helpers,
+            transforms: { explicitResourceManagement: true, classes: privateClass },
+          },
+          'input.mjs',
+        );
+        expect(code).toMatch(/^#!\/usr\/bin\/env node\n["']use helper-order["'];/);
+        expect(code).not.toMatch(/\busing resource\b|#value/);
+        expect(code).not.toMatch(/\brequire\(/);
+        const result = await importCode(moduleImports(code));
+        expect(result.result).toBe(7);
+        expect(result.events).toEqual(['disposed']);
+      },
+    );
+  }
   test('named regexp adapter executes in native ESM', async () => {
     const code = compile(
       'export default /(?<x>a)/.exec("a").groups.x;',

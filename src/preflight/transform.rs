@@ -1,4 +1,4 @@
-use oxc_allocator::GetAllocator;
+use oxc_allocator::{GetAddress, GetAllocator};
 use oxc_ast::builder::GetAstBuilder;
 use std::collections::VecDeque;
 use std::fmt::Write as _;
@@ -26,14 +26,14 @@ use oxc_parser::{ParseOptions, Parser};
 use oxc_react_compiler::{
     CompilationMode, CompilerTarget, PanicThreshold, PluginOptions as ReactCompilerOptions,
 };
-use oxc_semantic::{NodeId, Scoping, SemanticBuilder, SymbolFlags};
+use oxc_semantic::{NodeId, ReferenceId, Scoping, SemanticBuilder, SymbolFlags};
 use oxc_span::{GetSpan, SourceType, Span};
 use oxc_syntax::scope::ScopeFlags;
 use oxc_transformer::{
     CompilerAssumptions, HelperLoaderMode, JsxOptions, JsxRuntime, ReactRefreshOptions,
     TransformOptions, Transformer,
 };
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 use self_cell::self_cell;
 
 use crate::sourcemap::{DecodedLayer, compose_decoded_layers, pack_decoded_layer};
@@ -506,11 +506,10 @@ fn transform_with_function_map(
                             ..transform_options.assumptions
                         },
                         jsx: JsxOptions::disable(),
-                        // No helper loader, because `oxc_transformer::typescript`
-                        // requests no helper. That is what lets this run under inline
-                        // helper materialization as well: that mode recognises
-                        // `babelHelpers` references by their empty span, and printing
-                        // one here would give it a span it could no longer match.
+                        // This TypeScript-only prepass requests no helpers, so it
+                        // needs no helper loader. Later helper materialization uses
+                        // reference identities recorded by the emitting transform,
+                        // consumed against that transform's semantic snapshot.
                         ..TransformOptions::default()
                     };
                     // Preserve the factory bindings needed by the later JSX pass while
@@ -560,7 +559,13 @@ fn transform_with_function_map(
                             let decorate_name = reserve_prepass_name("_decorate", &mut reserved);
                             let decorate_param_name =
                                 reserve_prepass_name("_decorateParam", &mut reserved);
+                            let helper_references = transformed
+                                .external_helper_references
+                                .iter()
+                                .copied()
+                                .collect();
                             DecoratorHelperReferenceRewriter {
+                                references: &helper_references,
                                 allocator: &language_allocator,
                                 decorate_name: &decorate_name,
                                 decorate_param_name: &decorate_param_name,
@@ -1241,6 +1246,7 @@ fn transform_with_function_map(
         // parsed, so record origins before the transform and apply them only when
         // the returned runtime is classic.
         let origins = object_spread::JsxOrigins::collect(&program);
+        let input_statements = program.body.iter().map(GetAddress::address).collect::<FxHashSet<_>>();
         let mut transformed = Transformer::new(
             allocator,
             Path::new(options.source_filename.as_deref().unwrap_or(&filename)),
@@ -1264,6 +1270,8 @@ fn transform_with_function_map(
             transformed.scoping = async_pass.scoping;
             #[expect(deprecated)]
             transformed.helpers_used.extend(async_pass.helpers_used);
+            transformed.external_helper_references.extend(async_pass.external_helper_references);
+            transformed.runtime_helper_bindings.extend(async_pass.runtime_helper_bindings);
         }
         if !transformed.generated_async_iterators.is_empty() && transformed.diagnostics.is_empty() {
             let requests = validate_generated_async_iterator_results(
@@ -1318,7 +1326,8 @@ fn transform_with_function_map(
                 .iter()
                 .any(|(helper, _)| *helper == oxc_transformer::Helper::ObjectWithoutProperties);
         if rewrites_object_rest_helper {
-            ObjectRestLooseCompletionRewriter { allocator }.visit_program(&mut program);
+            ObjectRestLooseCompletionRewriter::new(allocator, &transformed)
+                .visit_program(&mut program);
         }
         if options.private_methods == Some(true) || options.private_property_in_object == Some(true)
         {
@@ -1535,16 +1544,19 @@ fn transform_with_function_map(
                 .iter()
                 .map(|helper| helper.name())
                 .collect::<rustc_hash::FxHashSet<_>>();
+            let runtime_bindings = transformed.runtime_helper_bindings.iter()
+                .map(|(_, symbol)| *symbol).collect::<FxHashSet<_>>();
+            let insertion = program.body.iter().take_while(|statement| {
+                !input_statements.contains(&statement.address())
+                    && is_safe_helper_preamble(statement, &runtime_bindings)
+            }).count();
             // Generated fragments are already formatted by our code generator.
             // Keep them opaque, as with Oxc's inline bundle. Runtime module
             // fragments still need parsing to convert requires into imports.
             let custom_inline_prefix = (!compact
                 && (helper_mode == "inline" || !output_is_module)
                 && helper_requests.is_empty()
-                && program
-                    .body
-                    .first()
-                    .is_none_or(|statement| !statement.span().is_empty()))
+                && insertion == 0)
             .then(|| custom_helper_fragments.concat());
             let mut declarations = if custom_inline_prefix.is_some() {
                 String::new()
@@ -1645,22 +1657,23 @@ fn transform_with_function_map(
                     }
                 }
                 SyntheticSpanZeroer.visit_program(&mut parsed_bridge.program);
-                let insertion = program
-                    .body
-                    .iter()
-                    .take_while(|statement| statement.span().is_empty())
-                    .count();
+                // Preserve safe generated declarations, but initialize helpers before
+                // executable replacements such as a disposal `try`. Hashbangs and
+                // directives live outside `body`.
                 let trailing = program.body.split_off(insertion);
                 program.body.extend(parsed_bridge.program.body);
                 program.body.extend(trailing);
             }
+            let helper_references = transformed.external_helper_references.iter().copied().collect();
             if let Some(binding) = inline_binding {
                 InlineHelperRenamer {
+                    references: &helper_references,
                     binding: allocator.alloc_str(&binding),
                 }
                 .visit_program(&mut program);
             } else {
                 MixedHelperReferenceRewriter {
+                    references: &helper_references,
                     allocator,
                     fallback: fallback.as_deref(),
                     replacements: &replacements,
@@ -2296,6 +2309,7 @@ fn decorator_helpers(
 }
 
 struct DecoratorHelperReferenceRewriter<'a, 'n> {
+    references: &'n FxHashSet<ReferenceId>,
     allocator: &'a Allocator,
     decorate_name: &'n str,
     decorate_param_name: &'n str,
@@ -2311,7 +2325,11 @@ impl<'a> VisitMut<'a> for DecoratorHelperReferenceRewriter<'a, '_> {
             walk_mut::walk_expression(self, expression);
             return;
         };
-        if !object.span.is_empty() || object.name != "babelHelpers" {
+        if !object
+            .reference_id
+            .get()
+            .is_some_and(|id| self.references.contains(&id))
+        {
             walk_mut::walk_expression(self, expression);
             return;
         }
@@ -2611,26 +2629,103 @@ fn protect_helper_globals<'a>(
     }
 }
 
-struct InlineHelperRenamer<'a> {
+struct InlineHelperRenamer<'a, 'r> {
+    references: &'r FxHashSet<ReferenceId>,
     binding: &'a str,
+}
+
+fn is_safe_helper_preamble(
+    statement: &Statement<'_>,
+    runtime_bindings: &FxHashSet<oxc_semantic::SymbolId>,
+) -> bool {
+    fn constant(expression: &Expression<'_>) -> bool {
+        match expression {
+            Expression::StringLiteral(_)
+            | Expression::NumericLiteral(_)
+            | Expression::BooleanLiteral(_)
+            | Expression::NullLiteral(_)
+            | Expression::BigIntLiteral(_) => true,
+            Expression::ArrayExpression(array) => array.elements.iter().all(|element| {
+                matches!(element, oxc_ast::ast::ArrayExpressionElement::Elision(_))
+                    || element.as_expression().is_some_and(constant)
+            }),
+            _ => false,
+        }
+    }
+    match statement {
+        Statement::ImportDeclaration(_)
+        | Statement::FunctionDeclaration(_)
+        | Statement::EmptyStatement(_) => true,
+        Statement::VariableDeclaration(declaration) => {
+            declaration.declarations.iter().all(|declarator| {
+                matches!(&declarator.id, oxc_ast::ast::BindingPattern::BindingIdentifier(binding)
+                if binding.symbol_id.get().is_some_and(|id| runtime_bindings.contains(&id)))
+                    || (matches!(
+                        declarator.id,
+                        oxc_ast::ast::BindingPattern::BindingIdentifier(_)
+                    ) && declarator.init.as_ref().is_none_or(constant))
+            })
+        }
+        _ => false,
+    }
 }
 
 struct ObjectRestLooseCompletionRewriter<'a> {
     allocator: &'a Allocator,
+    references: FxHashSet<ReferenceId>,
+    runtime_bindings: FxHashSet<oxc_semantic::SymbolId>,
+}
+
+impl<'a> ObjectRestLooseCompletionRewriter<'a> {
+    fn new(allocator: &'a Allocator, transformed: &oxc_transformer::TransformerReturn) -> Self {
+        Self {
+            allocator,
+            references: transformed
+                .external_helper_references
+                .iter()
+                .copied()
+                .collect(),
+            runtime_bindings: transformed
+                .runtime_helper_bindings
+                .iter()
+                .filter_map(|(helper, symbol)| {
+                    (*helper == oxc_transformer::Helper::ObjectWithoutProperties).then_some(*symbol)
+                })
+                .collect(),
+        }
+    }
+
+    fn rewrite_source(&self, literal: &mut StringLiteral<'a>) {
+        let replacement = format!("{}Loose", literal.value.as_str());
+        literal.value = self.allocator.alloc_str(&replacement).into();
+        literal.raw = None;
+    }
 }
 
 impl<'a> VisitMut<'a> for ObjectRestLooseCompletionRewriter<'a> {
-    fn visit_string_literal(&mut self, literal: &mut StringLiteral<'a>) {
-        if literal.span.is_empty()
-            && literal
-                .value
-                .as_str()
-                .ends_with("/helpers/objectWithoutProperties")
-        {
-            let replacement = format!("{}Loose", literal.value.as_str());
-            literal.value = self.allocator.alloc_str(&replacement).into();
-            literal.raw = None;
+    fn visit_import_declaration(&mut self, declaration: &mut oxc_ast::ast::ImportDeclaration<'a>) {
+        if declaration.specifiers.iter().flatten().any(|specifier| matches!(
+            specifier,
+            ImportDeclarationSpecifier::ImportDefaultSpecifier(specifier)
+                if specifier.local.symbol_id.get().is_some_and(|id| self.runtime_bindings.contains(&id))
+        )) {
+            self.rewrite_source(&mut declaration.source);
         }
+        walk_mut::walk_import_declaration(self, declaration);
+    }
+
+    fn visit_variable_declarator(&mut self, declaration: &mut VariableDeclarator<'a>) {
+        if let oxc_ast::ast::BindingPattern::BindingIdentifier(binding) = &declaration.id
+            && binding
+                .symbol_id
+                .get()
+                .is_some_and(|id| self.runtime_bindings.contains(&id))
+            && let Some(Expression::CallExpression(call)) = &mut declaration.init
+            && let Some(Argument::StringLiteral(source)) = call.arguments.first_mut()
+        {
+            self.rewrite_source(source);
+        }
+        walk_mut::walk_variable_declarator(self, declaration);
     }
 
     fn visit_static_member_expression(&mut self, member: &mut StaticMemberExpression<'a>) {
@@ -2638,8 +2733,7 @@ impl<'a> VisitMut<'a> for ObjectRestLooseCompletionRewriter<'a> {
             && matches!(
                 &member.object,
                 Expression::Identifier(identifier)
-                    if identifier.span.is_empty()
-                        && identifier.name.starts_with("babelHelpers")
+                    if identifier.reference_id.get().is_some_and(|id| self.references.contains(&id))
             )
         {
             member.property.name = self
@@ -2651,9 +2745,13 @@ impl<'a> VisitMut<'a> for ObjectRestLooseCompletionRewriter<'a> {
     }
 }
 
-impl<'a> VisitMut<'a> for InlineHelperRenamer<'a> {
+impl<'a> VisitMut<'a> for InlineHelperRenamer<'a, '_> {
     fn visit_identifier_reference(&mut self, identifier: &mut IdentifierReference<'a>) {
-        if identifier.span.is_empty() && identifier.name == "babelHelpers" {
+        if identifier
+            .reference_id
+            .get()
+            .is_some_and(|id| self.references.contains(&id))
+        {
             identifier.name = self.binding.into();
         }
         walk_mut::walk_identifier_reference(self, identifier);
@@ -2661,6 +2759,7 @@ impl<'a> VisitMut<'a> for InlineHelperRenamer<'a> {
 }
 
 struct MixedHelperReferenceRewriter<'a, 'n> {
+    references: &'n FxHashSet<ReferenceId>,
     allocator: &'a Allocator,
     fallback: Option<&'n str>,
     replacements: &'n [(&'static str, Option<String>)],
@@ -2684,7 +2783,11 @@ impl<'a> VisitMut<'a> for MixedHelperReferenceRewriter<'a, '_> {
             walk_mut::walk_expression(self, expression);
             return;
         };
-        if !object.span.is_empty() || object.name != "babelHelpers" {
+        if !object
+            .reference_id
+            .get()
+            .is_some_and(|id| self.references.contains(&id))
+        {
             walk_mut::walk_expression(self, expression);
             return;
         }
@@ -2835,6 +2938,87 @@ mod tests {
         edit::{EditCommand, EditKind, MappingPolicy, build},
         sourcemap::{compose, compose_layer_chain, render},
     };
+
+    #[test]
+    fn loose_rest_completion_preserves_user_nodes_across_source_anchors() {
+        struct ReversedAnchors;
+        impl<'a> VisitMut<'a> for ReversedAnchors {
+            fn visit_span(&mut self, span: &mut Span) {
+                *span = Span::new(1_000 - span.end, 1_000 - span.start);
+            }
+        }
+        let source = r#"
+            import userHelper from "@babel/runtime/helpers/objectWithoutProperties";
+            const babelHelpers = {objectWithoutProperties: () => 7};
+            const userPath = "@babel/runtime/helpers/objectWithoutProperties";
+            const {a, ...rest} = input;
+            globalThis.result = [babelHelpers.objectWithoutProperties(), userPath, userHelper];
+        "#;
+        for mode in [HelperLoaderMode::External, HelperLoaderMode::Runtime] {
+            for module in [false, true] {
+                let source = if module {
+                    source
+                } else {
+                    source.split_once(';').unwrap().1
+                };
+                let mut expected = None;
+                for anchors in ["parsed", "shared", "reversed"] {
+                    let allocator = Allocator::default();
+                    let source_type = if module {
+                        SourceType::mjs()
+                    } else {
+                        SourceType::cjs()
+                    };
+                    let mut parsed = Parser::new(&allocator, source, source_type).parse();
+                    assert!(parsed.diagnostics.is_empty());
+                    match anchors {
+                        "shared" => SyntheticSpanZeroer.visit_program(&mut parsed.program),
+                        "reversed" => ReversedAnchors.visit_program(&mut parsed.program),
+                        _ => {}
+                    }
+                    let built = SemanticBuilder::new().build(&parsed.program);
+                    assert!(built.diagnostics.is_empty());
+                    let mut options = TransformOptions::default();
+                    options.helper_loader.mode = mode;
+                    options.helper_loader.module_name = "@babel/runtime".into();
+                    options.env.es2018.object_rest_spread = Some(Default::default());
+                    let transformed = Transformer::new(&allocator, Path::new("input.js"), &options)
+                        .build_with_scoping(built.semantic.into_scoping(), &mut parsed.program);
+                    assert!(transformed.diagnostics.is_empty());
+                    #[expect(deprecated)]
+                    let requested = transformed
+                        .helpers_used
+                        .contains_key(&oxc_transformer::Helper::ObjectWithoutProperties);
+                    assert!(requested);
+                    ObjectRestLooseCompletionRewriter::new(&allocator, &transformed)
+                        .visit_program(&mut parsed.program);
+                    let code = Codegen::new().build(&parsed.program).code;
+                    assert!(
+                        code.contains("babelHelpers.objectWithoutProperties()"),
+                        "{anchors}: {code}"
+                    );
+                    assert!(
+                        code.contains(
+                            "const userPath = \"@babel/runtime/helpers/objectWithoutProperties\""
+                        ),
+                        "{anchors}: {code}"
+                    );
+                    assert!(
+                        code.contains("objectWithoutPropertiesLoose"),
+                        "{anchors}: {code}"
+                    );
+                    if module {
+                        assert!(code.contains("import userHelper from \"@babel/runtime/helpers/objectWithoutProperties\""), "{anchors}: {code}");
+                    }
+                    if let Some(expected) = &expected {
+                        assert_eq!(&code, expected, "{mode:?}, module={module}, {anchors}");
+                    } else {
+                        expected = Some(code);
+                    }
+                }
+            }
+        }
+    }
 
     #[test]
     fn fatal_locations_use_utf16_columns_and_javascript_line_breaks() {

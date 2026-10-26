@@ -14,7 +14,40 @@ Async lowering needs a second traversal when React Refresh replaces a function a
 
 Parameter and destructuring rewrites can introduce captured lexical locals inside loops. Settle those captures again before flat block-scoping planning.
 
-Every rewrite that changes bindings invalidates semantic plans built before it. Reserve helper names before subsequent passes allocate names, and rebuild scope information before planning more binding-sensitive work.
+## Identity during rewriting
+
+Source spans carry mapping provenance. Multiple generated nodes can share a span,
+and earlier rewrites can move nodes out of source order. Use `SymbolId` and
+`ReferenceId` for renames, `NodeId` for planned mutations and temporary owners,
+and AST ancestry for containment and scope boundaries. Source ranges cannot stand
+in for these identities, even when they are unique in freshly parsed source.
+Do not key transform plans, captures, caches, or mutation targets by spans, or
+infer live AST traversal order from source ranges. These rules also apply to
+native collectors outside this directory.
+
+Node IDs belong to one semantic snapshot. Every rewrite that changes bindings
+invalidates semantic plans built before it; rebuilding semantics can reassign IDs.
+Consume plans against the tree they analyzed, retain identity when moving existing
+nodes, and rebuild before analyzing new or cloned nodes. Parser-only or locally
+constructed nodes may have default IDs: use stable arena identity or traversal
+state when semantics are unavailable. Constant folding, for example, memoizes
+failed evaluations by arena address because it also runs on parser-only trees.
+Arena addresses belong to their allocated tree and cannot survive reparsing.
+
+Reserve helper names before subsequent passes allocate names, and rebuild scope
+information before planning more binding-sensitive work. Regressions for structural
+bookkeeping should exercise coincident anchors and AST order that differs from
+source order, in addition to ordinary parsed inputs.
+
+### Location-based boundaries
+
+`object_spread::JsxOrigins` deliberately classifies source origins across Oxc's
+replacement of JSX with calls; it does not select a unique live node. Immutable
+visitor text edits and retained-index range queries likewise describe source
+coordinates. Keep those coordinate contracts intact.
+Spans also remain appropriate for source maps, diagnostics, and slicing immutable
+source. Document deliberate origin classification when several generated nodes
+can relate to one source construct; it must not select a unique live node.
 
 ## Completion and failure
 
@@ -22,7 +55,7 @@ An intentional compatibility boundary declines without returning partial code or
 
 ## Helpers and optimization
 
-Helpers use pinned Babel metadata to choose between runtime imports and generated inline fragments. Preserve helper identity across passes so generated bindings cannot shadow helper references. Helper insertion follows hashbangs and directives and remains unmapped.
+Helpers use pinned Babel metadata to choose between runtime imports and generated inline fragments. External helper references are recorded by the owning loader and materialized by reference ID, including across the deferred async traversal. Runtime helper imports retain their binding IDs; loose-rest completion selects only those bindings and recorded external references. Empty spans do not identify helpers. Preserve helper identity across passes so generated bindings cannot shadow helper references. Helper insertion follows hashbangs, directives, and safe generated declarations, and remains unmapped. Preamble membership uses arena identity and declaration structure. Generated executable statements such as disposal blocks can call helpers regardless of their source anchors and must follow helper initialization.
 
 Optimization follows Metro's conservative behavior. Folding must preserve value-versus-reference semantics, and dead-code elimination must respect observable bindings, direct `eval`, and `with`. Module context permits bundler-oriented removal of unused script functions without changing parsing semantics.
 
