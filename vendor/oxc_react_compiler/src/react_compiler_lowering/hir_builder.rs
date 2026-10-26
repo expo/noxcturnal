@@ -16,6 +16,7 @@ use rustc_hash::FxHashSet;
 
 use oxc_allocator::{Allocator, CloneIn, Vec as ArenaVec};
 use oxc_diagnostics::OxcDiagnostic;
+use oxc_semantic::NodeId;
 use oxc_span::Span;
 use oxc_str::{Ident, format_ident};
 
@@ -562,16 +563,14 @@ impl<'a, 'b> HirBuilder<'a, 'b> {
         self.env.record_diagnostic(diagnostic);
     }
 
-    /// Resolve a local binding when the AST reference has no scope mapping.
+    /// Resolve a local binding at an AST occurrence without a semantic reference.
     pub fn resolve_local_binding_by_name(
         &mut self,
         name: &str,
+        node_id: NodeId,
         span: Option<Span>,
     ) -> Result<Option<IdentifierId>, OxcDiagnostic> {
-        let symbol_id = span.map_or_else(
-            || self.scope.find_binding(self.function_scope, name),
-            |span| self.scope.find_binding_at_position(name, self.component_scope, span.start),
-        );
+        let symbol_id = self.scope.find_binding_at_node(name, self.component_scope, node_id);
         let Some(symbol_id) = symbol_id else {
             return Ok(None);
         };

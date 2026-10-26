@@ -3310,6 +3310,273 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "react_compiler")]
+    #[test]
+    fn compiler_hoisting_uses_ast_ownership_with_shared_and_reversed_anchors() {
+        struct ReverseAnchors;
+        impl<'a> VisitMut<'a> for ReverseAnchors {
+            fn visit_span(&mut self, span: &mut Span) {
+                *span = Span::new(1_000 - span.end, 1_000 - span.start);
+            }
+        }
+        for body in [
+            "()=>later; const later=input; return later;",
+            "const read=()=>later; const later=input; return read();",
+            "const read=()=>[a,b]; const a=input; const b=input+1; return read();",
+            "const read=()=>later; function later(){return input;} return read()();",
+            "if(input){const read=()=>later;const later=input;return read();}return 0;",
+            "const object={read(){return later;}};const later=input;return object.read();",
+        ] {
+            let source = format!("export function calculate(input){{{body}}}");
+            let mut expected = None;
+            for anchors in ["parsed", "shared", "reversed"] {
+                let allocator = Allocator::default();
+                let mut parsed = Parser::new(&allocator, &source, SourceType::mjs()).parse();
+                assert!(parsed.diagnostics.is_empty());
+                match anchors {
+                    "shared" => SyntheticSpanZeroer.visit_program(&mut parsed.program),
+                    "reversed" => ReverseAnchors.visit_program(&mut parsed.program),
+                    _ => {}
+                }
+                let semantic = SemanticBuilder::new()
+                    .with_build_nodes(true)
+                    .build(&parsed.program)
+                    .semantic;
+                let options = ReactCompilerOptions {
+                    compilation_mode: "all".parse().unwrap(),
+                    panic_threshold: "all_errors".parse().unwrap(),
+                    environment: oxc_react_compiler::EnvironmentConfig {
+                        enable_reset_cache_on_source_file_changes: Some(false),
+                        ..oxc_react_compiler::EnvironmentConfig::default()
+                    },
+                    ..ReactCompilerOptions::default()
+                };
+                let output = match oxc_react_compiler::compile(
+                    &parsed.program,
+                    &semantic,
+                    &allocator,
+                    options,
+                ) {
+                    oxc_react_compiler::CompileResult::Success {
+                        output: Some(output),
+                        ..
+                    } => output,
+                    oxc_react_compiler::CompileResult::Fatal { diagnostics } => {
+                        panic!("compilation failed: {anchors}: {source}: {diagnostics:?}")
+                    }
+                    _ => panic!("no compiled output: {anchors}: {source}"),
+                };
+                drop(semantic);
+                output.transform(&mut parsed.program);
+                let code = Codegen::new().build(&parsed.program).code;
+                assert!(code.contains("react/compiler-runtime"));
+                if let Some(expected) = &expected {
+                    assert_eq!(&code, expected, "{anchors}: {source}");
+                } else {
+                    expected = Some(code);
+                }
+            }
+        }
+    }
+
+    #[cfg(feature = "react_compiler")]
+    #[test]
+    fn compiler_jsx_scope_lookup_ignores_source_anchors() {
+        struct ReverseAnchors;
+        impl<'a> VisitMut<'a> for ReverseAnchors {
+            fn visit_span(&mut self, span: &mut Span) {
+                *span = Span::new(1_000 - span.end, 1_000 - span.start);
+            }
+        }
+        for (body, local_tag, parameter_default) in [
+            (
+                "export function App(input){if(input){const fbs=()=>input;return <fbs/>;}return null;}",
+                true,
+                false,
+            ),
+            (
+                "import {fbs} from 'fbt';export function App(input){if(input){const fbs=()=>input;return <fbs/>;}return null;}",
+                true,
+                false,
+            ),
+            ("export function App(fbs){return <fbs/>;}", true, false),
+            (
+                "import {fbs} from 'fbt';export function App(input){if(input){return <fbs/>;}return null;}",
+                false,
+                false,
+            ),
+            (
+                "import {fbs} from 'fbt';export function App(input){if(input){const fbs=()=>input;}return <fbs/>;}",
+                false,
+                false,
+            ),
+            (
+                "import {fbs} from 'fbt';export function App(value=<fbs/>){var fbs=()=>2;return value;}",
+                false,
+                true,
+            ),
+        ] {
+            for anchors in ["parsed", "shared", "reversed"] {
+                let allocator = Allocator::default();
+                let mut parsed =
+                    Parser::new(&allocator, body, SourceType::mjs().with_jsx(true)).parse();
+                assert!(parsed.diagnostics.is_empty());
+                match anchors {
+                    "shared" => SyntheticSpanZeroer.visit_program(&mut parsed.program),
+                    "reversed" => ReverseAnchors.visit_program(&mut parsed.program),
+                    _ => {}
+                }
+                let semantic = SemanticBuilder::new()
+                    .with_build_nodes(true)
+                    .build(&parsed.program)
+                    .semantic;
+                let options = ReactCompilerOptions {
+                    compilation_mode: "all".parse().unwrap(),
+                    panic_threshold: "all_errors".parse().unwrap(),
+                    environment: oxc_react_compiler::EnvironmentConfig {
+                        enable_reset_cache_on_source_file_changes: Some(false),
+                        ..oxc_react_compiler::EnvironmentConfig::default()
+                    },
+                    ..ReactCompilerOptions::default()
+                };
+                let result =
+                    oxc_react_compiler::compile(&parsed.program, &semantic, &allocator, options);
+                let (fatal, diagnostics) = match result {
+                    oxc_react_compiler::CompileResult::Success {
+                        output,
+                        diagnostics,
+                    } => {
+                        assert!(output.is_some(), "{anchors}: {body}");
+                        (false, diagnostics)
+                    }
+                    oxc_react_compiler::CompileResult::Fatal { diagnostics } => (true, diagnostics),
+                };
+                assert_eq!(
+                    fatal,
+                    local_tag || parameter_default,
+                    "{anchors}: {body}: {diagnostics:?}"
+                );
+                assert_eq!(
+                    diagnostics.iter().any(|diagnostic| diagnostic.message
+                        == "<fbs> tags should be module-level imports"),
+                    local_tag,
+                    "{anchors}: {body}: {diagnostics:?}"
+                );
+                if parameter_default {
+                    assert!(diagnostics.iter().any(|diagnostic| {
+                        diagnostic.message.contains("cannot be safely reordered")
+                    }));
+                }
+            }
+        }
+    }
+
+    #[cfg(feature = "react_compiler")]
+    #[test]
+    fn compiler_derived_effect_lint_counts_ir_uses_instead_of_spans() {
+        struct ReverseAnchors;
+        impl<'a> VisitMut<'a> for ReverseAnchors {
+            fn visit_span(&mut self, span: &mut Span) {
+                *span = Span::new(2_000 - span.end, 2_000 - span.start);
+            }
+        }
+        let mut failures = Vec::new();
+        for (name, body, expected) in [
+            (
+                "one effect",
+                "useEffect(()=>{setState(value+1);},[value]);return state;",
+                1,
+            ),
+            (
+                "setter dependency",
+                "useEffect(()=>{setState(value+1);},[value,setState]);return state;",
+                1,
+            ),
+            (
+                "two derived calls",
+                "useEffect(()=>{setState(value+1);setState(value+2);},[value]);return state;",
+                2,
+            ),
+            (
+                "outside handler",
+                "const handler=()=>setState(0);useEffect(()=>{setState(value+1);},[value]);return [state,handler];",
+                0,
+            ),
+            (
+                "another effect",
+                "useEffect(()=>{setState(value+1);},[value]);useEffect(()=>{setState(value+2);},[value]);return state;",
+                0,
+            ),
+            (
+                "outside object method",
+                "const object={reset(){setState(0);}};useEffect(()=>{setState(value+1);},[value]);return object;",
+                0,
+            ),
+            (
+                "setter alias",
+                "const update=setState;useEffect(()=>{update(value+1);},[value]);return state;",
+                1,
+            ),
+        ] {
+            let source = format!(
+                "import {{useState,useEffect}} from 'react';
+export function App({{value}}){{
+ const [state,setState]=useState(0);
+ {body}
+}}"
+            );
+            for anchors in ["parsed", "shared", "reversed"] {
+                let allocator = Allocator::default();
+                let mut parsed = Parser::new(&allocator, &source, SourceType::mjs()).parse();
+                assert!(parsed.diagnostics.is_empty());
+                match anchors {
+                    "shared" => SyntheticSpanZeroer.visit_program(&mut parsed.program),
+                    "reversed" => ReverseAnchors.visit_program(&mut parsed.program),
+                    _ => {}
+                }
+                let semantic = SemanticBuilder::new()
+                    .with_build_nodes(true)
+                    .build(&parsed.program)
+                    .semantic;
+                let options = ReactCompilerOptions {
+                    compilation_mode: "all".parse().unwrap(),
+                    panic_threshold: "all_errors".parse().unwrap(),
+                    no_emit: true,
+                    environment: oxc_react_compiler::EnvironmentConfig {
+                        validate_no_derived_computations_in_effects_exp: true,
+                        enable_reset_cache_on_source_file_changes: Some(false),
+                        ..oxc_react_compiler::EnvironmentConfig::default()
+                    },
+                    ..ReactCompilerOptions::default()
+                };
+                let diagnostics = match oxc_react_compiler::compile(
+                    &parsed.program,
+                    &semantic,
+                    &allocator,
+                    options,
+                ) {
+                    oxc_react_compiler::CompileResult::Success { diagnostics, .. } => diagnostics,
+                    oxc_react_compiler::CompileResult::Fatal { diagnostics } => {
+                        panic!("{name}, {anchors}: {diagnostics:?}")
+                    }
+                };
+                let count = diagnostics
+                    .iter()
+                    .filter(|diagnostic| {
+                        diagnostic.message
+                            == "You might not need an effect. Derive values in render, not effects."
+                    })
+                    .count();
+                if count != expected {
+                    failures.push(format!(
+                        "{name}, {anchors}: expected {expected}, got {count}: {diagnostics:?}"
+                    ));
+                }
+            }
+        }
+        assert!(failures.is_empty(), "{}", failures.join("\n"));
+    }
+
     #[test]
     fn fatal_locations_use_utf16_columns_and_javascript_line_breaks() {
         let source = "first\r\n😀 value";

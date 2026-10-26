@@ -73,3 +73,34 @@ test('React Compiler reuses and invalidates output with persistent memo slots', 
   expect(third).not.toBe(first);
   expect(calculate({ value: 3 })).toBe(third);
 });
+
+for (const expression of ['() => later', 'async () => later', '(() => later)']) {
+  test(`React Compiler hoists the capture in a standalone ${expression}`, async () => {
+    const runtimeUrl = `data:text/javascript,${encodeURIComponent(`
+      export function c(size) {
+        return new Array(size).fill(Symbol.for('react.memo_cache_sentinel'));
+      }
+    `)}`;
+    const code = compile(
+      `export function calculate(input) {
+        "use memo";
+        ${expression};
+        const later = input;
+        return later;
+      }`,
+      {
+        reactCompiler: {
+          compilationMode: 'annotation',
+          panicThreshold: 'all_errors',
+          target: '19',
+          enableResetCacheOnSourceFileChanges: false,
+        },
+      },
+    );
+    expect(code).toContain('react/compiler-runtime');
+    const module = await importCode(code.replace('react/compiler-runtime', runtimeUrl));
+    const calculate = module.calculate as (input: number) => number;
+    expect(calculate(7)).toBe(7);
+    expect(calculate(9)).toBe(9);
+  });
+}

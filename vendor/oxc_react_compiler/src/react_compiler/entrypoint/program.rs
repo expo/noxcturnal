@@ -1410,7 +1410,7 @@ fn get_declarator_name<'ast>(decl: &VariableDeclarator<'ast>) -> Option<&'ast st
 /// TypeScript compiler's Babel `program.traverse` behavior one-for-one.
 ///
 /// Replicates the former Babel `AstWalker` + `FunctionDiscoveryVisitor`:
-/// - scope tracking via `ScopeInfo` (`node_id_to_scope`, keyed by `span.start`);
+/// - scope tracking via a `ScopeId` stack populated from the AST's scope cells;
 /// - `loop_expression_depth` for loop test/right positions (while.test,
 ///   do-while.test, for-in.right, for-of.right), which Babel treats as
 ///   non-program-scope in 'all' mode;

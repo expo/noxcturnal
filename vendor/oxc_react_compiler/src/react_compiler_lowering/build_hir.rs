@@ -113,40 +113,23 @@ fn lower_expression_to_temporary<'a>(
 // Operator conversion
 // =============================================================================
 
-fn is_binding_in_block_direct_statements(
-    declaration_start: Option<u32>,
-    stmts: &[oxc::Statement],
-) -> bool {
-    let decl_start = match declaration_start {
-        Some(pos) => pos,
-        None => return false,
-    };
-    for stmt in stmts {
-        if matches!(
-            stmt,
-            oxc::Statement::VariableDeclaration(_)
-                | oxc::Statement::FunctionDeclaration(_)
-                | oxc::Statement::ClassDeclaration(_)
-        ) {
-            let span = stmt.span();
-            if decl_start >= span.start && decl_start < span.end {
-                return true;
-            }
+fn is_binding_in_block_direct_statements(binding_id: SymbolId, stmts: &[oxc::Statement]) -> bool {
+    stmts.iter().any(|statement| match statement {
+        oxc::Statement::VariableDeclaration(declaration) => {
+            declaration.declarations.iter().any(|declaration| {
+                !declaration
+                    .id
+                    .all_binding_identifiers(&mut |id| id.symbol_id.get() != Some(binding_id))
+            })
         }
-    }
-    false
-}
-
-// =============================================================================
-// Statement position helpers
-// =============================================================================
-
-fn statement_start(stmt: &oxc::Statement) -> Option<u32> {
-    Some(stmt.span().start)
-}
-
-fn statement_end(stmt: &oxc::Statement) -> Option<u32> {
-    Some(stmt.span().end)
+        oxc::Statement::FunctionDeclaration(function) => {
+            function.id.as_ref().is_some_and(|id| id.symbol_id.get() == Some(binding_id))
+        }
+        oxc::Statement::ClassDeclaration(class) => {
+            class.id.as_ref().is_some_and(|id| id.symbol_id.get() == Some(binding_id))
+        }
+        _ => false,
+    })
 }
 
 /// Resolve a declaration identifier to its symbol.
@@ -255,13 +238,13 @@ fn lower_block_statement_inner<'a>(
     // Including child block scope bindings matches TS behavior where
     // stmt.scope.bindings includes all bindings accessible in the block.
     //
-    // IMPORTANT: Only include bindings whose declaration falls within THIS block's
-    // statement range. Bindings declared in nested blocks (e.g., inside an `if`
+    // IMPORTANT: Only include bindings declared directly by THIS block's
+    // statements. Bindings declared in nested blocks (e.g., inside an `if`
     // branch) should NOT be hoisted at the parent level — they'll be handled when
     // that nested block is recursively lowered. This prevents DeclareContext from
     // being emitted before an `if` terminal for variables declared within the branch.
     let scope = builder.scope();
-    let hoistable: Vec<(SymbolId, Ident, AstBindingKind, DeclKind, Option<u32>)> = scope
+    let hoistable: Vec<(SymbolId, Ident, AstBindingKind, DeclKind)> = scope
         .bindings_with_child_blocks(scope_id)
         .into_iter()
         .filter(|&sid| {
@@ -285,15 +268,7 @@ fn lower_block_statement_inner<'a>(
                         | DeclKind::TSEnumDeclaration
                 )
         })
-        .map(|sid| {
-            (
-                sid,
-                scope.symbol_ident(sid),
-                scope.binding_kind(sid),
-                scope.decl_kind(sid),
-                scope.declaration_ident(sid).map(|id| id.span.start),
-            )
-        })
+        .map(|sid| (sid, scope.symbol_ident(sid), scope.binding_kind(sid), scope.decl_kind(sid)))
         .collect();
 
     if hoistable.is_empty() {
@@ -308,25 +283,8 @@ fn lower_block_statement_inner<'a>(
     let mut declared: FxHashSet<SymbolId> = FxHashSet::default();
 
     for body_stmt in statements {
-        let stmt_start = statement_start(body_stmt).unwrap_or(0);
-        let stmt_end = statement_end(body_stmt).unwrap_or(u32::MAX);
+        let statement_id = body_stmt.node_id();
         let is_function_decl = matches!(body_stmt, oxc::Statement::FunctionDeclaration(_));
-
-        // Collect ranges of nested function scopes within this statement.
-        // Used to check per-reference whether a reference is inside a nested function,
-        // rather than checking once per-statement.
-        let nested_function_ranges: Vec<(u32, u32)> = if is_function_decl {
-            // For function declarations, fnDepth starts at 1 (all refs are inside)
-            vec![(stmt_start, stmt_end)]
-        } else {
-            builder
-                .scope()
-                .function_scope_ranges()
-                .iter()
-                .copied()
-                .filter(|&(pos, _)| pos > stmt_start && pos < stmt_end)
-                .collect()
-        };
 
         // Find references to not-yet-declared hoistable bindings within this statement
         struct HoistInfo<'a> {
@@ -335,34 +293,39 @@ fn lower_block_statement_inner<'a>(
             kind: AstBindingKind,
             declaration_type: DeclKind,
             first_ref_span: Span,
+            first_ref_order: usize,
         }
         let mut will_hoist: Vec<HoistInfo> = Vec::new();
 
-        for (binding_id, name, kind, decl_type, decl_start) in &hoistable {
+        for (binding_id, name, kind, decl_type) in &hoistable {
             if declared.contains(binding_id) {
                 continue;
             }
 
-            // Find the first reference to this binding in the statement's range.
+            // Find references by AST ancestry; spans only supply diagnostic locations.
             // Exclude JSX identifier references: while Babel's scope system links JSX
             // tag names to local bindings (and the context capture pass includes them),
             // the TS hoisting analysis does NOT traverse JSX elements. This mismatch
             // is intentional — it matches the TS behavior where <colgroup> adds
             // "colgroup" to the context but does NOT trigger hoisting, causing
             // EnterSSA to error with "Expected identifier to be defined before use".
-            let mut refs_in_stmt: Vec<Span> = scope
+            let mut refs_in_stmt: Vec<(usize, Span, bool)> = scope
                 .reference_ids(*binding_id)
                 .iter()
                 .filter_map(|&ref_id| {
                     let entry = builder.identifier_spans().reference(ref_id)?;
-                    let ref_start = entry.span.start;
-                    if ref_start < stmt_start || ref_start >= stmt_end {
+                    let node_id = scope.reference_node_id(ref_id);
+                    if !scope.node_within(node_id, statement_id) {
                         return None;
                     }
                     if entry.is_jsx() {
                         return None;
                     }
-                    Some(entry.span)
+                    Some((
+                        entry.order,
+                        entry.span,
+                        scope.node_in_nested_function(node_id, statement_id),
+                    ))
                 })
                 .collect();
             // For hoisted bindings (function declarations) outside their own
@@ -370,34 +333,33 @@ fn lower_block_statement_inner<'a>(
             // reference (Babel's binding references include the declaration).
             let decl_counts_as_ref = matches!(kind, AstBindingKind::Hoisted) && !is_function_decl;
             if decl_counts_as_ref
-                && let Some(decl_span) = builder.identifier_spans().declaration_span(*binding_id)
-                && decl_span.start >= stmt_start
-                && decl_span.start < stmt_end
+                && let Some(declaration) = builder.identifier_spans().declaration(*binding_id)
+                && scope.node_within(declaration.node_id, statement_id)
             {
-                refs_in_stmt.push(decl_span);
+                refs_in_stmt.push((
+                    declaration.order,
+                    declaration.span,
+                    scope.node_in_nested_function(declaration.node_id, statement_id),
+                ));
             }
 
             if refs_in_stmt.is_empty() {
                 continue;
             }
 
-            let first_ref_span = *refs_in_stmt.iter().min_by_key(|s| s.start).unwrap();
+            let first_ref = *refs_in_stmt.iter().min_by_key(|reference| reference.0).unwrap();
 
             // Hoist if: (1) binding is "hoisted" kind (function declaration), or
             // (2) any reference to this binding is inside a nested function scope.
             // Check per-reference rather than per-statement to correctly handle
             // statements that contain both nested functions and top-level code.
             let is_hoisted_kind = matches!(kind, AstBindingKind::Hoisted);
-            let refs_in_nested_fn: Vec<Span> = refs_in_stmt
+            let first_nested_ref = refs_in_stmt
                 .iter()
-                .copied()
-                .filter(|s| {
-                    nested_function_ranges
-                        .iter()
-                        .any(|&(fn_start, fn_end)| s.start >= fn_start && s.start < fn_end)
-                })
-                .collect();
-            let should_hoist = is_hoisted_kind || !refs_in_nested_fn.is_empty();
+                .filter(|reference| reference.2)
+                .min_by_key(|reference| reference.0)
+                .copied();
+            let should_hoist = is_hoisted_kind || first_nested_ref.is_some();
             if should_hoist {
                 // Bindings pulled in from CHILD block scopes (the
                 // scope_bindings_with_children descent compensates for scope
@@ -410,30 +372,28 @@ fn lower_block_statement_inner<'a>(
                 // for-in/for-of head vars belong to the block's scope without
                 // being declared by any direct statement, and TS hoists them.
                 if scope.symbol_scope(*binding_id) != scope_id
-                    && !is_binding_in_block_direct_statements(*decl_start, statements)
+                    && !is_binding_in_block_direct_statements(*binding_id, statements)
                 {
                     continue;
                 }
                 // For hoisted bindings (function declarations), use the first reference
                 // overall. For non-hoisted bindings, use the first reference inside a
                 // nested function.
-                let first_ref_span = if is_hoisted_kind {
-                    first_ref_span
-                } else {
-                    *refs_in_nested_fn.iter().min_by_key(|s| s.start).unwrap()
-                };
+                let (first_ref_order, first_ref_span, _) =
+                    if is_hoisted_kind { first_ref } else { first_nested_ref.unwrap() };
                 will_hoist.push(HoistInfo {
                     binding_id: *binding_id,
                     name: *name,
                     kind: *kind,
                     declaration_type: *decl_type,
                     first_ref_span,
+                    first_ref_order,
                 });
             }
         }
 
-        // Sort by first reference position to match TS traversal order
-        will_hoist.sort_unstable_by_key(|h| h.first_ref_span.start);
+        // Use the identifier walk's AST order, independent of source provenance.
+        will_hoist.sort_unstable_by_key(|h| h.first_ref_order);
 
         // Emit DeclareContext for hoisted bindings
         for info in &will_hoist {
@@ -3431,13 +3391,11 @@ fn gather_captured_context(
         None => FxIndexSet::default(),
     };
 
-    // Collect the earliest (lowest source position) reference location for each
-    // captured binding. Using the minimum position makes the result independent of
-    // reference iteration order, matching the behavior the TS compiler gets from
-    // Babel's position-ordered traversal.
+    // Preserve the identifier walk's order, even when generated references share
+    // anchors or earlier transforms moved declarations out of source order.
     let mut captured: rustc_hash::FxHashMap<
         SymbolId,
-        (u32, Option<Span>), // (min_position, span)
+        (usize, Option<Span>), // (first AST occurrence, diagnostic span)
     > = rustc_hash::FxHashMap::default();
 
     for symbol_id in scope.symbols() {
@@ -3452,12 +3410,10 @@ fn gather_captured_context(
         if !pure_scopes.contains(&scope.symbol_scope(symbol_id)) {
             continue;
         }
-        let declaration_start = scope.declaration_ident(symbol_id).map(|id| id.span.start);
         for &ref_id in scope.reference_ids(symbol_id) {
             // Only references the identifier walk recorded participate; the walk
             // covers exactly the compiled function's subtree.
             let Some(entry) = identifier_spans.reference(ref_id) else { continue };
-            let ref_start = entry.span.start;
             // Skip type-annotation references: TS's gatherCapturedContext traverse
             // skips TypeAnnotation/TSTypeAnnotation/TypeAlias/TSTypeAliasDeclaration
             // subtrees, so identifiers there never become captures (they DO still
@@ -3469,32 +3425,20 @@ fn gather_captured_context(
             if !scope.node_within(scope.reference_node_id(ref_id), root_node) {
                 continue;
             }
-            // Skip references whose start offset aliases the binding's own
-            // declaration offset. Hermes desugars (component syntax) reuse the
-            // original source offsets for generated nodes, so a sibling
-            // reference structurally OUTSIDE this function (e.g. the forwardRef
-            // argument naming the desugared inner function) can fall inside the
-            // function's position range and alias the declaration position. In
-            // real source a non-declaration reference can never share its
-            // declaration's offset, so this only filters desugared aliases.
-            if declaration_start == Some(ref_start) {
-                continue;
-            }
             let span = Some(entry.opening_element_span.unwrap_or(entry.span));
             captured
                 .entry(symbol_id)
                 .and_modify(|(min_pos, existing_span)| {
-                    if ref_start < *min_pos {
-                        *min_pos = ref_start;
+                    if entry.order < *min_pos {
+                        *min_pos = entry.order;
                         *existing_span = span;
                     }
                 })
-                .or_insert((ref_start, span));
+                .or_insert((entry.order, span));
         }
     }
 
-    // Sort captured entries by source position so context declarations appear
-    // in source order, matching the TS compiler's position-ordered traversal.
+    // Emit captures in the current AST traversal order.
     let mut sorted: Vec<_> = captured.into_iter().collect();
     sorted.sort_unstable_by_key(|(_, (pos, _))| *pos);
 
@@ -4721,14 +4665,16 @@ fn lower_jsx_element_expr<'a>(
         };
         // Get the opening element's name identifier and resolve any local binding.
         let jsx_id_name = match &jsx_element.opening_element.name {
-            oxc::JSXElementName::Identifier(id) => Some((id.name.as_str(), id.span)),
-            oxc::JSXElementName::IdentifierReference(id) => Some((id.name.as_str(), id.span)),
+            oxc::JSXElementName::Identifier(id) => Some((id.name.as_str(), id.span, id.node_id())),
+            oxc::JSXElementName::IdentifierReference(id) => {
+                Some((id.name.as_str(), id.span, id.node_id()))
+            }
             _ => None,
         };
-        if let Some((name, span)) = jsx_id_name {
+        if let Some((name, span, node_id)) = jsx_id_name {
             let id_span = Some(span);
             // JSX identifiers have no semantic reference, so resolve by name.
-            if builder.resolve_local_binding_by_name(name, id_span)?.is_some() {
+            if builder.resolve_local_binding_by_name(name, node_id, id_span)?.is_some() {
                 return Err(diagnostics::local_fbt_tag(&tag_name, id_span));
             }
         }
