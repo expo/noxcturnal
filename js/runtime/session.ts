@@ -29,7 +29,7 @@ import type {
 import { commitWithDedupe } from './editor';
 import { adaptBindingFact, toNodeView } from './node-utils';
 import { NodeCache } from './node-cache';
-import { alias, querySubscriptions } from '../pipeline/route-utils';
+import { querySubscriptions } from '../pipeline/route-utils';
 
 // Summaries carry no scalar payload to merge when a routed event replaces them.
 const SUMMARY_FIELDS: NativeEvent['fields'] = [];
@@ -37,13 +37,11 @@ const NO_STOPPED_PLUGINS = new Uint8Array(0);
 
 interface ChildState {
   // Interleaved child id / role id words, kept in native traversal order.
-  edges: Uint32Array | number[];
+  edges: Uint32Array;
   offset: number;
   count: number;
-  recursive?: boolean;
+  recursive: boolean;
   singular?: Map<number, number>;
-  // Used only by the explicit routed-child seeding path, which can replay nodes.
-  members?: Set<number>;
 }
 
 export class NativeTransformSession {
@@ -54,7 +52,6 @@ export class NativeTransformSession {
   #globalReferencesCache = new Map<string, SemanticReferenceView[] | boolean>();
   #globalBindingReferencesCache = new Map<string, SemanticReferenceView[]>();
   #childrenCache = new Map<number, ChildState>();
-  #prefetchedChildTypes: Set<string> | null = null;
   #native: NativeIndexedSessionBinding | null = null;
   #nativeFilename: string;
   #scopeParents: Uint32Array | null = null;
@@ -138,50 +135,7 @@ export class NativeTransformSession {
               target[field] = existing[field];
       }
       this.#eventCache.set(event.id, event);
-      if (this.#prefetchedChildTypes != null && event.parentId != null) {
-        const parent = this.#eventCache.get(event.parentId);
-        if (parent && this.#isPrefetchedChildType(parent.type)) {
-          let children = this.#childrenCache.get(event.parentId);
-          if (children == null) {
-            children = { edges: [], offset: 0, count: 0 };
-            this.#childrenCache.set(event.parentId, children);
-          }
-          let members = children.members;
-          if (!members) {
-            children.members = members = new Set();
-            for (
-              let offset = children.offset;
-              offset < children.offset + children.count * 2;
-              offset += 2
-            )
-              members.add(children.edges[offset]);
-          }
-          if (!members.has(event.id)) {
-            members.add(event.id);
-            if (children.edges instanceof Uint32Array) {
-              children.edges = Array.from(
-                children.edges.subarray(children.offset, children.offset + children.count * 2),
-              );
-              children.offset = 0;
-            }
-            children.edges.push(event.id, 0);
-            children.count++;
-            children.singular?.clear();
-          }
-        }
-      }
     }
-  }
-  /** Mark child-complete ancestor types whose edges are carried by the routed
-   * envelope, avoiding a synchronous native prefetch on structural access. */
-  seedRetainedChildTypes(types: readonly string[]): void {
-    for (const type of types) (this.#prefetchedChildTypes ??= new Set()).add(type);
-  }
-  #isPrefetchedChildType(parentType: string): boolean {
-    if (!this.#prefetchedChildTypes) return false;
-    for (const type of this.#prefetchedChildTypes)
-      if (type === parentType || alias(type, parentType)) return true;
-    return false;
   }
   nodeView(event: NativeEvent): NodeView {
     return toNodeView(event);
@@ -333,14 +287,8 @@ export class NativeTransformSession {
     this.#assertOpen();
     let children = this.#childrenCache.get(parentId);
     if (!children) {
-      const parent = this.event(parentId);
-      if (parent && this.#isPrefetchedChildType(parent.type)) {
-        children = { edges: [], offset: 0, count: 0 };
-        this.#childrenCache.set(parentId, children);
-      } else {
-        this.prefetchChildren([parentId]);
-        children = this.#childrenCache.get(parentId)!;
-      }
+      this.prefetchChildren([parentId]);
+      children = this.#childrenCache.get(parentId)!;
     }
     return children;
   }

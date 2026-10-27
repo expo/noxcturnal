@@ -1851,7 +1851,7 @@ impl RetainedIndex {
         self.scope_metadata = records;
     }
 
-    pub fn scope_metadata_buffer(&self, _scope_count: usize) -> Buffer {
+    pub fn scope_metadata_buffer(&self) -> Buffer {
         // Transfer a compact integer lookup instead of rebuilding a JS Map.
         // Scope records remain in scope-ID order; ownership uses exact node IDs.
         const MULTIPLIER: u32 = 0x9e37_79b1;
@@ -3247,7 +3247,7 @@ mod tests {
                 .collect(),
             ..RetainedIndex::default()
         };
-        let buffer = index.scope_metadata_buffer(COUNT);
+        let buffer = index.scope_metadata_buffer();
         assert_eq!(buffer.len(), (3 + COUNT * 4 + 256 * 2) * size_of::<u32>());
         let words = buffer
             .chunks_exact(4)
@@ -3280,7 +3280,7 @@ mod tests {
             scope_metadata: records.clone(),
             ..RetainedIndex::default()
         };
-        let buffer = index.scope_metadata_buffer(records.len());
+        let buffer = index.scope_metadata_buffer();
         let words = buffer
             .chunks_exact(4)
             .map(|word| u32::from_le_bytes(word.try_into().unwrap()))

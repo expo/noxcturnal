@@ -65,8 +65,7 @@ adjacency groups include empty parents and preserve native child order. JavaScri
 keeps one child-state cache pointing into the packed edge buffer. Child access
 filters those edges directly, avoiding per-parent typed-array views, role maps,
 and copied child-ID arrays. Wide parents lazily cache requested singular roles
-to avoid rescanning long sibling lists. Repeated routed-child seeding alone needs a membership
-set to deduplicate replayed nodes.
+to avoid rescanning long sibling lists.
 Singular child access resolves its one node directly, without constructing child
 arrays or unrelated paths. Lists preserve native order and create fresh result
 arrays so callers cannot mutate cached structural state.
