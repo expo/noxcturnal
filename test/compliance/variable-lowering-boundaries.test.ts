@@ -1,7 +1,6 @@
 import { createRequire } from 'node:module';
 import { describe, expect, test } from 'vitest';
 import { compile } from './runtime';
-import { defineNativePipeline, transform } from '../../js';
 
 const require = createRequire(import.meta.url);
 
@@ -324,7 +323,7 @@ globalThis.result = read();`,
       expected: { value: true },
     },
     {
-      name: 'direct eval in a lowered parameter arrow bails out for receiver access',
+      name: 'direct eval in a lowered parameter arrow uses its call receiver',
       transform: 'parameters',
       modes: ['inline'],
       source: `function make() {
@@ -339,7 +338,7 @@ globalThis.result = read.call({
       expected: { value: 9 },
     },
     {
-      name: 'direct eval in a lowered parameter arrow bails out for arguments access',
+      name: 'direct eval in a lowered parameter arrow uses its call arguments',
       transform: 'parameters',
       modes: ['inline'],
       source: `function make(value) {
@@ -400,29 +399,6 @@ try {
     test.each(entry.modes as readonly ('inline' | 'runtime')[])(
       entry.name + ', helpers=%s',
       mode => {
-        if (entry.name.startsWith('direct eval in a lowered parameter arrow')) {
-          const result = transform(
-            entry.source,
-            'input.js',
-            defineNativePipeline({
-              phases: [
-                {
-                  name: 'parameters',
-                  native: {
-                    transforms: { parameters: true },
-                    helpers: { mode, version: '7.29.7' },
-                  },
-                },
-              ],
-            }),
-          );
-          expect(result.status).toBe('bailout');
-          if (result.status === 'bailout') {
-            expect(result.reason).toContain('lowered-arrow-direct-eval');
-            expect(result.source).toBe(entry.source);
-          }
-          return;
-        }
         const code = compile(entry.source, {
           transforms: { [entry.transform]: true },
           helpers: { mode, moduleName: '@babel/runtime', version: '7.29.7' },

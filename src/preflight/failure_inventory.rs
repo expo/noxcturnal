@@ -37,7 +37,6 @@ macro_rules! fatal {
 }
 
 const REVIEWED: &[Entry] = &[
-    unsupported!("lowered-arrow-direct-eval", "arguments-capture"),
     unsupported!("decorated-class-expression", "decorator-compatibility"),
     fatal!(
         "arguments-capture-semantic-error",
@@ -286,7 +285,6 @@ fn looks_like_failure_reason(value: &str) -> bool {
     const PREFIXES: &[&str] = &[
         "arguments-capture-",
         "decorated-class-",
-        "lowered-arrow-",
         "block-scoping-",
         "captured-",
         "class-features-",

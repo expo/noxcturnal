@@ -46,11 +46,11 @@ fn selected_arrow(arrow: &ArrowFunctionExpression<'_>, options: &NativePreflight
         || (options.async_functions == Some(true) && arrow.r#async)
 }
 
-/// Conservative syntax hint for capture analysis and its optional async node store. Escapes can spell either identifier, so keep them.
+/// Conservative hint for explicit arguments captures and their optional async
+/// node store. Escapes can spell the identifier, so keep them.
 /// This controls optional analysis storage, never node or binding identity.
 pub(super) fn may_need_capture(source: &str, options: &NativePreflightOptions) -> bool {
-    selected(options)
-        && (source.contains("arguments") || source.contains("eval") || source.contains('\\'))
+    selected(options) && (source.contains("arguments") || source.contains('\\'))
 }
 
 fn selected(options: &NativePreflightOptions) -> bool {
@@ -87,24 +87,6 @@ fn direct_evals<'s>(semantic: &'s Semantic<'_>) -> impl Iterator<Item = NodeId> 
             let AstKind::CallExpression(call) = semantic.nodes().kind(parent) else { return None; };
             (!call.optional && matches!(call.callee.get_inner_expression(), Expression::Identifier(id) if id.name == "eval"))
                 .then_some(parent)
-        })
-}
-
-// A converted arrow cannot reproduce direct eval's lexical environment after
-// acquiring an ordinary function's own arguments binding.
-pub(super) fn has_direct_eval(semantic: &Semantic<'_>, options: &NativePreflightOptions) -> bool {
-    selected(options)
-        && direct_evals(semantic).any(|id| {
-            for ancestor in semantic.nodes().ancestor_ids(id) {
-                match semantic.nodes().kind(ancestor) {
-                    AstKind::Function(_) => break,
-                    AstKind::ArrowFunctionExpression(arrow) if selected_arrow(arrow, options) => {
-                        return true;
-                    }
-                    _ => {}
-                }
-            }
-            false
         })
 }
 

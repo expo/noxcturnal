@@ -822,9 +822,6 @@ fn transform_with_function_map(
         if !semantic.diagnostics.is_empty() {
             return Err(crate::parse_failure::error(source, &semantic.diagnostics, "native-phase"));
         }
-        if arguments_capture_selected && super::arguments::has_direct_eval(&semantic.semantic, &options) {
-            return Ok(unsupported("lowered-arrow-direct-eval", [] as [String; 0]));
-        }
         let arguments_plan = if arguments_capture_selected {
             super::arguments::prepare(&semantic.semantic, &options)
         } else { None };

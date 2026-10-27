@@ -1,7 +1,7 @@
 import { runInNewContext } from 'node:vm';
 import { createRequire } from 'node:module';
 import { expect, test } from 'vitest';
-import { defineNativePipeline, transform, type PreflightTransforms } from '../../js';
+import type { PreflightTransforms } from '../../js';
 import { compile } from './runtime';
 
 const cases = [
@@ -173,19 +173,13 @@ test('defers absent top-level arguments reads and preserves typeof', () => {
 });
 
 test.each([{ parameters: true }, { asyncFunctions: true }])(
-  'bails out before changing direct eval inside lowered arrows: %o',
+  'leaves direct eval calls to ordinary arrow lowering: %o',
   transforms => {
     const source = `function read(){const later=async (v=0)=>eval('arguments[0]'); arguments=[7]; return later();}`;
-    const result = transform(
-      source,
-      'input.js',
-      defineNativePipeline({ phases: [{ name: 'capture', native: { transforms } }] }),
-    );
-    expect(result.status).toBe('bailout');
-    if (result.status === 'bailout') {
-      expect(result.reason).toContain('lowered-arrow-direct-eval');
-      expect(result.source).toBe(source);
-    }
+    const code = compile(source, { transforms });
+    expect(code).toContain('eval(');
+    if ('parameters' in transforms) expect(code).not.toMatch(/async\s*\(v\s*=/);
+    else expect(code).not.toMatch(/async\s*\(/);
   },
 );
 
@@ -247,18 +241,9 @@ test('a parameter named eval can update the owning arguments binding', () => {
   expect(runInNewContext(compile(source, { transforms: { parameters: true } }))).toBe(7);
 });
 
-test('resolved eval calls in converted arrows retain the compatibility boundary', () => {
-  const source = `function read(eval){return (v=0)=>eval('arguments[0]')}`;
-  const result = transform(
-    source,
-    'input.js',
-    defineNativePipeline({
-      phases: [{ name: 'capture', native: { transforms: { parameters: true } } }],
-    }),
-  );
-  expect(result.status).toBe('bailout');
-  if (result.status === 'bailout') {
-    expect(result.source).toBe(source);
-    expect(result.reason).toContain('lowered-arrow-direct-eval');
-  }
+test('resolved eval calls follow ordinary converted-arrow behavior', () => {
+  const source = `function read(eval){return (v=0)=>eval('arguments[0]')}
+    globalThis.result=read(globalThis.eval)(9);`;
+  // Converted functions expose their own call arguments to direct eval.
+  expect(runInNewContext(compile(source, { transforms: { parameters: true } }))).toBe(9);
 });

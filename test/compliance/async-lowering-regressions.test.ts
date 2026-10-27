@@ -273,9 +273,9 @@ test('async capture planning retains escaped arguments identifiers', async () =>
   expect(await run(code)).toBe(7);
 });
 
-test('async eval compatibility checks retain escaped eval identifiers', () => {
-  const source = String.raw`const later=async()=>ev\u0061l('1');`;
-  expect(() => compile(source, { transforms: { asyncFunctions: true } })).toThrow(
-    'lowered-arrow-direct-eval',
-  );
+test('async lowering leaves escaped eval calls unchanged', async () => {
+  const source = String.raw`const later=async()=>ev\u0061l('1');globalThis.result=later();`;
+  const code = compile(source, { transforms: { asyncFunctions: true } });
+  expect(code).not.toMatch(/async\s*\(/);
+  expect(await run(code)).toBe(1);
 });

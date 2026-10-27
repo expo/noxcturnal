@@ -19,8 +19,9 @@ would change behavior, including deferred initialization. Assess liveness within
 the owning ordinary function.
 Keep generated capture templates within their allocator and clone them without
 semantic identities.
-Decline with pristine input when direct eval inside an arrow selected for
-conversion would observe a different implicit function environment.
+Leave direct eval to ordinary lowering; eval strings are not rewritten, so
+conversion may change their implicit receiver or arguments. Eval in the owning
+function still makes explicit arguments captures live.
 
 Keep Refresh signature statements in the original control-flow environment.
 Supply a local statement list for adjacent insertions; loop-header initializers
