@@ -262,3 +262,54 @@ describe('decorator order', () => {
     }
   }
 });
+
+test.each([false, true])(
+  'bails out pristinely for decorated class expressions (braced=%s)',
+  braced => {
+    for (const expression of [
+      `out.push(new (@mark class { value = row; })().value);`,
+      `out.push(class { @mark read() { return row; } });`,
+      `out.push(class { read(@mark value: number) { return value; } });`,
+    ]) {
+      const source = `const out = [];
+      const mark = C => C;
+      for (const row of [1, 2])
+        ${braced ? `{ ${expression} }` : expression}`;
+      const result = transform(
+        source,
+        'input.ts',
+        defineNativePipeline({
+          phases: [
+            {
+              name: 'decorators',
+              native: { typescript: 'strip', transforms: { legacyDecorators: true } },
+            },
+          ],
+        }),
+      );
+      expect(result.status).toBe('bailout');
+      if (result.status === 'bailout') {
+        expect(result.reason).toContain('decorated-class-expression');
+        expect(result.source).toBe(source);
+      }
+    }
+  },
+);
+
+test('invalid decorated expressions throw before compatibility bailout', () => {
+  const source = `const duplicate=1; const duplicate=2; const C=(@mark class {});`;
+  expect(() =>
+    transform(
+      source,
+      'input.ts',
+      defineNativePipeline({
+        phases: [
+          {
+            name: 'decorators',
+            native: { typescript: 'strip', transforms: { legacyDecorators: true } },
+          },
+        ],
+      }),
+    ),
+  ).toThrow();
+});

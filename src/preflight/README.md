@@ -78,6 +78,9 @@ and the loads that produce them.
 
 ## Completion and failure
 
+For legacy decorators on class expressions (including member and parameter
+decorators), validate input semantics before declining with pristine input.
+
 An intentional compatibility boundary declines without returning partial code or mappings. Invalid input or configuration throws. A failed postcondition after rewriting is fatal: later passes must not continue with a tree that fails the rewrite's postconditions. The [runtime](../../js/runtime/README.md) turns declines into bailouts with the caller's original source.
 
 ## Helpers and optimization
