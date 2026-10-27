@@ -124,7 +124,7 @@ pub(crate) fn static_member_root<'a, 'b>(
     mut expression: &'b Expression<'a>,
 ) -> Option<&'b IdentifierReference<'a>> {
     loop {
-        match expression {
+        match member_expression(expression) {
             Expression::Identifier(identifier) => return Some(identifier),
             Expression::StaticMemberExpression(member) => expression = &member.object,
             Expression::ComputedMemberExpression(member)

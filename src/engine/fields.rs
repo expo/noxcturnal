@@ -1415,3 +1415,52 @@ pub(crate) fn compiled_scalar_matches(
         CompiledScalar::Null => scalar_type == 3,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use oxc_ast::ast::Statement;
+    use oxc_span::SourceType;
+
+    #[test]
+    fn parenthesized_callee_paths_match_in_ordinary_and_packed_fields() {
+        for source in [
+            "(Platform).select({})",
+            "((Platform))[\"select\"]({})",
+            "((Platform).select)({})",
+        ] {
+            let allocator = Allocator::default();
+            let parsed = oxc_parser::Parser::new(&allocator, source, SourceType::default()).parse();
+            assert!(parsed.diagnostics.is_empty());
+            let Statement::ExpressionStatement(statement) = &parsed.program.body[0] else {
+                panic!("expected expression statement");
+            };
+            let Expression::CallExpression(call) = &statement.expression else {
+                panic!("expected call");
+            };
+            let kind = AstKind::CallExpression(call);
+            let requested = FieldMask::none().with(field_ids::CALLEE_PATH);
+            let ordinary = fields(kind, None, source, false, false, None, requested);
+            assert_eq!(ordinary.len(), 1, "{source}: ordinary calleePath");
+            assert_eq!(ordinary[0].key, "calleePath");
+            assert_eq!(ordinary[0].value, "Platform.select");
+            let mut strings = FxHashMap::default();
+            let packed = packed_fields_direct(
+                kind,
+                None,
+                source,
+                false,
+                false,
+                None,
+                None,
+                requested,
+                &mut strings,
+                &mut MemberPathInterner::default(),
+            )
+            .expect("direct packed call fields");
+            assert_eq!(packed.len, 2, "{source}: packed calleePath");
+            assert_eq!(packed.words[0], field_ids::CALLEE_PATH);
+            assert_eq!(strings.get("Platform.select"), Some(&packed.words[1]));
+        }
+    }
+}
