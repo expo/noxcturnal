@@ -472,13 +472,8 @@ impl<'a> ReactRefresh<'a> {
         };
         let local = signature.local.take();
         let binding = local.as_ref().map_or(&signature.binding, |local| &local.binding);
-        let attachment_scope = if let Some(local) = &local {
-            local.scope_id
-        } else if signature.expression_local {
-            ctx.create_child_scope_of_current(ScopeFlags::Function | ScopeFlags::Arrow)
-        } else {
-            ctx.current_scope_id()
-        };
+        let attachment_scope =
+            if let Some(local) = &local { local.scope_id } else { ctx.current_scope_id() };
         let mut arguments = signature.arguments.create_arguments(attachment_scope, ctx);
 
         if !matches!(expr, Expression::CallExpression(_)) {
@@ -559,11 +554,16 @@ impl<'a> ReactRefresh<'a> {
             *expr = Self::call_with_local(attached, init, local.binding, local.scope_id, span, ctx);
         } else if signature.expression_local {
             // Read the transport after the HOC (including all arguments) has run.
-            // Keeping the HOC outside the arrow preserves surrounding await/yield.
-            let scope_id = attachment_scope;
-            let parameter =
-                ctx.generate_uid("component", scope_id, SymbolFlags::FunctionScopedVariable);
-            arguments.insert(0, Argument::from(parameter.create_read_expression(ctx)));
+            // The sequence keeps surrounding await/yield in its original scope.
+            let component = VarDeclarationsStore::create_uid_var("component", ctx);
+            let assign = Expression::new_assignment_expression(
+                SPAN,
+                AssignmentOperator::Assign,
+                component.create_target(ReferenceFlags::Write, ctx),
+                value,
+                ctx,
+            );
+            arguments.insert(0, Argument::from(component.create_read_expression(ctx)));
             let attached = Expression::new_call_expression(
                 span,
                 signature.binding.create_read_expression(ctx),
@@ -572,7 +572,7 @@ impl<'a> ReactRefresh<'a> {
                 false,
                 ctx,
             );
-            *expr = Self::call_with_local(attached, value, parameter, scope_id, span, ctx);
+            *expr = Expression::new_sequence_expression(span, [assign, attached], ctx);
         } else {
             arguments.insert(0, Argument::from(value));
             *expr = Expression::new_call_expression(
