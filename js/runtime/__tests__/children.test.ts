@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { test, vi } from 'vitest';
 import { NativeTransformSession } from '../session';
+import { native } from '../../native/binding';
+import { packRouteManifest } from '../../protocol/manifest';
 
 import { defineNativePipeline, defineNativePlugin, defineVisitor, transform } from '../../index';
 test('provides lazy compact structural child roles without recursive ESTree transfer', () => {
@@ -616,4 +618,177 @@ test('batches child hydration for sparse matched parents and caches empty childr
   } finally {
     prefetch.mockRestore();
   }
+});
+
+test('hydrates recursive named children and empty lists in one native batch', () => {
+  const children = vi.spyOn(native.NativeIndexedSession.prototype, 'childrenPackedBuffer');
+  const observed: number[][] = [];
+  try {
+    const plugin = defineNativePlugin({
+      name: 'recursive-child-batch',
+      visitors: [
+        defineVisitor(
+          'ExportNamedDeclaration',
+          {
+            children: {
+              declaration: {
+                route: 'VariableDeclaration',
+                children: {
+                  declarations: {
+                    route: 'VariableDeclarator',
+                    children: {
+                      init: {
+                        route: 'CallExpression',
+                        children: {
+                          arguments: { route: 'NumericLiteral', fields: ['value'] },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          path => {
+            for (const declaration of path.getChild('declaration')!.getChildList('declarations')) {
+              const call = declaration.getChild('init')!;
+              const values = call
+                .getChildList('arguments')
+                .map(arg => (arg.node.type === 'NumericLiteral' ? arg.node.value : -1));
+              observed.push(values);
+              assert.deepEqual(
+                call
+                  .getChildList('arguments')
+                  .map(arg => (arg.node.type === 'NumericLiteral' ? arg.node.value : -1)),
+                values,
+              );
+            }
+          },
+        ),
+      ],
+    });
+    const result = transform(
+      'export const first=run(), second=run(2, 3);',
+      'input.js',
+      defineNativePipeline({ phases: [{ name: 'scan', plugins: [plugin] }] }),
+    );
+    assert.equal(result.status, 'complete');
+    assert.deepEqual(observed, [[], [2, 3]]);
+    assert.equal(children.mock.calls.length, 1);
+    assert.equal(children.mock.calls[0][3], true);
+  } finally {
+    children.mockRestore();
+  }
+});
+
+test('upgrades a direct child cache to a complete retained graph', () => {
+  const session = new NativeTransformSession(
+    'export const value=run(7);',
+    'input.js',
+    {},
+    packRouteManifest(
+      [],
+      false,
+      false,
+      (1 << 6) - 1,
+      {
+        ExportNamedDeclaration: ['declaration'],
+        VariableDeclaration: ['declarations'],
+        VariableDeclarator: ['init'],
+        CallExpression: ['arguments'],
+      },
+      { NumericLiteral: ['value'] },
+    ),
+  );
+  const prefetch = vi.spyOn(session, 'prefetchChildren');
+  try {
+    const root = session.nodes(['ExportNamedDeclaration'])[0]!;
+    session.prefetchChildren([root.id]);
+    session.prefetchChildren([root.id], true);
+    const declaration = session.children(root.id)[0]!;
+    const binding = session.children(declaration.id)[0]!;
+    const call = session.children(binding.id)[0]!;
+    assert.deepEqual(
+      session.children(call.id).map(event => session.nodeView(event).value),
+      [7],
+    );
+    assert.equal(prefetch.mock.calls.length, 2);
+  } finally {
+    session.close();
+  }
+});
+
+test('direct singular children preserve absent roles and list results remain independent', () => {
+  const initializers: (string | null)[] = [];
+  const lists: number[][] = [];
+  const plugin = defineNativePlugin({
+    name: 'direct-child-results',
+    visitors: [
+      defineVisitor('VariableDeclarator', { children: { init: { route: 'Expression' } } }, path => {
+        initializers.push(path.getChild('init')?.sourceText() ?? null);
+        assert.equal(Array.isArray(path.get('init')), false);
+      }),
+      defineVisitor(
+        'CallExpression',
+        { children: { arguments: { route: 'NumericLiteral', fields: ['value'] } } },
+        path => {
+          const first = path.getChildList('arguments');
+          (first as unknown[]).pop();
+          lists.push(
+            path
+              .getChildList('arguments')
+              .map(child => (child.node.type === 'NumericLiteral' ? child.node.value : -1)),
+          );
+        },
+      ),
+    ],
+  });
+  const result = transform(
+    'let missing; const present=run(1, 2);',
+    'input.js',
+    defineNativePipeline({ phases: [{ name: 'scan', plugins: [plugin] }] }),
+  );
+  assert.equal(result.status, 'complete');
+  assert.deepEqual(initializers, [null, 'run(1, 2)']);
+  assert.deepEqual(lists, [[1, 2]]);
+});
+
+test('keeps packed child groups separate across wide, empty, and mixed-role parents', () => {
+  const values = Array.from({ length: 256 }, (_, index) => index);
+  const observed: number[][] = [];
+  const plugin = defineNativePlugin({
+    name: 'packed-child-groups',
+    visitors: [
+      defineVisitor(
+        'CallExpression',
+        {
+          children: {
+            callee: { route: 'Identifier', fields: ['name'] },
+            arguments: { route: 'NumericLiteral', fields: ['value'] },
+          },
+        },
+        path => {
+          const expectedName =
+            observed.length === 0 ? 'wide' : observed.length === 1 ? 'empty' : 'last';
+          for (let read = 0; read < 3; read++) {
+            assert.equal(path.getChild('callee')?.node.name, expectedName);
+            const children = path.getChildList('arguments');
+            const actual = children.map(child =>
+              child.node.type === 'NumericLiteral' ? child.node.value : -1,
+            );
+            if (read === 0) observed.push(actual);
+            else assert.deepEqual(actual, observed[observed.length - 1]);
+            (children as unknown[]).length = 0;
+          }
+        },
+      ),
+    ],
+  });
+  const result = transform(
+    `wide(${values.join(',')}); empty(); last(999);`,
+    'input.js',
+    defineNativePipeline({ phases: [{ name: 'scan', plugins: [plugin] }] }),
+  );
+  assert.equal(result.status, 'complete');
+  assert.deepEqual(observed, [values, [], [999]]);
 });

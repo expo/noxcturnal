@@ -1712,6 +1712,12 @@ impl RetainedIndex {
             .map(|edge| (edge.child_id, edge.role_id))
     }
 
+    pub(crate) fn retains_children(&self, node_id: u32) -> bool {
+        self.type_id(node_id)
+            .and_then(|type_id| self.child_role_mask_by_parent_type.get(type_id as usize))
+            .is_some_and(ChildRoleMask::requests_children)
+    }
+
     /// Build only on demand; selected buckets contain IDs, never duplicate facts.
     /// Sorting the union preserves the original ascending-node-ID query order.
     pub fn node_ids_of_types(&self, type_ids: &FxHashSet<u32>) -> impl Iterator<Item = u32> {

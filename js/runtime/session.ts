@@ -2,7 +2,7 @@ import { nativeManifest } from '../native/manifest';
 import type { RouteCapabilities } from '../pipeline/types';
 import { decodeConstant, decodeString } from '../protocol/value-transport';
 import { parserFilename } from '../adapters/classification';
-import { CHILD_ROLES, SCALAR_FIELDS, NODE_TYPES } from '../generated/event-schema';
+import { SCALAR_FIELDS, NODE_TYPES } from '../generated/event-schema';
 import {
   native,
   type NativeIndexedSessionBinding,
@@ -33,6 +33,17 @@ import { alias, querySubscriptions } from '../pipeline/route-utils';
 
 // Summaries carry no scalar payload to merge when a routed event replaces them.
 const SUMMARY_FIELDS: NativeEvent['fields'] = [];
+interface ChildState {
+  // Interleaved child id / role id words, kept in native traversal order.
+  edges: Uint32Array | number[];
+  offset: number;
+  count: number;
+  recursive?: boolean;
+  singular?: Map<number, number>;
+  // Used only by the explicit routed-child seeding path, which can replay nodes.
+  members?: Set<number>;
+}
+
 export class NativeTransformSession {
   #closed = false;
   #sourceText: InstanceType<typeof native.NativeSourceText> | null = null;
@@ -40,9 +51,7 @@ export class NativeTransformSession {
   #queryCache = new WeakMap<QueryRequest, { request: QueryRequest; result: QueryResult }>();
   #globalReferencesCache = new Map<string, SemanticReferenceView[]>();
   #globalBindingReferencesCache = new Map<string, SemanticReferenceView[]>();
-  #childrenCache = new Map<number, number[]>();
-  #childIdsCache = new Map<number, Set<number>>();
-  #childRoleCache = new Map<number, Map<number, number[]>>();
+  #childrenCache = new Map<number, ChildState>();
   #prefetchedChildTypes: Set<string> | null = null;
   #native: NativeIndexedSessionBinding | null = null;
   #nativeFilename: string;
@@ -133,14 +142,30 @@ export class NativeTransformSession {
         if (parent && this.#isPrefetchedChildType(parent.type)) {
           let children = this.#childrenCache.get(event.parentId);
           if (children == null) {
-            children = [];
+            children = { edges: [], offset: 0, count: 0 };
             this.#childrenCache.set(event.parentId, children);
-            this.#childIdsCache.set(event.parentId, new Set());
           }
-          const childIds = this.#childIdsCache.get(event.parentId)!;
-          if (!childIds.has(event.id)) {
-            childIds.add(event.id);
-            children.push(event.id);
+          let members = children.members;
+          if (!members) {
+            children.members = members = new Set();
+            for (
+              let offset = children.offset;
+              offset < children.offset + children.count * 2;
+              offset += 2
+            )
+              members.add(children.edges[offset]);
+          }
+          if (!members.has(event.id)) {
+            members.add(event.id);
+            if (children.edges instanceof Uint32Array) {
+              children.edges = Array.from(
+                children.edges.subarray(children.offset, children.offset + children.count * 2),
+              );
+              children.offset = 0;
+            }
+            children.edges.push(event.id, 0);
+            children.count++;
+            children.singular?.clear();
           }
         }
       }
@@ -303,24 +328,48 @@ export class NativeTransformSession {
       ];
     });
   }
-  children(parentId: number, roleId?: number): NativeEvent[] {
+  #childState(parentId: number): ChildState {
     this.#assertOpen();
-    if (!this.#childrenCache.has(parentId)) {
+    let children = this.#childrenCache.get(parentId);
+    if (!children) {
       const parent = this.event(parentId);
       if (parent && this.#isPrefetchedChildType(parent.type)) {
-        const empty: number[] = [];
-        this.#childrenCache.set(parentId, empty);
-        this.#childIdsCache.set(parentId, new Set());
-        this.#childRoleCache.set(parentId, new Map());
-        return [];
+        children = { edges: [], offset: 0, count: 0 };
+        this.#childrenCache.set(parentId, children);
+      } else {
+        this.prefetchChildren([parentId]);
+        children = this.#childrenCache.get(parentId)!;
       }
-      this.prefetchChildren([parentId]);
     }
-    const selected =
-      roleId == null
-        ? this.#childrenCache.get(parentId)!
-        : (this.#childRoleCache.get(parentId)?.get(roleId) ?? []);
-    return selected.flatMap(nodeId => this.event(nodeId) ?? []);
+    return children;
+  }
+  child(parentId: number, roleId: number): NativeEvent | undefined {
+    const children = this.#childState(parentId);
+    const { edges, offset: start, count } = children;
+    // Most parents have only a handful of children. Wide parents can also have
+    // singular roles beside long lists (e.g. a function body after parameters).
+    // Index only requested singular roles there, avoiding repeated linear scans.
+    const singular = count > 32 ? (children.singular ??= new Map()) : undefined;
+    const cached = singular?.get(roleId);
+    if (cached != null) return cached < 0 ? undefined : this.event(cached);
+    for (let offset = start; offset < start + count * 2; offset += 2) {
+      if (edges[offset + 1] !== roleId) continue;
+      const nodeId = edges[offset];
+      singular?.set(roleId, nodeId);
+      return this.event(nodeId);
+    }
+    singular?.set(roleId, -1);
+    return undefined;
+  }
+  children(parentId: number, roleId?: number): NativeEvent[] {
+    const { edges, offset: start, count } = this.#childState(parentId);
+    const events: NativeEvent[] = [];
+    for (let offset = start; offset < start + count * 2; offset += 2) {
+      if (roleId != null && edges[offset + 1] !== roleId) continue;
+      const event = this.event(edges[offset]);
+      if (event) events.push(event);
+    }
+    return events;
   }
   nodes(nodeTypes: readonly string[]): NodeView[] {
     this.#assertOpen();
@@ -328,8 +377,8 @@ export class NativeTransformSession {
       decodePackedEnvelope(this.#binding('query.nodes').queryNodesPackedBuffer([...nodeTypes])),
     ).events.map(toNodeView);
   }
-  /** Hydrate only structural parents reached from actual route deliveries.
-   * Each frontier crosses the native boundary once, including empty parents. */
+  /** Hydrate the retained child graph reached from actual route deliveries in
+   * one native batch, including empty parents. */
   prefetchRoutedChildren(
     batch: RoutedEventBatch,
     routes: readonly (readonly RouteCapabilities[])[],
@@ -337,16 +386,9 @@ export class NativeTransformSession {
     if (!routes.some(members => members.some(caps => caps.childRules || caps.ancestorChildRules)))
       return;
     this.seedSummaries(batch.parentSummaries);
-    type Rules = NonNullable<RouteCapabilities['childRules']>;
-    let pending: { event: NativeEvent; rules: Rules }[] = [];
-    const seen = new Map<Rules, Set<number>>();
-    const enqueue = (event: NativeEvent, rules: Rules | null) => {
-      if (!rules?.[event.type]) return;
-      let ids = seen.get(rules);
-      if (!ids) seen.set(rules, (ids = new Set()));
-      if (ids.has(event.id)) return;
-      ids.add(event.id);
-      pending.push({ event, rules });
+    const parents = new Set<number>();
+    const enqueue = (event: NativeEvent, rules: RouteCapabilities['childRules']) => {
+      if (rules?.[event.type]) parents.add(event.id);
     };
     dispatchRoutedEvents(
       batch,
@@ -365,57 +407,44 @@ export class NativeTransformSession {
           }
         }
       }),
+      undefined,
+      false,
     );
-    while (pending.length > 0) {
-      const frontier = pending;
-      pending = [];
-      this.prefetchChildren([...new Set(frontier.map(item => item.event.id))]);
-      for (const { event, rules } of frontier) {
-        for (const role of rules[event.type] ?? []) {
-          const roleId = role === '*' ? undefined : CHILD_ROLES[event.type]?.[role]?.id;
-          if (role !== '*' && roleId == null) continue;
-          for (const child of this.children(event.id, roleId)) enqueue(child, rules);
-        }
-      }
-    }
+    // The retained child graph already contains the phase's declared role union.
+    // Expand it once in native code rather than round-tripping each frontier and
+    // maintaining a second visited index for every route's recursive rules.
+    if (parents.size > 0) this.prefetchChildren([...parents], true);
   }
-  prefetchChildren(parentIds: readonly number[] = []): void {
+  prefetchChildren(parentIds: readonly number[] = [], recursive = false): void {
     this.#assertOpen();
-    const missing = parentIds.filter(parentId => !this.#childrenCache.has(parentId));
+    const missing = parentIds.filter(parentId => {
+      const cached = this.#childrenCache.get(parentId);
+      return !cached || (recursive && !cached.recursive);
+    });
     if (missing.length === 0) return;
-    const nativeBatch = this.#binding('children.prefetch').childrenPackedBuffer(missing, [], []);
+    const nativeBatch = this.#binding('children.prefetch').childrenPackedBuffer(
+      missing,
+      [],
+      [],
+      recursive,
+    );
     if (nativeBatch.events == null)
       throw new Error(`invalid native child batch: ${Object.keys(nativeBatch).join(',')}`);
     const batch = decodeEventBatch(decodePackedEnvelope(nativeBatch.events));
-    for (const parentId of missing) {
-      this.#childrenCache.set(parentId, []);
-      this.#childIdsCache.set(parentId, new Set());
-      this.#childRoleCache.set(parentId, new Map());
-    }
-    for (const event of batch.events) {
-      this.#eventCache.set(event.id, event);
-    }
-    for (const edge of nativeBatch.edges) {
-      let children = this.#childrenCache.get(edge.parentId);
-      if (!children) {
-        children = [];
-        this.#childrenCache.set(edge.parentId, children);
-        this.#childIdsCache.set(edge.parentId, new Set());
-        this.#childRoleCache.set(edge.parentId, new Map());
-      }
-      const childIds = this.#childIdsCache.get(edge.parentId)!;
-      if (!childIds.has(edge.childId)) {
-        childIds.add(edge.childId);
-        children.push(edge.childId);
-      }
-      if (edge.roleId !== 0) {
-        const roles = this.#childRoleCache.get(edge.parentId)!;
-        const roleChildren = roles.get(edge.roleId) ?? [];
-        // Native CSR edges are unique per `(parent, child, role)`; preserving
-        // that invariant avoids an input-sized linear scan for every sibling.
-        roleChildren.push(edge.childId);
-        roles.set(edge.roleId, roleChildren);
-      }
+    for (const event of batch.events) this.#eventCache.set(event.id, event);
+    const data = nativeBatch.edges;
+    const words = new Uint32Array(data.buffer, data.byteOffset, data.byteLength / 4);
+    for (let offset = 0; offset < words.length;) {
+      const parentId = words[offset++];
+      const count = words[offset++];
+      const children: ChildState = {
+        edges: words,
+        offset,
+        count,
+        recursive,
+      };
+      offset += count * 2;
+      this.#childrenCache.set(parentId, children);
     }
   }
   event(nodeId: number): NativeEvent | undefined {

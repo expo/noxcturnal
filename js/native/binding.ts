@@ -225,8 +225,10 @@ interface NativeBinding {
       parentIds: number[],
       parentTypes: string[],
       parentTypeIds: number[],
+      recursive?: boolean,
     ): {
-      edges: { parentId: number; childId: number; roleId: number }[];
+      /** Groups of [parentId, count, ...[childId, roleId]], including empty parents. */
+      edges: Buffer;
       events: Buffer;
     };
     retentionDebugSummary(): {

@@ -52,3 +52,16 @@ visits identities out of order; source spans never participate in addressing.
 Exit replay retains only matched exit carriers on a stack. Its lifetime follows
 structural nesting rather than node-ID range or total delivered nodes. Enter
 paths keep their own event objects; creating the exit view never mutates them.
+
+Child preparation selects roots from actual route deliveries, then expands their
+retained child graph in one native batch. The graph follows the phase's declared
+role union; path contracts still enforce each visitor's own child access. Packed
+adjacency groups include empty parents and preserve native child order. JavaScript
+keeps one child-state cache pointing into the packed edge buffer. Child access
+filters those edges directly, avoiding per-parent typed-array views, role maps,
+and copied child-ID arrays. Wide parents lazily cache requested singular roles
+to avoid rescanning long sibling lists. Repeated routed-child seeding alone needs a membership
+set to deduplicate replayed nodes.
+Singular child access resolves its one node directly, without constructing child
+arrays or unrelated paths. Lists preserve native order and create fresh result
+arrays so callers cannot mutate cached structural state.

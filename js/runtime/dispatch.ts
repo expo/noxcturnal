@@ -33,6 +33,7 @@ import type {
   DefinedVisitor,
   Handler,
   NativePlugin,
+  NativeNodePath,
   PipelinePhase,
   PluginContext,
 } from '../contracts/visitor';
@@ -495,19 +496,39 @@ export function createDispatcher(
         if (runtime.cacheAncestorPaths) (runtime.pathCache ??= new NodeCache()).set(parentId, path);
         return path;
       },
+      child(target, ancestryDepth, role) {
+        const roleId = CHILD_ROLES[target.type]?.[role]?.id;
+        if (roleId == null) return null;
+        const child = session.child(target.id, roleId);
+        if (!child) return null;
+        const cached = ancestryDepth > 0 ? runtime.pathCache?.get(child.id) : undefined;
+        if (cached) return cached;
+        const path = makePath(runtime, child, ancestryDepth);
+        if (ancestryDepth > 0 && runtime.cacheAncestorPaths)
+          (runtime.pathCache ??= new NodeCache()).set(child.id, path);
+        return path;
+      },
       children(target, ancestryDepth, role) {
         const roleId = role == null ? undefined : CHILD_ROLES[target.type]?.[role]?.id;
-        return session.children(target.id, roleId).map(child => {
+        const children = session.children(target.id, roleId);
+        const paths = new Array<NativeNodePath>(children.length);
+        for (let index = 0; index < children.length; index++) {
+          const child = children[index];
           if (ancestryDepth > 0) {
             const cached = runtime.pathCache?.get(child.id);
-            if (cached) return cached;
+            if (cached) {
+              paths[index] = cached;
+              continue;
+            }
             const path = makePath(runtime, child, ancestryDepth);
             if (runtime.cacheAncestorPaths)
               (runtime.pathCache ??= new NodeCache()).set(child.id, path);
-            return path;
+            paths[index] = path;
+          } else {
+            paths[index] = makePath(runtime, child, 0);
           }
-          return makePath(runtime, child, 0);
-        });
+        }
+        return paths;
       },
       allowsAncestry() {
         return capabilities.ancestry != null;
