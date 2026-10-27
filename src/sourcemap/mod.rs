@@ -528,11 +528,12 @@ fn position_at(
     source: &str,
     line_starts: &[usize],
     utf16_offsets: &mut Option<Vec<usize>>,
+    source_ascii: bool,
     offset: usize,
 ) -> (i64, i64) {
     let line = line_starts.partition_point(|start| *start <= offset) - 1;
     let line_start = line_starts[line];
-    let column = if source.is_ascii() {
+    let column = if source_ascii {
         (offset - line_start) as i64
     } else {
         let offsets = utf16_offsets.get_or_insert_with(|| {
@@ -552,6 +553,7 @@ fn reposition<S: SegmentSink>(
     map: &mut StreamingMap<S>,
     line_starts: &mut Option<Vec<usize>>,
     utf16_offsets: &mut Option<Vec<usize>>,
+    source_ascii: &mut Option<bool>,
     source: &str,
     target: usize,
 ) {
@@ -566,7 +568,8 @@ fn reposition<S: SegmentSink>(
         );
         starts
     });
-    let (line, column) = position_at(source, starts, utf16_offsets, target);
+    let source_ascii = *source_ascii.get_or_insert_with(|| source.is_ascii());
+    let (line, column) = position_at(source, starts, utf16_offsets, source_ascii, target);
     map.original_line = line;
     map.original_column = column;
 }
@@ -584,6 +587,8 @@ struct Renderer<'a, S: SegmentSink> {
     line_starts: Option<Vec<usize>>,
     /// UTF-16 position at every byte boundary, built lazily for non-ASCII input.
     utf16_offsets: Option<Vec<usize>>,
+    /// Classify the whole source only once, on the first relocated piece.
+    source_ascii: Option<bool>,
     /// Byte offset the map's (original_line, original_column) currently corresponds
     /// to. In-place pieces keep it advancing monotonically; a mismatch means the
     /// previous piece came from elsewhere and the position must be re-derived.
@@ -611,6 +616,7 @@ impl<S: SegmentSink> Renderer<'_, S> {
             &mut self.map,
             &mut self.line_starts,
             &mut self.utf16_offsets,
+            &mut self.source_ascii,
             self.source,
             target,
         );
@@ -772,6 +778,7 @@ fn render_into<'a, S: SegmentSink>(
         name_ids: FxHashMap::default(),
         line_starts: None,
         utf16_offsets: None,
+        source_ascii: None,
         cursor: 0,
         generated_tail: false,
         identity_tail: false,
@@ -2075,6 +2082,39 @@ mod tests {
         assert_eq!(code, mapped_code);
         assert!(!mappings.is_empty());
         assert_eq!(names, ["value"]);
+    }
+
+    #[test]
+    fn repeated_relocated_copies_preserve_ascii_and_utf16_positions() {
+        for (source, first_column, second_column) in [
+            ("x first\nx second\nthird", 2, 2),
+            ("😀 first\né second\nthird", 3, 2),
+        ] {
+            let pieces: Vec<_> = ["third", "first", "second", "first"]
+                .iter()
+                .map(|text| {
+                    let start = source.find(text).unwrap();
+                    Piece::Original {
+                        start,
+                        end: start + text.len(),
+                    }
+                })
+                .collect();
+            let (code, mappings, _) = render(source, &pieces, "boundary");
+            assert_eq!(code, "thirdfirstsecondfirst");
+            for (generated_column, original_line, original_column) in [
+                (0, 2, 0),
+                (5, 0, first_column),
+                (10, 1, second_column),
+                (16, 0, first_column),
+            ] {
+                assert_eq!(
+                    trace_input_position(&mappings, 0, generated_column),
+                    Some((original_line, original_column)),
+                    "{source:?} at {generated_column}",
+                );
+            }
+        }
     }
 
     #[test]
