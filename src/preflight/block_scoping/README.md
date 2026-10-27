@@ -16,3 +16,8 @@ Rename priority preserves function-scoped bindings first, then the shallowest
 lexical binding. Equal-depth ties follow the current semantic scope traversal.
 Do not sort bindings by source anchors: moving declarations or sharing their
 spans must not change which binding keeps its name.
+
+Insert extracted helpers at the loop's statement position, before its complete
+label chain. When that position is a single-statement body, wrap the helpers and
+labelled loop together in a block. Walking out to an enclosing statement list
+would move initialized helpers out of the bindings and control flow they capture.

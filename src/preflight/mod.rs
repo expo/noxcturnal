@@ -1,5 +1,6 @@
 //! Facade for the planned native preflight phase.
 
+mod arguments;
 mod block_scoping;
 mod classes;
 mod destructuring;
@@ -12,6 +13,7 @@ mod optimize;
 pub mod options;
 mod parameters;
 mod regexp;
+mod statements;
 pub mod transform;
 
 pub use options::NativePreflightOptions;

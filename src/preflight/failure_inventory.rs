@@ -37,6 +37,12 @@ macro_rules! fatal {
 }
 
 const REVIEWED: &[Entry] = &[
+    unsupported!("decorated-class-expression", "decorator-compatibility"),
+    fatal!(
+        "arguments-capture-semantic-error",
+        "arguments-capture",
+        true
+    ),
     unsupported!("react-compiler-not-built", "feature-selection"),
     unsupported!("parse-error", "escaped-regexp-name-parser-boundary"),
     unsupported!("mutable-namespace-export", "typescript-compatibility"),
@@ -277,6 +283,8 @@ const REVIEWED: &[Entry] = &[
 
 fn looks_like_failure_reason(value: &str) -> bool {
     const PREFIXES: &[&str] = &[
+        "arguments-capture-",
+        "decorated-class-",
         "block-scoping-",
         "captured-",
         "class-features-",

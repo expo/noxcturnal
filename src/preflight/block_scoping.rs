@@ -136,32 +136,50 @@ struct CapturedLoopAstLowerer<'a> {
     error: Option<&'static str>,
 }
 
+impl<'a> CapturedLoopAstLowerer<'a> {
+    fn lower_root(&mut self, root: &mut Statement<'a>) -> Option<ArenaVec<'a, Statement<'a>>> {
+        let mut mutations = self.roots.remove(&root.node_id())?;
+        mutations.sort_unstable_by_key(|mutation| std::cmp::Reverse(mutation.loop_id.index()));
+        let mut helpers = ArenaVec::new_in(&self.allocator);
+        for mutation in mutations {
+            match mutate_captured_loop(self.allocator, root, mutation) {
+                Ok(mut generated) => helpers.append(&mut generated),
+                Err(error) => {
+                    self.error = Some(error);
+                    return None;
+                }
+            }
+        }
+        self.changed = true;
+        Some(helpers)
+    }
+}
+
 impl<'a> VisitMut<'a> for CapturedLoopAstLowerer<'a> {
     fn visit_statements(&mut self, statements: &mut ArenaVec<'a, Statement<'a>>) {
         let mut index = 0;
         while index < statements.len() {
-            let node_id = statements[index].node_id();
-            if let Some(mut mutations) = self.roots.remove(&node_id) {
-                mutations
-                    .sort_unstable_by_key(|mutation| std::cmp::Reverse(mutation.loop_id.index()));
-                let mut helpers = ArenaVec::new_in(&self.allocator);
-                for mutation in mutations {
-                    match mutate_captured_loop(self.allocator, &mut statements[index], mutation) {
-                        Ok(mut generated) => helpers.append(&mut generated),
-                        Err(error) => {
-                            self.error = Some(error);
-                            return;
-                        }
-                    }
-                }
+            if let Some(helpers) = self.lower_root(&mut statements[index]) {
                 let count = helpers.len();
                 statements.splice(index..index, helpers);
                 index += count + 1;
-                self.changed = true;
-                continue;
+            } else {
+                self.visit_statement(&mut statements[index]);
+                index += 1;
             }
-            self.visit_statement(&mut statements[index]);
-            index += 1;
+            if self.error.is_some() {
+                return;
+            }
+        }
+    }
+
+    fn visit_statement(&mut self, statement: &mut Statement<'a>) {
+        if let Some(helpers) = self.lower_root(statement) {
+            if !helpers.is_empty() {
+                super::statements::prepend(self.allocator, statement, helpers);
+            }
+        } else if self.error.is_none() {
+            walk_mut::walk_statement(self, statement);
         }
     }
 }
@@ -948,15 +966,12 @@ fn captured_loop_mutations(
         })
         .map(|captured| {
             let mut statement_root = captured.node_id;
+            // Prefix the complete label chain at this exact statement slot.
+            // Crossing an enclosing single-statement body loses its environment.
             for ancestor in nodes.ancestor_ids(captured.node_id) {
-                if matches!(
-                    nodes.kind(ancestor),
-                    AstKind::Program(_)
-                        | AstKind::BlockStatement(_)
-                        | AstKind::FunctionBody(_)
-                        | AstKind::SwitchCase(_)
-                        | AstKind::StaticBlock(_)
-                ) {
+                if !matches!(nodes.kind(ancestor), AstKind::LabeledStatement(label)
+                    if label.body.node_id() == statement_root)
+                {
                     break;
                 }
                 statement_root = ancestor;

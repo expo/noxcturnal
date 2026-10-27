@@ -14,6 +14,22 @@ Async lowering needs a second traversal when React Refresh replaces a function a
 
 Parameter and destructuring rewrites can introduce captured lexical locals inside loops. Settle those captures again before flat block-scoping planning.
 
+Lexical `arguments` captures must retain live reads and writes when a snapshot
+would change behavior, including deferred initialization. Assess liveness within
+the owning ordinary function.
+Keep generated capture templates within their allocator and clone them without
+semantic identities.
+Leave direct eval to ordinary lowering; eval strings are not rewritten, so
+conversion may change their implicit receiver or arguments. Eval in the owning
+function still makes explicit arguments captures live.
+
+Keep Refresh signature statements in the original control-flow environment.
+Supply a local statement list for adjacent insertions; loop-header initializers
+must remain expressions.
+Initialize signatures where header or conditional components are created, and
+retain a separate signature for each definition. Attach HOC results after their
+arguments evaluate without moving outer await/yield across a function boundary.
+
 ## Identity during rewriting
 
 Source spans carry mapping provenance. Multiple generated nodes can share a span,
@@ -67,6 +83,9 @@ values into functions, while dependency evaluation owns both its array operands
 and the loads that produce them.
 
 ## Completion and failure
+
+For legacy decorators on class expressions (including member and parameter
+decorators), validate input semantics before declining with pristine input.
 
 An intentional compatibility boundary declines without returning partial code or mappings. Invalid input or configuration throws. A failed postcondition after rewriting is fatal: later passes must not continue with a tree that fails the rewrite's postconditions. The [runtime](../../js/runtime/README.md) turns declines into bailouts with the caller's original source.
 

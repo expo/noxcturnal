@@ -477,10 +477,12 @@ fn transform_with_function_map(
                 ));
             }
             let mut program = parsed.program;
+            let mut expression_decorator = false;
             let has_decorators = if possible_decorators {
-                let mut decorator_detector = DecoratorDetector(false);
+                let mut decorator_detector = DecoratorDetector::default();
                 decorator_detector.visit_program(&program);
-                decorator_detector.0
+                expression_decorator = decorator_detector.expression_decorator;
+                decorator_detector.found
             } else {
                 false
             };
@@ -492,6 +494,9 @@ fn transform_with_function_map(
                         .build(&program)
                 };
                 if built.diagnostics.is_empty() {
+                    if expression_decorator {
+                        return Ok(unsupported("decorated-class-expression", [] as [String; 0]));
+                    }
                     let mut language_options = TransformOptions {
                         cwd: transform_options.cwd.clone(),
                         assumptions: CompilerAssumptions {
@@ -796,6 +801,10 @@ fn transform_with_function_map(
         if let Some(reason) = detector.failure_reason(&options) {
             return Ok(fatal(reason, [] as [String; 0]));
         }
+        if options.react_refresh == Some(true) {
+            super::statements::prepare_refresh(allocator, &mut program);
+        }
+        let arguments_capture_selected = super::arguments::may_need_capture(source, &options);
         let semantic = {
             SemanticBuilder::new_compiler()
                 .with_build_nodes(
@@ -803,7 +812,8 @@ fn transform_with_function_map(
                         || options.parameters == Some(true)
                         || options.destructuring == Some(true)
                         || focused_object_rest
-                        || class_rewrite_selected,
+                        || class_rewrite_selected
+                        || (options.async_functions == Some(true) && arguments_capture_selected),
                 )
                 .with_excess_capacity(2.0)
                 .with_enum_eval(true)
@@ -812,7 +822,17 @@ fn transform_with_function_map(
         if !semantic.diagnostics.is_empty() {
             return Err(crate::parse_failure::error(source, &semantic.diagnostics, "native-phase"));
         }
-        let mut semantic = semantic;
+        let arguments_plan = if arguments_capture_selected {
+            super::arguments::prepare(&semantic.semantic, &options)
+        } else { None };
+        let mut semantic = if let Some(plan) = arguments_plan {
+            drop(semantic);
+            structural_custom_helper_requests.prepend(super::arguments::run(allocator, &mut program, plan));
+            SemanticBuilder::new_compiler().with_build_nodes(true).with_enum_eval(true).build(&program)
+        } else { semantic };
+        if !semantic.diagnostics.is_empty() {
+            return Ok(fatal("arguments-capture-semantic-error", semantic.diagnostics));
+        }
         if options.block_scoping == Some(true) {
             loop {
                 let plan =
@@ -2271,7 +2291,12 @@ fn compile_options(
     Ok(compiled)
 }
 
-struct DecoratorDetector(bool);
+#[derive(Default)]
+struct DecoratorDetector {
+    found: bool,
+    in_expression: bool,
+    expression_decorator: bool,
+}
 
 struct JsxDetector(bool);
 
@@ -2356,8 +2381,16 @@ impl<'a> Visit<'a> for JsxDetector {
 }
 
 impl<'a> Visit<'a> for DecoratorDetector {
+    fn visit_class(&mut self, class: &Class<'a>) {
+        let previous = self.in_expression;
+        self.in_expression = class.is_expression();
+        walk::walk_class(self, class);
+        self.in_expression = previous;
+    }
+
     fn visit_decorator(&mut self, decorator: &Decorator<'a>) {
-        self.0 = true;
+        self.found = true;
+        self.expression_decorator |= self.in_expression;
         walk::walk_decorator(self, decorator);
     }
 }

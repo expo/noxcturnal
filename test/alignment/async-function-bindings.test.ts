@@ -107,7 +107,7 @@ describe('async top level arguments', () => {
       binding: false,
     },
     {
-      name: 'direct absent read follows Babel limitation',
+      name: 'direct absent read preserves native rejection',
       source: 'const read = async () => arguments; globalThis.result = read();',
       native: ['rejected', 'ReferenceError'],
       selected: ['fulfilled', undefined],
@@ -121,7 +121,7 @@ describe('async top level arguments', () => {
       binding: true,
     },
     {
-      name: 'global replacement follows Babel snapshot limitation',
+      name: 'global replacement preserves a live binding',
       source:
         'const read = async () => arguments[0]; globalThis.arguments = [7]; globalThis.result = read();',
       native: ['fulfilled', 7],
@@ -166,7 +166,7 @@ describe('async top level arguments', () => {
       });
       expect(code).not.toMatch(/async\s*\(/);
       expect(code.includes('@babel/runtime/')).toBe(mode === 'runtime');
-      expect(await execute(code, entry.binding)).toEqual(entry.selected);
+      expect(await execute(code, entry.binding)).toEqual(entry.native);
     });
   }
 });

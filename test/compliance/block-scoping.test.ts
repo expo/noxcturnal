@@ -1,6 +1,6 @@
 import { runInNewContext } from 'node:vm';
 import { expect, test } from 'vitest';
-import { compile, execute } from './runtime';
+import { compile, execute, importCode } from './runtime';
 
 // Unlike the transform corpus, these cases execute the output. Check the source
 // too so each expected value is independently grounded in JavaScript semantics.
@@ -944,3 +944,140 @@ test.each([
     expect(context.result).toEqual([...expected, ...expected]);
   },
 );
+
+// Issue #76: helper insertion must preserve the enclosing loop environment,
+// including when that environment has no statement-list body of its own.
+for (const forOf of [false, true]) {
+  test(`keeps the issue #76 TypeScript helper in the outer loop (forOf=${forOf})`, async () => {
+    const code = compile(
+      `export function reproF(rows: { cells: number[] }[]) {
+        const out: number[][] = [];
+        for (const r of rows)
+          for (let i = 0; i < 2; i++) {
+            const xs = r.cells.filter(c => c > i);
+            out.push(xs);
+          }
+        return out;
+      }`,
+      { typescript: 'strip', transforms: { blockScoping: true, forOf } },
+      'input.ts',
+    );
+    expect(code).not.toMatch(/\b(?:let|const)\b/);
+    const { reproF } = await importCode(code);
+    expect(
+      (reproF as (rows: { cells: number[] }[]) => number[][])([
+        { cells: [0, 1, 2] },
+        { cells: [2, 3] },
+      ]),
+    ).toEqual([[1, 2], [2], [2, 3], [2, 3]]);
+  });
+
+  test.each([
+    { name: 'for header', inner: 'for (let i = 0; i < 2; i++) out.push([r, (() => i)()]);' },
+    { name: 'for-of header', inner: 'for (const i of [0, 1]) out.push([r, (() => i)()]);' },
+    {
+      name: 'for-in header',
+      inner: 'for (const i in {a: 0, b: 1}) out.push([r, (() => i)()]);',
+      expected: [
+        [10, 'a'],
+        [10, 'b'],
+        [20, 'a'],
+        [20, 'b'],
+      ],
+    },
+    {
+      name: 'for body local',
+      inner: 'for (var n = 0; n < 2; n++) { let i = n; out.push([r, (() => i)()]); }',
+    },
+    {
+      name: 'while body local',
+      inner: 'while (out.length < r / 5) { let i = out.length % 2; out.push([r, (() => i)()]); }',
+    },
+    {
+      name: 'do-while body local',
+      inner:
+        'do { let i = out.length % 2; out.push([r, (() => i)()]); } while (out.length % 2 !== 0);',
+    },
+    { name: 'for test capture', inner: 'for (let i = 0; (() => i < 2)(); i++) out.push([r, i]);' },
+    {
+      name: 'for update capture',
+      inner: 'for (let i = 0; i < 2; (() => i++)()) out.push([r, i]);',
+    },
+    {
+      name: 'label chain',
+      inner:
+        'first: second: for (let i = 0; i < 2; i++) { out.push([r, (() => i)()]); continue first; }',
+    },
+    {
+      name: 'intervening conditional',
+      inner: 'if (r > 0) for (let i = 0; i < 2; i++) out.push([r, (() => i)()]);',
+    },
+  ])(`retains the outer binding for $name (forOf=${forOf})`, ({ inner, expected }) => {
+    const source = `const out = [];
+      for (const r of [10, 20])
+        ${inner}
+      globalThis.result = out;`;
+    const value = expected ?? [
+      [10, 0],
+      [10, 1],
+      [20, 0],
+      [20, 1],
+    ];
+    expect(runInNewContext(source)).toEqual(value);
+    const code = compile(source, { transforms: { blockScoping: true, forOf } });
+    expect(code).not.toMatch(/\b(?:let|const)\b/);
+    expect(runInNewContext(code)).toEqual(value);
+  });
+
+  test.each([
+    { name: 'classic for', outer: 'for (let r = 10; r <= 20; r += 10)' },
+    {
+      name: 'for-in',
+      outer: 'for (const r in { first: true, second: true })',
+      expected: [
+        ['first', 0],
+        ['first', 1],
+        ['second', 0],
+        ['second', 1],
+      ],
+    },
+  ])(`retains a braceless outer $name binding (forOf=${forOf})`, ({ outer, expected }) => {
+    const source = `const out = [];
+      ${outer}
+        for (let i = 0; i < 2; i++) out.push([r, (() => i)()]);
+      globalThis.result = out;`;
+    const value = expected ?? [
+      [10, 0],
+      [10, 1],
+      [20, 0],
+      [20, 1],
+    ];
+    expect(runInNewContext(source)).toEqual(value);
+    expect(runInNewContext(compile(source, { transforms: { blockScoping: true, forOf } }))).toEqual(
+      value,
+    );
+  });
+
+  test.each([
+    { name: 'test', header: 'let i = 0; (() => i < 2)(); i++' },
+    { name: 'update', header: 'let i = 0; i < 2; (() => i++)()' },
+  ])(
+    `does not dispatch an inner helper return at top level: $name (forOf=${forOf})`,
+    ({ header }) => {
+      const source = `const out = [];
+      for (const r of [10, 20]) {
+        for (${header}) out.push([r, i]);
+      }
+      globalThis.result = out;`;
+      const code = compile(source, { transforms: { blockScoping: true, forOf } });
+      expect(code).not.toMatch(/\b(?:let|const)\b/);
+      // Execute as a script: new Function would hide an illegal top-level return.
+      expect(runInNewContext(code)).toEqual([
+        [10, 0],
+        [10, 1],
+        [20, 0],
+        [20, 1],
+      ]);
+    },
+  );
+}

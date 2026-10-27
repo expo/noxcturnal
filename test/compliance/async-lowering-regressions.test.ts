@@ -216,3 +216,66 @@ describe.each(['inline', 'runtime'] as const)('%s async lowering', mode => {
     );
   });
 });
+
+for (const mode of ['inline', 'runtime'] as const) {
+  test.each([
+    {
+      name: 'unbraced condition',
+      body: `if ((arguments = [7], true)) return (async () => arguments[0])();`,
+    },
+    {
+      name: 'braced condition',
+      body: `if ((arguments = [7], true)) { return (async () => arguments[0])(); }`,
+    },
+    {
+      name: 'write after arrow creation',
+      body: `const later = async () => arguments[0]; arguments = [7]; return later();`,
+    },
+    {
+      name: 'write through converted arrow',
+      body: `const write = async () => { arguments = [7]; }; return write().then(() => arguments[0]);`,
+    },
+  ])(
+    `preserves live implicit arguments in async arrows: $name, helpers=${mode}`,
+    async ({ body }) => {
+      const source = `function read() { ${body} } globalThis.result = read(9);`;
+      expect(await run(source)).toBe(7);
+      const code = compile(source, {
+        helpers: { mode, version: '7.29.7' },
+        transforms: { asyncFunctions: true },
+      });
+      expect(code).not.toContain('async ()');
+      expect(await run(code)).toBe(7);
+    },
+  );
+}
+
+test.each(['inline', 'runtime'] as const)(
+  'async captures retain inferred names, %s',
+  async mode => {
+    const source = `function read(){const later=async()=>arguments[0];arguments=[7];
+    return later().then(value=>[value,later.name]);} globalThis.result=read(9);`;
+    expect(
+      await run(
+        compile(source, {
+          transforms: { asyncFunctions: true },
+          helpers: { mode, version: '7.29.7' },
+        }),
+      ),
+    ).toEqual([7, 'later']);
+  },
+);
+
+test('async capture planning retains escaped arguments identifiers', async () => {
+  const source = String.raw`function read(){const later=async()=>argum\u0065nts[0];argum\u0065nts=[7];return later();}globalThis.result=read(9);`;
+  const code = compile(source, { transforms: { asyncFunctions: true } });
+  expect(code).not.toMatch(/async\s*\(/);
+  expect(await run(code)).toBe(7);
+});
+
+test('async lowering leaves escaped eval calls unchanged', async () => {
+  const source = String.raw`const later=async()=>ev\u0061l('1');globalThis.result=later();`;
+  const code = compile(source, { transforms: { asyncFunctions: true } });
+  expect(code).not.toMatch(/async\s*\(/);
+  expect(await run(code)).toBe(1);
+});
