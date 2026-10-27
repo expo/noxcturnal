@@ -684,3 +684,111 @@ defineNativePlugin({
   // @ts-expect-error Syntax features are concrete AST kinds or named function modifiers.
   contract: { syntax: { anyOf: ['async'] } },
 });
+
+// Structural matching does not grant hydration capabilities.
+defineVisitor({ route: 'VariableDeclaration', parent: { route: 'Program' } }, {}, path => {
+  // @ts-expect-error Matching does not authorize ancestor-path access.
+  path.parentPath;
+});
+defineVisitor(
+  {
+    route: 'AssignmentExpression',
+    children: {
+      left: {
+        route: 'Identifier',
+        where: { name: { equals: 'exports' }, global: { equals: true } },
+      },
+    },
+  },
+  { fields: ['operator'] },
+  path => {
+    path.node.operator.toUpperCase();
+    // @ts-expect-error Match predicates are not payload fields.
+    path.node.name;
+    // @ts-expect-error Matching a child does not authorize fetching it.
+    path.getChild('left');
+  },
+);
+defineVisitor(
+  {
+    route: 'CallExpression',
+    children: {
+      arguments: {
+        route: 'Identifier',
+        index: 0,
+        where: { name: { equals: 'target' } },
+      },
+    },
+  },
+  {},
+  () => {},
+);
+defineVisitor(
+  // @ts-expect-error Unknown selector roles are rejected.
+  { route: 'CallExpression', children: { unknown: { route: 'Identifier' } } },
+  {},
+  () => {},
+);
+defineVisitor(
+  // @ts-expect-error Single child roles cannot be indexed.
+  { route: 'CallExpression', children: { callee: { route: 'Identifier', index: 0 } } },
+  {},
+  () => {},
+);
+// @ts-expect-error A literal cannot deliver an identifier field predicate.
+defineVisitor({ route: 'StringLiteral', where: { name: { equals: 'x' } } }, {}, () => {});
+defineVisitor(
+  // @ts-expect-error A child selector must stay within the role's types.
+  { route: 'ImportDeclaration', children: { source: { route: 'Identifier' } } },
+  {},
+  () => {},
+);
+
+const targetKind: boolean = Math.random() > 0.5;
+defineVisitor(
+  {
+    route: 'CallExpression',
+    children: {
+      arguments: targetKind
+        ? {
+            route: 'Identifier',
+            index: 0,
+            where: { name: { equals: 'exports' }, global: { equals: true } },
+          }
+        : {
+            route: 'StaticMemberExpression|ComputedMemberExpression',
+            index: 0,
+            where: { memberPath: { equals: 'module.exports' } },
+          },
+    },
+  },
+  { fields: ['argumentCount'] },
+  path => {
+    path.node.argumentCount?.toFixed();
+  },
+);
+
+// @ts-expect-error Misspelled relationship keys must not broaden delivery silently.
+defineVisitor({ route: 'Identifier', paretn: { route: 'Program' } }, {}, () => {});
+// @ts-expect-error Data belongs in the callback contract, not the selector.
+defineVisitor({ route: 'Identifier', fields: ['name'] }, {}, () => {});
+// @ts-expect-error Nested selectors reject misspelled predicates too.
+defineVisitor({ route: 'Identifier', parent: { route: 'Program', wher: {} } }, {}, () => {});
+// @ts-expect-error Index applies to a child role, not a root selector.
+defineVisitor({ route: 'Identifier', index: 0 }, {}, () => {});
+
+// Existing utility-type consumers and explicit generic arguments remain valid.
+const legacyVisitorRoute: Parameters<typeof defineVisitorTop>[0] = 'Identifier';
+void legacyVisitorRoute;
+defineVisitorTop<'Identifier', { fields: ['name'] }, { seen: string[] }>(
+  'Identifier',
+  { fields: ['name'] },
+  (path, state) => state.seen.push(path.node.name),
+);
+defineVisitorTop({ route: 'Identifier' }, { fields: ['name'] }, path => {
+  const type: 'Identifier' = path.node.type;
+  void type;
+  path.node.name.toUpperCase();
+  // @ts-expect-error Selector routes keep callback types precise.
+  path.node.value;
+});

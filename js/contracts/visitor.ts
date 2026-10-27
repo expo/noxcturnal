@@ -451,6 +451,125 @@ type RouteChildIsList<Route extends string, Role extends string> =
       : never
     : never;
 
+/** A native match condition. Related nodes are inspected without granting callback
+ * access to their data. All conditions are conjunctive; list children match any
+ * element unless an explicit zero-based index is supplied. */
+export interface VisitorSelector<Route extends VisitorRouteSpec = VisitorRouteSpec> {
+  readonly route: Route;
+  readonly where?: RouteWhere<Route>;
+  readonly parent?: VisitorSelector;
+  readonly children?: Readonly<Record<string, ChildSelector>>;
+}
+
+export interface ChildSelector extends VisitorSelector {
+  /** Only valid on list roles. Counts AST children in the generated role order. */
+  readonly index?: number;
+}
+
+type ValidateSelector<Route extends string, Selector> = {
+  readonly where?: RouteWhere<Route> &
+    (Selector extends { where: infer Where }
+      ? {
+          readonly [K in keyof Where]: K extends RoutePredicateKeys<Route>
+            ? RouteWhere<Route>[K]
+            : never;
+        }
+      : unknown);
+} & (Selector extends { parent: infer Parent }
+  ? { readonly parent: ValidateSelectorEntry<Parent> }
+  : unknown) &
+  (Selector extends { children: infer Children }
+    ? {
+        readonly children: {
+          readonly [Role in keyof Children]: Role extends RouteChildRoleNames<Route>
+            ? ValidateSelectorChild<Route, Role & string, Children[Role]>
+            : `Unknown child role '${Role & string}' for route '${Route}'`;
+        };
+      }
+    : unknown);
+
+type ValidateSelectorChild<Route extends string, Role extends string, Entry> = Entry extends {
+  route: infer R extends string;
+}
+  ? [RouteNodeTypes<R>] extends [RouteChildTypes<Route, Role>]
+    ? ValidateSelectorEntry<Entry, true> &
+        (Entry extends { index: number }
+          ? RouteChildIsList<Route, Role> extends true
+            ? unknown
+            : { readonly index: never }
+          : unknown)
+    : `Child role '${Role}' cannot deliver '${R}'`
+  : never;
+
+type ValidateSelectorEntry<Entry, AllowIndex extends boolean = false> = Entry extends {
+  route: infer R extends string;
+}
+  ? { readonly route: R & ValidRouteSpec<R> } & ValidateSelector<R, Entry> & {
+        readonly [
+          K in Exclude<
+            keyof Entry,
+            'route' | 'where' | 'parent' | 'children' | (AllowIndex extends true ? 'index' : never)
+          >
+        ]: never;
+      }
+  : never;
+
+/** Normalized immutable selector stored beside a visitor's hydration contract. */
+export interface StoredVisitorSelector {
+  readonly route: VisitorRouteSpec;
+  readonly where?: Readonly<Partial<Record<string, ScalarPredicate>>>;
+  readonly parent?: StoredVisitorSelector;
+  readonly children?: Readonly<Record<string, StoredVisitorSelector & { readonly index?: number }>>;
+}
+
+const SELECTOR_KEYS = new Set(['route', 'where', 'parent', 'children', 'index']);
+
+function freezeSelector(
+  selector: StoredVisitorSelector & { readonly index?: number },
+  depth = 0,
+  allowIndex = false,
+): StoredVisitorSelector {
+  if (depth >= 8) throw new Error('visitor selectors exceed the supported depth');
+  if (selector == null || typeof selector !== 'object' || typeof selector.route !== 'string')
+    throw new Error('visitor selector requires a route');
+  for (const key of Object.keys(selector)) {
+    if (!SELECTOR_KEYS.has(key)) throw new Error(`unknown visitor selector key ${key}`);
+  }
+  if ('index' in selector && !allowIndex)
+    throw new Error('selector index is only valid on a list child');
+  const where =
+    selector.where == null
+      ? undefined
+      : Object.freeze(
+          Object.fromEntries(
+            Object.entries(selector.where).map(([field, predicate]) => {
+              if (predicate == null) return [field, predicate];
+              const copy = { ...predicate };
+              if ('oneOf' in copy && Array.isArray(copy.oneOf))
+                copy.oneOf = Object.freeze([...copy.oneOf]);
+              return [field, Object.freeze(copy)];
+            }),
+          ),
+        );
+  return Object.freeze({
+    route: selector.route,
+    where,
+    ...(selector.index === undefined ? {} : { index: selector.index }),
+    parent: selector.parent == null ? undefined : freezeSelector(selector.parent, depth + 1),
+    children:
+      selector.children == null
+        ? undefined
+        : Object.freeze(
+            Object.fromEntries(
+              Object.entries(selector.children).map(([role, child]) => [
+                role,
+                freezeSelector(child!, depth + 1, true),
+              ]),
+            ),
+          ),
+  });
+}
+
 /** One declared child role: the expected route and the fields its paths carry. */
 export interface ChildContract {
   route: VisitorRouteSpec;
@@ -840,6 +959,7 @@ export type TypedVisitorHandler<
 export interface DefinedVisitor<in State = unknown> {
   readonly route: VisitorRouteSpec;
   readonly contract: StoredVisitorContract;
+  readonly selector?: StoredVisitorSelector;
   readonly enter: ((path: never, state: State) => void) | undefined;
   readonly exit: ((path: never, state: State) => void) | undefined;
 }
@@ -849,6 +969,7 @@ export interface StoredVisitorContract {
   readonly fields: readonly NativeFieldKey[];
   readonly comments: 'inner' | undefined;
   readonly where: Readonly<Partial<Record<string, ScalarPredicate>>> | undefined;
+
   readonly scope: boolean;
   readonly ancestry:
     | Readonly<{
@@ -952,11 +1073,17 @@ export function defineVisitor<
   Route extends VisitorRouteSpec,
   const Contract extends VisitorContract<Route>,
   State = unknown,
+  const Selector extends VisitorSelector = VisitorSelector,
 >(
-  route: Route & ValidRouteSpec<Route>,
+  routeOrSelector:
+    | (Route & ValidRouteSpec<Route>)
+    | (Selector & { readonly route: Route } & ValidateSelectorEntry<Selector>),
   contract: Contract & ValidateContract<Route, Contract>,
   handler: TypedVisitorHandler<Route, Contract, State>,
 ): DefinedVisitor<State> {
+  const selector =
+    typeof routeOrSelector === 'string' ? undefined : freezeSelector(routeOrSelector);
+  const route = typeof routeOrSelector === 'string' ? routeOrSelector : routeOrSelector.route;
   if (typeof route !== 'string' || route.length === 0)
     throw new Error('defineVisitor requires a route name');
   const callable = typeof handler === 'function' ? { enter: handler } : handler;
@@ -976,6 +1103,7 @@ export function defineVisitor<
   });
   return Object.freeze({
     route,
+    selector,
     contract: stored,
     enter: callable.enter as DefinedVisitor<State>['enter'],
     exit: callable.exit as DefinedVisitor<State>['exit'],
