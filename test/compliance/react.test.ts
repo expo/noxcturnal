@@ -212,17 +212,20 @@ test('Refresh keeps skipped signature factories unevaluated', () => {
   ).toBe(0);
 });
 
-test('Refresh for-initializer signatures preserve inferred names and mutable self references', () => {
-  const source = `const out=[];
+test.each(['App', '__proto__'])(
+  'Refresh for-initializer signatures preserve inferred names and mutable self references: %s',
+  name => {
+    const source = `const out=[];
     for(var App=function(){useState(1);return [App.name,App===globalThis.saved]},i=0;i<1;i++) {
       globalThis.saved=App;out.push(App.name,App());const read=App;App=()=>0;out.push(read());
     }
-    globalThis.result=out;`;
-  expect(
-    execute(
-      source,
-      { reactRefresh: {} },
-      { useState: () => [], $RefreshReg$: () => {}, $RefreshSig$: () => fn => fn },
-    ).result,
-  ).toEqual(['App', ['App', true], ['App', false]]);
-});
+    globalThis.result=out;`.replaceAll('App', name);
+    expect(
+      execute(
+        source,
+        { reactRefresh: {} },
+        { useState: () => [], $RefreshReg$: () => {}, $RefreshSig$: () => (fn: unknown) => fn },
+      ).result,
+    ).toEqual([name, [name, true], [name, false]]);
+  },
+);

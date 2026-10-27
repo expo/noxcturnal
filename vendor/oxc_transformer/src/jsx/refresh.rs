@@ -481,11 +481,11 @@ impl<'a> ReactRefresh<'a> {
                     [ObjectPropertyKind::new_object_property(
                         span,
                         PropertyKind::Init,
-                        PropertyKey::new_static_identifier(span, ident.name, ctx),
+                        PropertyKey::new_string_literal(span, ident.name, None, ctx),
                         value,
                         false,
                         false,
-                        false,
+                        true,
                         ctx,
                     )],
                     ctx,
