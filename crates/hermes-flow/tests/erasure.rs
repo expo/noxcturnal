@@ -262,20 +262,20 @@ fn transforms_enum_declarations() {
     // A defaulted string enum is the `Mirrored` case.
     assert_eq!(
         erased("enum Status { Active, Off }\n"),
-        "const Status = require(\"flow-enums-runtime\").Mirrored([\"Active\",\"Off\"])\n"
+        "const Status = require(\"flow-enums-runtime\").Mirrored([\"Active\",\"Off\"]);\n"
     );
     assert_eq!(
         erased("enum Suit of string { Hearts = \"h\" }\n"),
-        "const Suit = require(\"flow-enums-runtime\")({Hearts: \"h\"})\n"
+        "const Suit = require(\"flow-enums-runtime\")({Hearts: \"h\"});\n"
     );
     assert_eq!(
         erased("enum N of number { A = 1, B = 2 }\n"),
-        "const N = require(\"flow-enums-runtime\")({A: 1, B: 2})\n"
+        "const N = require(\"flow-enums-runtime\")({A: 1, B: 2});\n"
     );
     // A defaulted member outside a string body is a symbol.
     assert_eq!(
         erased("enum S of symbol { A, B }\n"),
-        "const S = require(\"flow-enums-runtime\")({A: Symbol(\"A\"), B: Symbol(\"B\")})\n"
+        "const S = require(\"flow-enums-runtime\")({A: Symbol(\"A\"), B: Symbol(\"B\")});\n"
     );
 }
 

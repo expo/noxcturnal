@@ -206,3 +206,50 @@ test('Flow match object patterns ignore unrelated properties and bind rest', () 
   );
   expect(result.result).toEqual([1, { kept: 2 }]);
 });
+
+for (const placement of ['program', 'loop body'] as const) {
+  test.each([
+    { name: 'mirrored', declaration: 'enum E { A, B }', expected: 'A' },
+    { name: 'numeric', declaration: 'enum E of number { A = 1, B = 2 }', expected: 1 },
+  ])(
+    `terminates a $name Flow enum before the following statement in a ${placement}`,
+    ({ declaration, expected }) => {
+      // Deliberately keep the next statement on the same line as the enum close.
+      const source =
+        placement === 'program'
+          ? `// @flow\n${declaration} globalThis.result = E.A;`
+          : `// @flow\nconst out = []; for (const row of [1, 2]) { ${declaration} out.push([row, E.A]); } globalThis.result = out;`;
+      const result = execute(
+        source,
+        {},
+        {
+          require(specifier: string) {
+            expect(specifier).toBe('flow-enums-runtime');
+            return flowEnumRuntime();
+          },
+        },
+      );
+      expect(result.result).toEqual(
+        placement === 'program'
+          ? expected
+          : [
+              [1, expected],
+              [2, expected],
+            ],
+      );
+    },
+  );
+}
+
+test('terminates a Flow enum before an array expression even across a newline', () => {
+  const result = execute(
+    `// @flow
+    enum E { A, B }
+    [1, 2].forEach(value => { globalThis.result = [value, E.A]; });`,
+    {},
+    {
+      require: () => flowEnumRuntime(),
+    },
+  );
+  expect(result.result).toEqual([2, 'A']);
+});

@@ -72,7 +72,7 @@ impl Enum {
                 .map(|member| format!("\"{}\"", slice(source, &member.name)))
                 .collect::<Vec<_>>()
                 .join(",");
-            return format!("const {name} = {runtime}.Mirrored([{names}])");
+            return format!("const {name} = {runtime}.Mirrored([{names}]);");
         }
         let entries = self
             .members
@@ -87,7 +87,7 @@ impl Enum {
             })
             .collect::<Vec<_>>()
             .join(", ");
-        format!("const {name} = {runtime}({{{entries}}})")
+        format!("const {name} = {runtime}({{{entries}}});")
     }
 }
 
