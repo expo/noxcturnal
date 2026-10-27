@@ -820,6 +820,7 @@ pub fn render(source: &str, pieces: &[Piece], mode: &str) -> (String, String, Ve
 
 /// Render code plus the mapping in packed decoded layer form, for phase boundaries
 /// that feed later composition instead of final output.
+#[cfg(test)]
 pub fn render_decoded(source: &str, pieces: &[Piece], mode: &str) -> (String, Vec<u8>) {
     let (code, layer) = render_decoded_layer(source, pieces, mode);
     (code, layer.pack())
