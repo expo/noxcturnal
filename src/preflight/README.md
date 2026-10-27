@@ -14,6 +14,12 @@ Async lowering needs a second traversal when React Refresh replaces a function a
 
 Parameter and destructuring rewrites can introduce captured lexical locals inside loops. Settle those captures again before flat block-scoping planning.
 
+Lexical `arguments` captures must retain live reads and writes when a snapshot
+would change behavior, including deferred initialization. Assess liveness within
+the owning ordinary function.
+Decline with pristine input when direct eval inside an arrow selected for
+conversion would observe a different implicit function environment.
+
 ## Identity during rewriting
 
 Source spans carry mapping provenance. Multiple generated nodes can share a span,

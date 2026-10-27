@@ -424,12 +424,12 @@ describe('async capture boundaries', () => {
       selected: 'ReferenceError',
     },
     {
-      name: 'default arguments capture follows Babel limitation',
+      name: 'default arguments capture preserves native binding',
       source:
         'function f(a = async () => arguments[1]) { return a(); } globalThis.result = f(undefined, 3);',
       native: 3,
       babel: 'ReferenceError',
-      selected: 'ReferenceError',
+      selected: 3,
     },
     {
       name: 'instance field captures instance receiver',

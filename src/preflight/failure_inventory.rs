@@ -37,6 +37,12 @@ macro_rules! fatal {
 }
 
 const REVIEWED: &[Entry] = &[
+    unsupported!("lowered-arrow-direct-eval", "arguments-capture"),
+    fatal!(
+        "arguments-capture-semantic-error",
+        "arguments-capture",
+        true
+    ),
     unsupported!("react-compiler-not-built", "feature-selection"),
     unsupported!("parse-error", "escaped-regexp-name-parser-boundary"),
     unsupported!("mutable-namespace-export", "typescript-compatibility"),

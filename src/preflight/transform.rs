@@ -803,7 +803,8 @@ fn transform_with_function_map(
                         || options.parameters == Some(true)
                         || options.destructuring == Some(true)
                         || focused_object_rest
-                        || class_rewrite_selected,
+                        || class_rewrite_selected
+                        || options.async_functions == Some(true),
                 )
                 .with_excess_capacity(2.0)
                 .with_enum_eval(true)
@@ -812,7 +813,18 @@ fn transform_with_function_map(
         if !semantic.diagnostics.is_empty() {
             return Err(crate::parse_failure::error(source, &semantic.diagnostics, "native-phase"));
         }
-        let mut semantic = semantic;
+        if super::arguments::has_direct_eval(&semantic.semantic, &options) {
+            return Ok(unsupported("lowered-arrow-direct-eval", [] as [String; 0]));
+        }
+        let arguments_plan = super::arguments::prepare(&semantic.semantic, &options);
+        let mut semantic = if let Some(plan) = arguments_plan {
+            drop(semantic);
+            super::arguments::run(allocator, &mut program, plan);
+            SemanticBuilder::new_compiler().with_build_nodes(true).with_enum_eval(true).build(&program)
+        } else { semantic };
+        if !semantic.diagnostics.is_empty() {
+            return Ok(fatal("arguments-capture-semantic-error", semantic.diagnostics));
+        }
         if options.block_scoping == Some(true) {
             loop {
                 let plan =

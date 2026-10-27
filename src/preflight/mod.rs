@@ -1,5 +1,6 @@
 //! Facade for the planned native preflight phase.
 
+mod arguments;
 mod block_scoping;
 mod classes;
 mod destructuring;

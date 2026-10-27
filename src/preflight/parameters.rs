@@ -1624,7 +1624,7 @@ impl<'a> Visit<'a> for ParameterReferenceCollector<'a> {
         self.has_eval |= reference.name == "eval";
     }
 }
-fn parameters_have_object_rest(params: &FormalParameters<'_>) -> bool {
+pub(super) fn parameters_have_object_rest(params: &FormalParameters<'_>) -> bool {
     fn has_rest(pattern: &BindingPattern<'_>) -> bool {
         match pattern {
             BindingPattern::ObjectPattern(pattern) => {

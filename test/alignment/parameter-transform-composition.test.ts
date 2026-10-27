@@ -161,10 +161,11 @@ describe('parameter baseline settlement', () => {
   }
   const cases = [
     {
-      name: 'mutable enclosing arguments snapshot',
+      name: 'mutable enclosing arguments binding',
       source: `function outer(){const read=(value=1)=>arguments[0];arguments=['changed'];return read();}globalThis.result=outer('original');`,
       native: 'changed',
       baseline: 'original',
+      repaired: true,
     },
     {
       name: 'typeof earlier rest binding',
@@ -185,7 +186,8 @@ describe('parameter baseline settlement', () => {
       baseline: [],
     },
   ];
-  test.each(cases)('adopted parameter baseline: $name', ({ source, native, baseline }) => {
+  test.each(cases)('adopted parameter baseline: $name', entry => {
+    const { source, native, baseline } = entry;
     expect(observe(source)).toEqual(native);
     const reference = transformSync(source, {
       sourceType: 'script',
@@ -195,8 +197,8 @@ describe('parameter baseline settlement', () => {
     })!.code!;
     expect(observe(reference)).toEqual(baseline);
     const code = compile(source, { transforms: { parameters: true } });
-    expect(code).not.toMatch(/=>|\.\.\.rest|function read\(first\s*=/);
+    expect(code).not.toMatch(/\(value\s*=|\.\.\.rest|function read\(first\s*=/);
     expect(code).not.toContain('@babel/runtime');
-    expect(observe(code)).toEqual(baseline);
+    expect(observe(code)).toEqual('repaired' in entry ? native : baseline);
   });
 });

@@ -216,3 +216,36 @@ describe.each(['inline', 'runtime'] as const)('%s async lowering', mode => {
     );
   });
 });
+
+for (const mode of ['inline', 'runtime'] as const) {
+  test.each([
+    {
+      name: 'unbraced condition',
+      body: `if ((arguments = [7], true)) return (async () => arguments[0])();`,
+    },
+    {
+      name: 'braced condition',
+      body: `if ((arguments = [7], true)) { return (async () => arguments[0])(); }`,
+    },
+    {
+      name: 'write after arrow creation',
+      body: `const later = async () => arguments[0]; arguments = [7]; return later();`,
+    },
+    {
+      name: 'write through converted arrow',
+      body: `const write = async () => { arguments = [7]; }; return write().then(() => arguments[0]);`,
+    },
+  ])(
+    `preserves live implicit arguments in async arrows: $name, helpers=${mode}`,
+    async ({ body }) => {
+      const source = `function read() { ${body} } globalThis.result = read(9);`;
+      expect(await run(source)).toBe(7);
+      const code = compile(source, {
+        helpers: { mode, version: '7.29.7' },
+        transforms: { asyncFunctions: true },
+      });
+      expect(code).not.toContain('async ()');
+      expect(await run(code)).toBe(7);
+    },
+  );
+}

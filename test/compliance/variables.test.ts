@@ -1143,7 +1143,6 @@ const additionalComplianceCases: {
     `,
     plan: { transforms: { parameters: true } },
     expected: 'changed',
-    knownFailure: true,
   },
 
   {
