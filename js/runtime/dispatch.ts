@@ -1,4 +1,5 @@
 import { alias, expandSubscriptions } from '../pipeline/route-utils';
+import { compileChildPrefetch } from '../pipeline/child-prefetch';
 import { NodeCache } from './node-cache';
 import { withRouteHandlers } from './route-handler-pool';
 import { CHILD_ROLES } from '../generated/event-schema';
@@ -28,6 +29,7 @@ import type {
   DispatchRoute,
   PreparedPluginPlan,
   RouteCapabilities,
+  ChildPrefetchPlan,
 } from '../pipeline/types';
 import type {
   Code,
@@ -613,10 +615,7 @@ export function createDispatcher(
     const compiled = services.compileNestedVisitor(visitor);
     if (routedBatch.includeParent) session.seedSummaries(routedBatch.parentSummaries);
 
-    session.prefetchRoutedChildren(
-      routedBatch,
-      compiled.capabilities.map(caps => [caps]),
-    );
+    session.prefetchRoutedChildren(routedBatch, compiled.childPrefetch);
 
     const entry: DispatcherEntry = {
       context,
@@ -640,7 +639,11 @@ export function createDispatcher(
   };
   const followupRouteCache = new Map<
     string,
-    { manifest: Buffer; routes: readonly CompiledRouteTemplate[] }
+    {
+      manifest: Buffer;
+      routes: readonly CompiledRouteTemplate[];
+      childPrefetch: ChildPrefetchPlan | undefined;
+    }
   >();
   const replayRoutedFollowup = (
     plugin: NativePlugin<any, any>,
@@ -662,6 +665,9 @@ export function createDispatcher(
       const routes = selected.map((route, id) => ({ ...route, id }));
       followup = {
         routes,
+        childPrefetch: compileChildPrefetch(
+          routes.map(route => [{ pluginId: 0, capabilities: route.capabilities }]),
+        ),
         // Scope IDs also serve subscribeForScope's filter. Parent summaries are
         // needed only when this plugin can observe ancestry.
         manifest: packRouteManifest(routes, plans.get(plugin)?.ancestry != null, true),
@@ -670,10 +676,7 @@ export function createDispatcher(
     }
     if (followup.routes.length === 0) return;
     const routed = session.nextRoutedPacked(followup.manifest, root);
-    session.prefetchRoutedChildren(
-      routed,
-      followup.routes.map(route => [route.capabilities]),
-    );
+    session.prefetchRoutedChildren(routed, followup.childPrefetch);
     resetSkippedTraversal(entry.skipped);
     dispatchRoutedEvents(
       routed,

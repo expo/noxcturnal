@@ -1,5 +1,6 @@
 import { shareManifest } from '../native/manifest';
 import { ArtifactDemand, phaseArtifactDemand } from './artifacts';
+import { compileChildPrefetch } from './child-prefetch';
 import {
   CHILD_ROLES,
   NODE_TYPE_IDS,
@@ -233,7 +234,7 @@ function attachDeclaredChildren(
   parentTypes: readonly string[],
   declared: Readonly<Record<string, ChildContract>> | undefined,
 ): void {
-  if (declared == null) return;
+  if (declared == null || Object.keys(declared).length === 0) return;
   for (const parentType of parentTypes) {
     const collected = (roles[parentType] ??= []);
     for (const role of Object.keys(declared)) {
@@ -336,9 +337,12 @@ function typedCapabilities(defined: DefinedVisitor<any>): RouteCapabilities {
         parentTypes: readonly string[],
         children: Readonly<Record<string, ChildContract>>,
       ) => {
-        for (const parentType of parentTypes) {
-          const roles = (rules[parentType] ??= []);
-          for (const role of Object.keys(children)) if (!roles.includes(role)) roles.push(role);
+        const requested = Object.keys(children);
+        if (requested.length > 0) {
+          for (const parentType of parentTypes) {
+            const roles = (rules[parentType] ??= []);
+            for (const role of requested) if (!roles.includes(role)) roles.push(role);
+          }
         }
         for (const child of Object.values(children)) {
           const types = concreteRouteTypes(child.route);
@@ -350,7 +354,7 @@ function typedCapabilities(defined: DefinedVisitor<any>): RouteCapabilities {
         }
       };
       attach(concreteRouteTypes(defined.route), contract.children);
-      childRules = rules;
+      childRules = Object.keys(rules).length > 0 ? rules : null;
     }
     const ancestorFields = ancestryRules(
       contract.ancestry,
@@ -392,6 +396,7 @@ function ancestryRules(
   ) => {
     for (const type of concreteRouteTypes(route)) {
       const values = kind === 'fields' ? fields : Object.keys(children ?? {});
+      if (kind === 'children' && values.length === 0) continue;
       const target = (rules[type] ??= []);
       for (const value of values) if (!target.includes(value)) target.push(value);
     }
@@ -401,7 +406,7 @@ function ancestryRules(
   for (const [route, requirement] of Object.entries(ancestry.routes)) {
     attach(route, requirement.fields, requirement.children);
   }
-  return rules;
+  return kind === 'children' && Object.keys(rules).length === 0 ? null : rules;
 }
 
 /** A plugin's plan is fixed by its definition, and a phase's preparation by the
@@ -659,6 +664,7 @@ export function preparePhase(phase: PipelinePhase): PreparedPhase {
     ...new Set(activePlugins.flatMap(plugin => Object.keys(plans.get(plugin)?.children ?? {}))),
   ];
   const prepared: PreparedPhase = {
+    childPrefetch: compileChildPrefetch(routed.dispatchRoutes.map(route => route.members)),
     artifactDemand: ArtifactDemand.None,
     activePlugins,
     plans,
@@ -968,6 +974,9 @@ export function compileNestedVisitor(visitor: NestedVisitor): CompiledNestedRout
   mergeChildRoleRequests(childRetention, requirements.children);
   mergeChildRoleRequests(childRetention, requirements.ancestryChildren);
   const compiled: CompiledNestedRoutes = {
+    childPrefetch: compileChildPrefetch(
+      capabilities.map(capabilities => [{ pluginId: 0, capabilities }]),
+    ),
     manifest: shareManifest(
       packRouteManifest(
         routes,

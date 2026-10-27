@@ -7,6 +7,7 @@ use crate::protocol::manifest::{
 use crate::semantic::retained_index::RetainedIndex;
 use crate::sourcemap;
 
+mod child_roots;
 mod collect;
 mod fields;
 mod manifest;

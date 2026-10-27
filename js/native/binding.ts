@@ -222,6 +222,18 @@ interface NativeBinding {
     }[];
     inspectPackedBuffer(nodeIds: number[]): Buffer;
     nodeSummaryBuffer(nodeId: number): Buffer;
+    routedChildRoots(
+      data: Uint32Array,
+      flags: number,
+      plan: Uint32Array,
+      stopped: Uint8Array,
+    ): number[];
+    childrenRoutedPackedBuffer(
+      data: Uint32Array,
+      flags: number,
+      plan: Uint32Array,
+      stopped: Uint8Array,
+    ): { edges: Buffer; events: Buffer } | null;
     childrenPackedBuffer(
       parentIds: number[],
       parentTypes: string[],

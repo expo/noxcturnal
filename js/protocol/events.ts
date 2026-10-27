@@ -110,14 +110,11 @@ function lazyStringLookup(
  *
  * This hot path does not allocate a route subarray or invoke an intermediate
  * JavaScript callback for every node record.
- * Structural preparation can skip scalar/comment decoding while preserving the
- * same route, enter/exit, and ancestry metadata.
  */
 export function dispatchRoutedEvents(
   batch: RoutedEventBatch,
   handlers: readonly ((event: NativeEvent) => void)[],
   onEvent?: (event: NativeEvent) => void,
-  decodePayload = true,
 ): void {
   // Signed reads keep every tape word SMI-representable: exit tags surface as negative
   // values and absent-id sentinels as -1, so no heap numbers are allocated per record.
@@ -193,33 +190,27 @@ export function dispatchRoutedEvents(
           fields: EMPTY_FIELDS,
         };
     const node = event as NativeEvent & Record<string, unknown>;
-    if (decodePayload) {
-      for (let field = 0; field < fieldCount; field++) {
-        const key = FIELD_KEYS[words[offset++]];
-        if (!key) throw new Error('invalid routed field key');
-        const word = words[offset++];
-        const value = decodeValue(word, batch.stringAt);
-        node[key] =
-          typeof value === 'string'
-            ? coerceFieldValue(key, type, value, decodedStrings, word)
-            : value;
-      }
-    } else offset += fieldCount * 2;
+    for (let field = 0; field < fieldCount; field++) {
+      const key = FIELD_KEYS[words[offset++]];
+      if (!key) throw new Error('invalid routed field key');
+      const word = words[offset++];
+      const value = decodeValue(word, batch.stringAt);
+      node[key] =
+        typeof value === 'string'
+          ? coerceFieldValue(key, type, value, decodedStrings, word)
+          : value;
+    }
     if (batch.includeComments) {
       const commentCount = words[offset++];
-      if (!decodePayload) {
-        offset += commentCount * 4;
-      } else {
-        const comments = new Array<NativeComment>(commentCount);
-        for (let comment = 0; comment < commentCount; comment++) {
-          const kind = words[offset++] === 0 ? 'line' : 'block';
-          const value = batch.stringAt(words[offset++]);
-          const commentStart = words[offset++];
-          const commentEnd = words[offset++];
-          comments[comment] = Object.freeze({ kind, value, start: commentStart, end: commentEnd });
-        }
-        event.comments = Object.freeze(comments);
+      const comments = new Array<NativeComment>(commentCount);
+      for (let comment = 0; comment < commentCount; comment++) {
+        const kind = words[offset++] === 0 ? 'line' : 'block';
+        const value = batch.stringAt(words[offset++]);
+        const commentStart = words[offset++];
+        const commentEnd = words[offset++];
+        comments[comment] = Object.freeze({ kind, value, start: commentStart, end: commentEnd });
       }
+      event.comments = Object.freeze(comments);
     }
     const routeCount = words[offset++];
     const routeStart = offset;

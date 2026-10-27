@@ -1,5 +1,6 @@
 import { nativeManifest } from '../native/manifest';
-import type { RouteCapabilities } from '../pipeline/types';
+import type { ChildPrefetchPlan } from '../pipeline/types';
+import { nativeChildPrefetch } from '../native/child-prefetch';
 import { decodeConstant, decodeString } from '../protocol/value-transport';
 import { parserFilename } from '../adapters/classification';
 import { SCALAR_FIELDS, NODE_TYPES } from '../generated/event-schema';
@@ -9,7 +10,6 @@ import {
   type NativeParsedSourceBinding,
 } from '../native/binding';
 import {
-  dispatchRoutedEvents,
   decodeEventBatch,
   decodePackedEnvelope,
   decodeRoutedEnvelope,
@@ -33,6 +33,8 @@ import { alias, querySubscriptions } from '../pipeline/route-utils';
 
 // Summaries carry no scalar payload to merge when a routed event replaces them.
 const SUMMARY_FIELDS: NativeEvent['fields'] = [];
+const NO_STOPPED_PLUGINS = new Uint8Array(0);
+
 interface ChildState {
   // Interleaved child id / role id words, kept in native traversal order.
   edges: Uint32Array | number[];
@@ -380,40 +382,62 @@ export class NativeTransformSession {
    * one native batch, including empty parents. */
   prefetchRoutedChildren(
     batch: RoutedEventBatch,
-    routes: readonly (readonly RouteCapabilities[])[],
+    routes: ChildPrefetchPlan | undefined,
+    states?: readonly { stopped: boolean }[],
   ): void {
-    if (!routes.some(members => members.some(caps => caps.childRules || caps.ancestorChildRules)))
+    if (
+      !routes ||
+      (states && !routes.some(members => members.some(member => !states[member.pluginId].stopped)))
+    )
       return;
     this.seedSummaries(batch.parentSummaries);
-    const parents = new Set<number>();
-    const enqueue = (event: NativeEvent, rules: RouteCapabilities['childRules']) => {
-      if (rules?.[event.type]) parents.add(event.id);
-    };
-    dispatchRoutedEvents(
-      batch,
-      routes.map(members => event => {
-        for (const caps of members) {
-          enqueue(event, caps.childRules);
-          if (!caps.ancestorChildRules || !caps.ancestry) continue;
-          const mode = caps.ancestry.mode;
-          const depth = typeof mode === 'number' ? mode : mode === 'parent' ? 1 : Infinity;
-          let parentId = event.parentId;
-          for (let level = 0; parentId != null && level < depth; level++) {
-            const parent = this.event(parentId);
-            if (!parent) break;
-            enqueue(parent, caps.ancestorChildRules);
-            parentId = parent.parentId;
-          }
+    if (batch.routeDeliveryCount === 0) return;
+    // One direct-only delivery can request at most its own child graph. A
+    // complete cached graph needs neither tape replay nor another native query.
+    if (
+      batch.nodeRecordCount === 1 &&
+      routes.length === 1 &&
+      routes[0].length === 1 &&
+      !routes[0][0].capabilities.ancestorChildRules &&
+      this.#childrenCache.get(batch.data.readUInt32LE(4))?.recursive
+    )
+      return;
+    let stopped = NO_STOPPED_PLUGINS;
+    if (states)
+      for (let id = 0; id < states.length; id++)
+        if (states[id].stopped) {
+          if (stopped === NO_STOPPED_PLUGINS) stopped = new Uint8Array(states.length);
+          stopped[id] = 1;
         }
-      }),
-      undefined,
-      false,
+    const flags =
+      Number(batch.includeParent) |
+      (Number(batch.includeScope) << 1) |
+      (Number(batch.includeExit) << 2) |
+      (Number(batch.includeComments) << 3) |
+      (Number(batch.includeTraversal) << 4);
+    const data = new Uint32Array(
+      batch.data.buffer,
+      batch.data.byteOffset,
+      batch.data.byteLength / 4,
     );
-    // The retained child graph already contains the phase's declared role union.
-    // Expand it once in native code rather than round-tripping each frontier and
-    // maintaining a second visited index for every route's recursive rules.
-    if (parents.size > 0) this.prefetchChildren([...parents], true);
+    const plan = nativeChildPrefetch(routes);
+    // The first hydration has no cached parents to filter. Keep selection and
+    // packing together instead of transferring root IDs through JS and back.
+    if (this.#childrenCache.size === 0) {
+      const children = this.#binding('children.prefetch').childrenRoutedPackedBuffer(
+        data,
+        flags,
+        plan,
+        stopped,
+      );
+      if (children) this.#cacheChildBatch(children, true);
+      return;
+    }
+    const parents = this.#binding('children.roots').routedChildRoots(data, flags, plan, stopped);
+    // Keep cache filtering and recursive hydration shared with explicit requests.
+    if (parents.length > 0) this.prefetchChildren(parents, true);
   }
+
   prefetchChildren(parentIds: readonly number[] = [], recursive = false): void {
     this.#assertOpen();
     const missing = parentIds.filter(parentId => {
@@ -427,6 +451,12 @@ export class NativeTransformSession {
       [],
       recursive,
     );
+    this.#cacheChildBatch(nativeBatch, recursive);
+  }
+  #cacheChildBatch(
+    nativeBatch: ReturnType<NativeIndexedSessionBinding['childrenPackedBuffer']>,
+    recursive: boolean,
+  ): void {
     if (nativeBatch.events == null)
       throw new Error(`invalid native child batch: ${Object.keys(nativeBatch).join(',')}`);
     const batch = decodeEventBatch(decodePackedEnvelope(nativeBatch.events));

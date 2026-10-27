@@ -18,3 +18,9 @@ Path-owned traversals select exact retained subtrees by node ID and tape interva
 The separate source-range routing API keeps its coordinate-filtering contract;
 identical spans can include multiple nodes there. Nested traversal and
 `subscribeWithin` must use the node-root route, including its own enter/exit events.
+
+Child hydration selects roots from the routed tape using a source-independent
+per-route demand plan compiled by TypeScript. Native selection uses retained node
+and parent identities, never source spans, and skips scalar/comment payloads.
+The first hydration fuses selection with child packing. Sessions with existing
+child caches return root IDs so JavaScript can filter already hydrated parents.

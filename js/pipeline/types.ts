@@ -76,6 +76,7 @@ export interface CompiledPhaseRoutes {
 }
 
 export interface CompiledNestedRoutes {
+  childPrefetch: ChildPrefetchPlan | undefined;
   manifest: Buffer;
   callbacks: readonly (readonly Handler<any>[])[];
   routes: readonly NativeRouteManifestEntry[];
@@ -87,6 +88,7 @@ export interface CompiledNestedRoutes {
  * Memoised on the phase's identity: every plugin plan is fixed by its definition,
  * so there is nothing per-file to key on and this object is shared across files. */
 export interface PreparedPhase {
+  childPrefetch: ChildPrefetchPlan | undefined;
   artifactDemand: ArtifactDemand;
   activePlugins: NativePlugin<any, any>[];
   plans: Map<NativePlugin<any, any>, PreparedPluginPlan>;
@@ -103,3 +105,9 @@ export interface PreparedPhase {
   dispatchRoutes: readonly DispatchRoute[];
   manifest: Buffer;
 }
+
+/** Indexed by delivery route; members retain their compiled plugin identity. */
+export type ChildPrefetchPlan = readonly (readonly {
+  pluginId: number;
+  capabilities: RouteCapabilities;
+}[])[];

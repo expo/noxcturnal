@@ -54,7 +54,12 @@ structural nesting rather than node-ID range or total delivered nodes. Enter
 paths keep their own event objects; creating the exit view never mutates them.
 
 Child preparation selects roots from actual route deliveries, then expands their
-retained child graph in one native batch. The graph follows the phase's declared
+retained child graph in one native batch. The prepared route plan shares a compact
+native child-demand projection across files. Native root selection reads structural
+tape words directly, including stopped-plugin filtering and declared ancestor depth,
+without constructing temporary JavaScript events. When the child cache is empty,
+selection and packing run in one call; later queries filter roots through the existing
+cache before fetching missing recursive graphs. The graph follows the phase's declared
 role union; path contracts still enforce each visitor's own child access. Packed
 adjacency groups include empty parents and preserve native child order. JavaScript
 keeps one child-state cache pointing into the packed edge buffer. Child access
