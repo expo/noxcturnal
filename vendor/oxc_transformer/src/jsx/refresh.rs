@@ -521,16 +521,7 @@ impl<'a> ReactRefresh<'a> {
             }
         }
 
-        let mut found_call_expression = false;
-        for ancestor in ctx.ancestors() {
-            if ancestor.is_assignment_expression() {
-                continue;
-            }
-            if ancestor.is_call_expression() {
-                found_call_expression = true;
-            }
-            break;
-        }
+        let found_call_expression = Self::has_enclosing_hoc(ctx);
 
         let span = expr.span();
         let value = expr.take_in(ctx);
@@ -544,13 +535,17 @@ impl<'a> ReactRefresh<'a> {
                 false,
                 ctx,
             );
-            let init = Expression::new_assignment_expression(
-                SPAN,
-                AssignmentOperator::Assign,
-                signature.binding.create_target(ReferenceFlags::Write, ctx),
-                local.init,
-                ctx,
-            );
+            let init = if found_call_expression {
+                Expression::new_assignment_expression(
+                    SPAN,
+                    AssignmentOperator::Assign,
+                    signature.binding.create_target(ReferenceFlags::Write, ctx),
+                    local.init,
+                    ctx,
+                )
+            } else {
+                local.init
+            };
             *expr = Self::call_with_local(attached, init, local.binding, local.scope_id, span, ctx);
         } else if signature.expression_local {
             // Read the transport after the HOC (including all arguments) has run.
@@ -618,6 +613,12 @@ impl<'a> ReactRefresh<'a> {
             ctx,
         );
         Expression::new_call_expression(span, arrow, None, [Argument::from(argument)], false, ctx)
+    }
+
+    fn has_enclosing_hoc(ctx: &TraverseCtx<'a>) -> bool {
+        ctx.ancestors()
+            .find(|ancestor| !ancestor.is_assignment_expression())
+            .is_some_and(|ancestor| ancestor.is_call_expression())
     }
 
     fn needs_local_signature(ctx: &TraverseCtx<'a>) -> bool {
@@ -836,7 +837,6 @@ impl<'a> ReactRefresh<'a> {
         );
         let expression_local = Self::needs_local_signature(ctx);
         let (binding, local) = if expression_local {
-            let binding = VarDeclarationsStore::create_uid_var("s", ctx);
             let parent_scope = ctx.scoping().scope_parent_id(scope_id).unwrap();
             let wrapper_scope = ctx.insert_scope_between(
                 parent_scope,
@@ -845,6 +845,13 @@ impl<'a> ReactRefresh<'a> {
             );
             let local_binding =
                 ctx.generate_uid("signature", wrapper_scope, SymbolFlags::FunctionScopedVariable);
+            // A standalone literal needs only its captured local signature.
+            // Allocate a transport variable only when an HOC will consume it.
+            let binding = if Self::has_enclosing_hoc(ctx) {
+                VarDeclarationsStore::create_uid_var("s", ctx)
+            } else {
+                local_binding.clone()
+            };
             (
                 binding,
                 Some(LocalSignature { scope_id: wrapper_scope, binding: local_binding, init }),
