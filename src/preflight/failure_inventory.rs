@@ -284,6 +284,9 @@ const REVIEWED: &[Entry] = &[
 
 fn looks_like_failure_reason(value: &str) -> bool {
     const PREFIXES: &[&str] = &[
+        "arguments-capture-",
+        "decorated-class-",
+        "lowered-arrow-",
         "block-scoping-",
         "captured-",
         "class-features-",
