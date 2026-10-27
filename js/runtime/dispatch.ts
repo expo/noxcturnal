@@ -537,6 +537,7 @@ export function createDispatcher(
         return capabilities.scope;
       },
       scopeCache: undefined,
+      programScope: undefined,
       pathCache: undefined,
       cacheAncestorPaths:
         typeof capabilities.ancestry?.mode !== 'number' &&

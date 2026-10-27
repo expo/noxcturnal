@@ -65,3 +65,45 @@ set to deduplicate replayed nodes.
 Singular child access resolves its one node directly, without constructing child
 arrays or unrelated paths. Lists preserve native order and create fresh result
 arrays so callers cannot mutate cached structural state.
+
+Single and batched binding lookups share lazily hydrated facts keyed by the
+resolved scope and interned name, so shadowed declarations remain distinct.
+Repeated `getBinding` calls reuse reference facts instead of transferring and
+converting the full reference list at every use. The sparse fact cache has one
+packed-key map rather than a map of scopes containing maps of names. Scope and
+binding path views still belong to each route runtime and enforce its contract;
+only immutable input facts are shared for the session's lifetime.
+Global presence and coarse reference queries share one cache. Presence checks
+store a native boolean without transporting reference records; arrays are
+hydrated only when requested. Only queried names enter this cache. Rich binding
+references retain their separate semantic view and read/write flags.
+Batched lookups put cache hits directly into their result array. Only misses
+allocate a deduplicated native request map and temporarily retain unresolved
+keys; hydration replaces those keys in place, preserving order and duplicates.
+Binding lookups return fresh views with shared prototype getters rather than
+allocating getter closures per lookup. Their lazy owner path and scope still
+resolve through the requesting route runtime.
+`scope.getProgramParent()` follows parent IDs once and retains the resolved view
+within that runtime. It avoids creating unused intermediate scope views and
+repeating the parent walk for every lookup.
+Scope views use a stable class layout with shared parent/path accessors and
+insertion methods. Methods that historically captured their owning scope remain
+bound, so extracting `getBinding`, `rename`, or the other lookup methods preserves
+the same owner. Lazy views and edit operations still use that route's runtime.
+
+Binding visibility uses scope-tree intervals computed from parent identities.
+A name declared in one scope needs a containment check; shadowed names use
+sorted changes to the visible owner and binary search. JavaScript retains packed
+views of these ranges rather than rebuilding a membership set or walking scope
+parents for every lookup. A redundant transport-count word becomes a cursor for
+repeated reads in the same visibility interval; bounds checks allow replay in any
+order. Only names with bindings are transferred.
+
+Scope metadata transfers ownership as a packed integer hash table instead of
+rebuilding a JavaScript map for every semantic snapshot. The header holds the
+scope count, bucket mask, and multiplicative hash constant, followed by four-word
+scope records and two-word owner/public-scope buckets. Empty buckets use the
+absent-ID sentinel. Linear probing compares exact node IDs, and later records
+replace earlier records for the same owner. Scope records retain scope-ID order;
+neither owner order nor source coordinates determine identity. Only the requested
+snapshot retains the buffer, and loading metadata does not allocate a second index.

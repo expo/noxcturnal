@@ -795,6 +795,23 @@ test.each([128, 256, 512])(
       assert.equal(batches.length, 1);
       assert.deepEqual(session.resolveBindings(['missing'], scopeId), []);
       assert.equal(batches.length, 1);
+      const mixed = session.resolveBindings(
+        ['shared', 'unused0', 'missing', 'outer', 'unused0'],
+        scopeId,
+      );
+      assert.deepEqual(
+        mixed.map(fact => fact.name),
+        ['shared', 'unused0', 'outer', 'unused0'],
+      );
+      assert.equal(mixed[0], facts[1]);
+      assert.equal(mixed[2], facts[0]);
+      assert.equal(mixed[1], mixed[3]);
+      assert.equal(batches.length, 2);
+      assert.deepEqual(batches[1], [{ name: 'unused0', scopeId: facts[0].scopeId }]);
+      assert.deepEqual(
+        facts.map(fact => fact.name),
+        ['outer', 'shared', 'outer'],
+      );
     } finally {
       session.close();
       prototype.queryBindingsBatch = originalBatch;

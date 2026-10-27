@@ -788,29 +788,9 @@ impl RetainedIndex {
             .collect()
     }
 
-    /// The interned name table plus every `(scopeId, nameId)` binding key as one packed
-    /// buffer, so JavaScript answers hasBinding-style lookups without per-call N-API
-    /// round trips. Layout: `[nameCount, keyCount]`, then each name as length-prefixed
-    /// padded UTF-8 in id order, then the key pairs as u32 words.
-    pub fn binding_index_buffer(&self) -> Buffer {
-        let names_size: usize = self
-            .names
-            .iter()
-            .map(|name| 4 + name.len().next_multiple_of(4))
-            .sum();
-        let mut output = Vec::with_capacity(8 + names_size + self.bindings.len() * 8);
-        output.extend_from_slice(&(self.names.len() as u32).to_le_bytes());
-        output.extend_from_slice(&(self.bindings.len() as u32).to_le_bytes());
-        for name in &self.names {
-            output.extend_from_slice(&(name.len() as u32).to_le_bytes());
-            output.extend_from_slice(name.as_bytes());
-            output.resize(output.len().next_multiple_of(4), 0);
-        }
-        for &(scope_id, name_id) in self.bindings.keys() {
-            output.extend_from_slice(&scope_id.to_le_bytes());
-            output.extend_from_slice(&name_id.to_le_bytes());
-        }
-        output.into()
+    /// Compact lexical visibility ranges for local JavaScript binding resolution.
+    pub fn binding_index_buffer(&self, scope_parents: &[u32]) -> Buffer {
+        super::binding_visibility::encode(&self.names, self.bindings.keys().copied(), scope_parents)
     }
 
     fn binding_fact(
@@ -1872,12 +1852,37 @@ impl RetainedIndex {
     }
 
     pub fn scope_metadata_buffer(&self, _scope_count: usize) -> Buffer {
-        self.scope_metadata
-            .iter()
-            .flatten()
-            .flat_map(|word| word.to_le_bytes())
-            .collect::<Vec<_>>()
-            .into()
+        // Transfer a compact integer lookup instead of rebuilding a JS Map.
+        // Scope records remain in scope-ID order; ownership uses exact node IDs.
+        const MULTIPLIER: u32 = 0x9e37_79b1;
+        let count = self.scope_metadata.len();
+        let capacity = count.max(1).next_power_of_two() * 2;
+        let mask = (capacity - 1) as u32;
+        let shift = mask.leading_zeros();
+        let owner_offset = 12 + count * 16;
+        let mut bytes = vec![0xff; owner_offset + capacity * 8];
+        for (index, word) in [count as u32, mask, MULTIPLIER].into_iter().enumerate() {
+            bytes[index * 4..index * 4 + 4].copy_from_slice(&word.to_le_bytes());
+        }
+        for (index, record) in self.scope_metadata.iter().enumerate() {
+            for (field, word) in record[..4].iter().enumerate() {
+                let offset = 12 + index * 16 + field * 4;
+                bytes[offset..offset + 4].copy_from_slice(&word.to_le_bytes());
+            }
+            let owner = record[0];
+            let mut slot = owner.wrapping_mul(MULTIPLIER) >> shift;
+            loop {
+                let offset = owner_offset + slot as usize * 8;
+                let key = u32::from_le_bytes(bytes[offset..offset + 4].try_into().unwrap());
+                if key == ABSENT_ID || key == owner {
+                    bytes[offset..offset + 4].copy_from_slice(&owner.to_le_bytes());
+                    bytes[offset + 4..offset + 8].copy_from_slice(&record[4].to_le_bytes());
+                    break;
+                }
+                slot = (slot + 1) & mask;
+            }
+        }
+        bytes.into()
     }
 
     pub fn memory_usage(&self) -> usize {
@@ -3243,11 +3248,53 @@ mod tests {
             ..RetainedIndex::default()
         };
         let buffer = index.scope_metadata_buffer(COUNT);
-        assert_eq!(buffer.len(), COUNT * 5 * size_of::<u32>());
+        assert_eq!(buffer.len(), (3 + COUNT * 4 + 256 * 2) * size_of::<u32>());
         let words = buffer
             .chunks_exact(4)
             .map(|word| u32::from_le_bytes(word.try_into().unwrap()))
             .collect::<Vec<_>>();
-        assert_eq!(&words[(COUNT - 1) * 5..], &[254, 137, 147, 0, 127]);
+        assert_eq!(&words[..2], &[COUNT as u32, 255]);
+        assert_eq!(
+            &words[3 + (COUNT - 1) * 4..3 + COUNT * 4],
+            &[254, 137, 147, 0]
+        );
+        let owners = words[3 + COUNT * 4..]
+            .chunks_exact(2)
+            .filter(|entry| entry[0] != ABSENT_ID)
+            .map(|entry| (entry[0], entry[1]))
+            .collect::<FxHashMap<_, _>>();
+        assert_eq!(owners.len(), COUNT);
+        for scope in 0..COUNT as u32 {
+            assert_eq!(owners.get(&(scope * 2)), Some(&scope));
+        }
+    }
+    #[test]
+    fn scope_ownership_preserves_identity_and_last_owner_override() {
+        let records = vec![
+            [26, 5, 5, 3, 2],
+            [10, 5, 5, 3, 0],
+            [18, 5, 5, 3, 1],
+            [10, 5, 5, 3, 3],
+        ];
+        let index = RetainedIndex {
+            scope_metadata: records.clone(),
+            ..RetainedIndex::default()
+        };
+        let buffer = index.scope_metadata_buffer(records.len());
+        let words = buffer
+            .chunks_exact(4)
+            .map(|word| u32::from_le_bytes(word.try_into().unwrap()))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            &words[3..19],
+            records
+                .iter()
+                .flat_map(|record| record[..4].iter().copied())
+                .collect::<Vec<_>>()
+        );
+        // 26 and 18 collide. Identical spans and reordered owners are not identities;
+        // the later record for owner 10 must still determine its public scope.
+        assert_eq!(&words[19..25], &[26, 2, 10, 3, 18, 1]);
+        assert!(words[25..].iter().all(|word| *word == ABSENT_ID));
     }
 }

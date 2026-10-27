@@ -152,6 +152,7 @@ export type PathRuntime = {
   allowsAncestry: () => boolean;
   allowsScope: () => boolean;
   scopeCache: Map<number, NativeScope> | undefined;
+  programScope: NativeScope | undefined;
   pathCache: NodeCache<NativeNodePath> | undefined;
   cacheAncestorPaths: boolean;
   ancestryDepthLimit: number;
@@ -814,164 +815,190 @@ function insertionTarget(
 function makeScope(runtime: PathRuntime, id: number, parentId: number | null): NativeScope {
   const cached = runtime.scopeCache?.get(id);
   if (cached) return cached;
-  const session = runtime.session;
-  const resolve = (name: string): QueryResult['bindings'][number] | undefined => {
-    return session.resolveBinding(name, id);
-  };
+  const scope = new ScopeImpl(runtime, id, parentId);
+  (runtime.scopeCache ??= new Map()).set(id, scope);
+  return scope;
+}
 
-  let parentScope: NativeScope | undefined;
-  let ownerPath: NativeNodePath | null | undefined;
-  const scope: NativeScope = {
-    id,
-    parentId,
-    get parent() {
-      return parentId == null
-        ? null
-        : (parentScope ??= makeScope(runtime, parentId, session.scopeParentId(parentId)));
-    },
-    get path() {
-      return ownerPath === undefined ? (ownerPath = scopeOwnerPath(runtime, id)) : ownerPath;
-    },
-    hasBinding: name => session.resolveBindingScope(name, id) != null,
-    hasGlobal: name => session.globalReferences(name).length > 0,
-    getBinding(name) {
-      const binding = resolve(name);
-      if (binding) return makeBinding(runtime, binding);
-      const references = session.globalBindingReferences(name);
-      if (references.length > 0)
-        return { name, global: true, declaration: null, references, path: null, scope: null };
-      return null;
-    },
-    getBindings(names) {
-      const bindings = session.resolveBindings(names, id);
-      return bindings.map(binding => makeBinding(runtime, binding));
-    },
-    getProgramParent() {
-      let current: NativeScope = this;
-      while (current.parent) current = current.parent;
-      return current;
-    },
-    push(content) {
-      const owner = this.path;
-      if (!owner) throw new Error(`Cannot find owner path for scope ${id}`);
-      const target = insertionTarget(session, id);
-      if (!target) throw new Error(`Scope ${id} has no statement insertion body`);
-      const { metadata } = target;
-      const wrapping = metadata.kind === 1 || metadata.kind === 2;
-      const edits = scopeEdits(runtime, target.id);
-      const suffix = metadata.kind === 1 ? '\n;\nreturn (' : '\n;\n';
-      if (!edits.push) {
-        edits.push = {
-          kind: 'AppendLeft',
-          start: metadata.start,
-          end: metadata.start,
-          ...realizeContent(session, content, wrapping ? '{\n' : '\n;\n', suffix),
-          owner: runtime.owner,
-          order: runtime.nextOrder(),
-          [EDIT_OWNER]: runtime.ownerIdentity,
-        };
-        runtime.edits.push(edits.push);
-        if (wrapping)
-          runtime.edits.push({
-            kind: 'AppendLeft',
-            start: metadata.end,
-            end: metadata.end,
-            content: metadata.kind === 1 ? ');}' : '}',
-            owner: runtime.owner,
-            order: runtime.nextOrder(),
-            [EDIT_OWNER]: runtime.ownerIdentity,
-          });
-        return;
-      }
-      // Keep a single push in its compact form. On repetition, append to parts
-      // without realizing or copying contributions already queued by this phase.
-      let parts = edits.push.contentParts;
-      if (parts == null) {
-        parts = [edits.push.content!.slice(0, -suffix.length)];
-        edits.push.content = undefined;
-        edits.push.contentParts = parts;
-      } else {
-        const tail = parts.pop() as string;
-        const preceding = tail.slice(0, -suffix.length);
-        if (preceding) parts.push(preceding);
-      }
-      parts.push('\n\n;\n\n');
-      const realized = realizeContent(session, content);
-      if (realized.content != null) parts.push(realized.content);
-      else for (const part of realized.contentParts) parts.push(part);
-      parts.push(suffix);
-    },
-    generateUid: name => session.generateUid(name),
-    rename(name, replacement = session.generateUid(name)) {
-      const bindingScopeId = session.resolveBindingScope(name, id);
-      if (bindingScopeId == null) throw new Error(`Cannot rename unbound identifier ${name}`);
-      native.validateIdentifier(replacement);
-      const plan = session.bindingRenamePlan(name, bindingScopeId);
-      for (const target of plan.targets) {
-        const content =
-          target.kind === 1
-            ? `${name}: ${replacement}`
-            : target.kind === 2
-              ? `${name} as ${replacement}`
-              : target.kind === 3
-                ? `${replacement} as ${name}`
-                : replacement;
+class ScopeImpl implements NativeScope {
+  // Scope methods historically close over their owner. Keep them bound for
+  // destructured calls; parent/path accessors and push can share a prototype.
+  private parentScope: NativeScope | undefined = undefined;
+  private ownerPath: NativeNodePath | null | undefined = undefined;
+  constructor(
+    private readonly runtime: PathRuntime,
+    readonly id: number,
+    readonly parentId: number | null,
+  ) {}
+  get parent(): NativeScope | null {
+    const { runtime, parentId } = this;
+    return parentId == null
+      ? null
+      : (this.parentScope ??= makeScope(
+          runtime,
+          parentId,
+          runtime.session.scopeParentId(parentId),
+        ));
+  }
+  get path(): NativeNodePath | null {
+    return this.ownerPath === undefined
+      ? (this.ownerPath = scopeOwnerPath(this.runtime, this.id))
+      : this.ownerPath;
+  }
+  hasBinding = (name: string): boolean =>
+    this.runtime.session.resolveBindingScope(name, this.id) != null;
+  hasGlobal = (name: string): boolean => this.runtime.session.hasGlobal(name);
+  getBinding = (name: string): NativeBinding | null => {
+    const { runtime, id } = this;
+    const session = runtime.session;
+    const binding = session.resolveBinding(name, id);
+    if (binding) return makeBinding(runtime, binding);
+    const references = session.globalBindingReferences(name);
+    if (references.length > 0)
+      return { name, global: true, declaration: null, references, path: null, scope: null };
+    return null;
+  };
+  getBindings = (names: readonly string[]): NativeBinding[] => {
+    const { runtime, id } = this;
+    const session = runtime.session;
+    const bindings = session.resolveBindings(names, id);
+    return bindings.map(binding => makeBinding(runtime, binding));
+  };
+  getProgramParent = (): NativeScope => {
+    const { runtime, id, parentId } = this;
+    const session = runtime.session;
+    if (runtime.programScope) return runtime.programScope;
+    // Follow scope identities without materializing intermediate public views.
+    let root = id;
+    let parent = parentId;
+    while (parent != null) {
+      root = parent;
+      parent = session.scopeParentId(root);
+    }
+    return (runtime.programScope = makeScope(runtime, root, null));
+  };
+  push(content: Code): void {
+    const { runtime, id } = this;
+    const session = runtime.session;
+    const owner = this.path;
+    if (!owner) throw new Error(`Cannot find owner path for scope ${id}`);
+    const target = insertionTarget(session, id);
+    if (!target) throw new Error(`Scope ${id} has no statement insertion body`);
+    const { metadata } = target;
+    const wrapping = metadata.kind === 1 || metadata.kind === 2;
+    const edits = scopeEdits(runtime, target.id);
+    const suffix = metadata.kind === 1 ? '\n;\nreturn (' : '\n;\n';
+    if (!edits.push) {
+      edits.push = {
+        kind: 'AppendLeft',
+        start: metadata.start,
+        end: metadata.start,
+        ...realizeContent(session, content, wrapping ? '{\n' : '\n;\n', suffix),
+        owner: runtime.owner,
+        order: runtime.nextOrder(),
+        [EDIT_OWNER]: runtime.ownerIdentity,
+      };
+      runtime.edits.push(edits.push);
+      if (wrapping)
         runtime.edits.push({
-          kind: 'Replace',
-          start: target.start,
-          end: target.end,
-          content,
-          mapping: 'AnchorBoundaries',
-          names: [name],
+          kind: 'AppendLeft',
+          start: metadata.end,
+          end: metadata.end,
+          content: metadata.kind === 1 ? ');}' : '}',
           owner: runtime.owner,
           order: runtime.nextOrder(),
           [EDIT_OWNER]: runtime.ownerIdentity,
         });
-      }
-      const exportEdits = scopeEdits(runtime, bindingScopeId).exports;
-      for (const declaration of plan.exports) {
-        let entry = exportEdits.get(declaration.start);
-        if (!entry) {
-          const parts = ['\nexport { '];
-          const positions = new Map<string, number>();
-          for (const external of session.bindingRenameExportNames(declaration.start)) {
-            if (positions.size > 0) parts.push(', ');
-            positions.set(external, parts.length);
-            parts.push(external);
-          }
-          parts.push(' };');
-          const edit: OwnedEdit = {
-            kind: 'AppendLeft',
-            start: declaration.end,
-            end: declaration.end,
-            contentParts: parts,
+      return;
+    }
+    // Keep a single push in its compact form. On repetition, append to parts
+    // without realizing or copying contributions already queued by this phase.
+    let parts = edits.push.contentParts;
+    if (parts == null) {
+      parts = [edits.push.content!.slice(0, -suffix.length)];
+      edits.push.content = undefined;
+      edits.push.contentParts = parts;
+    } else {
+      const tail = parts.pop() as string;
+      const preceding = tail.slice(0, -suffix.length);
+      if (preceding) parts.push(preceding);
+    }
+    parts.push('\n\n;\n\n');
+    const realized = realizeContent(session, content);
+    if (realized.content != null) parts.push(realized.content);
+    else for (const part of realized.contentParts) parts.push(part);
+    parts.push(suffix);
+  }
+  generateUid = (name?: string): string => this.runtime.session.generateUid(name);
+  rename = (name: string, replacement = this.runtime.session.generateUid(name)): string => {
+    const { runtime, id } = this;
+    const session = runtime.session;
+    const bindingScopeId = session.resolveBindingScope(name, id);
+    if (bindingScopeId == null) throw new Error(`Cannot rename unbound identifier ${name}`);
+    native.validateIdentifier(replacement);
+    const plan = session.bindingRenamePlan(name, bindingScopeId);
+    for (const target of plan.targets) {
+      const content =
+        target.kind === 1
+          ? `${name}: ${replacement}`
+          : target.kind === 2
+            ? `${name} as ${replacement}`
+            : target.kind === 3
+              ? `${replacement} as ${name}`
+              : replacement;
+      runtime.edits.push({
+        kind: 'Replace',
+        start: target.start,
+        end: target.end,
+        content,
+        mapping: 'AnchorBoundaries',
+        names: [name],
+        owner: runtime.owner,
+        order: runtime.nextOrder(),
+        [EDIT_OWNER]: runtime.ownerIdentity,
+      });
+    }
+    const exportEdits = scopeEdits(runtime, bindingScopeId).exports;
+    for (const declaration of plan.exports) {
+      let entry = exportEdits.get(declaration.start);
+      if (!entry) {
+        const parts = ['\nexport { '];
+        const positions = new Map<string, number>();
+        for (const external of session.bindingRenameExportNames(declaration.start)) {
+          if (positions.size > 0) parts.push(', ');
+          positions.set(external, parts.length);
+          parts.push(external);
+        }
+        parts.push(' };');
+        const edit: OwnedEdit = {
+          kind: 'AppendLeft',
+          start: declaration.end,
+          end: declaration.end,
+          contentParts: parts,
+          owner: runtime.owner,
+          order: runtime.nextOrder(),
+          [EDIT_OWNER]: runtime.ownerIdentity,
+        };
+        entry = { positions, parts };
+        exportEdits.set(declaration.start, entry);
+        runtime.edits.push(
+          {
+            kind: 'Replace',
+            start: declaration.start,
+            end: declaration.start + 6,
+            content: '',
             owner: runtime.owner,
             order: runtime.nextOrder(),
             [EDIT_OWNER]: runtime.ownerIdentity,
-          };
-          entry = { positions, parts };
-          exportEdits.set(declaration.start, entry);
-          runtime.edits.push(
-            {
-              kind: 'Replace',
-              start: declaration.start,
-              end: declaration.start + 6,
-              content: '',
-              owner: runtime.owner,
-              order: runtime.nextOrder(),
-              [EDIT_OWNER]: runtime.ownerIdentity,
-            },
-            edit,
-          );
-        }
-        entry.parts[entry.positions.get(name)!] =
-          name === replacement ? name : `${replacement} as ${name}`;
+          },
+          edit,
+        );
       }
-      return replacement;
-    },
+      entry.parts[entry.positions.get(name)!] =
+        name === replacement ? name : `${replacement} as ${name}`;
+    }
+    return replacement;
   };
-  (runtime.scopeCache ??= new Map()).set(id, scope);
-  return scope;
 }
 
 function scopeOwnerPath(runtime: PathRuntime, scopeId: number): NativeNodePath | null {
@@ -983,23 +1010,41 @@ function makeBinding(
   runtime: PathRuntime,
   binding: QueryResult['bindings'][number],
 ): NativeBinding {
-  let path: NativeNodePath | null | undefined;
-  let scope: NativeScope | null | undefined;
-  return {
-    ...binding,
-    global: false,
-    get path() {
-      return path === undefined ? (path = bindingOwnerPath(runtime, binding.declaration)) : path;
-    },
-    get scope() {
-      if (scope !== undefined) return scope;
-      return (scope = makeScope(
-        runtime,
-        binding.scopeId,
-        runtime.session.scopeParentId(binding.scopeId),
-      ));
-    },
-  };
+  return new BindingImpl(runtime, binding);
+}
+
+class BindingImpl implements NativeBinding {
+  readonly global = false;
+  readonly name: string;
+  readonly scopeId: number;
+  readonly declaration: NodeSummary | null;
+  readonly references: NativeBinding['references'];
+  private lazyPath: NativeNodePath | null | undefined;
+  private lazyScope: NativeScope | undefined;
+
+  constructor(
+    private readonly runtime: PathRuntime,
+    binding: QueryResult['bindings'][number],
+  ) {
+    this.name = binding.name;
+    this.scopeId = binding.scopeId;
+    this.declaration = binding.declaration;
+    this.references = binding.references;
+  }
+
+  get path(): NativeNodePath | null {
+    return this.lazyPath === undefined
+      ? (this.lazyPath = bindingOwnerPath(this.runtime, this.declaration))
+      : this.lazyPath;
+  }
+
+  get scope(): NativeScope {
+    return (this.lazyScope ??= makeScope(
+      this.runtime,
+      this.scopeId,
+      this.runtime.session.scopeParentId(this.scopeId),
+    ));
+  }
 }
 
 function bindingOwnerPath(

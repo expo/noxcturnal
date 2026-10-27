@@ -329,6 +329,13 @@ impl NativeIndexedSession {
     }
 
     #[napi]
+    pub fn has_global(&self, name: String) -> Result<bool> {
+        self.ensure_open()?;
+        // The retained iterator knows its length without hydrating references.
+        Ok(self.retained_index.global_references(&name).len() > 0)
+    }
+
+    #[napi]
     pub fn query_globals_buffer(&self, names: Vec<String>) -> Result<Buffer> {
         self.ensure_open()?;
         // One count followed by [id, start, end] triples per requested name,
@@ -472,11 +479,13 @@ impl NativeIndexedSession {
             .scope_metadata_buffer(self.scope_parents.len()))
     }
 
-    /// The binding-name table and key set for local JavaScript binding resolution.
+    /// Binding visibility ranges for local JavaScript binding resolution.
     #[napi]
     pub fn binding_index_buffer(&self) -> Result<Buffer> {
         self.ensure_open()?;
-        Ok(self.retained_index.binding_index_buffer())
+        Ok(self
+            .retained_index
+            .binding_index_buffer(&self.scope_parents))
     }
 
     /// Apply a packed edit buffer to the source this session already holds,
