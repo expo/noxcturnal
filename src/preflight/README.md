@@ -26,9 +26,11 @@ function still makes explicit arguments captures live.
 Keep Refresh signature statements in the original control-flow environment.
 Supply a local statement list for adjacent insertions; loop-header initializers
 must remain expressions.
-Initialize signatures where header or conditional components are created, and
-retain a separate signature for each definition. Attach HOC results after their
-arguments evaluate without moving outer await/yield across a function boundary.
+Initialize signatures where header, conditional, default, or custom-factory
+component expressions are evaluated, retaining a separate signature per definition.
+Parameter-default temporaries must be available before the function body starts.
+Attach HOC results after their arguments evaluate without moving outer await/yield
+across a function boundary.
 
 ## Identity during rewriting
 

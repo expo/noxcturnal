@@ -455,3 +455,343 @@ test.each([false, true])(
     ]);
   },
 );
+
+test.each([
+  {
+    name: 'separate const declarations',
+    declaration: 'const signature = factory; const App = function () { useState(1); return 7; };',
+  },
+  {
+    name: 'one let declaration',
+    declaration: 'let signature = factory, App = () => { useState(1); return 7; };',
+  },
+  {
+    name: 'a nested HOC',
+    declaration:
+      'const signature = factory; const App = hoc(hoc(function () { useState(1); return 7; }));',
+  },
+])('Refresh initializes a local factory after its binding: $name', ({ declaration, name }) => {
+  const calls: string[] = [];
+  const result = execute(
+    `${declaration} globalThis.result = [App.name, App()];`,
+    { reactRefresh: { refreshSig: 'signature' } },
+    {
+      factory: () => {
+        calls.push('factory');
+        return (fn?: unknown) => {
+          calls.push(fn ? 'attach' : 'render');
+          return fn;
+        };
+      },
+      hoc: (fn: unknown) => fn,
+      useState: () => [],
+      $RefreshReg$: () => {},
+    },
+  );
+  expect(result.result).toEqual([name === 'a nested HOC' ? '' : 'App', 7]);
+  expect(calls).toEqual(
+    name === 'a nested HOC'
+      ? ['factory', 'attach', 'attach', 'attach', 'render']
+      : ['factory', 'attach', 'render'],
+  );
+});
+
+test.each(
+  [
+    {
+      name: 'direct function',
+      parameter: 'App = function App() { useState(1); return value; }',
+      inferredName: 'App',
+      attachments: 1,
+    },
+    {
+      name: 'nested HOC',
+      parameter: 'App = hoc(hoc(() => { useCustom(); return value; }))',
+      inferredName: '',
+      attachments: 3,
+    },
+    {
+      name: 'binding default',
+      parameter: '{ App = hoc(() => { useState(1); return value; }) } = {}',
+      inferredName: '',
+      attachments: 2,
+    },
+    {
+      name: 'conditional default',
+      parameter: 'App = enabled ? hoc(() => { useState(1); return value; }) : supplied',
+      inferredName: '',
+      attachments: 2,
+    },
+  ].flatMap(entry => [false, true].map(lowered => ({ ...entry, lowered }))),
+)(
+  'Refresh owns its signature temporaries inside a parameter $name (lowered=$lowered)',
+  ({ parameter, inferredName, attachments, lowered }) => {
+    const events: string[] = [];
+    let nextId = 0;
+    const factory = () => {
+      const id = nextId++;
+      events.push(`factory:${id}`);
+      return (fn?: unknown, _key?: string, _reset?: boolean, hooks?: () => unknown[]) => {
+        events.push(`${fn ? 'attach' : 'render'}:${id}`);
+        if (hooks) expect(hooks()).toHaveLength(1);
+        return fn;
+      };
+    };
+    const source = `"use strict"; function useCustom() {}
+    function build(value, signature, ${parameter}) { return App; }
+    const first = build(3, factory), second = build(7, factory);
+    globalThis.result = [first.name, first(), second.name, second()];`;
+    expect(
+      execute(
+        source,
+        {
+          reactRefresh: { refreshSig: 'signature' },
+          ...(lowered
+            ? { transforms: { parameters: true, destructuring: true, blockScoping: true } }
+            : {}),
+        },
+        {
+          factory,
+          hoc: (fn: unknown) => fn,
+          enabled: true,
+          supplied: () => 0,
+          useState: () => [],
+          $RefreshReg$: () => {},
+        },
+      ).result,
+    ).toEqual([inferredName, 3, inferredName, 7]);
+    expect(events).toEqual([
+      'factory:0',
+      ...Array(attachments).fill('attach:0'),
+      'factory:1',
+      ...Array(attachments).fill('attach:1'),
+      'render:0',
+      'render:1',
+    ]);
+  },
+);
+
+test('Refresh parameter-default signatures are isolated across recursive HOC calls', () => {
+  const renders: number[] = [];
+  const source = `"use strict";
+    function build(value, signature = factory(value), App = hoc(hoc(function () {
+      useState(1); return value;
+    }), value ? build(0) : undefined)) { return App; }
+    function hoc(fn, nested) { if (nested) nested(); return fn; }
+    const App = build(1);
+    globalThis.result = [App.signatureId, App()];`;
+  expect(
+    execute(
+      source,
+      { reactRefresh: { refreshSig: 'signature' } },
+      {
+        factory: (id: number) => () => (fn?: { signatureId: number }) => {
+          if (fn) fn.signatureId = id;
+          else renders.push(id);
+          return fn;
+        },
+        useState: () => [],
+        $RefreshReg$: () => {},
+      },
+    ).result,
+  ).toEqual([1, 1]);
+  expect(renders).toEqual([0, 1]);
+});
+
+test('Refresh defaults own sibling transports and preserve parameter environments', () => {
+  const renders: number[] = [];
+  const source = `"use strict";
+    function build(signature,
+      [First = hoc(() => { useState(1); return 3; }),
+       Second = hoc(() => { useState(1); return 7; })] = [],
+      Third = hoc(() => { useState(1); return 9; })) {
+      var signature = () => { throw new Error('body factory used'); };
+      return [First, Second, Third];
+    }
+    const components = build(factory);
+    globalThis.result = components.map(read => [read.signatureId, read()]);`;
+  let nextId = 0;
+  expect(
+    execute(
+      source,
+      { reactRefresh: { refreshSig: 'signature' } },
+      {
+        factory: () => {
+          const id = nextId++;
+          return (fn?: { signatureId: number }) => {
+            if (fn) fn.signatureId = id;
+            else renders.push(id);
+            return fn;
+          };
+        },
+        hoc: (fn: unknown) => fn,
+        useState: () => [],
+        $RefreshReg$: () => {},
+      },
+    ).result,
+  ).toEqual([
+    [0, 3],
+    [1, 7],
+    [2, 9],
+  ]);
+  expect(renders).toEqual([0, 1, 2]);
+});
+
+test('Refresh leaves supplied parameter defaults and skipped branches unevaluated', () => {
+  let calls = 0;
+  const source = `function build(signature, App = hoc(() => { useState(1); })) { return App; }
+    const signature = factory;
+    const App = false && hoc(() => { useState(1); });
+    globalThis.result = build(signature, supplied) === supplied;`;
+  expect(
+    execute(
+      source,
+      { reactRefresh: { refreshSig: 'signature' } },
+      {
+        factory: () => {
+          calls++;
+          return (fn: unknown) => fn;
+        },
+        supplied: () => 7,
+        hoc: (fn: unknown) => fn,
+        $RefreshReg$: () => {},
+      },
+    ).result,
+  ).toBe(true);
+  expect(calls).toBe(0);
+});
+
+test.each(['App', '__proto__'])('Refresh preserves anonymous parameter-default names: %s', name => {
+  const source = `function build(signature, App = () => { useState(1); return 7; }) { return App; }
+    const read = build(factory);
+    globalThis.result = [read.name, read()];`.replaceAll('App', name);
+  expect(
+    execute(
+      source,
+      { reactRefresh: { refreshSig: 'signature' } },
+      {
+        factory: () => (fn: unknown) => fn,
+        useState: () => [],
+        $RefreshReg$: () => {},
+      },
+    ).result,
+  ).toEqual([name, 7]);
+});
+
+test('Refresh parameter HOCs preserve lexical this, arguments, and new.target', () => {
+  const source = `"use strict";
+    function build(signature, App = hoc(() => {
+      useState(1); return [this.value, arguments[0] === signature, new.target];
+    })) { return App; }
+    const read = build.call({ value: 7 }, factory);
+    globalThis.result = read();`;
+  expect(
+    execute(
+      source,
+      { reactRefresh: { refreshSig: 'signature' } },
+      {
+        factory: () => (fn: unknown) => fn,
+        hoc: (fn: unknown) => fn,
+        useState: () => [],
+        $RefreshReg$: () => {},
+      },
+    ).result,
+  ).toEqual([7, true, undefined]);
+});
+
+test('Refresh custom factory member calls retain their receiver after declaration', () => {
+  const source = `const runtime = {
+    value: 7,
+    signature() {
+      if (this !== runtime) throw new Error('factory receiver lost');
+      return fn => fn;
+    }
+  };
+  const App = () => { useState(1); return runtime.value; };
+  globalThis.result = App();`;
+  expect(
+    execute(
+      source,
+      { reactRefresh: { refreshSig: 'runtime.signature' } },
+      {
+        useState: () => [],
+        $RefreshReg$: () => {},
+      },
+    ).result,
+  ).toBe(7);
+});
+
+test('Refresh rest-parameter defaults retain their own signatures during recursion', () => {
+  const source = `function make(id) {
+    const factory = () => fn => { if (fn) fn.signatureId = id; return fn; };
+    factory.id = id;
+    return factory;
+  }
+  function hoc(fn, signature) { if (signature.id) build(make(0)); return fn; }
+  function build(signature, ...[App = hoc(function App() {
+    useState(1); return signature.id;
+  }, signature)]) { return [App.signatureId, App()]; }
+  globalThis.result = build(make(1));`;
+  expect(
+    execute(
+      source,
+      { reactRefresh: { refreshSig: 'signature' } },
+      {
+        useState: () => [],
+        $RefreshReg$: () => {},
+      },
+    ).result,
+  ).toEqual([1, 1]);
+});
+
+test.each([
+  {
+    name: 'ordinary default',
+    parameter: "App = hoc(function () { useState(1); return 7; }, eval('var value = 7'))",
+  },
+  {
+    name: 'binding default',
+    parameter: "{ App = hoc(function () { useState(1); return 7; }, eval('var value = 7')) } = {}",
+  },
+  {
+    name: 'rest default',
+    parameter: "...[App = hoc(function () { useState(1); return 7; }, eval('var value = 7'))]",
+  },
+])('Refresh lowers a direct-eval $name without special exclusions', ({ parameter }) => {
+  let signatures = 0;
+  const source = `function build(signature, ${parameter}) { return App(); }
+    globalThis.result = build(factory);`;
+  expect(
+    execute(
+      source,
+      { reactRefresh: { refreshSig: 'signature' } },
+      {
+        factory: () => {
+          signatures++;
+          return (fn: unknown) => fn;
+        },
+        hoc: (fn: unknown) => fn,
+        useState: () => [],
+        $RefreshReg$: () => {},
+      },
+    ).result,
+  ).toBe(7);
+  expect(signatures).toBe(1);
+});
+
+test('Refresh also respects a lexical factory using the default identifier', () => {
+  const source = `const $RefreshSig$ = factory;
+    const App = () => { useState(1); return 7; };
+    globalThis.result = [App.name, App()];`;
+  expect(
+    execute(
+      source,
+      { reactRefresh: {} },
+      {
+        factory: () => (fn: unknown) => fn,
+        useState: () => [],
+        $RefreshReg$: () => {},
+      },
+    ).result,
+  ).toEqual(['App', 7]);
+});

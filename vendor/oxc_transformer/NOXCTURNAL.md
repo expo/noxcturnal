@@ -74,7 +74,9 @@ Local patches:
   Keep for/for-in initializer signature attachment in the expression and preserve inferred
   names without introducing a self binding. The native host supplies local
   statement lists for instrumented single control-flow bodies before semantics,
-  so signature factory initialization stays in its original environment.
+  so signature factory initialization stays in its original environment. Custom
+  factory expressions must evaluate at component creation; HOC transport in
+  parameter defaults belongs to the default's environment, not the function body.
 
 Keep Rust and npm Oxc versions pinned together. Reassess these patches against the
 upstream implementation before any upgrade; archived regressions define the repair
