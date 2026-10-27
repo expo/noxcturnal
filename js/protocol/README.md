@@ -22,3 +22,10 @@ the remaining bits identify the node type. Only these enters survive in the
 decoder's exit stack. Native routing emits matching exits in structural order,
 so the stack is bounded by nesting depth rather than the number or maximum ID of
 visited nodes. Node IDs validate each pair; spans do not participate in pairing.
+
+Child batches pair packed node events with a little-endian adjacency buffer. Each
+group is `[parentId, count, ...[childId, roleId]]`; zero-count groups cache empty
+parents. CSR edges have one entry per child under its structural or projected
+parent, in native child order. Recursive requests expand retained roles by node
+identity and transfer each child's scalar facts once, including when several
+requested roots reach it.

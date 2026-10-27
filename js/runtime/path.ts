@@ -147,6 +147,7 @@ export type PathRuntime = {
   nested: (target: NativeEvent, visitor: readonly DefinedVisitor<any>[], value: any) => void;
   widen: (target: NativeEvent, types: string[], scopeOnly: boolean) => void;
   parent: (target: NativeEvent, id: number, ancestryDepth: number) => NativeNodePath | null;
+  child: (target: NativeEvent, ancestryDepth: number, role: string) => NativeNodePath | null;
   children: (target: NativeEvent, ancestryDepth: number, role?: string) => NativeNodePath[];
   allowsAncestry: () => boolean;
   allowsScope: () => boolean;
@@ -322,11 +323,12 @@ export class NodePathImpl implements NativeNodePath {
   get(key: string): NativeNodePath | readonly NativeNodePath[] | null {
     this.#assertChildRole(key);
     if (key === '*') return this.childrenUnchecked();
-    const declaration = CHILD_ROLES[this.node.type]?.[key];
+    const declaration = CHILD_ROLES[this.event.type]?.[key];
     if (declaration == null)
       throw new Error(`${this.node.type} does not expose child role ${JSON.stringify(key)}`);
-    const children = this.runtime.children(this.event, this.ancestryDepth, key);
-    return declaration.list ? children : (children[0] ?? null);
+    return declaration.list
+      ? this.runtime.children(this.event, this.ancestryDepth, key)
+      : this.runtime.child(this.event, this.ancestryDepth, key);
   }
   getChild(key: string): NativeNodePath | null {
     const value = this.get(key);

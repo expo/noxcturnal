@@ -35,15 +35,8 @@ pub struct NativeCallQuery {
 }
 
 #[napi(object)]
-pub struct NativeChildEdge {
-    pub parent_id: u32,
-    pub child_id: u32,
-    pub role_id: u32,
-}
-
-#[napi(object)]
 pub struct NativeChildBatch {
-    pub edges: Vec<NativeChildEdge>,
+    pub edges: Buffer,
     pub events: Buffer,
 }
 
@@ -220,6 +213,7 @@ impl NativeIndexedSession {
         parent_ids: Vec<u32>,
         parent_types: Vec<String>,
         parent_type_ids: Vec<u32>,
+        recursive: Option<bool>,
     ) -> Result<NativeChildBatch> {
         self.ensure_open()?;
         let mut parent_ids = parent_ids.into_iter().collect::<FxHashSet<_>>();
@@ -234,23 +228,34 @@ impl NativeIndexedSession {
             }
         }
         parent_ids.extend(self.retained_index.node_ids_of_types(&parent_type_ids));
-        let edges = parent_ids
-            .iter()
-            .flat_map(|parent_id| {
-                self.retained_index
-                    .child_edges(*parent_id)
-                    .map(|(child_id, role_id)| NativeChildEdge {
-                        parent_id: *parent_id,
-                        child_id,
-                        role_id,
-                    })
-            })
-            .collect::<Vec<_>>();
-        let mut ordered_child_ids = edges.iter().map(|edge| edge.child_id).collect::<Vec<_>>();
+        let mut pending = parent_ids.iter().copied().collect::<Vec<_>>();
+        let mut edges = Vec::new();
+        let mut ordered_child_ids = Vec::new();
+        while let Some(parent_id) = pending.pop() {
+            // Each group includes empty parents. The JS cache can therefore
+            // distinguish an empty retained child list from an unqueried one.
+            edges.extend_from_slice(&parent_id.to_le_bytes());
+            let count_offset = edges.len();
+            edges.extend_from_slice(&0_u32.to_le_bytes());
+            let mut count = 0_u32;
+            for (child_id, role_id) in self.retained_index.child_edges(parent_id) {
+                edges.extend_from_slice(&child_id.to_le_bytes());
+                edges.extend_from_slice(&role_id.to_le_bytes());
+                ordered_child_ids.push(child_id);
+                count += 1;
+                if recursive == Some(true)
+                    && self.retained_index.retains_children(child_id)
+                    && parent_ids.insert(child_id)
+                {
+                    pending.push(child_id);
+                }
+            }
+            edges[count_offset..count_offset + 4].copy_from_slice(&count.to_le_bytes());
+        }
         ordered_child_ids.sort_unstable();
         ordered_child_ids.dedup();
         Ok(NativeChildBatch {
-            edges,
+            edges: edges.into(),
             events: self
                 .retained_index
                 .packed_events_buffer(&ordered_child_ids, &self.scope_parents),
