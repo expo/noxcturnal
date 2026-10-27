@@ -113,3 +113,7 @@ Per-file state follows that plugin order, including syntax-filtered plugins.
 Route handlers bind lazily on delivery and keep caches and control state local to
 their route runtime. Shared helper functions use the receiving runtime's owner,
 contract, state, and edit queue; they must not capture another plugin or file.
+
+Handler scratch pools keep one idle binding set per compiled route plan. Reentrant
+transforms borrow a separate set. Every exit clears the per-file compiler and
+restores bound slots, so paths and plugin owners never survive in idle handlers.
