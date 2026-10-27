@@ -265,3 +265,17 @@ test.each(['inline', 'runtime'] as const)(
     ).toEqual([7, 'later']);
   },
 );
+
+test('async capture planning retains escaped arguments identifiers', async () => {
+  const source = String.raw`function read(){const later=async()=>argum\u0065nts[0];argum\u0065nts=[7];return later();}globalThis.result=read(9);`;
+  const code = compile(source, { transforms: { asyncFunctions: true } });
+  expect(code).not.toMatch(/async\s*\(/);
+  expect(await run(code)).toBe(7);
+});
+
+test('async eval compatibility checks retain escaped eval identifiers', () => {
+  const source = String.raw`const later=async()=>ev\u0061l('1');`;
+  expect(() => compile(source, { transforms: { asyncFunctions: true } })).toThrow(
+    'lowered-arrow-direct-eval',
+  );
+});

@@ -240,3 +240,25 @@ test('uses runtime property-key helpers for computed capture names', () => {
     1,
   ]);
 });
+
+test('a parameter named eval can update the owning arguments binding', () => {
+  const source = `function read(eval){const later=(v=arguments[1])=>v;eval('arguments=[0,7]');return later()}
+    globalThis.result=read(globalThis.eval,9);`;
+  expect(runInNewContext(compile(source, { transforms: { parameters: true } }))).toBe(7);
+});
+
+test('resolved eval calls in converted arrows retain the compatibility boundary', () => {
+  const source = `function read(eval){return (v=0)=>eval('arguments[0]')}`;
+  const result = transform(
+    source,
+    'input.js',
+    defineNativePipeline({
+      phases: [{ name: 'capture', native: { transforms: { parameters: true } } }],
+    }),
+  );
+  expect(result.status).toBe('bailout');
+  if (result.status === 'bailout') {
+    expect(result.source).toBe(source);
+    expect(result.reason).toContain('lowered-arrow-direct-eval');
+  }
+});

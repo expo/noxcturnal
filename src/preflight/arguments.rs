@@ -11,7 +11,10 @@ use oxc_ast_visit::{VisitMut, walk_mut};
 use oxc_parser::Parser;
 use oxc_semantic::{NodeId, Semantic};
 use oxc_span::{GetSpan, SourceType, Span};
-use oxc_syntax::operator::{AssignmentOperator, UnaryOperator};
+use oxc_syntax::{
+    operator::{AssignmentOperator, UnaryOperator},
+    reference::ReferenceId,
+};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use super::options::NativePreflightOptions;
@@ -43,74 +46,102 @@ fn selected_arrow(arrow: &ArrowFunctionExpression<'_>, options: &NativePreflight
         || (options.async_functions == Some(true) && arrow.r#async)
 }
 
+/// Conservative syntax hint for capture analysis and its optional async node store. Escapes can spell either identifier, so keep them.
+/// This controls optional analysis storage, never node or binding identity.
+pub(super) fn may_need_capture(source: &str, options: &NativePreflightOptions) -> bool {
+    selected(options)
+        && (source.contains("arguments") || source.contains("eval") || source.contains('\\'))
+}
+
+fn selected(options: &NativePreflightOptions) -> bool {
+    options.parameters == Some(true)
+        || options.object_rest_spread == Some(true)
+        || options.async_functions == Some(true)
+}
+
+fn references_named<'s>(
+    semantic: &'s Semantic<'_>,
+    name: &'s str,
+) -> impl Iterator<Item = ReferenceId> + 's {
+    let scoping = semantic.scoping();
+    scoping
+        .root_unresolved_references()
+        .get(name)
+        .into_iter()
+        .flatten()
+        .copied()
+        .chain(
+            scoping
+                .symbol_ids()
+                .filter(move |symbol| scoping.symbol_name(*symbol) == name)
+                .flat_map(|symbol| scoping.get_resolved_reference_ids(symbol).iter().copied()),
+        )
+}
+
+fn direct_evals<'s>(semantic: &'s Semantic<'_>) -> impl Iterator<Item = NodeId> + 's {
+    references_named(semantic, "eval")
+        .filter_map(|id| {
+            let id = semantic.scoping().get_reference(id).node_id();
+            let parent = semantic.nodes().ancestor_ids(id).find(|id| !matches!(
+                semantic.nodes().kind(*id), AstKind::ParenthesizedExpression(_)))?;
+            let AstKind::CallExpression(call) = semantic.nodes().kind(parent) else { return None; };
+            (!call.optional && matches!(call.callee.get_inner_expression(), Expression::Identifier(id) if id.name == "eval"))
+                .then_some(parent)
+        })
+}
+
 // A converted arrow cannot reproduce direct eval's lexical environment after
 // acquiring an ordinary function's own arguments binding.
 pub(super) fn has_direct_eval(semantic: &Semantic<'_>, options: &NativePreflightOptions) -> bool {
-    semantic.nodes().iter_enumerated().any(|(id, node)| {
-        let AstKind::CallExpression(call) = node.kind() else {
-            return false;
-        };
-        if call.optional
-            || !matches!(call.callee.get_inner_expression(), Expression::Identifier(id)
-            if id.name == "eval" && id.reference_id.get().is_some_and(|id|
-                semantic.scoping().get_reference(id).symbol_id().is_none()))
-        {
-            return false;
-        }
-        for ancestor in semantic.nodes().ancestor_ids(id) {
-            match semantic.nodes().kind(ancestor) {
-                AstKind::Function(_) => break,
-                AstKind::ArrowFunctionExpression(arrow) if selected_arrow(arrow, options) => {
-                    return true;
+    selected(options)
+        && direct_evals(semantic).any(|id| {
+            for ancestor in semantic.nodes().ancestor_ids(id) {
+                match semantic.nodes().kind(ancestor) {
+                    AstKind::Function(_) => break,
+                    AstKind::ArrowFunctionExpression(arrow) if selected_arrow(arrow, options) => {
+                        return true;
+                    }
+                    _ => {}
                 }
-                _ => {}
             }
-        }
-        false
-    })
+            false
+        })
 }
 
 pub(super) fn prepare(semantic: &Semantic<'_>, options: &NativePreflightOptions) -> Option<Plan> {
     let nodes = semantic.nodes();
     let scoping = semantic.scoping();
-    let selected: FxHashSet<_> = nodes
-        .iter_enumerated()
-        .filter_map(|(id, node)| {
-            let AstKind::ArrowFunctionExpression(arrow) = node.kind() else {
-                return None;
-            };
-            selected_arrow(arrow, options).then_some(id)
-        })
-        .collect();
-    if selected.is_empty() {
+    if !selected(options) {
         return None;
     }
-    // Writes and direct eval require live transport even when creation itself
-    // occurs in a statement list. Conservatively include all lexical captures
-    // in such a program; reference identities still select the exact uses.
-    let live = nodes.iter_enumerated().any(|(_, node)| match node.kind() {
-        AstKind::IdentifierReference(id) if id.name == "arguments" => id
-            .reference_id
-            .get()
-            .is_some_and(|id| scoping.get_reference(id).is_write()),
-        AstKind::BindingIdentifier(id) if id.name == "arguments" => true,
-        AstKind::CallExpression(call) => {
-            matches!(&call.callee, Expression::Identifier(id) if id.name == "eval")
-        }
-        _ => false,
-    });
+    let mut references = references_named(semantic, "arguments").peekable();
+    references.peek()?;
+    // Implicit arguments bindings can change only through writes/eval in their
+    // own ordinary-function environment. An unrelated function must not force
+    // reference cells throughout the file. Explicit arguments symbols always
+    // use live transport (including deferred lexical initialization).
+    let provider = |id| {
+        nodes
+            .ancestor_ids(id)
+            .find(|id| matches!(nodes.kind(*id), AstKind::Function(_)))
+    };
+    let live: FxHashSet<_> = scoping
+        .root_unresolved_references()
+        .get("arguments")
+        .into_iter()
+        .flatten()
+        .filter_map(|id| {
+            let reference = scoping.get_reference(*id);
+            reference.is_write().then(|| provider(reference.node_id()))
+        })
+        .chain(direct_evals(semantic).map(provider))
+        .collect();
     let mut groups: FxHashMap<NodeId, FxHashSet<NodeId>> = FxHashMap::default();
-    for (id, node) in nodes.iter_enumerated() {
-        let AstKind::IdentifierReference(reference) = node.kind() else {
-            continue;
-        };
-        if reference.name != "arguments" {
-            continue;
-        }
+    for reference_id in references {
+        let reference = scoping.get_reference(reference_id);
+        let id = reference.node_id();
         let declaration = reference
-            .reference_id
-            .get()
-            .and_then(|id| scoping.get_reference(id).symbol_id())
+            .symbol_id()
             .map(|symbol| scoping.symbol_declaration(symbol));
         let mut owner = None;
         let mut provider_is_program = true;
@@ -119,7 +150,8 @@ pub(super) fn prepare(semantic: &Semantic<'_>, options: &NativePreflightOptions)
                 provider_is_program = false;
                 break;
             }
-            if selected.contains(&ancestor) {
+            if matches!(nodes.kind(ancestor), AstKind::ArrowFunctionExpression(arrow) if selected_arrow(arrow, options))
+            {
                 if declaration.is_some_and(|decl| {
                     decl == ancestor || nodes.ancestor_ids(decl).any(|id| id == ancestor)
                 }) {
@@ -159,7 +191,11 @@ pub(super) fn prepare(semantic: &Semantic<'_>, options: &NativePreflightOptions)
                         | AstKind::FormalParameter(_)
                 )
             });
-        if live || provider_is_program || crosses_evaluation_boundary {
+        if declaration.is_some()
+            || live.contains(&provider(id))
+            || provider_is_program
+            || crosses_evaluation_boundary
+        {
             groups.entry(owner).or_default().insert(id);
         }
     }
@@ -284,6 +320,7 @@ pub(super) fn run<'a>(
         names: plan.names,
         keys: plan.keys,
         key_helper: plan.key_helper,
+        templates: FxHashMap::default(),
     }
     .visit_program(program);
     requests
@@ -303,6 +340,7 @@ struct Capture<'a> {
     names: FxHashMap<NodeId, InferredName>,
     keys: FxHashMap<NodeId, String>,
     key_helper: String,
+    templates: FxHashMap<u8, Expression<'a>>,
 }
 impl<'a> VisitMut<'a> for Capture<'a> {
     fn visit_object_property(&mut self, property: &mut ObjectProperty<'a>) {
@@ -347,34 +385,57 @@ impl<'a> VisitMut<'a> for Capture<'a> {
             references: &references,
             writes: false,
             deletes: false,
+            types: false,
         };
         rewriter.visit_expression(expression);
-        // Only emit assignment/delete syntax that was legal in the original
-        // context (strict code cannot assign to or delete implicit arguments).
-        let set = if rewriter.writes {
-            "v => arguments = v"
-        } else {
-            "v => v"
-        };
-        let delete = if rewriter.deletes {
-            "() => delete arguments"
-        } else {
-            "() => false"
-        };
+        let operations = u8::from(rewriter.writes)
+            | (u8::from(rewriter.types) << 1)
+            | (u8::from(rewriter.deletes) << 2);
+        let writes = rewriter.writes;
+        let types = rewriter.types;
+        let deletes = rewriter.deletes;
         walk_mut::walk_expression(self, expression);
-        let source = self.allocator.alloc_str(&format!(
-            "(({name}) => null)(((get,set,type,del) => ({{get value(){{return get()}},set value(v){{set(v)}},type,del}}))(() => arguments,{set},() => typeof arguments,{delete}))"
-        ));
-        let parsed = Parser::new(self.allocator, source, SourceType::cjs()).parse();
-        assert!(
-            parsed.diagnostics.is_empty(),
-            "generated arguments capture must parse"
-        );
-        let mut body = parsed.program.body;
-        let Statement::ExpressionStatement(statement) = body.remove(0) else {
-            unreachable!()
-        };
-        let mut wrapper = statement.unbox().expression;
+        // Parse each operation shape once per allocator. Generated templates
+        // have no semantic IDs; clones receive the current expression's anchors.
+        let template = self.templates.entry(operations).or_insert_with(|| {
+            // Allocate only the operations the original references use. Lexical
+            // arrows transport arguments; accessor methods have their own binding.
+            let mut parameters = vec!["get"];
+            let mut arguments = vec!["() => arguments"];
+            let mut properties = vec!["get value(){return get()}"];
+            if writes {
+                parameters.push("set");
+                arguments.push("v => arguments = v");
+                properties.push("set value(v){set(v)}");
+            }
+            if types {
+                parameters.push("type");
+                arguments.push("() => typeof arguments");
+                properties.push("type");
+            }
+            if deletes {
+                parameters.push("del");
+                arguments.push("() => delete arguments");
+                properties.push("del");
+            }
+            let source = self.allocator.alloc_str(&format!(
+                "((capture) => null)((({}) => ({{{}}}))({}))",
+                parameters.join(","),
+                properties.join(","),
+                arguments.join(",")
+            ));
+            let parsed = Parser::new(self.allocator, source, SourceType::cjs()).parse();
+            assert!(
+                parsed.diagnostics.is_empty(),
+                "generated arguments capture must parse"
+            );
+            let mut body = parsed.program.body;
+            let Statement::ExpressionStatement(statement) = body.remove(0) else {
+                unreachable!()
+            };
+            statement.unbox().expression
+        });
+        let mut wrapper = template.clone_in(self.allocator);
         // New nodes have no semantic IDs yet. Give them mapping provenance only;
         // the caller rebuilds semantics before another identity-sensitive pass.
         Anchors(Span::new(expression.span().start, expression.span().start))
@@ -386,6 +447,11 @@ impl<'a> VisitMut<'a> for Capture<'a> {
         else {
             unreachable!()
         };
+        let BindingPattern::BindingIdentifier(binding) = &mut factory.params.items[0].pattern
+        else {
+            unreachable!()
+        };
+        binding.name = self.allocator.alloc_str(&name).into();
         let mut value = expression.take_in(&ast);
         if let Some(name) = self.names.remove(&original_id) {
             let span = value.span();
@@ -427,6 +493,7 @@ struct References<'a, 'p> {
     references: &'p FxHashSet<NodeId>,
     writes: bool,
     deletes: bool,
+    types: bool,
 }
 impl<'a> References<'a, '_> {
     fn member(&self, span: Span, property: &str) -> MemberExpression<'a> {
@@ -466,6 +533,7 @@ impl<'a> VisitMut<'a> for References<'a, '_> {
         {
             match unary.operator {
                 UnaryOperator::Typeof => {
+                    self.types = true;
                     *expression = self.call(unary.span, "type");
                     return;
                 }

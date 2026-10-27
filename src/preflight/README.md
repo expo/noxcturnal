@@ -17,6 +17,8 @@ Parameter and destructuring rewrites can introduce captured lexical locals insid
 Lexical `arguments` captures must retain live reads and writes when a snapshot
 would change behavior, including deferred initialization. Assess liveness within
 the owning ordinary function.
+Keep generated capture templates within their allocator and clone them without
+semantic identities.
 Decline with pristine input when direct eval inside an arrow selected for
 conversion would observe a different implicit function environment.
 
