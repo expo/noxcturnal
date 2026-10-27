@@ -1,3 +1,4 @@
+import { nativeManifest } from '../native/manifest';
 import type { RouteCapabilities } from '../pipeline/types';
 import { decodeConstant, decodeString } from '../protocol/value-transport';
 import { parserFilename } from '../adapters/classification';
@@ -66,12 +67,15 @@ export class NativeTransformSession {
     if (retentionManifest != null || initialManifest != null) {
       this.#native =
         parsedSource != null && retentionManifest != null && initialManifest != null
-          ? parsedSource.materialize(retentionManifest, initialManifest)
+          ? parsedSource.materialize(
+              nativeManifest(retentionManifest),
+              nativeManifest(initialManifest),
+            )
           : new native.NativeIndexedSession(
               source,
               this.#nativeFilename,
-              retentionManifest,
-              initialManifest,
+              retentionManifest == null ? undefined : nativeManifest(retentionManifest),
+              initialManifest == null ? undefined : nativeManifest(initialManifest),
               buildInitialRoute,
             );
     }
@@ -90,7 +94,7 @@ export class NativeTransformSession {
     const coordinates = root != null && 'start' in root ? root : undefined;
     const rootId = root != null && 'id' in root ? root.id : undefined;
     const buffer = this.#binding('route.next').nextRoutedPacked(
-      manifest,
+      nativeManifest(manifest),
       coordinates?.start,
       coordinates?.end,
       rootId,

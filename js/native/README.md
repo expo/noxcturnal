@@ -7,3 +7,9 @@ The loader first tries a binary beside the package, then the matching optional p
 Source and map layers stay in Rust across phases to avoid repeated large copies across the boundary.
 
 Builds of the same package version can differ in native Flow support. Flow classification cache keys include that capability to prevent reuse across incompatible builds.
+
+Prepared plans register their owned manifest buffers for lazy native compilation.
+Sharing is keyed by the exact Buffer object, and registered buffers must remain
+immutable. Unregistered raw buffers are validated on every native call. A compiled
+handle snapshots the bytes and owns source-independent routing metadata; sessions
+retain shared native ownership so closing one session cannot invalidate another.

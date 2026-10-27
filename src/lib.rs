@@ -87,11 +87,14 @@ pub fn native_flow_erase(
 pub fn materialize_routed_buffer(
     source: String,
     filename: String,
-    manifest: napi::bindgen_prelude::Buffer,
+    manifest: napi::bindgen_prelude::Either<
+        napi::bindgen_prelude::Buffer,
+        &engine::NativeCompiledManifest,
+    >,
     root_start: Option<u32>,
     root_end: Option<u32>,
 ) -> napi::Result<napi::bindgen_prelude::Buffer> {
-    engine::materialize_routed_buffer(&source, &filename, &manifest, root_start, root_end)
+    engine::materialize_routed_buffer(&source, &filename, manifest, root_start, root_end)
 }
 
 #[napi]

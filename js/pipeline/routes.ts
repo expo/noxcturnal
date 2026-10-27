@@ -1,3 +1,4 @@
+import { shareManifest } from '../native/manifest';
 import {
   CHILD_ROLES,
   NODE_TYPE_IDS,
@@ -778,18 +779,20 @@ function compilePhaseRoutes(
   }
   const retained = createRetentionFacts();
   accumulateRetention(retained, plugins, plans);
-  const manifest = packRouteManifest(
-    dispatchRoutes,
-    includeParent,
-    includeScope,
-    retentionCapabilities,
-    retained.childRoles,
-    retained.fields,
-    retained.ancestorFields,
-    [...retained.ancestorTypes],
-    [...retained.ancestorChildParentTypes],
-    retained.ancestryDepth,
-    plugins.some(plugin => plans.get(plugin)?.controlFlow?.includes('skip')),
+  const manifest = shareManifest(
+    packRouteManifest(
+      dispatchRoutes,
+      includeParent,
+      includeScope,
+      retentionCapabilities,
+      retained.childRoles,
+      retained.fields,
+      retained.ancestorFields,
+      [...retained.ancestorTypes],
+      [...retained.ancestorChildParentTypes],
+      retained.ancestryDepth,
+      plugins.some(plugin => plans.get(plugin)?.controlFlow?.includes('skip')),
+    ),
   );
   return { routes, dispatchRoutes, manifest };
 }
@@ -930,17 +933,19 @@ export function compileNestedVisitor(visitor: NestedVisitor): CompiledNestedRout
   mergeChildRoleRequests(childRetention, requirements.children);
   mergeChildRoleRequests(childRetention, requirements.ancestryChildren);
   const compiled: CompiledNestedRoutes = {
-    manifest: packRouteManifest(
-      routes,
-      true,
-      true,
-      0,
-      childRetention,
-      retainedFields,
-      ancestorFields,
-      [...ancestorTypes],
-      [...ancestorChildParentTypes],
-      ancestryDepth,
+    manifest: shareManifest(
+      packRouteManifest(
+        routes,
+        true,
+        true,
+        0,
+        childRetention,
+        retainedFields,
+        ancestorFields,
+        [...ancestorTypes],
+        [...ancestorChildParentTypes],
+        ancestryDepth,
+      ),
     ),
     callbacks: variants.map(variant => variant.callbacks),
     routes,

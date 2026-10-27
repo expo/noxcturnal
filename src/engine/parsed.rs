@@ -1,4 +1,7 @@
-use napi::{Error, Result, Status, bindgen_prelude::Buffer};
+use napi::{
+    Error, Result, Status,
+    bindgen_prelude::{Buffer, Either},
+};
 use napi_derive::napi;
 use oxc_allocator::Allocator;
 use oxc_ast::AstKind;
@@ -10,7 +13,8 @@ use self_cell::self_cell;
 use crate::generated::event_schema::{NODE_TYPE_COUNT, ast_kind_protocol_id, node_type_name};
 use crate::syntax::{classification::source_type, validation::validate_program};
 
-use super::{collect::materialize_program, session::NativeIndexedSession};
+use super::manifest::ResolvedManifest;
+use super::{NativeCompiledManifest, collect::materialize_program, session::NativeIndexedSession};
 
 struct ParseOwner {
     allocator: Allocator,
@@ -122,38 +126,43 @@ impl NativeParsedSource {
     #[napi]
     pub fn materialize(
         &mut self,
-        retention_manifest: Buffer,
-        initial_route_manifest: Buffer,
+        retention_manifest: Either<Buffer, &NativeCompiledManifest>,
+        initial_route_manifest: Either<Buffer, &NativeCompiledManifest>,
     ) -> Result<NativeIndexedSession> {
         let parsed = self.parsed.take().ok_or_else(consumed)?;
+        let retention_manifest = ResolvedManifest::new(retention_manifest)?;
+        let initial_route_manifest = ResolvedManifest::new(initial_route_manifest)?;
         let parts = parsed.with_dependent(|owner, parsed| {
             materialize_program(
                 &owner.source,
                 &owner.allocator,
                 &parsed.program,
-                Some(&retention_manifest),
-                Some(&initial_route_manifest),
+                Some(retention_manifest.compiled()),
+                Some(initial_route_manifest.compiled()),
                 true,
             )
         })?;
         Ok(NativeIndexedSession::from_parts(
             parsed.into_owner().source,
             self.filename.clone(),
-            Some(initial_route_manifest),
+            Some(initial_route_manifest.key()),
             parts,
         ))
     }
 
     #[napi]
-    pub fn materialize_routed(&mut self, manifest: Buffer) -> Result<Buffer> {
-        let manifest = super::decode_route_manifest(&manifest)?;
+    pub fn materialize_routed(
+        &mut self,
+        manifest: Either<Buffer, &NativeCompiledManifest>,
+    ) -> Result<Buffer> {
+        let manifest = ResolvedManifest::new(manifest)?;
         let parsed = self.parsed.take().ok_or_else(consumed)?;
         parsed.with_dependent(|owner, parsed| {
             super::routed::materialize_routed_program(
                 &owner.source,
                 &owner.allocator,
                 &parsed.program,
-                &manifest,
+                manifest.compiled(),
                 None,
             )
         })

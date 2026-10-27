@@ -1,4 +1,7 @@
-use napi::{Error, Result, Status, bindgen_prelude::Buffer};
+use napi::{
+    Error, Result, Status,
+    bindgen_prelude::{Buffer, Either},
+};
 use napi_derive::napi;
 use rustc_hash::FxHashSet;
 
@@ -14,8 +17,9 @@ use crate::semantic::retained_index::{
 use crate::syntax::source_text::UidAllocator;
 
 use super::collect::{materialize_with_scope_parents, parse_program_body_offsets};
+use super::manifest::{ManifestKey, ResolvedManifest};
 use super::retained::{routed_buffer_from_index, routed_subtree_buffer_from_index};
-use super::{MaterializedSessionParts, decode_route_manifest};
+use super::{MaterializedSessionParts, NativeCompiledManifest};
 
 #[napi(object)]
 pub struct NativeBindingQuery {
@@ -58,7 +62,7 @@ pub struct NativeIndexedSession {
     retained_index: RetainedIndex,
     uids: UidAllocator,
     scope_parents: Vec<u32>,
-    initial_route_manifest: Option<Vec<u8>>,
+    initial_route_manifest: Option<ManifestKey>,
     initial_routed_buffer: Option<Vec<u8>>,
     program_body_offsets: Option<[u32; 5]>,
     closed: bool,
@@ -70,10 +74,14 @@ impl NativeIndexedSession {
     pub fn new(
         source: String,
         filename: String,
-        retention_manifest: Option<Buffer>,
-        initial_route_manifest: Option<Buffer>,
+        retention_manifest: Option<Either<Buffer, &NativeCompiledManifest>>,
+        initial_route_manifest: Option<Either<Buffer, &NativeCompiledManifest>>,
         build_initial_route: Option<bool>,
     ) -> Result<Self> {
+        let retention_manifest = retention_manifest.map(ResolvedManifest::new).transpose()?;
+        let initial_route_manifest = initial_route_manifest
+            .map(ResolvedManifest::new)
+            .transpose()?;
         let has_retention = retention_manifest.is_some();
         let has_initial_route = initial_route_manifest.is_some();
         let parts = if !has_retention && !has_initial_route {
@@ -87,12 +95,19 @@ impl NativeIndexedSession {
             materialize_with_scope_parents(
                 &source,
                 &filename,
-                retention_manifest.as_deref(),
-                initial_route_manifest.as_deref(),
+                retention_manifest.as_ref().map(ResolvedManifest::compiled),
+                initial_route_manifest
+                    .as_ref()
+                    .map(ResolvedManifest::compiled),
                 build_initial_route.unwrap_or(true),
             )?
         };
-        let mut session = Self::from_parts(source, filename, initial_route_manifest, parts);
+        let mut session = Self::from_parts(
+            source,
+            filename,
+            initial_route_manifest.as_ref().map(ResolvedManifest::key),
+            parts,
+        );
         if !has_retention && !has_initial_route {
             session.program_body_offsets = None;
         }
@@ -128,12 +143,13 @@ impl NativeIndexedSession {
     #[napi]
     pub fn next_routed_packed(
         &mut self,
-        manifest: Buffer,
+        manifest: Either<Buffer, &NativeCompiledManifest>,
         root_start: Option<u32>,
         root_end: Option<u32>,
         root_id: Option<u32>,
     ) -> Result<Buffer> {
         self.ensure_open()?;
+        let manifest = ResolvedManifest::new(manifest)?;
         if let Some(root_id) = root_id {
             if root_start.is_some() || root_end.is_some() {
                 return Err(Error::new(
@@ -141,9 +157,8 @@ impl NativeIndexedSession {
                     "node root cannot be combined with a source range",
                 ));
             }
-            let manifest = decode_route_manifest(&manifest)?;
             return routed_subtree_buffer_from_index(
-                &manifest,
+                manifest.compiled(),
                 &self.retained_index,
                 &self.scope_parents,
                 root_id,
@@ -152,7 +167,11 @@ impl NativeIndexedSession {
         // The precompiled initial tape is moved out on its first request; afterwards every
         // request recomputes from the retained index, so no served flag is needed.
         if root_start.is_none() && root_end.is_none() && self.initial_routed_buffer.is_some() {
-            if self.initial_route_manifest.as_deref() != Some(manifest.as_ref()) {
+            if !self
+                .initial_route_manifest
+                .as_ref()
+                .is_some_and(|key| key.matches(&manifest))
+            {
                 return Err(Error::new(
                     Status::GenericFailure,
                     "route manifest does not match the compiled retention plan",
@@ -165,9 +184,8 @@ impl NativeIndexedSession {
                 .map(Buffer::from)
                 .expect("initial routed buffer is present"));
         }
-        let manifest = decode_route_manifest(&manifest)?;
         routed_buffer_from_index(
-            &manifest,
+            manifest.compiled(),
             &self.retained_index,
             &self.scope_parents,
             root_start.zip(root_end),
@@ -511,7 +529,7 @@ impl NativeIndexedSession {
             + self
                 .initial_route_manifest
                 .as_ref()
-                .map_or(0, Vec::capacity)
+                .map_or(0, ManifestKey::memory_usage)
             + self.initial_routed_buffer.as_ref().map_or(0, Vec::capacity))
         .min(u32::MAX as usize) as u32
     }
@@ -529,7 +547,7 @@ impl NativeIndexedSession {
     pub(super) fn from_parts(
         source: String,
         filename: String,
-        initial_route_manifest: Option<Buffer>,
+        initial_route_manifest: Option<ManifestKey>,
         parts: MaterializedSessionParts,
     ) -> Self {
         let MaterializedSessionParts {
@@ -544,7 +562,7 @@ impl NativeIndexedSession {
             retained_index,
             uids: UidAllocator::default(),
             scope_parents,
-            initial_route_manifest: initial_route_manifest.map(|manifest| manifest.to_vec()),
+            initial_route_manifest,
             initial_routed_buffer,
             program_body_offsets: Some(program_body_offsets),
             closed: false,
