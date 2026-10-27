@@ -422,3 +422,36 @@ test('Refresh header signature transport is local to recursive HOC activations',
   ).toEqual([1, 1]);
   expect(renders).toEqual([0, 1]);
 });
+
+test.each([false, true])(
+  'Refresh retains signatures from for-of binding defaults (lowered=%s)',
+  lowered => {
+    const source = `const out = [], renders = [];
+  const factory = id => () => fn => {
+    if (fn) fn.signatureId = id;
+    else renders.push(id);
+    return fn;
+  };
+  for (const [signature, App = function () { useState(1); return value; }, value]
+    of [[factory(0), undefined, 3], [factory(1), undefined, 7]]) out.push(App);
+  globalThis.result = [out.map(read => [read.signatureId, read()]), renders];`;
+    expect(
+      execute(
+        source,
+        {
+          reactRefresh: { refreshSig: 'signature' },
+          ...(lowered
+            ? { transforms: { blockScoping: true, destructuring: true, forOf: true } }
+            : {}),
+        },
+        { useState: () => [], $RefreshReg$: () => {} },
+      ).result,
+    ).toEqual([
+      [
+        [0, 3],
+        [1, 7],
+      ],
+      [0, 1],
+    ]);
+  },
+);

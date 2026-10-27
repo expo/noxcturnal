@@ -620,7 +620,7 @@ impl<'a> ReactRefresh<'a> {
         Expression::new_call_expression(span, arrow, None, [Argument::from(argument)], false, ctx)
     }
 
-    fn in_loop_header(ctx: &TraverseCtx<'a>) -> bool {
+    fn needs_local_signature(ctx: &TraverseCtx<'a>) -> bool {
         for ancestor in ctx.ancestors() {
             if ancestor.is_function()
                 || ancestor.is_arrow_function_expression()
@@ -630,7 +630,12 @@ impl<'a> ReactRefresh<'a> {
             }
             if matches!(
                 ancestor,
-                Ancestor::ForStatementInit(_)
+                // Destructuring can turn a loop binding default into a
+                // conditional initializer before Refresh visits its function.
+                Ancestor::ConditionalExpressionConsequent(_)
+                    | Ancestor::ConditionalExpressionAlternate(_)
+                    | Ancestor::LogicalExpressionRight(_)
+                    | Ancestor::ForStatementInit(_)
                     | Ancestor::ForStatementTest(_)
                     | Ancestor::ForStatementUpdate(_)
                     | Ancestor::ForInStatementLeft(_)
@@ -829,7 +834,7 @@ impl<'a> ReactRefresh<'a> {
             false,
             ctx,
         );
-        let expression_local = Self::in_loop_header(ctx);
+        let expression_local = Self::needs_local_signature(ctx);
         let (binding, local) = if expression_local {
             let binding = VarDeclarationsStore::create_uid_var("s", ctx);
             let parent_scope = ctx.scoping().scope_parent_id(scope_id).unwrap();
