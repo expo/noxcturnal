@@ -5,11 +5,13 @@ use crate::generated::event_schema::field_key_name;
 use crate::protocol::manifest::{
     CompiledManifest, CompiledPredicate, CompiledRoute, CompiledScalar, VisitSide,
 };
-use crate::protocol::routed::{PackedWords, encode_routed_envelope, routed_shape_flags};
+use crate::protocol::routed::{
+    PackedWords, encode_routed_envelope, routed_shape_flags, routed_type_tag,
+};
 use crate::semantic::retained_index::{RetainedFieldValue, RetainedIndex};
 
 use super::RoutedCounts;
-use super::fields::{compiled_scalar_matches, intern_packed, predicate_scalar_type};
+use super::fields::{compiled_scalar_matches, predicate_scalar_type};
 
 pub(crate) fn routed_buffer_from_index(
     manifest: &CompiledManifest,
@@ -64,6 +66,11 @@ fn routed_buffer_from_range(
     }
     let records = &index.traversal_records()[range];
     for &record in records {
+        // Inspection can retain exits for later nested visitors. Enter-only
+        // manifests never advance their sequence for these records.
+        if !manifest.include_exit && record & 0x8000_0000 != 0 {
+            continue;
+        }
         let side = if record & 0x8000_0000 != 0 {
             VisitSide::Exit
         } else {
@@ -75,16 +82,16 @@ fn routed_buffer_from_range(
     writer.finish(manifest, index.len() as u32, index, scope_parents)
 }
 
-struct RetainedRouteWriter {
+struct RetainedRouteWriter<'a> {
     words: PackedWords,
-    string_ids: FxHashMap<String, u32>,
+    string_ids: FxHashMap<&'a str, u32>,
     counts: RoutedCounts,
     sequence: u32,
     route_scratch: Vec<u32>,
     parent_ids: FxHashSet<u32>,
 }
 
-impl RetainedRouteWriter {
+impl<'a> RetainedRouteWriter<'a> {
     fn with_capacity(capacity: usize) -> Self {
         Self {
             words: PackedWords::with_capacity(capacity),
@@ -96,10 +103,17 @@ impl RetainedRouteWriter {
         }
     }
 
+    // The retained snapshot owns these strings until packing completes. Reuse
+    // their bytes instead of cloning every response-local dictionary entry.
+    fn intern(&mut self, value: &'a str) -> u32 {
+        let next = self.string_ids.len() as u32;
+        *self.string_ids.entry(value).or_insert(next)
+    }
+
     fn record(
         &mut self,
         manifest: &CompiledManifest,
-        index: &RetainedIndex,
+        index: &'a RetainedIndex,
         node_id: u32,
         side: VisitSide,
         scope_parents: &[u32],
@@ -176,8 +190,13 @@ impl RetainedRouteWriter {
             self.route_scratch = matched_routes;
             return;
         }
-        self.words
-            .extend([event_sequence, node_id, protocol_id, start, end]);
+        self.words.extend([
+            event_sequence,
+            node_id,
+            routed_type_tag(protocol_id, matched_exit_carrier),
+            start,
+            end,
+        ]);
         if manifest.include_parent {
             let parent_id = index.parent_id(node_id);
             if let Some(parent_id) = parent_id {
@@ -202,11 +221,9 @@ impl RetainedRouteWriter {
         }
         let payload_ids: &[u32] =
             payload_route.map_or(&payload_union, |route| &route.payload_field_ids);
-        let present = payload_ids
-            .iter()
-            .filter(|&&field_id| index.scalar_field(node_id, field_id).is_some())
-            .count();
-        self.words.push(present as u32);
+        let count_offset = self.words.len();
+        self.words.push(0);
+        let mut present = 0;
         for &field_id in payload_ids {
             let Some(retained) = index.scalar_field(node_id, field_id) else {
                 continue;
@@ -217,17 +234,19 @@ impl RetainedRouteWriter {
                     let value = index
                         .scalar_string(id)
                         .expect("retained scalar string id is valid");
-                    intern_packed(&mut self.string_ids, value)
+                    self.intern(value)
                 }
             };
             self.words.extend([field_id, value]);
+            present += 1;
         }
+        self.words.patch(count_offset, present);
         if manifest.needs_comments {
             if comments_inner {
                 let comments = index.inner_comments(start, end).collect::<Vec<_>>();
                 self.words.push(comments.len() as u32);
                 for comment in comments {
-                    let value = intern_packed(&mut self.string_ids, &comment.value);
+                    let value = self.intern(&comment.value);
                     self.words.extend([
                         u32::from(comment.block),
                         value,
@@ -250,14 +269,14 @@ impl RetainedRouteWriter {
         mut self,
         manifest: &CompiledManifest,
         node_count: u32,
-        index: &RetainedIndex,
+        index: &'a RetainedIndex,
         scope_parents: &[u32],
     ) -> Result<Buffer> {
         // Parent access commonly continues through several ancestors. Ship the
         // compact summary closure once with the routed batch instead of forcing
         // JavaScript to issue one synchronous N-API request per additional
         // level.
-        let mut parent_ids = self.parent_ids;
+        let mut parent_ids = std::mem::take(&mut self.parent_ids);
         let seeds = parent_ids.iter().copied().collect::<Vec<_>>();
         if manifest.ancestry_depth == u32::MAX {
             for seed in seeds {
@@ -289,9 +308,7 @@ impl RetainedRouteWriter {
         let parents = index.parent_summary_words(&parent_ids, scope_parents);
         if !manifest.has_ancestor_hydration {
             let data = self.words.into_bytes();
-            let mut strings = (0..self.string_ids.len())
-                .map(|_| String::new())
-                .collect::<Vec<_>>();
+            let mut strings = vec![""; self.string_ids.len()];
             for (value, id) in self.string_ids {
                 strings[id as usize] = value;
             }
@@ -387,7 +404,7 @@ impl RetainedRouteWriter {
                         let value = index
                             .scalar_string(id)
                             .expect("retained scalar string id is valid");
-                        intern_packed(&mut self.string_ids, value)
+                        self.intern(value)
                     }
                 };
                 hydrated.extend([field_id, value]);
@@ -400,9 +417,7 @@ impl RetainedRouteWriter {
         }
         let mut data = hydrated.into_bytes();
         data.extend_from_slice(&self.words.into_bytes());
-        let mut strings = (0..self.string_ids.len())
-            .map(|_| String::new())
-            .collect::<Vec<_>>();
+        let mut strings = vec![""; self.string_ids.len()];
         for (value, id) in self.string_ids {
             strings[id as usize] = value;
         }
@@ -468,6 +483,99 @@ fn retained_predicate_matches(
                 .values
                 .iter()
                 .any(|expected| compiled_scalar_matches(expected, scalar_type, actual))
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::generated::event_schema::{field_ids, node_type_id};
+    use crate::protocol::constants::{FieldMask, ROUTE_MANIFEST_MAGIC};
+
+    #[test]
+    fn route_packing_preserves_sparse_payloads_and_ignored_exit_sequences() {
+        let identifier_type = node_type_id("Identifier").unwrap();
+        let mut index = RetainedIndex::with_node_count(2, None, false, true);
+        index.record(0, node_type_id("Program").unwrap(), 0, 10, None, 0);
+        index.record(1, identifier_type, 2, 3, Some(0), 0);
+        index.set_scalar_strings([("x".into(), 0)].into_iter().collect());
+        index.record_packed_fields(1, &[field_ids::NAME, 0, field_ids::BINDING, 0x8000_0001]);
+        index.set_comments(vec![
+            crate::semantic::retained_index::RetainedComment {
+                block: true,
+                value: "x".into(),
+                start: 2,
+                end: 3,
+            },
+            crate::semantic::retained_index::RetainedComment {
+                block: false,
+                value: "雪😀".into(),
+                start: 2,
+                end: 3,
+            },
+        ]);
+        index.record_enter(0);
+        index.record_enter(1);
+        index.record_exit(1);
+        index.record_exit(0);
+        for include_exit in [false, true] {
+            let bytes = [ROUTE_MANIFEST_MAGIC, 0, 0, 0, 32, 0, 0, 0]
+                .into_iter()
+                .flat_map(u32::to_le_bytes)
+                .collect::<Vec<_>>();
+            let mut manifest = crate::engine::decode_route_manifest(&bytes).unwrap();
+            manifest.include_exit = include_exit;
+            manifest.program_only = false;
+            manifest.needs_comments = true;
+            for (id, payload_field_ids) in [
+                vec![field_ids::GLOBAL, field_ids::NAME],
+                vec![field_ids::NAME, field_ids::BINDING],
+            ]
+            .into_iter()
+            .enumerate()
+            {
+                manifest.routes_by_type[identifier_type as usize].push(CompiledRoute {
+                    id: id as u32,
+                    node_type_id: identifier_type,
+                    side: if include_exit && id == 1 {
+                        VisitSide::Exit
+                    } else {
+                        VisitSide::Enter
+                    },
+                    predicates: Vec::new(),
+                    payload_mask: payload_field_ids
+                        .iter()
+                        .fold(FieldMask::none(), |mask, &id| mask.with(id)),
+                    payload_field_ids,
+                    comments_inner: true,
+                });
+            }
+            let actual = routed_buffer_from_index(&manifest, &index, &[], None).unwrap();
+            let word = |offset| u32::from_le_bytes(actual[offset..offset + 4].try_into().unwrap());
+            // Field and comment strings deduplicate by content, including when
+            // equal values live in separate allocations in the retained index.
+            assert_eq!(word(20), 2);
+            assert_eq!(word(32), 1);
+            assert_eq!(actual[36], b'x');
+            assert_eq!(word(40), "雪😀".len() as u32);
+            assert_eq!(&actual[44..51], "雪😀".as_bytes());
+            let records_offset = word(24) as usize;
+            assert_eq!(word(records_offset), 1);
+            assert_eq!(word(records_offset + 5 * 4), 2);
+            assert_eq!(
+                (word(records_offset + 6 * 4), word(records_offset + 7 * 4)),
+                (field_ids::NAME, 0)
+            );
+            assert_eq!(
+                (word(records_offset + 8 * 4), word(records_offset + 9 * 4)),
+                (field_ids::BINDING, 0x8000_0001)
+            );
+            assert_eq!(word(records_offset + 10 * 4), 2);
+            assert_eq!(word(records_offset + 12 * 4), 0);
+            assert_eq!(word(records_offset + 16 * 4), 1);
+            assert_eq!(word(12), if include_exit { 2 } else { 1 });
+            assert_eq!(word(16), 2);
         }
     }
 }

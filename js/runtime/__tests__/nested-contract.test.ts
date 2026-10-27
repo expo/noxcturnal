@@ -1,5 +1,6 @@
 import { resolve } from 'node:path';
-import { beforeAll, describe, expect, test } from 'vitest';
+import { beforeAll, describe, expect, test, vi } from 'vitest';
+import { NativeTransformSession } from '../session';
 import {
   NativeTransformError,
   defineNativePipeline,
@@ -7,7 +8,7 @@ import {
   defineVisitor,
   transform,
 } from '../../index';
-import type { DefinedVisitor } from '../../index';
+import type { DefinedVisitor, NativeNodePath } from '../../index';
 
 function run(source: string, visitors: readonly DefinedVisitor<unknown>[], nested: boolean) {
   const plugin = defineNativePlugin({
@@ -389,5 +390,87 @@ for (const source of [
     expect(immediate).toEqual([]);
     expect(seen.length).toBeGreaterThanOrEqual(3);
     expect(new Set(seen).size).toBe(seen.length);
+  });
+}
+
+test('nested replay shares scopes within a route and isolates repeated traversal control', () => {
+  const scopes: unknown[] = [];
+  const names: string[] = [];
+  const leaf = [
+    defineVisitor('Identifier', { fields: ['name'], scope: true, controlFlow: ['stop'] }, path => {
+      scopes.push(path.scope);
+      names.push(path.node.name);
+      if (path.node.name === 'second') path.stop();
+    }),
+  ];
+  const plugin = defineNativePlugin({
+    name: 'repeated-nested-state',
+    visitors: [
+      defineVisitor('Program', { nested: leaf, controlFlow: ['nested-traverse'] }, path => {
+        path.traverse(leaf);
+        path.traverse(leaf);
+      }),
+    ],
+  });
+  const result = transform(
+    'first; second; third;',
+    'input.js',
+    defineNativePipeline({ phases: [{ name: 'scan', plugins: [plugin] }] }),
+  );
+  expect(result.status).toBe('complete');
+  expect(names).toEqual(['first', 'second', 'first', 'second']);
+  expect(scopes[0] === scopes[1]).toBe(true);
+  expect(scopes[2] === scopes[3]).toBe(true);
+  expect(scopes[0] === scopes[2]).toBe(false);
+});
+
+test('nested runtime caches keep ancestry capability boundaries separate', () => {
+  const limited: (string | undefined)[] = [];
+  const unlimited: (string | undefined)[] = [];
+  const ancestry = { mode: 'findParent', routes: { Program: { fields: [] } } } as const;
+  const leaf = [
+    defineVisitor('Identifier', { ancestry }, path => {
+      unlimited.push(path.parentPath?.parentPath?.type);
+    }),
+    defineVisitor('Identifier', { ancestry: { ...ancestry, mode: 'parent' } }, path => {
+      // Probe the runtime limit beyond the statically restricted parent view.
+      limited.push((path.parentPath as NativeNodePath | null)?.parentPath?.type);
+    }),
+  ];
+  const result = run('first; second;', leaf, true);
+  expect(result.status).toBe('complete');
+  expect(unlimited).toEqual(['Program', 'Program']);
+  expect(limited).toEqual([undefined, undefined]);
+});
+
+for (const mode of ['plain', 'ancestry', 'scope', 'dynamic'] as const) {
+  test(`nested ${mode} routes transport only the required structural data`, () => {
+    const next = vi.spyOn(NativeTransformSession.prototype, 'nextRoutedPacked');
+    const names: string[] = [];
+    try {
+      const leaf = [
+        defineVisitor(
+          'Identifier',
+          {
+            fields: ['name'],
+            scope: mode === 'scope',
+            ancestry: mode === 'ancestry' ? { mode: 'parent', routes: {} } : undefined,
+            controlFlow: mode === 'dynamic' ? ['dynamic-subscriptions'] : [],
+          },
+          path => {
+            names.push(path.node.name);
+          },
+        ),
+      ];
+      const result = run('const value=1; value;', leaf, true);
+      expect(result.status).toBe('complete');
+      expect(names).toEqual(['value', 'value']);
+      const batch = next.mock.results.at(-1)?.value;
+      expect(batch.includeParent).toBe(mode === 'ancestry');
+      expect(batch.includeScope).toBe(mode === 'scope' || mode === 'dynamic');
+      if (mode !== 'ancestry') expect(batch.parentSummaries.length).toBe(0);
+    } finally {
+      next.mockRestore();
+    }
   });
 }

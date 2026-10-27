@@ -34,3 +34,21 @@ use source ranges or per-node native queries. Siblings can share source spans.
 `path.traverse` and `subscribeWithin` send the owning node ID to native routing.
 Their bounds are structural, including when parents and siblings share the same
 source coordinates. Explicit coordinate queries keep their range semantics.
+
+Nested replays bind path runtimes once per route contract, sharing lazy scope and
+ancestor caches across deliveries. Each replay owns fresh control state and caches;
+sharing them across separate `traverse` calls would leak stops and skip ranges.
+Nested envelopes transport parent summaries only for declared ancestry and scope
+IDs only for scope access or dynamic subscriptions. Dynamic followup filtering is
+stateless; delivery sets remain necessary to prevent reentrant subscriptions from
+delivering the same callback twice.
+
+Event and ancestor-path caches address native node identities through pages of
+256 slots. Only touched pages allocate node slots, so sparse visitors avoid
+reserving arrays for the entire parse. Ancestor-path caches are created on first
+use within their route runtime. Page directories stay packed even when replay
+visits identities out of order; source spans never participate in addressing.
+
+Exit replay retains only matched exit carriers on a stack. Its lifetime follows
+structural nesting rather than node-ID range or total delivered nodes. Enter
+paths keep their own event objects; creating the exit view never mutates them.

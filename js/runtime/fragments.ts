@@ -88,7 +88,6 @@ export function sourceFragmentBelongsTo(
 export function realizeContent(
   session: NativeTransformSession,
   value: Code | readonly Code[],
-  onDegrade?: (message: string, fragment: SourceFragment) => void,
   prefix = '',
   suffix = '',
 ): RealizedContent {
@@ -109,10 +108,6 @@ export function realizeContent(
         parts.push({ start: part.start, end: part.end });
         hasCopy = true;
       } else {
-        onDegrade?.(
-          `source fragment ${part.start}..${part.end} comes from another phase; copied as text`,
-          part,
-        );
         if (part.text()) parts.push(part.text());
       }
       return;

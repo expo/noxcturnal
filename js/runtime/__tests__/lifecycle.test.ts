@@ -432,7 +432,7 @@ test('conservatively evaluates side-effect-free constant expressions', () => {
   const ids = ['1 + 2 * 3', '!0 && "yes"', 'true ? "123" : "x"', 'sideEffect()'].map(expression =>
     bySource.get(expression)!,
   );
-  const missing = session.nodeCapacity + 1;
+  const missing = 0xffff_ffff;
   const constants = session.query({ constants: [ids[0], ...ids, ids[0], missing] }).constants;
   assert.equal(constants[ids[0]], 7);
   assert.equal(constants[ids[1]], 'yes');
@@ -768,4 +768,21 @@ test('UID allocation without identifier retention preserves lazy parsing and err
   assert.throws(() => invalid.generateUid('temp'));
   assert.throws(() => invalid.generateUid('temp'));
   invalid.close();
+});
+
+test('event replay enriches summaries and preserves earlier scalar fields', () => {
+  const session = openRetained('value;', 'input.js');
+  try {
+    const identifier = session.nodes(['Identifier'])[0]!;
+    const summary = session.event(identifier.id)!;
+    assert.equal(session.nodeView(summary).name, undefined);
+    session.cacheEvent(Object.assign({ ...summary, fields: [] }, { name: 'value', global: false }));
+    assert.equal(session.nodeView(session.event(identifier.id)!).name, 'value');
+    session.cacheEvent(Object.assign({ ...summary, fields: [] }, { global: true }));
+    const replayed = session.nodeView(session.event(identifier.id)!);
+    assert.equal(replayed.name, 'value');
+    assert.equal(replayed.global, true);
+  } finally {
+    session.close();
+  }
 });

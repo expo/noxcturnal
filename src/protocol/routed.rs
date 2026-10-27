@@ -3,6 +3,12 @@ use napi::{Result, bindgen_prelude::Buffer};
 use super::constants::ROUTED_TAPE_MAGIC;
 use super::manifest::CompiledManifest;
 
+/// Only matched exit carriers need to survive until their matching leave. The
+/// type tag's high bit marks those enters without adding a word to every node.
+pub(crate) fn routed_type_tag(type_id: u32, exit_carrier: bool) -> u32 {
+    type_id | (u32::from(exit_carrier) << 31)
+}
+
 /// Indexed routing can leave bounds absent and use its lazy bulk table instead.
 /// This keeps skip declarations from eagerly allocating per-node index caches.
 pub(crate) fn routed_shape_flags(manifest: &CompiledManifest, inline_bounds: bool) -> u32 {
@@ -16,7 +22,7 @@ pub(crate) fn routed_shape_flags(manifest: &CompiledManifest, inline_bounds: boo
 pub(crate) fn encode_routed_envelope(
     shape_flags: u32,
     node_count: u32,
-    strings: Vec<String>,
+    strings: Vec<impl AsRef<str>>,
     data: Vec<u8>,
     node_records: u32,
     route_deliveries: u32,
@@ -24,7 +30,10 @@ pub(crate) fn encode_routed_envelope(
 ) -> Result<Buffer> {
     let strings_size: usize = strings
         .iter()
-        .map(|value| 4 + value.len() + (4 - value.len() % 4) % 4)
+        .map(|value| {
+            let length = value.as_ref().len();
+            4 + length + (4 - length % 4) % 4
+        })
         .sum();
     let records_offset = 32 + strings_size + parent_summaries.len() * 4;
     let mut output = Vec::with_capacity(records_offset + data.len());
@@ -41,6 +50,7 @@ pub(crate) fn encode_routed_envelope(
         output.extend_from_slice(&word.to_le_bytes());
     }
     for value in strings {
+        let value = value.as_ref();
         output.extend_from_slice(&(value.len() as u32).to_le_bytes());
         output.extend_from_slice(value.as_bytes());
         output.resize(output.len().next_multiple_of(4), 0);

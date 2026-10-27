@@ -571,6 +571,8 @@ export const NODE_TYPE_IDS = new Map<string, number>(NODE_TYPES.map((value, inde
 export const FIELD_KEYS = ${JSON.stringify(['', ...schema.fieldKeys])} as const;
 export type NativeFieldKey = Exclude<(typeof FIELD_KEYS)[number], ''>;
 export const FIELD_KEY_IDS = new Map<string, number>(FIELD_KEYS.map((value, index) => [value, index]));
+/** Valid scalar payload keys for each concrete node type. */
+export const SCALAR_FIELDS: Readonly<Record<string, readonly string[]>> = ${JSON.stringify(Object.fromEntries(Object.entries(carrierRows).map(([type, fields]) => [type, Object.keys(fields)])))};
 export const PREDICATE_FIELDS: Readonly<Record<string, readonly string[]>> = ${JSON.stringify(schema.predicateFields)};
 /** Runtime scalar domains for predicate validation, generated from the same
  * field types that drive RouteWhere. */

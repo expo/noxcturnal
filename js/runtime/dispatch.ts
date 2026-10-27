@@ -1,4 +1,5 @@
 import { alias, expandSubscriptions } from '../pipeline/route-utils';
+import { NodeCache } from './node-cache';
 import { CHILD_ROLES } from '../generated/event-schema';
 import { createEditor, EDIT_OWNER, type OwnedEdit } from './editor';
 import {
@@ -80,7 +81,6 @@ export function createDispatcher(
   compiledRoutes: readonly CompiledRouteTemplate[],
   dispatchRoutes: readonly DispatchRoute[],
   intents: Map<string, IntentRegistration>,
-  provenance: { degradations: number },
   services: DispatchServices,
   pluginData: unknown,
 ): Dispatcher {
@@ -212,10 +212,7 @@ export function createDispatcher(
       skipped: undefined,
       context: undefined as unknown as PluginContext,
     };
-    const realizeIntentContent = (code: Code): RealizedContent =>
-      realizeContent(session, code, () => {
-        provenance.degradations++;
-      });
+    const realizeIntentContent = (code: Code): RealizedContent => realizeContent(session, code);
     /** Register `(kind, key)` for this plugin, or return the existing registration
      * when the intent is already claimed with identical realized content. */
     const ensureIntent = (
@@ -490,22 +487,23 @@ export function createDispatcher(
         replayRoutedFollowup(plugin, entry, context, expanded, root, filter);
       },
       parent(_target, parentId, ancestryDepth) {
-        const cached = runtime.pathCache?.[parentId];
+        const cached = runtime.pathCache?.get(parentId);
         if (cached) return cached;
         const parent = session.event(parentId);
         if (!parent) return null;
         const path = makePath(runtime, parent, ancestryDepth);
-        if (runtime.pathCache) runtime.pathCache[parentId] = path;
+        if (runtime.cacheAncestorPaths) (runtime.pathCache ??= new NodeCache()).set(parentId, path);
         return path;
       },
       children(target, ancestryDepth, role) {
         const roleId = role == null ? undefined : CHILD_ROLES[target.type]?.[role]?.id;
         return session.children(target.id, roleId).map(child => {
           if (ancestryDepth > 0) {
-            const cached = runtime.pathCache?.[child.id];
+            const cached = runtime.pathCache?.get(child.id);
             if (cached) return cached;
             const path = makePath(runtime, child, ancestryDepth);
-            if (runtime.pathCache) runtime.pathCache[child.id] = path;
+            if (runtime.cacheAncestorPaths)
+              (runtime.pathCache ??= new NodeCache()).set(child.id, path);
             return path;
           }
           return makePath(runtime, child, 0);
@@ -517,7 +515,7 @@ export function createDispatcher(
       allowsScope() {
         return capabilities.scope;
       },
-      scopeCache: new Map(),
+      scopeCache: undefined,
       pathCache: undefined,
       cacheAncestorPaths:
         typeof capabilities.ancestry?.mode !== 'number' &&
@@ -543,18 +541,13 @@ export function createDispatcher(
         );
       },
       capabilities,
-      provenance,
     };
-    if (runtime.cacheAncestorPaths) runtime.pathCache = new Array(session.nodeCapacity);
     return runtime;
   };
   const dispatchOne = (
     event: NativeEvent,
-    plugin: NativePlugin<any, any>,
     entry: DispatcherEntry,
-    context: PluginContext,
-    boundRuntime: PathRuntime | null,
-    capabilities: RouteCapabilities,
+    runtime: PathRuntime,
     override?: readonly DefinedVisitor<any>[],
     overrideState?: any,
     routedCallbacks: readonly Handler<any>[] = [],
@@ -569,7 +562,6 @@ export function createDispatcher(
     if (delivered?.has(deliveryKey)) return;
     if (entry.stopped || stopAll || eventIsSkipped(event, entry.skipped)) return;
     if (routedCallbacks.length === 0) return;
-    const runtime = boundRuntime ?? createPathRuntime(plugin, entry, context, capabilities);
     const path = makePath(runtime, event, 0, true);
     currentSequence = event.sequence;
     delivered?.add(deliveryKey);
@@ -589,7 +581,6 @@ export function createDispatcher(
     context: PluginContext,
   ) => {
     const compiled = services.compileNestedVisitor(visitor);
-    session.reserveEventCache(routedBatch.nodeCount);
     if (routedBatch.includeParent) session.seedSummaries(routedBatch.parentSummaries);
 
     session.prefetchRoutedChildren(
@@ -597,7 +588,7 @@ export function createDispatcher(
       compiled.capabilities.map(caps => [caps]),
     );
 
-    const entry = {
+    const entry: DispatcherEntry = {
       context,
       state,
       ownerIdentity: contexts.get(plugin)!.ownerIdentity,
@@ -606,20 +597,14 @@ export function createDispatcher(
     };
     dispatchRoutedEvents(
       routedBatch,
-      compiled.callbacks.map(
-        (callbacks, index) => (event: NativeEvent) =>
-          dispatchOne(
-            event,
-            plugin,
-            entry,
-            context,
-            null,
-            compiled.capabilities[index],
-            visitor,
-            state,
-            callbacks,
-          ),
-      ),
+      compiled.callbacks.map((callbacks, index) => {
+        const capabilities = compiled.capabilities[index];
+        // A replay owns fresh control state, but every delivery of the same
+        // contract can share its closures and lazy scope/ancestor caches.
+        const runtime = runtimeFor(plugin, entry, context, capabilities);
+        return (event: NativeEvent) =>
+          dispatchOne(event, entry, runtime, visitor, state, callbacks);
+      }),
       event => session.cacheEvent(event),
     );
   };
@@ -647,7 +632,9 @@ export function createDispatcher(
       const routes = selected.map((route, id) => ({ ...route, id }));
       followup = {
         routes,
-        manifest: packRouteManifest(routes, true, true),
+        // Scope IDs also serve subscribeForScope's filter. Parent summaries are
+        // needed only when this plugin can observe ancestry.
+        manifest: packRouteManifest(routes, plans.get(plugin)?.ancestry != null, true),
       };
       followupRouteCache.set(key, followup);
     }
@@ -658,29 +645,22 @@ export function createDispatcher(
       followup.routes.map(route => [route.capabilities]),
     );
     resetSkippedTraversal(entry.skipped);
-    const accepted = new WeakSet<NativeEvent>();
     dispatchRoutedEvents(
       routed,
       followup.routes.map(route => {
         const runtime = runtimeFor(plugin, entry, context, route.capabilities);
         return (event: NativeEvent) => {
-          if (accepted.has(event))
+          if (filter(event))
             dispatchOne(
               event,
-              plugin,
               entry,
-              context,
               runtime,
-              route.capabilities,
               undefined,
               undefined,
               route.callbacks as Handler<any>[],
             );
         };
       }),
-      event => {
-        if (filter(event)) accepted.add(event);
-      },
     );
   };
   const compileCheckedRoute = (route: (typeof dispatchRoutes)[number]) => {
@@ -688,17 +668,7 @@ export function createDispatcher(
     const entry = contexts.get(plugin)!;
     const runtime = runtimeFor(plugin, entry, entry.context, capabilities);
     return (event: NativeEvent) =>
-      dispatchOne(
-        event,
-        plugin,
-        entry,
-        entry.context,
-        runtime,
-        capabilities,
-        undefined,
-        undefined,
-        callbacks as Handler<any>[],
-      );
+      dispatchOne(event, entry, runtime, undefined, undefined, callbacks as Handler<any>[]);
   };
   const compileStaticSingleCallbackRoute = (member: {
     entry: DispatcherEntry;

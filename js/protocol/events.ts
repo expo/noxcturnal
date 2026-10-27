@@ -119,7 +119,9 @@ export function dispatchRoutedEvents(
   // Signed reads keep every tape word SMI-representable: exit tags surface as negative
   // values and absent-id sentinels as -1, so no heap numbers are allocated per record.
   const words = new Int32Array(batch.data.buffer, batch.data.byteOffset, batch.data.byteLength / 4);
-  const enterEvents: (NativeEvent | undefined)[] | null = batch.includeExit ? [] : null;
+  // Only enters with matching exit deliveries are retained, in structural order.
+  // A stack stays bounded by nesting depth instead of the parse's node count.
+  const enterEvents: NativeEvent[] | null = batch.includeExit ? [] : null;
   // Interned exceptional strings need JSON decoding only once per tape.
   const decodedStrings: string[] = [];
   let offset = 0;
@@ -130,8 +132,9 @@ export function dispatchRoutedEvents(
       const routeCount = words[offset++];
       const routeStart = offset;
       offset += routeCount;
-      const enter = enterEvents?.[id];
-      if (!enter) throw new Error(`routed exit event ${id} has no enter record`);
+      const enter = enterEvents?.pop();
+      if (!enter || enter.id !== id)
+        throw new Error(`routed exit event ${id} has no matching enter record`);
       const event: TraversalEvent = {
         ...enter,
         sequence: sequenceWord & TAG_INDEX,
@@ -145,7 +148,8 @@ export function dispatchRoutedEvents(
     }
     const sequence = sequenceWord;
     const id = words[offset++];
-    const type = NODE_TYPES[words[offset++]];
+    const typeTag = words[offset++];
+    const type = NODE_TYPES[typeTag & TAG_INDEX];
     if (!type) throw new Error('invalid routed node type');
     const start = words[offset++];
     const end = words[offset++];
@@ -211,12 +215,13 @@ export function dispatchRoutedEvents(
     const routeCount = words[offset++];
     const routeStart = offset;
     offset += routeCount;
-    if (enterEvents) enterEvents[id] = event;
+    if (typeTag < 0) enterEvents?.push(event);
     onEvent?.(event);
     for (let index = routeStart; index < routeStart + routeCount; index++)
       handlers[words[index]](event);
   }
   if (offset !== words.length) throw new Error('trailing routed tape words');
+  if (enterEvents?.length) throw new Error('unclosed routed exit carriers');
 }
 
 export function decodePackedEnvelope(buffer: Buffer): PackedEventBatch {
