@@ -142,6 +142,13 @@ test.each([
     expected: [3, 3],
     signatures: 1,
   },
+  {
+    name: 'var in a sloppy for-in initializer',
+    source: `for (var App = function () { const [value] = useState(3); return value; } in {}) {}
+      globalThis.result = App();`,
+    expected: 3,
+    signatures: 1,
+  },
 ])(
   'Refresh attaches a signature to a $name without aborting',
   ({ source, expected, signatures }) => {

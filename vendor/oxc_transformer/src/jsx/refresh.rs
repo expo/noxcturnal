@@ -461,7 +461,10 @@ impl<'a> ReactRefresh<'a> {
                 && let Some(ident) = declarator.id().get_binding_identifier()
             {
                 let id_binding = BoundIdentifier::from_binding_ident(ident);
-                if !matches!(ctx.ancestor(2), Ancestor::ForStatementInit(_)) {
+                if !matches!(
+                    ctx.ancestor(2),
+                    Ancestor::ForStatementInit(_) | Ancestor::ForInStatementLeft(_)
+                ) {
                     self.handle_function_in_variable_declarator(
                         &id_binding,
                         &binding,
@@ -470,7 +473,7 @@ impl<'a> ReactRefresh<'a> {
                     );
                     return;
                 }
-                // A for initializer is not a statement-list item. Infer the
+                // A for/for-in initializer is not a statement-list item. Infer the
                 // original function name through a property initializer, then
                 // associate its signature in the initializer expression itself.
                 // A named function would introduce a different self binding.

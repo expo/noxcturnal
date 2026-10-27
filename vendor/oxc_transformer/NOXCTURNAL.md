@@ -71,7 +71,7 @@ Local patches:
   static-block boundaries, reset comments, and safe synthetic-span signatures.
   Propagate HOC signature descriptions instead of cloning callback ASTs, so each
   emitted custom-hook callback has fresh scopes and references for later passes.
-  Keep for-initializer signature attachment in the expression and preserve inferred
+  Keep for/for-in initializer signature attachment in the expression and preserve inferred
   names without introducing a self binding. The native host supplies local
   statement lists for instrumented single control-flow bodies before semantics,
   so signature factory initialization stays in its original environment.
