@@ -6,7 +6,11 @@ Native phases run through [preflight](../preflight/README.md); visitor changes g
 
 A session retains the facts requested by the phase's visitor contracts. It supports queries and later traversals without requiring a separate native call to discover each node's context. Collection must remain opt-in.
 
-The input parse can serve selection and function-map collection before it is consumed by traversal or validation. Do not reuse consumed session or parsed-program handles.
+Initial collection completes before derived query indexes are built. Collectors
+write node facts and traversal records directly, without invalidating empty
+query caches for every node.
+
+The input parse can serve selection and function-map collection before it is consumed by traversal or validation. Syntax selection also counts nodes, scopes, symbols, and references for semantic allocation, avoiding another counting traversal of the same immutable tree. Do not reuse consumed session or parsed-program handles.
 
 Reuse indexes only when the source and requested facts still match. A no-edit phase can retain its index, while changes that invalidate bindings require new semantic analysis. Source-map failures remain fatal even when code generation succeeded.
 

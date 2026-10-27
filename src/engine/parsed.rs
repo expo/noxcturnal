@@ -1,13 +1,17 @@
+use std::cell::Cell;
+
 use napi::{
     Error, Result, Status,
     bindgen_prelude::{Buffer, Either},
 };
 use napi_derive::napi;
 use oxc_allocator::Allocator;
-use oxc_ast::AstKind;
-use oxc_ast_visit::Visit;
+use oxc_ast::{AstKind, ast::TSEnumMemberName};
+use oxc_ast_visit::{Visit, walk};
 use oxc_parser::{Parser, ParserReturn};
+use oxc_semantic::Stats;
 use oxc_span::SourceType;
+use oxc_syntax::scope::{ScopeFlags, ScopeId};
 use self_cell::self_cell;
 
 use crate::generated::event_schema::{NODE_TYPE_COUNT, ast_kind_protocol_id, node_type_name};
@@ -35,12 +39,16 @@ struct SyntaxFacts {
     types: [bool; NODE_TYPE_COUNT + 1],
     async_function: bool,
     generator_function: bool,
+    stats: Stats,
 }
 
 impl<'a> Visit<'a> for SyntaxFacts {
     fn enter_node(&mut self, kind: AstKind<'a>) {
         self.types[ast_kind_protocol_id(kind) as usize] = true;
+        self.stats.nodes += 1;
         match kind {
+            AstKind::BindingIdentifier(_) => self.stats.symbols += 1,
+            AstKind::IdentifierReference(_) => self.stats.references += 1,
             AstKind::Function(function) => {
                 self.async_function |= function.r#async;
                 self.generator_function |= function.generator;
@@ -51,6 +59,15 @@ impl<'a> Visit<'a> for SyntaxFacts {
             _ => {}
         }
     }
+
+    fn enter_scope(&mut self, _: ScopeFlags, _: &Cell<Option<ScopeId>>) {
+        self.stats.scopes += 1;
+    }
+
+    fn visit_ts_enum_member_name(&mut self, name: &TSEnumMemberName<'a>) {
+        self.stats.symbols += 1;
+        walk::walk_ts_enum_member_name(self, name);
+    }
 }
 
 /// Own the input parse while JavaScript selects the applicable plugin contracts.
@@ -59,6 +76,9 @@ impl<'a> Visit<'a> for SyntaxFacts {
 pub struct NativeParsedSource {
     parsed: Option<OwnedProgram>,
     filename: String,
+    // Syntax selection already walks this immutable tree. Carry its exact
+    // allocation counts into semantic analysis instead of counting it again.
+    semantic_stats: Cell<Option<Stats>>,
 }
 
 #[napi]
@@ -84,6 +104,7 @@ impl NativeParsedSource {
         Ok(Self {
             parsed: Some(parsed),
             filename,
+            semantic_stats: Cell::new(None),
         })
     }
 
@@ -102,8 +123,10 @@ impl NativeParsedSource {
             types: [false; NODE_TYPE_COUNT + 1],
             async_function: false,
             generator_function: false,
+            stats: Stats::default(),
         };
         facts.visit_program(&parsed.borrow_dependent().program);
+        self.semantic_stats.set(Some(facts.stats));
         let mut names = facts
             .types
             .iter()
@@ -140,6 +163,7 @@ impl NativeParsedSource {
                 Some(retention_manifest.compiled()),
                 Some(initial_route_manifest.compiled()),
                 true,
+                self.semantic_stats.get(),
             )
         })?;
         Ok(NativeIndexedSession::from_parts(
@@ -164,6 +188,7 @@ impl NativeParsedSource {
                 &parsed.program,
                 manifest.compiled(),
                 None,
+                self.semantic_stats.get(),
             )
         })
     }
@@ -173,7 +198,16 @@ impl NativeParsedSource {
     pub fn validate(&mut self) -> Result<()> {
         let parsed = self.parsed.take().ok_or_else(consumed)?;
         parsed.with_dependent(|owner, parsed| {
-            validate_program(&parsed.program, "indexed-session", &owner.allocator).map(|_| ())
+            if let Some(stats) = self.semantic_stats.get() {
+                crate::syntax::validation::validate_program_with_stats(
+                    &parsed.program,
+                    "indexed-session",
+                    stats,
+                )
+                .map(|_| ())
+            } else {
+                validate_program(&parsed.program, "indexed-session", &owner.allocator).map(|_| ())
+            }
         })
     }
 
@@ -225,6 +259,66 @@ mod tests {
             .syntax_facts()
             .unwrap();
         assert!(facts.iter().any(|fact| fact == "JSDocUnknownType"));
+    }
+
+    #[test]
+    fn syntax_selection_reuses_exact_semantic_allocation_counts() {
+        for (filename, source) in [
+            (
+                "input.js",
+                "function outer(value = () => unknown) { try { return value(); } catch ({message}) { return message; } }",
+            ),
+            (
+                "input.js",
+                "var repeated; var repeated; class C extends Base { #value = 1; static { const local = 2; } method() { return this.#value; } }",
+            ),
+            (
+                "input.ts",
+                "interface I<T> { value: T } type Mapper<T> = T extends infer U ? U : never; enum E { First, Second = 2 } namespace N { export const value = E.First; }",
+            ),
+            (
+                "input.tsx",
+                "const View = <T,>(value: T) => <Widget value={value} />;",
+            ),
+        ] {
+            let mut parsed = NativeParsedSource::new(source.into(), filename.into()).unwrap();
+            let expected =
+                Stats::count(&parsed.parsed.as_ref().unwrap().borrow_dependent().program);
+            let initial_facts = parsed.syntax_facts().unwrap();
+            assert_eq!(parsed.syntax_facts().unwrap(), initial_facts);
+            let actual = parsed.semantic_stats.get().unwrap();
+            assert_eq!(
+                (
+                    actual.nodes,
+                    actual.scopes,
+                    actual.symbols,
+                    actual.references
+                ),
+                (
+                    expected.nodes,
+                    expected.scopes,
+                    expected.symbols,
+                    expected.references
+                ),
+                "{filename}: {source}",
+            );
+            // The same cached counts feed ordinary early-error validation;
+            // successful validation still consumes exactly this parse.
+            parsed.validate().unwrap();
+            assert!(parsed.syntax_facts().is_err());
+        }
+    }
+
+    #[test]
+    fn cached_syntax_counts_do_not_skip_early_errors() {
+        let mut parsed =
+            NativeParsedSource::new("let duplicate; let duplicate;".into(), "input.js".into())
+                .unwrap();
+        parsed.syntax_facts().unwrap();
+        assert!(parsed.validate().is_err());
+        assert!(parsed.syntax_facts().is_err());
+        parsed.close();
+        parsed.close();
     }
 
     #[test]

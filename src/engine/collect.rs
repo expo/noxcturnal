@@ -88,8 +88,8 @@ impl<'a> Visit<'a> for SyntaxIndexCollector<'a> {
         let protocol_id = ast_kind_protocol_id(kind);
         let parent_id = self.parent_stack.last().map(|(id, _, _)| *id);
         let span = kind.span();
-        self.retained_index.record_enter(id);
-        self.retained_index.record(
+        self.retained_index.collect_enter(id);
+        self.retained_index.collect_node(
             id,
             protocol_id,
             self.utf16
@@ -100,12 +100,11 @@ impl<'a> Visit<'a> for SyntaxIndexCollector<'a> {
             0,
         );
         if self.retention_capabilities & RETAIN_CHILDREN != 0 {
-            let child_role_id = self
-                .parent_stack
-                .last()
-                .and_then(|(_, _, parent)| child_role_id_for_edge(*parent, kind));
-            self.retained_index
-                .record_child_edge(id, parent_id, child_role_id);
+            self.retained_index.record_child_edge(id, parent_id, || {
+                self.parent_stack
+                    .last()
+                    .and_then(|(_, _, parent)| child_role_id_for_edge(*parent, kind))
+            });
         }
         if self.retention_capabilities & RETAIN_CONSTANTS != 0 {
             self.retained_index.record_constant(kind, id);
@@ -153,7 +152,7 @@ impl<'a> Visit<'a> for SyntaxIndexCollector<'a> {
             .expect("syntax traversal enter/leave balance");
         self.member_writes.leave();
         if self.retains_traversal_kind(kind) {
-            self.retained_index.record_exit(id);
+            self.retained_index.collect_exit(id);
         }
     }
 
@@ -183,7 +182,7 @@ impl<'a> EventCollector<'a> {
         };
         let is_root = id.index() == 0;
         let protocol_id = ast_kind_protocol_id(kind);
-        self.retained_index.record(
+        self.retained_index.collect_node(
             id.index() as u32,
             protocol_id,
             self.utf16
@@ -194,11 +193,10 @@ impl<'a> EventCollector<'a> {
             scope_id.index() as u32,
         );
         if self.retention_capabilities & RETAIN_CHILDREN != 0 {
-            let parent_kind = (!is_root).then(|| self.nodes.parent_kind(id));
             self.retained_index.record_child_edge(
                 id.index() as u32,
                 (!is_root).then(|| self.nodes.parent_id(id).index() as u32),
-                parent_kind.and_then(|parent| child_role_id_for_edge(parent, kind)),
+                || child_role_id_for_edge(self.nodes.parent_kind(id), kind),
             );
         }
         if self.retain_scopes && self.retention_capabilities & RETAIN_IDENTIFIERS != 0 {
@@ -277,14 +275,14 @@ impl<'a> Visit<'a> for EventCollector<'a> {
     fn enter_node(&mut self, kind: AstKind<'a>) {
         let (member_write, member_root_write) = self.member_writes.enter(kind);
         self.retained_index
-            .record_enter(kind.node_id().index() as u32);
+            .collect_enter(kind.node_id().index() as u32);
         self.record_summary(kind, member_write, member_root_write);
     }
     fn leave_node(&mut self, kind: AstKind<'a>) {
         self.member_writes.leave();
         if self.retains_traversal_kind(kind) {
             self.retained_index
-                .record_exit(kind.node_id().index() as u32);
+                .collect_exit(kind.node_id().index() as u32);
         }
     }
     fn visit_program(&mut self, program: &oxc_ast::ast::Program<'a>) {
@@ -315,6 +313,7 @@ pub(crate) fn materialize_with_scope_parents(
         retention_manifest,
         initial_route_manifest,
         build_initial_route,
+        None,
     )
 }
 
@@ -325,6 +324,7 @@ pub(crate) fn materialize_program<'a>(
     retention_manifest: Option<&CompiledManifest>,
     initial_route_manifest: Option<&CompiledManifest>,
     build_initial_route: bool,
+    semantic_stats: Option<Stats>,
 ) -> Result<MaterializedSessionParts> {
     let utf16 = (!source.is_ascii()).then(|| utf16_index(source, allocator));
     let program_body_offsets =
@@ -405,10 +405,13 @@ pub(crate) fn materialize_program<'a>(
             initial_routed_buffer,
         });
     }
-    let semantic_return = SemanticBuilder::new()
+    let mut semantic_builder = SemanticBuilder::new()
         .with_build_nodes(true)
-        .with_check_syntax_error(true)
-        .build(program);
+        .with_check_syntax_error(true);
+    if let Some(stats) = semantic_stats {
+        semantic_builder = semantic_builder.with_stats(stats);
+    }
+    let semantic_return = semantic_builder.build(program);
     if !semantic_return.diagnostics.is_empty() {
         return Err(crate::parse_failure::error(
             source,
@@ -452,6 +455,11 @@ pub(crate) fn materialize_program<'a>(
             retention_capabilities,
         )),
     };
+    if retention_capabilities & RETAIN_IDENTIFIERS != 0 {
+        collector
+            .retained_index
+            .reserve_reference_count(collector.scoping.references_len());
+    }
     collector.visit_program(program);
     if retain_scopes && retention_capabilities & RETAIN_IDENTIFIERS != 0 {
         collector
@@ -640,6 +648,7 @@ mod uid_tests {
                 Some(&manifest),
                 None,
                 false,
+                None,
             )
             .unwrap();
             assert!(parts.retained_index.has_uid_identifiers());
