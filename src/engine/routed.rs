@@ -64,6 +64,7 @@ pub fn materialize_routed_buffer(
         &parsed.program,
         manifest.compiled(),
         root_start.zip(root_end),
+        None,
     )
 }
 
@@ -73,12 +74,16 @@ pub(super) fn materialize_routed_program<'a>(
     program: &oxc_ast::ast::Program<'a>,
     manifest: &CompiledManifest,
     root: Option<(u32, u32)>,
+    semantic_stats: Option<Stats>,
 ) -> Result<Buffer> {
     let semantic_return = manifest.needs_semantics.then(|| {
-        SemanticBuilder::new()
+        let mut builder = SemanticBuilder::new()
             .with_build_nodes(true)
-            .with_check_syntax_error(true)
-            .build(program)
+            .with_check_syntax_error(true);
+        if let Some(stats) = semantic_stats {
+            builder = builder.with_stats(stats);
+        }
+        builder.build(program)
     });
     if let Some(semantic_return) = &semantic_return
         && !semantic_return.diagnostics.is_empty()
@@ -124,11 +129,19 @@ pub(super) fn materialize_routed_program<'a>(
     // still visits the entire AST and supplies its exact node count; reuse that
     // count instead of walking the same tree again just to emit its root.
     if manifest.program_only && !manifest.needs_semantics {
-        let validated = crate::syntax::validation::validate_program(
-            program,
-            "routed-materialization",
-            allocator,
-        )?;
+        let validated = if let Some(stats) = semantic_stats {
+            crate::syntax::validation::validate_program_with_stats(
+                program,
+                "routed-materialization",
+                stats,
+            )?
+        } else {
+            crate::syntax::validation::validate_program(
+                program,
+                "routed-materialization",
+                allocator,
+            )?
+        };
         collector.node_count = validated.stats.nodes;
         collector.emit(AstKind::Program(program), VisitSide::Enter, false, false);
         collector.sequence = collector.node_count;
@@ -783,6 +796,7 @@ mod tests {
                     &allocator,
                     &parsed.program,
                     &manifest,
+                    None,
                     None,
                 )
                 .unwrap();

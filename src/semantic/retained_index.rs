@@ -52,7 +52,8 @@ pub struct RetainedIndex {
     name_ids: FxHashMap<Rc<str>, u32>,
     bindings: FxHashMap<(u32, u32), BindingRecord>,
     redeclarations: Vec<Vec<u32>>,
-    globals: FxHashMap<u32, Vec<SemanticReference>>,
+    globals: FxHashMap<u32, ReferenceList>,
+    reference_links: Vec<ReferenceLink>,
     constants: Option<Vec<Option<TransportConstant>>>,
     calls: Vec<CallRecord>,
     scalar_field_ranges: Option<Vec<(u32, u32)>>,
@@ -206,11 +207,85 @@ impl SemanticReference {
     }
 }
 
+struct ReferenceLink {
+    reference: SemanticReference,
+    next: u32,
+}
+
+#[derive(Clone, Copy)]
+struct ReferenceList {
+    head: u32,
+    tail: u32,
+    count: u32,
+}
+
+impl Default for ReferenceList {
+    fn default() -> Self {
+        Self {
+            head: ABSENT_ID,
+            tail: ABSENT_ID,
+            count: 0,
+        }
+    }
+}
+
+impl ReferenceList {
+    fn push(&mut self, reference: SemanticReference, links: &mut Vec<ReferenceLink>) {
+        let id = links.len() as u32;
+        links.push(ReferenceLink {
+            reference,
+            next: ABSENT_ID,
+        });
+        if self.count == 0 {
+            self.head = id;
+        } else {
+            links[self.tail as usize].next = id;
+        }
+        self.tail = id;
+        self.count += 1;
+    }
+
+    fn iter(self, links: &[ReferenceLink]) -> References<'_> {
+        References {
+            links,
+            next: self.head,
+            remaining: self.count as usize,
+        }
+    }
+}
+
+struct References<'a> {
+    links: &'a [ReferenceLink],
+    next: u32,
+    remaining: usize,
+}
+
+impl<'a> Iterator for References<'a> {
+    type Item = &'a SemanticReference;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.remaining == 0 {
+            return None;
+        }
+        let link = &self.links[self.next as usize];
+        self.next = link.next;
+        self.remaining -= 1;
+        Some(&link.reference)
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (self.remaining, Some(self.remaining))
+    }
+}
+
+impl ExactSizeIterator for References<'_> {}
+impl std::iter::FusedIterator for References<'_> {}
+
 struct BindingRecord {
     // Latest declaration and optional side-table index, both using ABSENT_ID.
     declaration_id: u32,
     redeclarations_id: u32,
-    references: Vec<SemanticReference>,
+    references: ReferenceList,
 }
 
 struct CallRecord {
@@ -375,6 +450,7 @@ impl RetainedIndex {
             bindings: FxHashMap::default(),
             redeclarations: Vec::new(),
             globals: FxHashMap::default(),
+            reference_links: Vec::new(),
             constants: retain_constants.then(|| vec![None; node_count]),
             calls: Vec::new(),
             scalar_field_ranges: retain_scalar_fields.then(|| vec![(0, 0); node_count]),
@@ -415,6 +491,10 @@ impl RetainedIndex {
                     .flat_map(|names| names.iter().cloned()),
             )
             .collect()
+    }
+
+    pub(crate) fn reserve_reference_count(&mut self, reference_count: usize) {
+        self.reference_links.reserve_exact(reference_count);
     }
 
     pub fn record_semantics(
@@ -459,7 +539,7 @@ impl RetainedIndex {
                         .or_insert_with(|| BindingRecord {
                             declaration_id: ABSENT_ID,
                             redeclarations_id: ABSENT_ID,
-                            references: Vec::new(),
+                            references: ReferenceList::default(),
                         });
                 if binding.declaration_id != ABSENT_ID {
                     if binding.redeclarations_id == ABSENT_ID {
@@ -491,15 +571,15 @@ impl RetainedIndex {
                         .or_insert_with(|| BindingRecord {
                             declaration_id: ABSENT_ID,
                             redeclarations_id: ABSENT_ID,
-                            references: Vec::new(),
+                            references: ReferenceList::default(),
                         })
                         .references
-                        .push(semantic_reference);
+                        .push(semantic_reference, &mut self.reference_links);
                 } else {
                     self.globals
                         .entry(name_id)
                         .or_default()
-                        .push(semantic_reference);
+                        .push(semantic_reference, &mut self.reference_links);
                 }
             }
             _ => {}
@@ -603,7 +683,12 @@ impl RetainedIndex {
         };
         let targets = self
             .binding_declarations(binding)
-            .chain(binding.references.iter().map(SemanticReference::node_id))
+            .chain(
+                binding
+                    .references
+                    .iter(&self.reference_links)
+                    .map(SemanticReference::node_id),
+            )
             .map(|id| NativeRenameTarget {
                 start: self.starts[id as usize],
                 end: self.ends[id as usize],
@@ -756,7 +841,7 @@ impl RetainedIndex {
             }),
             references: binding
                 .references
-                .iter()
+                .iter(&self.reference_links)
                 .filter(|reference| (!reads || reference.read()) && (!writes || reference.write()))
                 .map(|reference| self.native_reference(reference))
                 .collect(),
@@ -769,8 +854,9 @@ impl RetainedIndex {
         self.name_ids
             .get(name)
             .and_then(|name_id| self.globals.get(name_id))
-            .map_or(&[][..], Vec::as_slice)
-            .iter()
+            .copied()
+            .unwrap_or_default()
+            .iter(&self.reference_links)
             .map(|reference| {
                 let id = reference.node_id();
                 (id, self.starts[id as usize], self.ends[id as usize])
@@ -782,7 +868,9 @@ impl RetainedIndex {
             .name_ids
             .get(name)
             .and_then(|name_id| self.globals.get(name_id))
-            .map_or(&[][..], Vec::as_slice);
+            .copied()
+            .unwrap_or_default()
+            .iter(&self.reference_links);
         // Eight little-endian u32 words per reference. Parent type uses the
         // generated node type id; absent parent fields use ABSENT_ID.
         let mut words = crate::protocol::routed::PackedWords::with_capacity(references.len() * 32);
@@ -877,7 +965,7 @@ impl RetainedIndex {
         };
 
         for (&(binding_scope_id, name_id), binding) in &self.bindings {
-            for reference in &binding.references {
+            for reference in binding.references.iter(&self.reference_links) {
                 let node_id = reference.node_id();
                 let start = self.starts[node_id as usize];
                 let end = self.ends[node_id as usize];
@@ -1166,6 +1254,7 @@ impl RetainedIndex {
         id
     }
 
+    #[cfg(test)]
     pub fn record(
         &mut self,
         node_id: u32,
@@ -1179,6 +1268,23 @@ impl RetainedIndex {
         self.traversal_sequences.take();
         self.subtree_ranges.take();
         self.node_type_index.take();
+        self.collect_node(node_id, type_id, start, end, parent_id, scope_id);
+    }
+
+    /// Initial collection precedes all derived queries; mutation uses `record`.
+    pub(crate) fn collect_node(
+        &mut self,
+        node_id: u32,
+        type_id: u32,
+        start: u32,
+        end: u32,
+        parent_id: Option<u32>,
+        scope_id: u32,
+    ) {
+        debug_assert!(self.node_type_index.get().is_none());
+        debug_assert!(self.traversal_ranges.get().is_none());
+        debug_assert!(self.traversal_sequences.get().is_none());
+        debug_assert!(self.subtree_ranges.get().is_none());
         let index = node_id as usize;
         if index >= self.type_ids.len() {
             let new_len = index + 1;
@@ -1205,7 +1311,7 @@ impl RetainedIndex {
         &mut self,
         node_id: u32,
         parent_id: Option<u32>,
-        child_role_id: Option<u32>,
+        child_role_id: impl FnOnce() -> Option<u32>,
     ) {
         let (Some(parent_id), Some(pending)) = (parent_id, &mut self.pending_child_edges) else {
             return;
@@ -1218,7 +1324,10 @@ impl RetainedIndex {
         else {
             return;
         };
-        let retained_role_id = match child_role_id {
+        if !mask.requests_children() {
+            return;
+        }
+        let retained_role_id = match child_role_id() {
             Some(role_id) if mask.wildcard || mask.role_ids.contains(&role_id) => role_id,
             None if mask.wildcard && !child_role_parent_has_roles(parent_type_id) => 0,
             _ => return,
@@ -1285,17 +1394,33 @@ impl RetainedIndex {
         self.child_edges = edges;
     }
 
+    #[cfg(test)]
     pub fn record_enter(&mut self, node_id: u32) {
         self.traversal_ranges.take();
         self.traversal_sequences.take();
         self.subtree_ranges.take();
+        self.collect_enter(node_id);
+    }
+
+    pub(crate) fn collect_enter(&mut self, node_id: u32) {
+        debug_assert!(self.traversal_ranges.get().is_none());
+        debug_assert!(self.traversal_sequences.get().is_none());
+        debug_assert!(self.subtree_ranges.get().is_none());
         self.traversal_records.push(node_id);
     }
 
+    #[cfg(test)]
     pub fn record_exit(&mut self, node_id: u32) {
         self.traversal_ranges.take();
         self.traversal_sequences.take();
         self.subtree_ranges.take();
+        self.collect_exit(node_id);
+    }
+
+    pub(crate) fn collect_exit(&mut self, node_id: u32) {
+        debug_assert!(self.traversal_ranges.get().is_none());
+        debug_assert!(self.traversal_sequences.get().is_none());
+        debug_assert!(self.subtree_ranges.get().is_none());
         self.traversal_records.push(node_id | 0x8000_0000);
     }
 
@@ -1815,28 +1940,15 @@ impl RetainedIndex {
             + self.names.capacity() * size_of::<Rc<str>>()
             + self.names.iter().map(|name| name.len()).sum::<usize>()
             + self.name_ids.capacity() * size_of::<(Rc<str>, u32)>()
-            + self
-                .bindings
-                .values()
-                .map(|binding| {
-                    size_of::<((u32, u32), BindingRecord)>()
-                        + binding.references.capacity() * size_of::<SemanticReference>()
-                })
-                .sum::<usize>()
+            + self.bindings.capacity() * size_of::<((u32, u32), BindingRecord)>()
+            + self.reference_links.capacity() * size_of::<ReferenceLink>()
             + self.redeclarations.capacity() * size_of::<Vec<u32>>()
             + self
                 .redeclarations
                 .iter()
                 .map(|ids| ids.capacity() * size_of::<u32>())
                 .sum::<usize>()
-            + self
-                .globals
-                .values()
-                .map(|references| {
-                    size_of::<(u32, Vec<SemanticReference>)>()
-                        + references.capacity() * size_of::<SemanticReference>()
-                })
-                .sum::<usize>()
+            + self.globals.capacity() * size_of::<(u32, ReferenceList)>()
             + self.constants.as_ref().map_or(0, |constants| {
                 constants.capacity() * size_of::<Option<TransportConstant>>()
                     + constants
@@ -1959,6 +2071,289 @@ use std::rc::Rc;
 mod tests {
     use super::*;
     use crate::syntax::source_text::UidAllocator;
+
+    #[test]
+    fn pooled_reference_lists_preserve_interleaved_order_and_exact_lengths() {
+        let mut links = Vec::new();
+        let mut lists = [ReferenceList::default(); 3];
+        for (list, node) in [(0, 9), (1, 2), (0, 4), (2, 8), (1, 1), (0, 6)] {
+            lists[list].push(
+                SemanticReference::new(node, node / 2, node % 2 == 0, node % 3 == 0, node % 4 == 0),
+                &mut links,
+            );
+        }
+        for (list, expected) in lists.into_iter().zip([vec![9, 4, 6], vec![2, 1], vec![8]]) {
+            let mut references = list.iter(&links);
+            assert_eq!(references.len(), expected.len());
+            for (offset, node) in expected.iter().enumerate() {
+                assert_eq!(
+                    references.size_hint(),
+                    (expected.len() - offset, Some(expected.len() - offset))
+                );
+                let reference = references.next().unwrap();
+                assert_eq!(reference.node_id(), *node);
+                assert_eq!(
+                    (
+                        reference.read(),
+                        reference.write(),
+                        reference.member_write()
+                    ),
+                    (node % 2 == 0, node % 3 == 0, node % 4 == 0)
+                );
+            }
+            assert_eq!(references.len(), 0);
+            assert!(references.next().is_none());
+            assert!(references.next().is_none());
+        }
+        assert_eq!(ReferenceList::default().iter(&links).len(), 0);
+    }
+
+    #[test]
+    fn pooled_semantic_references_preserve_canonical_aliases_and_ast_identity() {
+        use oxc_ast_visit::VisitMut;
+        use oxc_span::{SourceType, Span};
+        struct Anchors(bool);
+        impl<'a> VisitMut<'a> for Anchors {
+            fn visit_span(&mut self, span: &mut Span) {
+                *span = if self.0 {
+                    Span::default()
+                } else {
+                    Span::new(10_000 - span.end, 10_000 - span.start)
+                };
+            }
+        }
+        for (source, source_type) in [
+            (
+                "const fnValue=function same(same){let first=0,second=1;first+=same;external(first);second+=same;external(second);return first+second+same;}; function read(value){return value+external(value);}",
+                SourceType::mjs(),
+            ),
+            (
+                "export interface Model { value:number } export class Model {} namespace Model { export const version=1; } function read(value:string):string; function read(value:unknown){return value;} read(Model);",
+                SourceType::ts(),
+            ),
+        ] {
+            for anchors in ["parsed", "shared", "reversed"] {
+                let allocator = oxc_allocator::Allocator::default();
+                let mut parsed = oxc_parser::Parser::new(&allocator, source, source_type).parse();
+                assert!(parsed.diagnostics.is_empty());
+                parsed.program.body.reverse();
+                if anchors != "parsed" {
+                    Anchors(anchors == "shared").visit_program(&mut parsed.program);
+                }
+                let built = oxc_semantic::SemanticBuilder::new()
+                    .with_build_nodes(true)
+                    .build(&parsed.program);
+                assert!(built.diagnostics.is_empty());
+                let semantic = built.semantic;
+                let nodes = semantic.nodes();
+                let mut index = RetainedIndex::with_node_count(nodes.len(), None, false, false);
+                index.reserve_reference_count(semantic.scoping().references_len());
+                let mut declarations: FxHashMap<(u32, String), Vec<u32>> = FxHashMap::default();
+                type ReferenceFlags = (u32, u32, bool, bool, bool);
+                let mut references: FxHashMap<(u32, String), Vec<ReferenceFlags>> =
+                    FxHashMap::default();
+                let mut globals: FxHashMap<String, Vec<ReferenceFlags>> = FxHashMap::default();
+                for (id, node) in nodes.iter_enumerated() {
+                    let kind = node.kind();
+                    let id = id.index() as u32;
+                    let scope = node.scope_id().index() as u32;
+                    index.record(
+                        id,
+                        crate::generated::event_schema::ast_kind_protocol_id(kind),
+                        kind.span().start,
+                        kind.span().end,
+                        (id != 0).then(|| nodes.parent_id(kind.node_id()).index() as u32),
+                        scope,
+                    );
+                    index.record_rename_roles(kind, nodes);
+                    index.record_semantics(
+                        kind,
+                        semantic.scoping(),
+                        id,
+                        scope,
+                        true,
+                        id.is_multiple_of(2),
+                    );
+                    match kind {
+                        AstKind::BindingIdentifier(identifier) => {
+                            let owner = identifier.symbol_id.get().map_or(scope, |symbol| {
+                                semantic.scoping().symbol_scope_id(symbol).index() as u32
+                            });
+                            declarations
+                                .entry((owner, identifier.name.to_string()))
+                                .or_default()
+                                .push(id);
+                        }
+                        AstKind::IdentifierReference(identifier) => {
+                            let Some(reference_id) = identifier.reference_id.get() else {
+                                continue;
+                            };
+                            let reference = semantic.scoping().get_reference(reference_id);
+                            let fact = (
+                                id,
+                                scope,
+                                reference.is_read(),
+                                reference.is_write(),
+                                id.is_multiple_of(2),
+                            );
+                            if let Some(symbol) = reference.symbol_id() {
+                                let owner =
+                                    semantic.scoping().symbol_scope_id(symbol).index() as u32;
+                                references
+                                    .entry((owner, identifier.name.to_string()))
+                                    .or_default()
+                                    .push(fact);
+                            } else {
+                                globals
+                                    .entry(identifier.name.to_string())
+                                    .or_default()
+                                    .push(fact);
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+                let facts = |reference: &SemanticReference| {
+                    (
+                        reference.node_id(),
+                        reference.scope_id,
+                        reference.read(),
+                        reference.write(),
+                        reference.member_write(),
+                    )
+                };
+                for (&(scope, name_id), binding) in &index.bindings {
+                    let key = (scope, index.names[name_id as usize].to_string());
+                    assert_eq!(
+                        index.binding_declarations(binding).collect::<Vec<_>>(),
+                        declarations.get(&key).cloned().unwrap_or_default()
+                    );
+                    assert_eq!(
+                        binding
+                            .references
+                            .iter(&index.reference_links)
+                            .map(facts)
+                            .collect::<Vec<_>>(),
+                        references.get(&key).cloned().unwrap_or_default()
+                    );
+                    let plan = index.rename_plan(&key.1, scope);
+                    assert_eq!(
+                        plan.targets.len(),
+                        declarations.get(&key).map_or(0, Vec::len)
+                            + references.get(&key).map_or(0, Vec::len)
+                    );
+                }
+                for (name, expected) in &globals {
+                    let id = index.name_ids[name.as_str()];
+                    assert_eq!(
+                        index.globals[&id]
+                            .iter(&index.reference_links)
+                            .map(facts)
+                            .collect::<Vec<_>>(),
+                        *expected
+                    );
+                    let mut public = index.global_references(name);
+                    assert_eq!(public.len(), expected.len());
+                    for &(id, _, _, _, _) in expected {
+                        assert_eq!(public.next(), Some((id, index.start(id), index.end(id))));
+                    }
+                    assert_eq!(public.len(), 0);
+                    let words = index.global_binding_references_buffer(name);
+                    assert_eq!(words.len(), expected.len() * 32);
+                    for (record, &(id, scope, read, write, member_write)) in
+                        words.chunks_exact(32).zip(expected)
+                    {
+                        let word = |offset| {
+                            u32::from_le_bytes(record[offset..offset + 4].try_into().unwrap())
+                        };
+                        assert_eq!(
+                            (word(0), word(12), word(28)),
+                            (
+                                id,
+                                scope,
+                                u32::from(read)
+                                    | u32::from(write) << 1
+                                    | u32::from(member_write) << 2
+                            )
+                        );
+                    }
+                }
+                assert_eq!(index.global_references("notPresent").len(), 0);
+                if source.contains("function same") {
+                    let scope = declarations
+                        .keys()
+                        .find(|(_, name)| name == "same")
+                        .unwrap()
+                        .0;
+                    assert_eq!(declarations[&(scope, "same".into())].len(), 2);
+                    assert_eq!(
+                        index
+                            .binding_facts(Some("same"), Some(scope), false, false)
+                            .len(),
+                        1
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn child_roles_resolve_only_for_requested_parents_and_preserve_wildcards() {
+        use crate::generated::event_schema::{NODE_TYPE_COUNT, child_role_id};
+
+        let call_type = node_type_id("CallExpression").unwrap();
+        let union_type = node_type_id("TSUnionType").unwrap();
+        let identifier_type = node_type_id("Identifier").unwrap();
+        let arguments = child_role_id(call_type, "arguments").unwrap();
+        let callee = child_role_id(call_type, "callee").unwrap();
+        let resolved = Cell::new(0);
+        let resolve = |role| {
+            resolved.set(resolved.get() + 1);
+            role
+        };
+        let mut disabled = RetainedIndex::with_node_count(2, None, false, false);
+        disabled.record(0, call_type, 0, 0, None, 0);
+        disabled.record_child_edge(1, Some(0), || resolve(Some(arguments)));
+        assert_eq!(resolved.get(), 0);
+
+        let masks = vec![ChildRoleMask::default(); NODE_TYPE_COUNT + 1];
+        let mut index = RetainedIndex::with_node_count(5, Some(&masks), false, false);
+        for (id, kind, parent) in [
+            (0, call_type, None),
+            (1, identifier_type, Some(0)),
+            (2, identifier_type, Some(0)),
+            (3, union_type, None),
+            (4, node_type_id("TSStringKeyword").unwrap(), Some(3)),
+        ] {
+            // Shared anchors must never select a parent or child identity.
+            index.record(id, kind, 0, 0, parent, 0);
+        }
+        index.record_child_edge(0, None, || resolve(None));
+        index.record_child_edge(1, Some(0), || resolve(Some(arguments)));
+        assert_eq!(resolved.get(), 0);
+        index.child_role_mask_by_parent_type[call_type as usize]
+            .role_ids
+            .push(arguments);
+        index.record_child_edge(1, Some(0), || resolve(Some(arguments)));
+        index.record_child_edge(2, Some(0), || resolve(Some(callee)));
+        assert_eq!(resolved.get(), 2);
+        assert_eq!(index.pending_child_edges.as_ref().unwrap().len(), 1);
+
+        index.child_role_mask_by_parent_type[call_type as usize].wildcard = true;
+        index.record_child_edge(2, Some(0), || resolve(Some(callee)));
+        // A missing role cannot bypass a parent's generated named roles.
+        index.record_child_edge(2, Some(0), || resolve(None));
+        assert!(!child_role_parent_has_roles(union_type));
+        index.child_role_mask_by_parent_type[union_type as usize].wildcard = true;
+        index.record_child_edge(4, Some(3), || resolve(None));
+        assert_eq!(resolved.get(), 5);
+        index.finalize_child_edges();
+        assert_eq!(
+            index.child_edges(0).collect::<Vec<_>>(),
+            [(1, arguments), (2, callee)]
+        );
+        assert_eq!(index.child_edges(3).collect::<Vec<_>>(), [(4, 0)]);
+    }
 
     #[test]
     fn selective_query_indexes_are_lazy_reused_and_invalidated() {
@@ -2787,7 +3182,7 @@ mod tests {
             names: vec![Rc::from("outer")],
             ..RetainedIndex::default()
         };
-        let mut references = Vec::with_capacity(COUNT);
+        let mut references = ReferenceList::default();
         let mut scope_parents = vec![ABSENT_ID];
         for function in 0..COUNT {
             let function_id = function as u32;
@@ -2801,13 +3196,10 @@ mod tests {
             index.ends[reference_id as usize] = start + 2;
             index.scope_ids[reference_id as usize] = scope_id;
             scope_parents.push(0);
-            references.push(SemanticReference::new(
-                reference_id,
-                scope_id,
-                true,
-                false,
-                false,
-            ));
+            references.push(
+                SemanticReference::new(reference_id, scope_id, true, false, false),
+                &mut index.reference_links,
+            );
         }
         index.bindings.insert(
             (0, 0),
