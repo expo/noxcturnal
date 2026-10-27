@@ -82,7 +82,14 @@ export interface NativePreflightResultOutput {
   helpersUsed: string[];
 }
 
+declare const COMPILED_MANIFEST: unique symbol;
+export interface NativeCompiledManifestBinding {
+  readonly [COMPILED_MANIFEST]: true;
+}
+export type NativeManifest = Buffer | NativeCompiledManifestBinding;
+
 interface NativeBinding {
+  NativeCompiledManifest: new (manifest: Buffer) => NativeCompiledManifestBinding;
   originalSourcePosition(
     mappings: string,
     line: number,
@@ -94,10 +101,10 @@ interface NativeBinding {
   ) => {
     syntaxFacts(): string[];
     functionMap(): FunctionMap;
-    materializeRouted(manifest: Buffer): Buffer;
+    materializeRouted(manifest: NativeManifest): Buffer;
     materialize(
-      retentionManifest: Buffer,
-      initialRouteManifest: Buffer,
+      retentionManifest: NativeManifest,
+      initialRouteManifest: NativeManifest,
     ): NativeIndexedSessionBinding;
     validate(): void;
     close(): void;
@@ -134,13 +141,13 @@ interface NativeBinding {
   NativeIndexedSession: new (
     source: string,
     filename: string,
-    retentionManifest?: Buffer,
-    initialRouteManifest?: Buffer,
+    retentionManifest?: NativeManifest,
+    initialRouteManifest?: NativeManifest,
     buildInitialRoute?: boolean,
   ) => {
     generateUid(name: string): string | null;
     nextRoutedPacked(
-      manifest: Buffer,
+      manifest: NativeManifest,
       rootStart?: number,
       rootEnd?: number,
       rootId?: number,
@@ -325,7 +332,7 @@ interface NativeBinding {
   materializeRoutedBuffer(
     source: string,
     filename: string,
-    manifest: Buffer,
+    manifest: NativeManifest,
     rootStart?: number,
     rootEnd?: number,
   ): Buffer;

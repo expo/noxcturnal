@@ -1,3 +1,4 @@
+import { nativeManifest, shareManifest } from '../native/manifest';
 import { resolve } from 'node:path';
 import { classifyForTransform, parserFilename, sourceHints } from '../adapters/classification';
 import { selectParserAdapter } from '../adapters/registry';
@@ -233,17 +234,19 @@ function buildRetainedPlan(
   }
   return {
     futureSubscriptions,
-    retentionManifest: packRouteManifest(
-      retainedRoutes.map((route, id) => ({ ...route, id })),
-      prepared.includeParent,
-      retainScope,
-      prepared.retentionCapabilities | futureRetentionCapabilities,
-      facts.childRoles,
-      facts.fields,
-      facts.ancestorFields,
-      [...facts.ancestorTypes],
-      [...facts.ancestorChildParentTypes],
-      facts.ancestryDepth,
+    retentionManifest: shareManifest(
+      packRouteManifest(
+        retainedRoutes.map((route, id) => ({ ...route, id })),
+        prepared.includeParent,
+        retainScope,
+        prepared.retentionCapabilities | futureRetentionCapabilities,
+        facts.childRoles,
+        facts.fields,
+        facts.ancestorFields,
+        [...facts.ancestorTypes],
+        [...facts.ancestorChildParentTypes],
+        facts.ancestryDepth,
+      ),
     ),
   };
 }
@@ -718,8 +721,12 @@ export function transform(
           } else {
             const routedBuffer =
               parsedSource != null
-                ? parsedSource.materializeRouted(manifest)
-                : native.materializeRoutedBuffer(observationSource, parseFilename, manifest);
+                ? parsedSource.materializeRouted(nativeManifest(manifest))
+                : native.materializeRoutedBuffer(
+                    observationSource,
+                    parseFilename,
+                    nativeManifest(manifest),
+                  );
             parsedSource = null;
             batch = decodeRoutedEnvelope(routedBuffer);
           }

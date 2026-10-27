@@ -9,7 +9,9 @@ use crate::sourcemap;
 
 mod collect;
 mod fields;
+mod manifest;
 mod member;
+pub use manifest::NativeCompiledManifest;
 mod parsed;
 mod pipeline;
 mod retained;

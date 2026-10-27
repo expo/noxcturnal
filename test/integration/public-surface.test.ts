@@ -37,6 +37,7 @@ test('preserves the public source and native ABI surfaces', () => {
   assert.deepEqual(Object.keys(native).sort(), [
     'EditKind',
     'MappingPolicy',
+    'NativeCompiledManifest',
     'NativeIndexedSession',
     'NativeParsedSource',
     'NativePipelineSession',

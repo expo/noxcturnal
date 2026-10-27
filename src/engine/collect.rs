@@ -25,7 +25,7 @@ use super::member::{MemberPathInterner, MemberWriteStack, tracks_member_writes};
 use super::retained::routed_buffer_from_index;
 use super::{
     MaterializedSessionParts, RETAIN_CALLS, RETAIN_CHILDREN, RETAIN_CONSTANTS, RETAIN_IDENTIFIERS,
-    RETAIN_INSPECTION, RETAIN_MODULE_FACTS, decode_route_manifest,
+    RETAIN_INSPECTION, RETAIN_MODULE_FACTS,
 };
 
 struct EventCollector<'a> {
@@ -295,8 +295,8 @@ impl<'a> Visit<'a> for EventCollector<'a> {
 pub(crate) fn materialize_with_scope_parents(
     source: &str,
     filename: &str,
-    retention_manifest: Option<&[u8]>,
-    initial_route_manifest: Option<&[u8]>,
+    retention_manifest: Option<&CompiledManifest>,
+    initial_route_manifest: Option<&CompiledManifest>,
     build_initial_route: bool,
 ) -> Result<MaterializedSessionParts> {
     let allocator = Allocator::default();
@@ -322,45 +322,28 @@ pub(crate) fn materialize_program<'a>(
     source: &'a str,
     allocator: &'a Allocator,
     program: &oxc_ast::ast::Program<'a>,
-    retention_manifest: Option<&[u8]>,
-    initial_route_manifest: Option<&[u8]>,
+    retention_manifest: Option<&CompiledManifest>,
+    initial_route_manifest: Option<&CompiledManifest>,
     build_initial_route: bool,
 ) -> Result<MaterializedSessionParts> {
     let utf16 = (!source.is_ascii()).then(|| utf16_index(source, allocator));
     let program_body_offsets =
         program_body_offsets(program, source, utf16.as_deref().map(|offsets| &**offsets));
-    let compiled_manifest = initial_route_manifest
-        .map(decode_route_manifest)
-        .transpose()?;
-    let retention_manifest = retention_manifest.map(decode_route_manifest).transpose()?;
+    let compiled_manifest = initial_route_manifest;
     let retention_capabilities = retention_manifest
-        .as_ref()
-        .or(compiled_manifest.as_ref())
+        .or(compiled_manifest)
         .map_or(u32::MAX, |manifest| manifest.retention_capabilities);
     let child_role_masks = retention_manifest
-        .as_ref()
-        .or(compiled_manifest.as_ref())
+        .or(compiled_manifest)
         .map(|manifest| manifest.child_role_mask_by_parent_type.as_slice());
-    let needs_semantics = retention_manifest
-        .as_ref()
-        .is_some_and(|manifest| manifest.needs_semantics)
-        || compiled_manifest
-            .as_ref()
-            .is_some_and(|manifest| manifest.needs_semantics)
+    let needs_semantics = retention_manifest.is_some_and(|manifest| manifest.needs_semantics)
+        || compiled_manifest.is_some_and(|manifest| manifest.needs_semantics)
         || (retention_manifest.is_some() || compiled_manifest.is_some())
             && retention_capabilities & (RETAIN_IDENTIFIERS | RETAIN_CALLS) != 0;
-    let needs_comments = retention_manifest
-        .as_ref()
-        .is_some_and(|manifest| manifest.needs_comments)
-        || compiled_manifest
-            .as_ref()
-            .is_some_and(|manifest| manifest.needs_comments);
-    let retain_scopes = retention_manifest
-        .as_ref()
-        .is_some_and(|manifest| manifest.include_scope)
-        || compiled_manifest
-            .as_ref()
-            .is_some_and(|manifest| manifest.include_scope);
+    let needs_comments = retention_manifest.is_some_and(|manifest| manifest.needs_comments)
+        || compiled_manifest.is_some_and(|manifest| manifest.needs_comments);
+    let retain_scopes = retention_manifest.is_some_and(|manifest| manifest.include_scope)
+        || compiled_manifest.is_some_and(|manifest| manifest.include_scope);
     if !needs_semantics {
         let mut collector = SyntaxIndexCollector {
             source,
@@ -374,13 +357,13 @@ pub(crate) fn materialize_program<'a>(
                 retention_capabilities & (RETAIN_INSPECTION | RETAIN_MODULE_FACTS) != 0
                     || retention_manifest.is_some(),
             ),
-            retention_routes: retention_manifest.as_ref(),
+            retention_routes: retention_manifest,
             retention_capabilities,
             retained_string_ids: FxHashMap::default(),
             member_paths: MemberPathInterner::default(),
             parent_stack: Vec::new(),
             member_writes: MemberWriteStack::new(tracks_member_writes(
-                retention_manifest.as_ref(),
+                retention_manifest,
                 retention_capabilities,
             )),
             node_count: 0,
@@ -407,7 +390,6 @@ pub(crate) fn materialize_program<'a>(
         }
         let initial_routed_buffer = if build_initial_route {
             compiled_manifest
-                .as_ref()
                 .map(|manifest| {
                     routed_buffer_from_index(manifest, &collector.retained_index, &[], None)
                         .map(|buffer| buffer.to_vec())
@@ -460,13 +442,13 @@ pub(crate) fn materialize_program<'a>(
             retention_capabilities & (RETAIN_INSPECTION | RETAIN_MODULE_FACTS) != 0
                 || retention_manifest.is_some(),
         ),
-        retention_routes: retention_manifest.as_ref(),
+        retention_routes: retention_manifest,
         retention_capabilities,
         retain_scopes,
         retained_string_ids: FxHashMap::default(),
         member_paths: MemberPathInterner::default(),
         member_writes: MemberWriteStack::new(tracks_member_writes(
-            retention_manifest.as_ref(),
+            retention_manifest,
             retention_capabilities,
         )),
     };
@@ -490,7 +472,6 @@ pub(crate) fn materialize_program<'a>(
     }
     let initial_routed_buffer = if build_initial_route {
         compiled_manifest
-            .as_ref()
             .map(|manifest| {
                 routed_buffer_from_index(manifest, &collector.retained_index, &scope_parents, None)
                     .map(|buffer| buffer.to_vec())
@@ -597,6 +578,7 @@ fn program_body_offsets(
 
 #[cfg(test)]
 mod uid_tests {
+    use super::super::decode_route_manifest;
     use super::*;
     use crate::protocol::constants::ROUTE_MANIFEST_MAGIC;
     use crate::syntax::source_text::identifier_names;
@@ -616,6 +598,7 @@ mod uid_tests {
         .into_iter()
         .flat_map(u32::to_le_bytes)
         .collect::<Vec<_>>();
+        let manifest = decode_route_manifest(&manifest).unwrap();
         for (filename, source) in [
             ("empty.js", ""),
             (

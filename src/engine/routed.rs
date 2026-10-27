@@ -1,6 +1,9 @@
 use std::{borrow::Cow, cell::Cell};
 
-use napi::{Result, bindgen_prelude::Buffer};
+use napi::{
+    Result,
+    bindgen_prelude::{Buffer, Either},
+};
 use oxc_allocator::Allocator;
 use oxc_ast::{
     AstKind,
@@ -27,8 +30,11 @@ use super::fields::{
     compiled_scalar_matches, fields, packed_fields_direct, predicate_scalar_type, utf16_index,
 };
 
+#[cfg(test)]
+use super::decode_route_manifest;
+use super::manifest::ResolvedManifest;
 use super::member::{MemberPathInterner, MemberWriteStack, tracks_member_writes};
-use super::{RoutedCounts, decode_route_manifest};
+use super::{NativeCompiledManifest, RoutedCounts};
 
 enum PredicateScalar<'a> {
     String(Cow<'a, str>),
@@ -38,11 +44,11 @@ enum PredicateScalar<'a> {
 pub fn materialize_routed_buffer(
     source: &str,
     filename: &str,
-    manifest_data: &[u8],
+    manifest_data: Either<Buffer, &NativeCompiledManifest>,
     root_start: Option<u32>,
     root_end: Option<u32>,
 ) -> Result<Buffer> {
-    let manifest = decode_route_manifest(manifest_data)?;
+    let manifest = ResolvedManifest::new(manifest_data)?;
     let allocator = Allocator::default();
     let parsed = Parser::new(&allocator, source, source_type(filename, source)?).parse();
     if !parsed.diagnostics.is_empty() {
@@ -56,7 +62,7 @@ pub fn materialize_routed_buffer(
         source,
         &allocator,
         &parsed.program,
-        &manifest,
+        manifest.compiled(),
         root_start.zip(root_end),
     )
 }
