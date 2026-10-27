@@ -5,6 +5,38 @@ import { native } from '../../native/binding';
 import { packRouteManifest } from '../../protocol/manifest';
 
 import { defineNativePipeline, defineNativePlugin, defineVisitor, transform } from '../../index';
+
+// Observe packed hydration from either native entry point. Root-only queries
+// returning no batch do not count as child hydration.
+function observeChildBatches() {
+  const explicit = vi.spyOn(native.NativeIndexedSession.prototype, 'childrenPackedBuffer');
+  const routed = vi.spyOn(native.NativeIndexedSession.prototype, 'childrenRoutedPackedBuffer');
+  return {
+    get batches() {
+      return [...explicit.mock.results, ...routed.mock.results].flatMap(result =>
+        result.type === 'return' && result.value ? [result.value] : [],
+      );
+    },
+    mockClear() {
+      explicit.mockClear();
+      routed.mockClear();
+    },
+    mockRestore() {
+      explicit.mockRestore();
+      routed.mockRestore();
+    },
+  };
+}
+function childParentCount(batch: { edges: Buffer }): number {
+  const words = new Uint32Array(
+    batch.edges.buffer,
+    batch.edges.byteOffset,
+    batch.edges.byteLength / 4,
+  );
+  let count = 0;
+  for (let offset = 0; offset < words.length; count++) offset += 2 + words[offset + 1] * 2;
+  return count;
+}
 test('provides lazy compact structural child roles without recursive ESTree transfer', () => {
   const observed: Record<string, string[]> = {};
   const sources = (value: ReturnType<any>) =>
@@ -584,7 +616,7 @@ test('projects flattened arrow parameters with parser-accurate binding roles', (
 });
 
 test('batches child hydration for sparse matched parents and caches empty children', () => {
-  const prefetch = vi.spyOn(NativeTransformSession.prototype, 'prefetchChildren');
+  const prefetch = observeChildBatches();
   const observed: string[][] = [];
   const plugin = defineNativePlugin({
     name: 'selective-children',
@@ -611,8 +643,8 @@ test('batches child hydration for sparse matched parents and caches empty childr
         'fixture.js',
         defineNativePipeline({ phases: [{ name: 'inspect', plugins: [plugin] }] }),
       );
-      assert.equal(prefetch.mock.calls.length, 1);
-      assert.equal(prefetch.mock.calls[0][0]?.length, 2);
+      assert.equal(prefetch.batches.length, 1);
+      assert.equal(childParentCount(prefetch.batches[0]), 2);
     }
     assert.deepEqual(observed, [['2'], [], ['2'], [], ['2'], []]);
   } finally {
@@ -621,7 +653,7 @@ test('batches child hydration for sparse matched parents and caches empty childr
 });
 
 test('hydrates recursive named children and empty lists in one native batch', () => {
-  const children = vi.spyOn(native.NativeIndexedSession.prototype, 'childrenPackedBuffer');
+  const children = observeChildBatches();
   const observed: number[][] = [];
   try {
     const plugin = defineNativePlugin({
@@ -674,8 +706,8 @@ test('hydrates recursive named children and empty lists in one native batch', ()
     );
     assert.equal(result.status, 'complete');
     assert.deepEqual(observed, [[], [2, 3]]);
-    assert.equal(children.mock.calls.length, 1);
-    assert.equal(children.mock.calls[0][3], true);
+    assert.equal(children.batches.length, 1);
+    assert.ok(childParentCount(children.batches[0]) > 1);
   } finally {
     children.mockRestore();
   }
@@ -791,4 +823,148 @@ test('keeps packed child groups separate across wide, empty, and mixed-role pare
   );
   assert.equal(result.status, 'complete');
   assert.deepEqual(observed, [values, [], [999]]);
+});
+
+test('shared child hydration plans follow each file analysis decision and delivery route IDs', () => {
+  const prefetch = observeChildBatches();
+  let active: string | undefined;
+  const observed: string[][] = [];
+  const pipeline = defineNativePipeline({
+    phases: [
+      {
+        name: 'inspect',
+        plugins: [
+          defineNativePlugin({
+            name: 'scalar-only',
+            visitors: [defineVisitor('Program', {}, () => {})],
+          }),
+          ...['first', 'second'].map(name =>
+            defineNativePlugin({
+              name,
+              analyze: () =>
+                active === name
+                  ? { status: 'supported', analysis: undefined }
+                  : { status: 'irrelevant' },
+              visitors: [
+                defineVisitor(
+                  'CallExpression',
+                  {
+                    where: { calleeName: { equals: name } },
+                    children: { arguments: { route: 'Expression' } },
+                  },
+                  path => {
+                    observed.push([
+                      name,
+                      ...path.getChildList('arguments').map(arg => arg.sourceText()),
+                    ]);
+                  },
+                ),
+              ],
+            }),
+          ),
+        ],
+      },
+    ],
+  });
+  try {
+    for (const name of ['first', 'second', undefined, 'first']) {
+      active = name;
+      observed.length = 0;
+      prefetch.mockClear();
+      const result = transform('first(1);second(2);', `${name}.js`, pipeline);
+      assert.equal(result.status, 'complete');
+      if (result.status === 'complete') assert.equal(result.code, 'first(1);second(2);');
+      assert.deepEqual(observed, name ? [[name, name === 'first' ? '1' : '2']] : []);
+      assert.equal(prefetch.batches.length, name ? 1 : 0);
+      if (name) assert.equal(childParentCount(prefetch.batches[0]), 1);
+    }
+  } finally {
+    prefetch.mockRestore();
+  }
+});
+
+test.each([false, true])(
+  'scalar-only ancestry does not hydrate child graphs (nested=%s)',
+  nested => {
+    const prefetch = observeChildBatches();
+    const observed: unknown[] = [];
+    const leaf = [
+      defineVisitor(
+        'CallExpression',
+        {
+          ancestry: {
+            mode: 'findParent',
+            routes: { VariableDeclarator: { fields: ['bindingName'] } },
+          },
+        },
+        {
+          enter(path) {
+            const owner = path.findParent(parent => parent.node.type === 'VariableDeclarator');
+            observed.push(owner?.node.type === 'VariableDeclarator' && owner.node.bindingName);
+          },
+          exit(path) {
+            const owner = path.findParent(parent => parent.node.type === 'VariableDeclarator');
+            observed.push(owner?.node.type === 'VariableDeclarator' && owner.node.bindingName);
+          },
+        },
+      ),
+    ];
+    const pipeline = defineNativePipeline({
+      phases: [
+        {
+          name: 'inspect',
+          plugins: [
+            defineNativePlugin({
+              name: 'scalar-ancestry',
+              visitors: nested
+                ? [
+                    defineVisitor(
+                      'Program',
+                      { nested: leaf, controlFlow: ['nested-traverse'] },
+                      path => path.traverse(leaf),
+                    ),
+                  ]
+                : leaf,
+            }),
+          ],
+        },
+      ],
+    });
+    try {
+      const result = transform('const owner = create();', 'input.js', pipeline);
+      assert.equal(result.status, 'complete');
+      if (result.status === 'complete') assert.equal(result.code, 'const owner = create();');
+      assert.deepEqual(observed, ['owner', 'owner']);
+      assert.equal(prefetch.batches.length, 0);
+    } finally {
+      prefetch.mockRestore();
+    }
+  },
+);
+
+test('empty child contracts do not request child hydration', () => {
+  const prefetch = observeChildBatches();
+  let visits = 0;
+  const pipeline = defineNativePipeline({
+    phases: [
+      {
+        name: 'inspect',
+        plugins: [
+          defineNativePlugin({
+            name: 'empty-children',
+            visitors: [defineVisitor('CallExpression', { children: {} }, () => visits++)],
+          }),
+        ],
+      },
+    ],
+  });
+  try {
+    const result = transform('read();', 'input.js', pipeline);
+    assert.equal(result.status, 'complete');
+    if (result.status === 'complete') assert.equal(result.code, 'read();');
+    assert.equal(visits, 1);
+    assert.equal(prefetch.batches.length, 0);
+  } finally {
+    prefetch.mockRestore();
+  }
 });

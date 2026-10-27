@@ -756,14 +756,7 @@ export function transform(
       }
       // Analysis may reject a plugin using semantic facts. Its visitors no longer
       // need structural hydration; pre/analyze nested traversals hydrate themselves.
-      session.prefetchRoutedChildren(
-        batch,
-        dispatchRoutes.map(route =>
-          route.members
-            .filter(member => !dispatch.entries[member.pluginId].stopped)
-            .map(member => member.capabilities),
-        ),
-      );
+      session.prefetchRoutedChildren(batch, prepared.childPrefetch, dispatch.entries);
       for (let pluginId = 0; pluginId < activePlugins.length; pluginId++) {
         const plugin = activePlugins[pluginId];
         const decision = decisions?.[pluginId];

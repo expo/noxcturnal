@@ -1,6 +1,6 @@
 use napi::{
     Error, Result, Status,
-    bindgen_prelude::{Buffer, Either},
+    bindgen_prelude::{Buffer, Either, Uint8Array, Uint32Array},
 };
 use napi_derive::napi;
 use rustc_hash::FxHashSet;
@@ -205,6 +205,41 @@ impl NativeIndexedSession {
         Ok(self
             .retained_index
             .summary_buffer(node_id, &self.scope_parents))
+    }
+
+    #[napi]
+    pub fn routed_child_roots(
+        &self,
+        data: Uint32Array,
+        flags: u32,
+        plan: Uint32Array,
+        stopped: Uint8Array,
+    ) -> Result<Vec<u32>> {
+        self.ensure_open()?;
+        super::child_roots::routed_child_roots(&self.retained_index, &data, flags, &plan, &stopped)
+    }
+
+    #[napi]
+    pub fn children_routed_packed_buffer(
+        &mut self,
+        data: Uint32Array,
+        flags: u32,
+        plan: Uint32Array,
+        stopped: Uint8Array,
+    ) -> Result<Option<NativeChildBatch>> {
+        self.ensure_open()?;
+        let roots = super::child_roots::routed_child_roots(
+            &self.retained_index,
+            &data,
+            flags,
+            &plan,
+            &stopped,
+        )?;
+        if roots.is_empty() {
+            return Ok(None);
+        }
+        self.children_packed_buffer(roots, Vec::new(), Vec::new(), Some(true))
+            .map(Some)
     }
 
     #[napi]

@@ -61,6 +61,10 @@ test('rejects every hook and all retention and hydration before opening an index
   const materialize = vi.spyOn(native.NativeParsedSource.prototype, 'materialize');
   const route = vi.spyOn(NativeTransformSession.prototype, 'nextRoutedPacked');
   const children = vi.spyOn(NativeTransformSession.prototype, 'prefetchChildren');
+  const routedChildren = vi.spyOn(
+    native.NativeIndexedSession.prototype,
+    'childrenRoutedPackedBuffer',
+  );
   const plugin = defineNativePlugin({
     name: 'irrelevant-repair',
     contract: { syntax: { anyOf: ['AsyncFunction', 'Super'] } },
@@ -98,6 +102,7 @@ test('rejects every hook and all retention and hydration before opening an index
   expect(materialize).not.toHaveBeenCalled();
   expect(route).not.toHaveBeenCalled();
   expect(children).not.toHaveBeenCalled();
+  expect(routedChildren).not.toHaveBeenCalled();
 });
 
 test('omits rejected later-phase capabilities from speculative retention and consumes the input parse', () => {
@@ -244,6 +249,10 @@ test.each(['break;', 'let duplicate; let duplicate;', 'const = ;'])(
 
 test('analysis rejection avoids child hydration while preserving lifecycle behavior', () => {
   const children = vi.spyOn(NativeTransformSession.prototype, 'prefetchChildren');
+  const routedChildren = vi.spyOn(
+    native.NativeIndexedSession.prototype,
+    'childrenRoutedPackedBuffer',
+  );
   const post = vi.fn();
   const cleanup = vi.fn();
   const visit = vi.fn();
@@ -263,6 +272,7 @@ test('analysis rejection avoids child hydration while preserving lifecycle behav
   );
   expect(result.status).toBe('complete');
   expect(children).not.toHaveBeenCalled();
+  expect(routedChildren).not.toHaveBeenCalled();
   expect(visit).not.toHaveBeenCalled();
   expect(post).toHaveBeenCalledTimes(1);
   expect(cleanup).toHaveBeenCalledWith('complete', undefined);
