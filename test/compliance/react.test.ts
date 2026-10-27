@@ -236,3 +236,120 @@ test.each(['App', '__proto__'])(
     ).toEqual([name, [name, true], [name, false]]);
   },
 );
+
+test.each([
+  {
+    name: 'initializer',
+    header: `let signature = makeFactory(0), App = function () { useState(1); return 7; }, i = 0; i < 1; i++`,
+    body: `out.push(App.name, App())`,
+    expected: ['factory:0', 'attach:0', 'render:0', 'App', 7],
+  },
+  {
+    name: 'test and update with retained components',
+    header: `let signature = makeFactory(0), i = 0; i < 2 && out.push(function App() { useCustom(); return i; }); i++, signature = makeFactory(i), i < 2 && out.push(() => { useState(1); return i; })`,
+    body: ``,
+    expected: [
+      'factory:0',
+      'attach:0',
+      'factory:1',
+      'attach:1',
+      'factory:1',
+      'attach:1',
+      'render:0',
+      'render:1',
+      'render:1',
+    ],
+  },
+  {
+    name: 'skipped header branch',
+    header: `let signature = makeFactory(0), i = 0; false && (() => { useState(1); }); i++`,
+    body: ``,
+    expected: [],
+  },
+])(
+  'Refresh evaluates header-local factories at component creation: $name',
+  ({ header, body, expected, name }) => {
+    const events: unknown[] = [];
+    const source = `const out = []; function useCustom() {}
+    for (${header}) { ${body}; }
+    ${name === 'test and update with retained components' ? 'out.forEach(read => read());' : ''}
+    globalThis.result = out;`;
+    const result = execute(
+      source,
+      { reactRefresh: { refreshSig: 'signature' } },
+      {
+        makeFactory: (id: number) => {
+          return () => {
+            events.push(`factory:${id}`);
+            return (fn: unknown, _key: unknown, _reset: unknown, hooks?: () => unknown[]) => {
+              events.push(`${fn ? 'attach' : 'render'}:${id}`);
+              if (hooks) expect(hooks()).toHaveLength(1);
+              return fn;
+            };
+          };
+        },
+        useState: () => [],
+        useCustom: () => [],
+        $RefreshReg$: () => {},
+      },
+    );
+    expect([...events, ...(name === 'initializer' ? (result.result as unknown[]) : [])]).toEqual(
+      expected,
+    );
+  },
+);
+
+test('Refresh carries header-local signatures through HOCs without moving yield', () => {
+  const events: string[] = [];
+  const source = `globalThis.runtime = factoryRuntime;
+  function* build() {
+    const out = [];
+    for (let signature = runtime.signature, i = 0;
+      i < 2 && out.push(runtime.hoc(runtime.hoc(function App() { useState(1); return i; }), yield i));
+      i++) {}
+    return out.map(read => read());
+  }
+  const it = build();
+  globalThis.result = [it.next(), it.next('first'), it.next('second')];`;
+  let nextId = 0;
+  const runtime = {
+    signature() {
+      expect(this).toBe(runtime);
+      const id = nextId++;
+      events.push(`factory:${id}`);
+      return (fn?: unknown) => {
+        events.push(`${fn ? 'attach' : 'render'}:${id}`);
+        return fn;
+      };
+    },
+    hoc(fn: unknown) {
+      expect(this).toBe(runtime);
+      return fn;
+    },
+  };
+  // The configured member call must keep its receiver, while the lexical alias
+  // above makes the loop-header scope relevant even with a custom factory.
+  const result = execute(
+    source.replace('let signature = runtime.signature,', 'let runtime = globalThis.runtime,'),
+    { reactRefresh: { refreshSig: 'runtime.signature' } },
+    { factoryRuntime: runtime, useState: () => [], $RefreshReg$: () => {} },
+    'input.js',
+  );
+  expect(result.result).toEqual([
+    { value: 0, done: false },
+    { value: 1, done: false },
+    { value: [0, 1], done: true },
+  ]);
+  expect(events).toEqual([
+    'factory:0',
+    'attach:0',
+    'attach:0',
+    'attach:0',
+    'factory:1',
+    'attach:1',
+    'attach:1',
+    'attach:1',
+    'render:0',
+    'render:1',
+  ]);
+});
