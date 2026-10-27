@@ -1,3 +1,4 @@
+import type { ArtifactDemand } from './artifacts';
 import type {
   DefinedVisitor,
   Handler,
@@ -24,6 +25,8 @@ export interface RouteCapabilities {
   declaredFields: readonly NativeFieldKey[];
   childFields?: Readonly<Partial<Record<string, readonly NativeFieldKey[]>>>;
   comments: 'inner' | undefined;
+  cacheAncestorPaths: boolean;
+  ancestryDepthLimit: number;
 }
 
 export type PreparedPluginPlan = {
@@ -33,7 +36,8 @@ export type PreparedPluginPlan = {
   scope?: boolean;
   queries?: readonly QueryRequest[];
   retainComments?: boolean;
-  metadataWrites?: readonly string[];
+  metadataWrites?: ReadonlySet<string>;
+  queryCapabilities?: ReadonlySet<string>;
   ancestry?: StoredVisitorContract['ancestry'];
   ancestryFields?: Readonly<Partial<Record<NativeNodeType, readonly NativeFieldKey[]>>>;
   ancestryChildren?: Readonly<Partial<Record<string, readonly string[]>>>;
@@ -58,6 +62,7 @@ export interface DispatchRoute extends NativeRouteManifestEntry {
   fast: boolean;
   contract: string;
   members: {
+    pluginId: number;
     plugin: NativePlugin<any, any>;
     callbacks: readonly Handler<any>[];
     capabilities: RouteCapabilities;
@@ -82,8 +87,10 @@ export interface CompiledNestedRoutes {
  * Memoised on the phase's identity: every plugin plan is fixed by its definition,
  * so there is nothing per-file to key on and this object is shared across files. */
 export interface PreparedPhase {
+  artifactDemand: ArtifactDemand;
   activePlugins: NativePlugin<any, any>[];
   plans: Map<NativePlugin<any, any>, PreparedPluginPlan>;
+  metadataConflict?: string;
   subscriptions: Set<string>;
   fieldRequests: Record<string, string[]>;
   includeParent: boolean;

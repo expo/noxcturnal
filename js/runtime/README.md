@@ -107,3 +107,9 @@ absent-ID sentinel. Linear probing compares exact node IDs, and later records
 replace earlier records for the same owner. Scope records retain scope-ID order;
 neither owner order nor source coordinates determine identity. Only the requested
 snapshot retains the buffer, and loading metadata does not allocate a second index.
+
+Prepared phases compile plugin order, permissions, and artifact demand once.
+Per-file state follows that plugin order, including syntax-filtered plugins.
+Route handlers bind lazily on delivery and keep caches and control state local to
+their route runtime. Shared helper functions use the receiving runtime's owner,
+contract, state, and edit queue; they must not capture another plugin or file.

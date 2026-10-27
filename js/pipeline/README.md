@@ -4,6 +4,17 @@ This directory validates and compiles plugin and phase definitions into plans fo
 
 Define reusable phases at module scope, before the first transform. Equivalent definitions share objects and compiled routes. New definitions created after the first transform share a bounded cache; once it fills, new shapes compile their routes on every use.
 
+Metadata write permissions and query capabilities compile once with each plugin's
+plan. Metadata ownership conflicts compile once per applicable phase subset and
+throw when that subset runs, so mutually exclusive syntax-gated writers remain
+valid. Runtime query requests still check their own capabilities on every call;
+a cached request or another plugin's declarations cannot grant permission.
+
+Each prepared phase also compiles the artifact demand implied by its routes and
+retention capabilities. Execution combines that bitmask with the phase boundary's
+base demand. Source-version availability remains per file; fixed requirements do
+not require another scan of route fields and predicates for every input.
+
 Visitor contracts become routes describing which nodes and facts Rust should collect. Edit effects describe how much a phase may change and help determine when parsed data can be reused. Understating an effect risks invalid reuse; a phase that promises no edits is checked at runtime.
 
 ## Cache identity
