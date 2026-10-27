@@ -827,7 +827,7 @@ fn transform_with_function_map(
         let arguments_plan = super::arguments::prepare(&semantic.semantic, &options);
         let mut semantic = if let Some(plan) = arguments_plan {
             drop(semantic);
-            super::arguments::run(allocator, &mut program, plan);
+            structural_custom_helper_requests.prepend(super::arguments::run(allocator, &mut program, plan));
             SemanticBuilder::new_compiler().with_build_nodes(true).with_enum_eval(true).build(&program)
         } else { semantic };
         if !semantic.diagnostics.is_empty() {

@@ -249,3 +249,19 @@ for (const mode of ['inline', 'runtime'] as const) {
     },
   );
 }
+
+test.each(['inline', 'runtime'] as const)(
+  'async captures retain inferred names, %s',
+  async mode => {
+    const source = `function read(){const later=async()=>arguments[0];arguments=[7];
+    return later().then(value=>[value,later.name]);} globalThis.result=read(9);`;
+    expect(
+      await run(
+        compile(source, {
+          transforms: { asyncFunctions: true },
+          helpers: { mode, version: '7.29.7' },
+        }),
+      ),
+    ).toEqual([7, 'later']);
+  },
+);

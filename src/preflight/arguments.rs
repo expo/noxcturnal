@@ -3,13 +3,15 @@
 //! The reference cell is created at the arrow expression, before parameter or
 //! async lowering changes that arrow's implicit arguments environment. Its
 //! accessors close over the original binding, including later writes and eval.
-use oxc_allocator::{Allocator, GetAllocator, TakeIn};
+use super::helpers::CustomHelperRequests;
+use crate::generated::inline_helpers::INLINE_TO_PROPERTY_KEY_HELPER_DESCRIPTOR;
+use oxc_allocator::{Allocator, CloneIn, GetAllocator, TakeIn};
 use oxc_ast::{AstKind, ast::*, builder::AstBuilder};
 use oxc_ast_visit::{VisitMut, walk_mut};
 use oxc_parser::Parser;
 use oxc_semantic::{NodeId, Semantic};
 use oxc_span::{GetSpan, SourceType, Span};
-use oxc_syntax::operator::UnaryOperator;
+use oxc_syntax::operator::{AssignmentOperator, UnaryOperator};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use super::options::NativePreflightOptions;
@@ -17,7 +19,15 @@ use super::options::NativePreflightOptions;
 pub(super) struct Plan {
     groups: FxHashMap<NodeId, FxHashSet<NodeId>>,
     reserved: FxHashSet<String>,
-    names: FxHashMap<NodeId, String>,
+    names: FxHashMap<NodeId, InferredName>,
+    keys: FxHashMap<NodeId, String>,
+    key_helper: String,
+    inline_helpers: bool,
+}
+
+enum InferredName {
+    Static(String),
+    Key(String),
 }
 
 fn selected_arrow(arrow: &ArrowFunctionExpression<'_>, options: &NativePreflightOptions) -> bool {
@@ -136,7 +146,8 @@ pub(super) fn prepare(semantic: &Semantic<'_>, options: &NativePreflightOptions)
             .any(|ancestor| {
                 matches!(
                     nodes.kind(ancestor),
-                    AstKind::ForStatement(_)
+                    AstKind::WithStatement(_)
+                        | AstKind::ForStatement(_)
                         | AstKind::ForOfStatement(_)
                         | AstKind::ForInStatement(_)
                         | AstKind::WhileStatement(_)
@@ -162,7 +173,8 @@ pub(super) fn prepare(semantic: &Semantic<'_>, options: &NativePreflightOptions)
             .keys()
             .map(ToString::to_string),
     );
-    let names = groups
+    let mut keys = FxHashMap::default();
+    let mut names: FxHashMap<_, _> = groups
         .keys()
         .filter_map(|id| {
             let parent = nodes
@@ -204,33 +216,123 @@ pub(super) fn prepare(semantic: &Semantic<'_>, options: &NativePreflightOptions)
 
                 _ => None,
             }?;
-            Some((*id, name))
+            Some((*id, InferredName::Static(name)))
         })
         .collect();
+    // Computed names must use the same normalized key as the original property.
+    // Save only the primitive key; coercing a raw object twice can run user code.
+    for id in groups.keys() {
+        let Some(parent) = nodes
+            .ancestor_ids(*id)
+            .find(|id| !matches!(nodes.kind(*id), AstKind::ParenthesizedExpression(_)))
+        else {
+            continue;
+        };
+        if let AstKind::ObjectProperty(property) = nodes.kind(parent)
+            && property.computed
+            && property.key.static_name().is_none()
+        {
+            let key = super::reserve_generated_name("_argumentsKey", &mut reserved);
+            names.insert(*id, InferredName::Key(key.clone()));
+            keys.insert(parent, key);
+        }
+    }
+    let key_helper = if keys.is_empty() {
+        String::new()
+    } else {
+        super::reserve_generated_name("_toPropertyKey", &mut reserved)
+    };
     Some(Plan {
         groups,
         reserved,
         names,
+        keys,
+        key_helper,
+        inline_helpers: options.helpers_mode.as_deref() == Some("inline"),
     })
 }
 
-pub(super) fn run<'a>(allocator: &'a Allocator, program: &mut Program<'a>, plan: Plan) {
+pub(super) fn run<'a>(
+    allocator: &'a Allocator,
+    program: &mut Program<'a>,
+    plan: Plan,
+) -> CustomHelperRequests {
+    let mut requests = CustomHelperRequests::default();
+    if !plan.keys.is_empty() {
+        let runtime = super::reserve_generated_name("_toPropertyKey2", &mut plan.reserved.clone());
+        requests.materialize_generated(
+            &INLINE_TO_PROPERTY_KEY_HELPER_DESCRIPTOR,
+            plan.inline_helpers,
+            &[
+                ("_toPropertyKey", &plan.key_helper),
+                ("_toPropertyKey2", &runtime),
+            ],
+        );
+        let mut declarations: Vec<_> = plan.keys.values().cloned().collect();
+        declarations.sort();
+        let source = allocator.alloc_str(&format!("var {};", declarations.join(",")));
+        let mut parsed = Parser::new(allocator, source, SourceType::cjs()).parse();
+        assert!(parsed.diagnostics.is_empty());
+        let mut declaration = parsed.program.body.remove(0);
+        Anchors(Span::new(0, 0)).visit_statement(&mut declaration);
+        program.body.insert(0, declaration);
+    }
     Capture {
         allocator,
         groups: plan.groups,
         reserved: plan.reserved,
         names: plan.names,
+        keys: plan.keys,
+        key_helper: plan.key_helper,
     }
     .visit_program(program);
+    requests
+}
+
+struct Anchors(Span);
+impl VisitMut<'_> for Anchors {
+    fn visit_span(&mut self, span: &mut Span) {
+        *span = self.0;
+    }
 }
 
 struct Capture<'a> {
     allocator: &'a Allocator,
     groups: FxHashMap<NodeId, FxHashSet<NodeId>>,
     reserved: FxHashSet<String>,
-    names: FxHashMap<NodeId, String>,
+    names: FxHashMap<NodeId, InferredName>,
+    keys: FxHashMap<NodeId, String>,
+    key_helper: String,
 }
 impl<'a> VisitMut<'a> for Capture<'a> {
+    fn visit_object_property(&mut self, property: &mut ObjectProperty<'a>) {
+        if let Some(key) = self.keys.remove(&property.node_id.get()) {
+            let ast = AstBuilder::new(self.allocator);
+            let span = property.key.span();
+            let original = property.key.take_in(&ast).into_expression();
+            let normalized = Expression::new_call_expression(
+                span,
+                Expression::new_identifier(span, self.allocator.alloc_str(&self.key_helper), &ast),
+                None::<oxc_allocator::Box<'a, TSTypeParameterInstantiation<'a>>>,
+                [Argument::from(original)],
+                false,
+                &ast,
+            );
+            property.key = PropertyKey::from(Expression::new_assignment_expression(
+                span,
+                AssignmentOperator::Assign,
+                AssignmentTarget::new_assignment_target_identifier(
+                    span,
+                    self.allocator.alloc_str(&key),
+                    &ast,
+                ),
+                normalized,
+                &ast,
+            ));
+        }
+        walk_mut::walk_object_property(self, property);
+    }
+
     fn visit_expression(&mut self, expression: &mut Expression<'a>) {
         let original_id = expression.node_id();
         let Some(references) = self.groups.remove(&original_id) else {
@@ -275,12 +377,6 @@ impl<'a> VisitMut<'a> for Capture<'a> {
         let mut wrapper = statement.unbox().expression;
         // New nodes have no semantic IDs yet. Give them mapping provenance only;
         // the caller rebuilds semantics before another identity-sensitive pass.
-        struct Anchors(Span);
-        impl VisitMut<'_> for Anchors {
-            fn visit_span(&mut self, span: &mut Span) {
-                *span = self.0;
-            }
-        }
         Anchors(Span::new(expression.span().start, expression.span().start))
             .visit_expression(&mut wrapper);
         let Expression::CallExpression(call) = &mut wrapper else {
@@ -292,14 +388,24 @@ impl<'a> VisitMut<'a> for Capture<'a> {
         };
         let mut value = expression.take_in(&ast);
         if let Some(name) = self.names.remove(&original_id) {
-            let name = self.allocator.alloc_str(&name);
             let span = value.span();
+            let key = match name {
+                InferredName::Static(name) => Expression::new_string_literal(
+                    span,
+                    self.allocator.alloc_str(&name),
+                    None,
+                    &ast,
+                ),
+                InferredName::Key(name) => {
+                    Expression::new_identifier(span, self.allocator.alloc_str(&name), &ast)
+                }
+            };
             let object = Expression::new_object_expression(
                 span,
                 [ObjectPropertyKind::new_object_property(
                     span,
                     PropertyKind::Init,
-                    PropertyKey::new_string_literal(span, name, None, &ast),
+                    PropertyKey::from(key.clone_in(self.allocator)),
                     value,
                     false,
                     false,
@@ -308,13 +414,7 @@ impl<'a> VisitMut<'a> for Capture<'a> {
                 )],
                 &ast,
             );
-            value = Expression::new_computed_member_expression(
-                span,
-                object,
-                Expression::new_string_literal(span, name, None, &ast),
-                false,
-                &ast,
-            );
+            value = Expression::new_computed_member_expression(span, object, key, false, &ast);
         }
         factory.body = ArrowFunctionBody::from(value);
         *expression = wrapper;

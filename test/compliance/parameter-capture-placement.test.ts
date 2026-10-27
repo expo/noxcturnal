@@ -1,4 +1,5 @@
 import { runInNewContext } from 'node:vm';
+import { createRequire } from 'node:module';
 import { expect, test } from 'vitest';
 import { defineNativePipeline, transform, type PreflightTransforms } from '../../js';
 import { compile } from './runtime';
@@ -208,4 +209,34 @@ test.each([
       compile(source, { transforms: { objectRestSpread: { loose: true, useBuiltIns: true } } }),
     ),
   ).toBe(1);
+});
+
+test.each([
+  `'later'`,
+  `Symbol('later')`,
+  `({[Symbol.toPrimitive](hint){calls.push(hint); return 'later'}})`,
+])('preserves dynamic inferred names and coerces keys once: %s', key => {
+  const source = `function read(){const calls=[];const key=${key};
+    const holder={[key]:(v=arguments[0])=>v};arguments=[7];
+    const name=Reflect.ownKeys(holder)[0];return [holder[name](),holder[name].name,calls];}
+    globalThis.result=read(9);`;
+  expect(runInNewContext(compile(source, { transforms: { parameters: true } }))).toEqual(
+    runInNewContext(source),
+  );
+});
+
+test('uses runtime property-key helpers for computed capture names', () => {
+  const source = `function read(){let calls=0;const key={[Symbol.toPrimitive](){calls++;return 'later'}};
+    const holder={[key]:(v=arguments[0])=>v};arguments=[7];return [holder.later(),holder.later.name,calls];}
+    globalThis.result=read(9);`;
+  const code = compile(source, {
+    transforms: { parameters: true },
+    helpers: { mode: 'runtime', version: '7.29.7' },
+  });
+  expect(code).toContain('@babel/runtime/helpers/toPropertyKey');
+  expect(runInNewContext(code, { require: createRequire(import.meta.url) })).toEqual([
+    7,
+    'later',
+    1,
+  ]);
 });
