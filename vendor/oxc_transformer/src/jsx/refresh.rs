@@ -8,7 +8,8 @@ use hmac_sha1_compact::Hash as Sha1;
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use oxc_allocator::{
-    ArenaStringBuilder, ArenaVec, GetAddress, GetAllocator, ReplaceWith, TakeIn, UnstableAddress,
+    Address, ArenaStringBuilder, ArenaVec, GetAddress, GetAllocator, ReplaceWith, TakeIn,
+    UnstableAddress,
 };
 use oxc_ast::{ast::*, builder::AstBuilder, match_expression};
 use oxc_ast_visit::{
@@ -22,8 +23,12 @@ use oxc_syntax::operator::AssignmentOperator;
 use oxc_traverse::{Ancestor, BoundIdentifier, Traverse};
 
 use crate::{
-    common::var_declarations::VarDeclarationsStore, context::TraverseCtx, state::TransformState,
-    utils::ast_builder::arrow_function_body_as_function_body_mut,
+    common::var_declarations::VarDeclarationsStore,
+    context::TraverseCtx,
+    state::TransformState,
+    utils::ast_builder::{
+        arrow_function_body_as_function_body_mut, wrap_statements_in_arrow_function_iife,
+    },
 };
 
 use super::options::{DEFAULT_REFRESH_REG, DEFAULT_REFRESH_SIG, ReactRefreshOptions};
@@ -183,6 +188,8 @@ impl<'a> SignatureArguments<'a> {
 pub struct ReactRefresh<'a> {
     refresh_reg: RefreshIdentifierResolver<'a>,
     refresh_sig: RefreshIdentifierResolver<'a>,
+    custom_refresh_sig: bool,
+    parameter_temporaries: FxHashMap<Address, Vec<BoundIdentifier<'a>>>,
     emit_full_signatures: bool,
     force_reset: bool,
     // States
@@ -204,6 +211,8 @@ impl<'a> ReactRefresh<'a> {
         Self {
             refresh_reg: RefreshIdentifierResolver::parse(refresh_reg, ast),
             refresh_sig: RefreshIdentifierResolver::parse(refresh_sig, ast),
+            custom_refresh_sig: refresh_sig != DEFAULT_REFRESH_SIG,
+            parameter_temporaries: FxHashMap::default(),
             emit_full_signatures: options.is_some_and(|options| options.emit_full_signatures),
             force_reset: false,
             registrations: Vec::default(),
@@ -232,6 +241,7 @@ impl<'a> Traverse<'a, TransformState<'a>> for ReactRefresh<'a> {
     }
 
     fn exit_program(&mut self, program: &mut Program<'a>, ctx: &mut TraverseCtx<'a>) {
+        debug_assert!(self.parameter_temporaries.is_empty());
         if self.registrations.is_empty() {
             return;
         }
@@ -297,6 +307,7 @@ impl<'a> Traverse<'a, TransformState<'a>> for ReactRefresh<'a> {
         let Some(signature) = self.create_signature_call_expression(
             func.scope_id(),
             func.body.as_mut().unwrap(),
+            false,
             ctx,
         ) else {
             return;
@@ -328,6 +339,25 @@ impl<'a> Traverse<'a, TransformState<'a>> for ReactRefresh<'a> {
             _ => func.unstable_address(),
         };
         ctx.state.statement_injector.insert_after(&address, statement);
+    }
+
+    fn exit_formal_parameter(
+        &mut self,
+        parameter: &mut FormalParameter<'a>,
+        ctx: &mut TraverseCtx<'a>,
+    ) {
+        let owner = parameter.unstable_address();
+        if let Some(initializer) = &mut parameter.initializer {
+            self.finish_parameter_initializer(owner, initializer, ctx);
+        }
+    }
+
+    fn exit_assignment_pattern(
+        &mut self,
+        pattern: &mut AssignmentPattern<'a>,
+        ctx: &mut TraverseCtx<'a>,
+    ) {
+        self.finish_parameter_initializer(pattern.unstable_address(), &mut pattern.right, ctx);
     }
 
     fn enter_call_expression(
@@ -451,13 +481,14 @@ impl<'a> ReactRefresh<'a> {
             Expression::FunctionExpression(func) => self.create_signature_call_expression(
                 func.scope_id(),
                 func.body.as_mut().unwrap(),
+                true,
                 ctx,
             ),
             Expression::ArrowFunctionExpression(arrow) => {
                 let scope_id = arrow.scope_id();
                 if self.function_signature_keys.contains_key(&scope_id) {
                     let body = arrow_function_body_as_function_body_mut(&mut arrow.body, ctx);
-                    self.create_signature_call_expression(scope_id, body, ctx)
+                    self.create_signature_call_expression(scope_id, body, true, ctx)
                 } else {
                     None
                 }
@@ -477,24 +508,35 @@ impl<'a> ReactRefresh<'a> {
         let mut arguments = signature.arguments.create_arguments(attachment_scope, ctx);
 
         if !matches!(expr, Expression::CallExpression(_)) {
-            // Try to get binding from parent VariableDeclarator
-            if let Ancestor::VariableDeclaratorInit(declarator) = ctx.parent()
-                && let Some(ident) = declarator.id().get_binding_identifier()
-            {
-                let id_binding = BoundIdentifier::from_binding_ident(ident);
-                if !signature.expression_local {
-                    self.handle_function_in_variable_declarator(
-                        &id_binding,
-                        binding,
-                        arguments,
-                        ctx,
-                    );
-                    return;
+            let inferred_name = match ctx.parent() {
+                Ancestor::VariableDeclaratorInit(declarator) => {
+                    if let Some(ident) = declarator.id().get_binding_identifier() {
+                        if !signature.expression_local {
+                            let id_binding = BoundIdentifier::from_binding_ident(ident);
+                            self.handle_function_in_variable_declarator(
+                                &id_binding,
+                                binding,
+                                arguments,
+                                ctx,
+                            );
+                            return;
+                        }
+                        Some(ident.name)
+                    } else {
+                        None
+                    }
                 }
-                // A for/for-in initializer is not a statement-list item. Infer the
-                // original function name through a property initializer, then
-                // associate its signature in the initializer expression itself.
-                // A named function would introduce a different self binding.
+                Ancestor::FormalParameterInitializer(parameter) => {
+                    parameter.pattern().get_binding_identifier().map(|id| id.name)
+                }
+                Ancestor::AssignmentPatternRight(pattern) => {
+                    pattern.left().get_binding_identifier().map(|id| id.name)
+                }
+                _ => None,
+            };
+            if let Some(name) = inferred_name {
+                // Preserve default/initializer name inference without creating a
+                // new self binding or invoking the special __proto__ setter.
                 let span = expr.span();
                 let value = expr.take_in(ctx);
                 let object = Expression::new_object_expression(
@@ -502,7 +544,7 @@ impl<'a> ReactRefresh<'a> {
                     [ObjectPropertyKind::new_object_property(
                         span,
                         PropertyKind::Init,
-                        PropertyKey::new_string_literal(span, ident.name, None, ctx),
+                        PropertyKey::new_string_literal(span, name, None, ctx),
                         value,
                         false,
                         false,
@@ -514,7 +556,7 @@ impl<'a> ReactRefresh<'a> {
                 *expr = Expression::new_static_member_expression(
                     span,
                     object,
-                    IdentifierName::new(span, ident.name, ctx),
+                    IdentifierName::new(span, name, ctx),
                     false,
                     ctx,
                 );
@@ -550,7 +592,7 @@ impl<'a> ReactRefresh<'a> {
         } else if signature.expression_local {
             // Read the transport after the HOC (including all arguments) has run.
             // The sequence keeps surrounding await/yield in its original scope.
-            let component = VarDeclarationsStore::create_uid_var("component", ctx);
+            let component = self.create_signature_temp("component", ctx);
             let assign = Expression::new_assignment_expression(
                 SPAN,
                 AssignmentOperator::Assign,
@@ -621,7 +663,11 @@ impl<'a> ReactRefresh<'a> {
             .is_some_and(|ancestor| ancestor.is_call_expression())
     }
 
-    fn needs_local_signature(ctx: &TraverseCtx<'a>) -> bool {
+    // Parameter defaults evaluate before the body's variable environment exists.
+    // Their live owners retain arena identity until the matching exit hook.
+    fn signature_context(ctx: &TraverseCtx<'a>) -> (bool, Option<Address>) {
+        let mut local = false;
+        let mut pattern_default = None;
         for ancestor in ctx.ancestors() {
             if ancestor.is_function()
                 || ancestor.is_arrow_function_expression()
@@ -629,25 +675,88 @@ impl<'a> ReactRefresh<'a> {
             {
                 break;
             }
-            if matches!(
-                ancestor,
+            match ancestor {
+                Ancestor::FormalParameterInitializer(parameter) => {
+                    return (true, Some(parameter.address()));
+                }
+                Ancestor::AssignmentPatternRight(pattern) if pattern_default.is_none() => {
+                    pattern_default = Some(pattern.address());
+                }
+                Ancestor::FormalParameterPattern(_) | Ancestor::FormalParameterRestRest(_) => {
+                    return (local || pattern_default.is_some(), pattern_default);
+                }
                 // Destructuring can turn a loop binding default into a
                 // conditional initializer before Refresh visits its function.
                 Ancestor::ConditionalExpressionConsequent(_)
-                    | Ancestor::ConditionalExpressionAlternate(_)
-                    | Ancestor::LogicalExpressionRight(_)
-                    | Ancestor::ForStatementInit(_)
-                    | Ancestor::ForStatementTest(_)
-                    | Ancestor::ForStatementUpdate(_)
-                    | Ancestor::ForInStatementLeft(_)
-                    | Ancestor::ForInStatementRight(_)
-                    | Ancestor::ForOfStatementLeft(_)
-                    | Ancestor::ForOfStatementRight(_)
-            ) {
-                return true;
+                | Ancestor::ConditionalExpressionAlternate(_)
+                | Ancestor::LogicalExpressionRight(_)
+                | Ancestor::ForStatementInit(_)
+                | Ancestor::ForStatementTest(_)
+                | Ancestor::ForStatementUpdate(_)
+                | Ancestor::ForInStatementLeft(_)
+                | Ancestor::ForInStatementRight(_)
+                | Ancestor::ForOfStatementLeft(_)
+                | Ancestor::ForOfStatementRight(_) => local = true,
+                _ => {}
             }
         }
-        false
+        (local, None)
+    }
+
+    fn create_signature_temp(
+        &mut self,
+        name: &str,
+        ctx: &mut TraverseCtx<'a>,
+    ) -> BoundIdentifier<'a> {
+        if let Some(owner) = Self::signature_context(ctx).1 {
+            let binding = ctx.generate_uid_in_current_hoist_scope(name);
+            self.parameter_temporaries.entry(owner).or_default().push(binding.clone());
+            binding
+        } else {
+            VarDeclarationsStore::create_uid_var(name, ctx)
+        }
+    }
+
+    fn finish_parameter_initializer(
+        &mut self,
+        owner: Address,
+        expression: &mut Expression<'a>,
+        ctx: &mut TraverseCtx<'a>,
+    ) {
+        let Some(bindings) = self.parameter_temporaries.remove(&owner) else {
+            return;
+        };
+        // A parameter initializer cannot contain an outer await/yield. An arrow
+        // keeps its lexical this/arguments/super while owning the HOC transport.
+        let scope_id =
+            ctx.insert_scope_below_expression(expression, ScopeFlags::Function | ScopeFlags::Arrow);
+        let mut declarators = ArenaVec::with_capacity_in(bindings.len(), ctx);
+        for binding in bindings {
+            let old_scope = ctx.scoping().symbol_scope_id(binding.symbol_id);
+            ctx.scoping_mut().move_binding_by_symbol_id(old_scope, scope_id, binding.symbol_id);
+            declarators.push(VariableDeclarator::new(
+                SPAN,
+                binding.create_binding_pattern(ctx),
+                None,
+                None,
+                false,
+                ctx,
+            ));
+        }
+        let span = expression.span();
+        let declaration = Statement::new_variable_declaration(
+            SPAN,
+            VariableDeclarationKind::Var,
+            declarators,
+            false,
+            ctx,
+        );
+        let value = expression.take_in(ctx);
+        let statements = ArenaVec::from_iter_in(
+            [declaration, Statement::new_return_statement(SPAN, Some(value), ctx)],
+            ctx,
+        );
+        *expression = wrap_statements_in_arrow_function_iife(statements, scope_id, span, ctx);
     }
 
     fn create_registration(
@@ -772,10 +881,10 @@ impl<'a> ReactRefresh<'a> {
         &mut self,
         scope_id: ScopeId,
         body: &mut FunctionBody<'a>,
+        is_expression: bool,
         ctx: &mut TraverseCtx<'a>,
     ) -> Option<Signature<'a>> {
         let key = self.function_signature_keys.remove(&scope_id)?;
-
         let key = if self.emit_full_signatures {
             Str::from_str_in(&key, ctx)
         } else {
@@ -835,7 +944,12 @@ impl<'a> ReactRefresh<'a> {
             false,
             ctx,
         );
-        let expression_local = Self::needs_local_signature(ctx);
+        let expression_local = is_expression
+            && (self.custom_refresh_sig
+                || Self::signature_context(ctx).0
+                || self.refresh_sig.root.is_some_and(|name| {
+                    ctx.scoping().find_binding(ctx.current_scope_id(), name.into()).is_some()
+                }));
         let (binding, local) = if expression_local {
             let parent_scope = ctx.scoping().scope_parent_id(scope_id).unwrap();
             let wrapper_scope = ctx.insert_scope_between(
@@ -848,7 +962,7 @@ impl<'a> ReactRefresh<'a> {
             // A standalone literal needs only its captured local signature.
             // Allocate a transport variable only when an HOC will consume it.
             let binding = if Self::has_enclosing_hoc(ctx) {
-                VarDeclarationsStore::create_uid_var("s", ctx)
+                self.create_signature_temp("s", ctx)
             } else {
                 local_binding.clone()
             };

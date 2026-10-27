@@ -125,6 +125,26 @@ impl<'a> Traverse<'a, TransformState<'a>> for Jsx<'a> {
         }
     }
 
+    fn exit_formal_parameter(
+        &mut self,
+        parameter: &mut FormalParameter<'a>,
+        ctx: &mut TraverseCtx<'a>,
+    ) {
+        if self.refresh_plugin {
+            self.refresh.exit_formal_parameter(parameter, ctx);
+        }
+    }
+
+    fn exit_assignment_pattern(
+        &mut self,
+        pattern: &mut AssignmentPattern<'a>,
+        ctx: &mut TraverseCtx<'a>,
+    ) {
+        if self.refresh_plugin {
+            self.refresh.exit_assignment_pattern(pattern, ctx);
+        }
+    }
+
     fn exit_function(&mut self, func: &mut Function<'a>, ctx: &mut TraverseCtx<'a>) {
         if self.refresh_plugin {
             self.refresh.exit_function(func, ctx);

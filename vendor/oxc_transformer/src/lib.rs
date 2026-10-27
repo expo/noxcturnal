@@ -554,6 +554,22 @@ impl<'a> Traverse<'a, TransformState<'a>> for TransformerImpl<'a> {
         }
     }
 
+    fn exit_formal_parameter(
+        &mut self,
+        parameter: &mut FormalParameter<'a>,
+        ctx: &mut TraverseCtx<'a>,
+    ) {
+        self.x1_jsx.exit_formal_parameter(parameter, ctx);
+    }
+
+    fn exit_assignment_pattern(
+        &mut self,
+        pattern: &mut AssignmentPattern<'a>,
+        ctx: &mut TraverseCtx<'a>,
+    ) {
+        self.x1_jsx.exit_assignment_pattern(pattern, ctx);
+    }
+
     fn enter_function(&mut self, func: &mut Function<'a>, ctx: &mut TraverseCtx<'a>) {
         self.common.enter_function(func, ctx);
         self.x2_es2018.enter_function(func, ctx);
