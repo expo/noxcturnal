@@ -16,7 +16,7 @@ use oxc_ast_visit::{
     walk_js::{walk_call_expression, walk_declaration},
 };
 use oxc_semantic::{ReferenceFlags, ScopeFlags, ScopeId, SymbolFlags, SymbolId};
-use oxc_span::{GetSpan, SPAN};
+use oxc_span::{GetSpan, SPAN, Span};
 use oxc_str::{Ident, Str};
 use oxc_syntax::operator::AssignmentOperator;
 use oxc_traverse::{Ancestor, BoundIdentifier, Traverse};
@@ -88,8 +88,27 @@ struct SignatureArguments<'a> {
     custom_hooks: Vec<CustomHook<'a>>,
 }
 
+// Header literals capture a fresh signature; enclosing HOCs use the hoist-local
+// transport only after their argument expression has evaluated.
+struct LocalSignature<'a> {
+    scope_id: ScopeId,
+    binding: BoundIdentifier<'a>,
+    init: Expression<'a>,
+}
+
+struct Signature<'a> {
+    binding: BoundIdentifier<'a>,
+    arguments: SignatureArguments<'a>,
+    expression_local: bool,
+    local: Option<LocalSignature<'a>>,
+}
+
 impl<'a> SignatureArguments<'a> {
-    fn create_arguments(&self, ctx: &mut TraverseCtx<'a>) -> ArenaVec<'a, Argument<'a>> {
+    fn create_arguments(
+        &self,
+        parent_scope: ScopeId,
+        ctx: &mut TraverseCtx<'a>,
+    ) -> ArenaVec<'a, Argument<'a>> {
         let allocator = ctx.allocator();
         let custom_hooks_in_scope = ArenaVec::from_iter_in(
             self.custom_hooks.iter().map(|hook| {
@@ -128,7 +147,7 @@ impl<'a> SignatureArguments<'a> {
                 )],
                 ctx,
             );
-            let scope_id = ctx.create_child_scope_of_current(ScopeFlags::Function);
+            let scope_id = ctx.create_child_scope(parent_scope, ScopeFlags::Function);
             let function = Argument::new_function_expression_with_scope_id_and_pure_and_pife(
                 SPAN,
                 FunctionType::FunctionExpression,
@@ -170,7 +189,7 @@ pub struct ReactRefresh<'a> {
     registrations: Vec<(BoundIdentifier<'a>, Str<'a>)>,
     /// Used to wrap call expression with signature.
     /// (eg: hoc(() => {}) -> _s1(hoc(_s1(() => {}))))
-    last_signature: Option<(BindingIdentifier<'a>, SignatureArguments<'a>)>,
+    last_signature: Option<Signature<'a>>,
     // (function_scope_id, key)
     function_signature_keys: FxHashMap<ScopeId, String>,
     non_builtin_hooks_callee: FxHashMap<ScopeId, Vec<Option<CustomHook<'a>>>>,
@@ -275,7 +294,7 @@ impl<'a> Traverse<'a, TransformState<'a>> for ReactRefresh<'a> {
             return;
         }
 
-        let Some((binding_identifier, signature)) = self.create_signature_call_expression(
+        let Some(signature) = self.create_signature_call_expression(
             func.scope_id(),
             func.body.as_mut().unwrap(),
             ctx,
@@ -288,11 +307,10 @@ impl<'a> Traverse<'a, TransformState<'a>> for ReactRefresh<'a> {
         };
         let id_binding = BoundIdentifier::from_binding_ident(id);
 
-        let mut arguments = signature.create_arguments(ctx);
+        let mut arguments = signature.arguments.create_arguments(ctx.current_scope_id(), ctx);
         arguments.insert(0, Argument::from(id_binding.create_read_expression(ctx)));
 
-        let binding = BoundIdentifier::from_binding_ident(&binding_identifier);
-        let callee = binding.create_read_expression(ctx);
+        let callee = signature.binding.create_read_expression(ctx);
         let expr = Expression::new_call_expression(func.span, callee, None, arguments, false, ctx);
         let statement = Statement::new_expression_statement(func.span, expr, ctx);
 
@@ -449,11 +467,19 @@ impl<'a> ReactRefresh<'a> {
             _ => unreachable!(),
         };
 
-        let Some((binding_identifier, signature)) = signature else {
+        let Some(mut signature) = signature else {
             return;
         };
-        let binding = BoundIdentifier::from_binding_ident(&binding_identifier);
-        let mut arguments = signature.create_arguments(ctx);
+        let local = signature.local.take();
+        let binding = local.as_ref().map_or(&signature.binding, |local| &local.binding);
+        let attachment_scope = if let Some(local) = &local {
+            local.scope_id
+        } else if signature.expression_local {
+            ctx.create_child_scope_of_current(ScopeFlags::Function | ScopeFlags::Arrow)
+        } else {
+            ctx.current_scope_id()
+        };
+        let mut arguments = signature.arguments.create_arguments(attachment_scope, ctx);
 
         if !matches!(expr, Expression::CallExpression(_)) {
             // Try to get binding from parent VariableDeclarator
@@ -461,13 +487,10 @@ impl<'a> ReactRefresh<'a> {
                 && let Some(ident) = declarator.id().get_binding_identifier()
             {
                 let id_binding = BoundIdentifier::from_binding_ident(ident);
-                if !matches!(
-                    ctx.ancestor(2),
-                    Ancestor::ForStatementInit(_) | Ancestor::ForInStatementLeft(_)
-                ) {
+                if !signature.expression_local {
                     self.handle_function_in_variable_declarator(
                         &id_binding,
-                        &binding,
+                        binding,
                         arguments,
                         ctx,
                     );
@@ -514,24 +537,111 @@ impl<'a> ReactRefresh<'a> {
             break;
         }
 
-        if found_call_expression {
-            // Carry signature data through HOCs, not cloned callback ASTs whose
-            // scope and reference identities would be lost or shared.
-            self.last_signature = Some((binding_identifier.clone(), signature));
-        }
-
         let span = expr.span();
-        expr.replace_with(|expr| {
-            arguments.insert(0, Argument::from(expr));
-            Expression::new_call_expression(
+        let value = expr.take_in(ctx);
+        if let Some(local) = local {
+            arguments.insert(0, Argument::from(value));
+            let attached = Expression::new_call_expression(
                 span,
-                binding.create_read_expression(ctx),
+                local.binding.create_read_expression(ctx),
                 None,
                 arguments,
                 false,
                 ctx,
-            )
-        });
+            );
+            let init = Expression::new_assignment_expression(
+                SPAN,
+                AssignmentOperator::Assign,
+                signature.binding.create_target(ReferenceFlags::Write, ctx),
+                local.init,
+                ctx,
+            );
+            *expr = Self::call_with_local(attached, init, local.binding, local.scope_id, span, ctx);
+        } else if signature.expression_local {
+            // Read the transport after the HOC (including all arguments) has run.
+            // Keeping the HOC outside the arrow preserves surrounding await/yield.
+            let scope_id = attachment_scope;
+            let parameter =
+                ctx.generate_uid("component", scope_id, SymbolFlags::FunctionScopedVariable);
+            arguments.insert(0, Argument::from(parameter.create_read_expression(ctx)));
+            let attached = Expression::new_call_expression(
+                span,
+                signature.binding.create_read_expression(ctx),
+                None,
+                arguments,
+                false,
+                ctx,
+            );
+            *expr = Self::call_with_local(attached, value, parameter, scope_id, span, ctx);
+        } else {
+            arguments.insert(0, Argument::from(value));
+            *expr = Expression::new_call_expression(
+                span,
+                signature.binding.create_read_expression(ctx),
+                None,
+                arguments,
+                false,
+                ctx,
+            );
+        }
+
+        if found_call_expression {
+            self.last_signature = Some(signature);
+        }
+    }
+
+    fn call_with_local(
+        body: Expression<'a>,
+        argument: Expression<'a>,
+        binding: BoundIdentifier<'a>,
+        scope_id: ScopeId,
+        span: Span,
+        ctx: &mut TraverseCtx<'a>,
+    ) -> Expression<'a> {
+        let params = FormalParameters::boxed(
+            SPAN,
+            FormalParameterKind::ArrowFormalParameters,
+            [FormalParameter::new_plain(SPAN, binding.create_binding_pattern(ctx), ctx)],
+            None,
+            ctx,
+        );
+        let arrow = Expression::new_arrow_function_expression_with_scope_id_and_pure_and_pife(
+            SPAN,
+            false,
+            None,
+            params,
+            None,
+            ArrowFunctionBody::from(body),
+            scope_id,
+            false,
+            false,
+            ctx,
+        );
+        Expression::new_call_expression(span, arrow, None, [Argument::from(argument)], false, ctx)
+    }
+
+    fn in_loop_header(ctx: &TraverseCtx<'a>) -> bool {
+        for ancestor in ctx.ancestors() {
+            if ancestor.is_function()
+                || ancestor.is_arrow_function_expression()
+                || ancestor.is_static_block()
+            {
+                break;
+            }
+            if matches!(
+                ancestor,
+                Ancestor::ForStatementInit(_)
+                    | Ancestor::ForStatementTest(_)
+                    | Ancestor::ForStatementUpdate(_)
+                    | Ancestor::ForInStatementLeft(_)
+                    | Ancestor::ForInStatementRight(_)
+                    | Ancestor::ForOfStatementLeft(_)
+                    | Ancestor::ForOfStatementRight(_)
+            ) {
+                return true;
+            }
+        }
+        false
     }
 
     fn create_registration(
@@ -657,7 +767,7 @@ impl<'a> ReactRefresh<'a> {
         scope_id: ScopeId,
         body: &mut FunctionBody<'a>,
         ctx: &mut TraverseCtx<'a>,
-    ) -> Option<(BindingIdentifier<'a>, SignatureArguments<'a>)> {
+    ) -> Option<Signature<'a>> {
         let key = self.function_signature_keys.remove(&scope_id)?;
 
         let key = if self.emit_full_signatures {
@@ -719,14 +829,32 @@ impl<'a> ReactRefresh<'a> {
             false,
             ctx,
         );
-        let binding = VarDeclarationsStore::create_uid_var_with_init("s", init, ctx);
+        let expression_local = Self::in_loop_header(ctx);
+        let (binding, local) = if expression_local {
+            let binding = VarDeclarationsStore::create_uid_var("s", ctx);
+            let parent_scope = ctx.scoping().scope_parent_id(scope_id).unwrap();
+            let wrapper_scope = ctx.insert_scope_between(
+                parent_scope,
+                scope_id,
+                ScopeFlags::Function | ScopeFlags::Arrow,
+            );
+            let local_binding =
+                ctx.generate_uid("signature", wrapper_scope, SymbolFlags::FunctionScopedVariable);
+            (
+                binding,
+                Some(LocalSignature { scope_id: wrapper_scope, binding: local_binding, init }),
+            )
+        } else {
+            (VarDeclarationsStore::create_uid_var_with_init("s", init, ctx), None)
+        };
+        let body_binding = local.as_ref().map_or(&binding, |local| &local.binding);
 
         // _s();
         let call_expression = Statement::new_expression_statement(
             SPAN,
             Expression::new_call_expression(
                 SPAN,
-                binding.create_read_expression(ctx),
+                body_binding.create_read_expression(ctx),
                 None,
                 [],
                 false,
@@ -740,8 +868,7 @@ impl<'a> ReactRefresh<'a> {
         // Following is the signature call expression, will be generated in call site.
         // _s(App, signature_key, false, function() { return [] });
         //                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ custom hooks only
-        let binding_identifier = binding.create_binding_identifier(ctx);
-        Some((binding_identifier, signature))
+        Some(Signature { binding, arguments: signature, expression_local, local })
     }
 
     fn process_statement(

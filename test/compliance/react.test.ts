@@ -246,7 +246,7 @@ test.each([
   },
   {
     name: 'test and update with retained components',
-    header: `let signature = makeFactory(0), i = 0; i < 2 && out.push(function App() { useCustom(); return i; }); i++, signature = makeFactory(i), i < 2 && out.push(() => { useState(1); return i; })`,
+    header: `let signature = makeFactory(0), i = 0; i < 2 && (out[out.length] = function App() { useCustom(); return i; }); i++, signature = makeFactory(i), i < 2 && (out[out.length] = () => { useState(1); return i; })`,
     body: ``,
     expected: [
       'factory:0',
@@ -289,7 +289,6 @@ test.each([
           };
         },
         useState: () => [],
-        useCustom: () => [],
         $RefreshReg$: () => {},
       },
     );
@@ -301,11 +300,10 @@ test.each([
 
 test('Refresh carries header-local signatures through HOCs without moving yield', () => {
   const events: string[] = [];
-  const source = `globalThis.runtime = factoryRuntime;
-  function* build() {
+  const source = `function* build() {
     const out = [];
-    for (let signature = runtime.signature, i = 0;
-      i < 2 && out.push(runtime.hoc(runtime.hoc(function App() { useState(1); return i; }), yield i));
+    for (let runtime = factoryRuntime, i = 0;
+      i < 2 && (out[out.length] = runtime.hoc(runtime.hoc(function App() { useState(1); return i; }), yield i));
       i++) {}
     return out.map(read => read());
   }
@@ -327,10 +325,8 @@ test('Refresh carries header-local signatures through HOCs without moving yield'
       return fn;
     },
   };
-  // The configured member call must keep its receiver, while the lexical alias
-  // above makes the loop-header scope relevant even with a custom factory.
   const result = execute(
-    source.replace('let signature = runtime.signature,', 'let runtime = globalThis.runtime,'),
+    source,
     { reactRefresh: { refreshSig: 'runtime.signature' } },
     { factoryRuntime: runtime, useState: () => [], $RefreshReg$: () => {} },
     'input.js',
@@ -352,4 +348,77 @@ test('Refresh carries header-local signatures through HOCs without moving yield'
     'render:0',
     'render:1',
   ]);
+});
+
+test.each([false, true])(
+  'Refresh header signatures survive async interleaving (lowered=%s)',
+  async lowered => {
+    const source = `async function build(value) {
+    let App;
+    for (let signature = () => {
+      const id = value;
+      return fn => {
+        if (fn) fn.signatureId = id;
+        else renders.push(id);
+        return fn;
+      };
+    }, i = 0; i < 1; i++) {
+      // The next loop has an await outside the component's function boundary.
+      for (let j = 0; j < 1 && (App = hoc(() => { useState(1); return value; }, await pause())); j++) {}
+    }
+    return [App.signatureId, App()];
+  }
+  globalThis.result = Promise.all([build(3), build(7)]);`;
+    const renders: number[] = [];
+    const result = execute<{ result: Promise<unknown> }>(
+      source,
+      {
+        reactRefresh: { refreshSig: 'signature' },
+        ...(lowered ? { transforms: { asyncFunctions: true, blockScoping: true } } : {}),
+      },
+      {
+        renders,
+        hoc: (fn: unknown) => fn,
+        pause: async () => {},
+        useState: () => [],
+        $RefreshReg$: () => {},
+      },
+    );
+    expect(await result.result).toEqual([
+      [3, 3],
+      [7, 7],
+    ]);
+    expect(renders).toEqual([3, 7]);
+  },
+);
+
+test('Refresh header signature transport is local to recursive HOC activations', () => {
+  const source = `function build(value) {
+    const out = [];
+    for (let signature = () => fn => {
+      if (fn) fn.signatureId = value;
+      else renders.push(value);
+      return fn;
+    }, i = 0; i < 1 && (out[i] = hoc(function App() { useState(1); return value; }, value)); i++) {}
+    return out[0];
+  }
+  function hoc(fn, value) {
+    if (value) { const nested = build(0); nested(); }
+    return fn;
+  }
+  const App = build(1);
+  globalThis.result = [App.signatureId, App()];`;
+  const renders: number[] = [];
+  expect(
+    execute(
+      source,
+      { reactRefresh: { refreshSig: 'signature' } },
+      {
+        renders,
+        useState: () => [],
+        $RefreshReg$: () => {},
+      },
+    ).result,
+  ).toEqual([1, 1]);
+  expect(renders).toEqual([0, 1]);
 });
