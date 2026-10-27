@@ -49,7 +49,7 @@ export class NativeTransformSession {
   #sourceText: InstanceType<typeof native.NativeSourceText> | null = null;
   #eventCache = new NodeCache<NativeEvent>();
   #queryCache = new WeakMap<QueryRequest, { request: QueryRequest; result: QueryResult }>();
-  #globalReferencesCache = new Map<string, SemanticReferenceView[]>();
+  #globalReferencesCache = new Map<string, SemanticReferenceView[] | boolean>();
   #globalBindingReferencesCache = new Map<string, SemanticReferenceView[]>();
   #childrenCache = new Map<number, ChildState>();
   #prefetchedChildTypes: Set<string> | null = null;
@@ -58,12 +58,11 @@ export class NativeTransformSession {
   #scopeParents: Uint32Array | null = null;
   #traversalIntervals: Uint32Array | null = null;
   #scopeMetadata: Uint32Array | null = null;
-  #ownedScopes = new Map<number, number>();
   #linePrefixPage = -1;
   #linePrefixIntervals: Uint32Array | undefined;
   #programBodyOffsets: readonly [number, number, boolean, boolean, boolean] | null = null;
-  #bindingIndex: { nameIds: Map<string, number>; keys: Set<number> } | null = null;
-  #bindingsByScope = new Map<number, Map<string, QueryResult['bindings'][number]>>();
+  #bindingIndex: { scopes: Uint32Array; names: Map<string, number | Uint32Array> } | null = null;
+  #bindingFacts = new Map<number, QueryResult['bindings'][number]>();
   constructor(
     readonly source: string,
     readonly filename: string,
@@ -489,43 +488,75 @@ export class NativeTransformSession {
     if (event) this.#eventCache.set(nodeId, event);
     return event;
   }
-  /** The scope owning the nearest binding visible from `scopeId`, or null.
-   *
-   * Resolution is local: the binding name table and key set transfer once per session,
-   * so hasBinding-style lookups perform no per-call native request.
-   */
+  /** The nearest binding is selected by scope-tree position, without walking
+   * parents or rebuilding a JavaScript membership set for all declarations. */
   resolveBindingScope(name: string, scopeId: number): number | null {
+    const key = this.#resolveBindingKey(name, scopeId);
+    return key == null ? null : Math.floor(key / 0x200000);
+  }
+  #resolveBindingKey(name: string, scopeId: number): number | undefined {
     this.#assertOpen();
     const index = (this.#bindingIndex ??= this.#loadBindingIndex());
-    const nameId = index.nameIds.get(name);
-    if (nameId == null) return null;
-    const parents = this.#scopeParentTable();
-    let scope = scopeId;
-    while (true) {
-      if (index.keys.has(scope * 0x200000 + nameId)) return scope;
-      const parent = parents[scope];
-      if (parent === undefined || parent === 0xffffffff) return null;
-      scope = parent;
+    const binding = index.names.get(name);
+    if (binding == null) return undefined;
+    const position = index.scopes[scopeId * 2];
+    if (position == null) return undefined;
+    if (typeof binding === 'number') {
+      const owner = Math.floor(binding / 0x200000);
+      return index.scopes[owner * 2] <= position && position < index.scopes[owner * 2 + 1]
+        ? binding
+        : undefined;
     }
+    // The transport count is redundant with the view length. Reuse its word as
+    // a cursor into the last visibility interval, without another cache/index.
+    // Validate both bounds so nested traversals and out-of-order lookups work.
+    const count = (binding.length - 2) / 2;
+    const cursor = binding[1];
+    if (cursor === count) {
+      if (position < binding[2]) return undefined;
+    } else if (
+      binding[2 + cursor * 2] <= position &&
+      (cursor + 1 === count || position < binding[4 + cursor * 2])
+    ) {
+      const owner = binding[3 + cursor * 2];
+      return owner === 0xffffffff ? undefined : owner * 0x200000 + binding[0];
+    }
+    let low = 0;
+    let high = count;
+    while (low < high) {
+      const middle = (low + high) >>> 1;
+      if (binding[2 + middle * 2] <= position) low = middle + 1;
+      else high = middle;
+    }
+    binding[1] = low === 0 ? count : low - 1;
+    if (low === 0) return undefined;
+    const owner = binding[3 + (low - 1) * 2];
+    return owner === 0xffffffff ? undefined : owner * 0x200000 + binding[0];
   }
-  #loadBindingIndex(): { nameIds: Map<string, number>; keys: Set<number> } {
+  #loadBindingIndex(): { scopes: Uint32Array; names: Map<string, number | Uint32Array> } {
     const data = this.#binding('binding-index').bindingIndexBuffer();
     const nameCount = data.readUInt32LE(0);
-    const keyCount = data.readUInt32LE(4);
-    if (nameCount >= 0x200000) throw new Error('binding name table exceeds packed key space');
-    const nameIds = new Map<string, number>();
-    let offset = 8;
-    for (let id = 0; id < nameCount; id++) {
+    const scopeCount = data.readUInt32LE(4);
+    const scopes = new Uint32Array(data.buffer, data.byteOffset + 8, scopeCount * 2);
+    const names = new Map<string, number | Uint32Array>();
+    let offset = 8 + scopeCount * 8;
+    for (let index = 0; index < nameCount; index++) {
       const length = data.readUInt32LE(offset);
       offset += 4;
-      nameIds.set(data.toString('utf8', offset, offset + length), id);
+      const name = data.toString('utf8', offset, offset + length);
       offset += length + ((4 - (length % 4)) % 4);
+      const nameId = data.readUInt32LE(offset);
+      const count = data.readUInt32LE(offset + 4);
+      if (nameId >= 0x200000) throw new Error('binding name table exceeds packed key space');
+      if (count === 0) {
+        names.set(name, data.readUInt32LE(offset + 8) * 0x200000 + nameId);
+        offset += 12;
+      } else {
+        names.set(name, new Uint32Array(data.buffer, data.byteOffset + offset, 2 + count * 2));
+        offset += 8 + count * 8;
+      }
     }
-    const words = new Uint32Array(data.buffer, data.byteOffset + offset, keyCount * 2);
-    const keys = new Set<number>();
-    for (let index = 0; index < keyCount; index++)
-      keys.add(words[index * 2] * 0x200000 + words[index * 2 + 1]);
-    return { nameIds, keys };
+    return { scopes, names };
   }
   bindingRenamePlan(name: string, scopeId: number) {
     return this.#binding('binding.rename').bindingRenamePlan(name, scopeId);
@@ -534,34 +565,43 @@ export class NativeTransformSession {
     return this.#binding('binding.rename.exports').bindingRenameExportNames(start);
   }
   resolveBinding(name: string, scopeId: number): QueryResult['bindings'][number] | undefined {
-    const scope = this.resolveBindingScope(name, scopeId);
-    const fact =
-      scope == null ? undefined : this.#binding('query.bindings').queryBindings(name, scope)[0];
-    return fact && adaptBindingFact(fact);
+    const key = this.#resolveBindingKey(name, scopeId);
+    if (key == null) return undefined;
+    const cached = this.#bindingFacts.get(key);
+    if (cached) return cached;
+    const raw = this.#binding('query.bindings').queryBindings(name, Math.floor(key / 0x200000))[0];
+    if (!raw) return undefined;
+    const fact = adaptBindingFact(raw);
+    this.#bindingFacts.set(key, fact);
+    return fact;
   }
   resolveBindings(names: readonly string[], scopeId: number): QueryResult['bindings'][number][] {
-    const resolved = names.flatMap(name => {
-      const bindingScope = this.resolveBindingScope(name, scopeId);
-      return bindingScope == null ? [] : [{ name, scopeId: bindingScope }];
-    });
-    const missing = new Map<string, { name: string; scopeId: number }>();
-    for (const binding of resolved) {
-      if (this.#bindingsByScope.get(binding.scopeId)?.has(binding.name)) continue;
-      missing.set(binding.name, binding);
+    const resolved: (QueryResult['bindings'][number] | number)[] = [];
+    let missing: Map<number, { name: string; scopeId: number }> | undefined;
+    for (const name of names) {
+      const key = this.#resolveBindingKey(name, scopeId);
+      if (key == null) continue;
+      const fact = this.#bindingFacts.get(key);
+      resolved.push(fact ?? key);
+      if (!fact) (missing ??= new Map()).set(key, { name, scopeId: Math.floor(key / 0x200000) });
     }
-    if (missing.size > 0) {
+    if (missing) {
       const facts = this.#binding('query.bindings.batch').queryBindingsBatch([...missing.values()]);
       for (const raw of facts) {
         const fact = adaptBindingFact(raw);
-        let scope = this.#bindingsByScope.get(fact.scopeId);
-        if (!scope) this.#bindingsByScope.set(fact.scopeId, (scope = new Map()));
-        scope.set(fact.name, fact);
+        const binding = this.#bindingIndex!.names.get(fact.name)!;
+        const nameId = typeof binding === 'number' ? binding % 0x200000 : binding[0];
+        this.#bindingFacts.set(fact.scopeId * 0x200000 + nameId, fact);
       }
+      let count = 0;
+      for (const entry of resolved) {
+        const fact = typeof entry === 'number' ? this.#bindingFacts.get(entry) : entry;
+        if (fact) resolved[count++] = fact;
+      }
+      resolved.length = count;
     }
-    return resolved.flatMap(binding => {
-      const fact = this.#bindingsByScope.get(binding.scopeId)?.get(binding.name);
-      return fact == null ? [] : [fact];
-    });
+    // Keys occur only for cache misses and have now been replaced or removed.
+    return resolved as QueryResult['bindings'];
   }
   globalBindingReferences(name: string): SemanticReferenceView[] {
     this.#assertOpen();
@@ -594,9 +634,22 @@ export class NativeTransformSession {
     this.#globalBindingReferencesCache.set(name, references);
     return references;
   }
+  hasGlobal(name: string): boolean {
+    this.#assertOpen();
+    const cached = this.#globalReferencesCache.get(name);
+    if (cached !== undefined) return typeof cached === 'boolean' ? cached : cached.length > 0;
+    const present = this.#binding('query.globals.presence').hasGlobal(name);
+    this.#globalReferencesCache.set(name, present);
+    return present;
+  }
   globalReferences(name: string): SemanticReferenceView[] {
     const cached = this.#globalReferencesCache.get(name);
-    if (cached) return cached;
+    if (Array.isArray(cached)) return cached;
+    if (cached === false) {
+      const references: SemanticReferenceView[] = [];
+      this.#globalReferencesCache.set(name, references);
+      return references;
+    }
     return this.#queryGlobalReferences([name])[0];
   }
   #queryGlobalReferences(names: string[]): SemanticReferenceView[][] {
@@ -636,15 +689,35 @@ export class NativeTransformSession {
   #loadScopeMetadata(): Uint32Array {
     if (this.#scopeMetadata == null) {
       const data = this.#binding('scope-metadata').scopeMetadataBuffer();
-      this.#scopeMetadata = new Uint32Array(data.buffer, data.byteOffset, data.byteLength / 4);
-      for (let offset = 0; offset < this.#scopeMetadata.length; offset += 5)
-        this.#ownedScopes.set(this.#scopeMetadata[offset], this.#scopeMetadata[offset + 4]);
+      const words = new Uint32Array(data.buffer, data.byteOffset, data.byteLength / 4);
+      const count = words[0];
+      const mask = words[1];
+      if (
+        mask < 1 ||
+        ((mask + 1) & mask) !== 0 ||
+        mask < count ||
+        words.length !== 3 + count * 4 + (mask + 1) * 2
+      )
+        throw new Error('invalid scope metadata');
+      this.#scopeMetadata = words;
     }
     return this.#scopeMetadata;
   }
   ownedScopeId(nodeId: number): number | undefined {
-    this.#loadScopeMetadata();
-    return this.#ownedScopes.get(nodeId);
+    const words = this.#loadScopeMetadata();
+    const mask = words[1];
+    const base = 3 + words[0] * 4;
+    // High product bits avoid clustering owners whose node IDs have regular strides.
+    const first = Math.imul(nodeId, words[2]) >>> Math.clz32(mask);
+    let slot = first;
+    do {
+      const offset = base + slot * 2;
+      const owner = words[offset];
+      if (owner === 0xffffffff) return undefined;
+      if (owner === nodeId) return words[offset + 1];
+      slot = (slot + 1) & mask;
+    } while (slot !== first);
+    throw new Error('invalid scope ownership index');
   }
   scopeMetadata(scopeId: number): {
     ownerId: number;
@@ -653,8 +726,8 @@ export class NativeTransformSession {
     kind: number;
   } | null {
     const words = this.#loadScopeMetadata();
-    const offset = scopeId * 5;
-    if (offset >= words.length) return null;
+    if (scopeId >= words[0]) return null;
+    const offset = 3 + scopeId * 4;
     return {
       ownerId: words[offset],
       start: words[offset + 1],

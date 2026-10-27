@@ -154,6 +154,7 @@ interface NativeBinding {
     ): Buffer;
     traversalIntervalsBuffer(): Buffer;
     queryGlobalsBuffer(names: string[]): Buffer;
+    hasGlobal(name: string): boolean;
     globalBindingReferencesBuffer(name: string): Buffer;
     queryBindingsBatch(
       requests: { name: string; scopeId: number }[],
