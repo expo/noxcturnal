@@ -509,9 +509,7 @@ impl NativeIndexedSession {
     #[napi]
     pub fn scope_metadata_buffer(&self) -> Result<Buffer> {
         self.ensure_open()?;
-        Ok(self
-            .retained_index
-            .scope_metadata_buffer(self.scope_parents.len()))
+        Ok(self.retained_index.scope_metadata_buffer())
     }
 
     /// Binding visibility ranges for local JavaScript binding resolution.

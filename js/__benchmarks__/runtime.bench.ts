@@ -10,7 +10,7 @@ import { generateLargeFileSource } from './large-file-corpus';
 import { createEditor } from '../runtime/editor';
 import { codeFactory, makeSourceFragment, realizeContent } from '../runtime/fragments';
 import { NativeTransformSession } from '../runtime/session';
-import type { EditCommand, NativeEvent } from '../types';
+import type { EditCommand } from '../types';
 
 function benchmarkTransform(...args: Parameters<typeof transform>) {
   const result = transform(...args);
@@ -1123,29 +1123,6 @@ for (const depth of [32, 128, 256]) {
     benchmarkTransform(nestedObjectFunction, 'function-map.js', visitorPipeline, {
       functionMap: true,
     });
-  });
-}
-
-for (const count of [256, 2_048]) {
-  verifiedBench(`retained repeated high-fanout child cache scaling: ${count}`, () => {
-    const session = new NativeTransformSession('', 'children.js');
-    session.seedRetainedChildTypes(['Program']);
-    const event = (id: number, parentId?: number): NativeEvent => ({
-      sequence: id,
-      side: 'enter',
-      id,
-      type: parentId == null ? 'Program' : 'ExpressionStatement',
-      start: 0,
-      end: 0,
-      parentId,
-      parentType: parentId == null ? undefined : 'Program',
-      scopeId: 0,
-      fields: [],
-    });
-    session.cacheEvent(event(0));
-    for (let batch = 0; batch < 4; batch++)
-      for (let id = 1; id <= count; id++) session.cacheEvent(event(id, 0));
-    session.close();
   });
 }
 
