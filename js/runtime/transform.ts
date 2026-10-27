@@ -464,7 +464,6 @@ export function transform(
   if (adapterMetadata != null) metadata.sourceAdapter = adapterMetadata;
   const diagnostics: Diagnostic[] = [];
   const intents = new Map<string, IntentRegistration>();
-  const provenance = { degradations: 0 };
   const allStates: PreparedState[] = [];
   let openSession: NativeTransformSession | null = null;
   let reusableSession: NativeTransformSession | null = null;
@@ -734,8 +733,6 @@ export function transform(
         }
         reusableRoutedBatch = null;
       }
-      if (requiresIndex || includeParent || includeScope)
-        session.reserveEventCache(batch.nodeCount);
       if (batch.includeParent) session.seedSummaries(batch.parentSummaries);
       const dispatch = createDispatcher(
         session,
@@ -751,7 +748,6 @@ export function transform(
         compiledRoutes,
         dispatchRoutes,
         intents,
-        provenance,
         { compileNestedVisitor, nestedManifest },
         options.pluginData,
       );

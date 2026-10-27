@@ -3,6 +3,7 @@ import { test } from 'vitest';
 
 import { defineNativePipeline, defineNativePlugin, defineVisitor, transform } from '../../index';
 import { native } from '../../native/binding';
+import { NODE_TYPE_IDS } from '../../generated/event-schema';
 import {
   decodeEventBatch,
   decodePackedEnvelope,
@@ -987,5 +988,71 @@ test('retention capabilities cannot alias the structural-bounds flag', () => {
   assert.throws(
     () => packRouteManifest([], false, false, 1 << 8),
     /invalid retention capabilities/,
+  );
+});
+
+// Deliberately unrelated IDs and coincident spans: pairing follows traversal,
+// without allocating an index up to the largest node ID.
+function exitCarrierBatch(exitIds: readonly number[] = [7, 50_000_000]) {
+  const tag = (type: string, exits: boolean) => NODE_TYPE_IDS.get(type)! + (exits ? 0x80000000 : 0);
+  const words = [
+    0,
+    50_000_000,
+    tag('Program', true),
+    0,
+    1,
+    0,
+    1,
+    0,
+    1,
+    1,
+    tag('Identifier', false),
+    0,
+    1,
+    0,
+    1,
+    0,
+    2,
+    7,
+    tag('Identifier', true),
+    0,
+    1,
+    0,
+    1,
+    0,
+    ...exitIds.flatMap((id, index) => [0x80000003 + index, id, 1, 0]),
+  ];
+  const buffer = Buffer.alloc(32 + words.length * 4);
+  [0x4e525446, 4, 50_000_001, 3 + exitIds.length, 3 + exitIds.length, 0, 32, 0, ...words].forEach(
+    (word, index) => buffer.writeUInt32LE(word, index * 4),
+  );
+  return decodeRoutedEnvelope(buffer);
+}
+
+test('pairs exit carriers by traversal with sparse nonmonotonic IDs and coincident spans', () => {
+  const events: import('../../types').NativeEvent[] = [];
+  dispatchRoutedEvents(exitCarrierBatch(), [event => events.push(event)]);
+  assert.deepEqual(
+    events.map(event => [event.side, event.id]),
+    [
+      ['enter', 50_000_000],
+      ['enter', 1],
+      ['enter', 7],
+      ['exit', 7],
+      ['exit', 50_000_000],
+    ],
+  );
+  assert.notEqual(events[2], events[3]);
+  assert.equal(events[2].side, 'enter');
+});
+
+test('rejects out-of-order and unclosed exit carriers', () => {
+  assert.throws(
+    () => dispatchRoutedEvents(exitCarrierBatch([50_000_000, 7]), [() => {}]),
+    /no matching enter record/,
+  );
+  assert.throws(
+    () => dispatchRoutedEvents(exitCarrierBatch([7]), [() => {}]),
+    /unclosed routed exit carriers/,
   );
 });

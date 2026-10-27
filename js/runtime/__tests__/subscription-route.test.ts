@@ -1,4 +1,5 @@
-import { beforeAll, describe, expect, test } from 'vitest';
+import { beforeAll, describe, expect, test, vi } from 'vitest';
+import { NativeTransformSession } from '../session';
 import { defineNativePipeline, defineNativePlugin, defineVisitor, transform } from '../../index';
 
 for (const reversed of [false, true])
@@ -55,3 +56,43 @@ for (const reversed of [false, true])
       });
     },
   );
+
+for (const ancestry of [false, true]) {
+  test(`followup parent summaries follow the ancestry contract: ${ancestry}`, () => {
+    const next = vi.spyOn(NativeTransformSession.prototype, 'nextRoutedPacked');
+    const names: string[] = [];
+    try {
+      const plugin = defineNativePlugin({
+        name: 'followup-structural-data',
+        visitors: [
+          defineVisitor('Program', { controlFlow: ['dynamic-subscriptions'] }, path => {
+            path.subscribeWithin('Identifier');
+          }),
+          defineVisitor(
+            'Identifier',
+            {
+              fields: ['name'],
+              ancestry: ancestry ? { mode: 'parent', routes: {} } : undefined,
+            },
+            path => names.push(path.node.name),
+          ),
+        ],
+      });
+      const result = transform(
+        'first; second;',
+        'input.js',
+        defineNativePipeline({
+          phases: [{ name: 'scan', plugins: [plugin] }],
+        }),
+      );
+      expect(result.status).toBe('complete');
+      expect(names).toEqual(['first', 'second']);
+      const batch = next.mock.results.at(-1)?.value;
+      expect(batch.includeParent).toBe(ancestry);
+      expect(batch.includeScope).toBe(true);
+      if (!ancestry) expect(batch.parentSummaries.length).toBe(0);
+    } finally {
+      next.mockRestore();
+    }
+  });
+}

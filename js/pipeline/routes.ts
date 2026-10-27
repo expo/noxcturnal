@@ -936,8 +936,9 @@ export function compileNestedVisitor(visitor: NestedVisitor): CompiledNestedRout
     manifest: shareManifest(
       packRouteManifest(
         routes,
-        true,
-        true,
+        requirements.ancestry != null,
+        requirements.scope === true ||
+          requirements.controlFlow?.includes('dynamic-subscriptions') === true,
         0,
         childRetention,
         retainedFields,

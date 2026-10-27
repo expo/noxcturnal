@@ -1,4 +1,5 @@
 import type { TraversalEvent } from '../protocol/events';
+import type { NodeCache } from './node-cache';
 import { native } from '../native/binding';
 import { EDIT_OWNER, type OwnedEdit } from './editor';
 import { CHILD_ROLES, FIELD_KEY_IDS } from '../generated/event-schema';
@@ -149,13 +150,12 @@ export type PathRuntime = {
   children: (target: NativeEvent, ancestryDepth: number, role?: string) => NativeNodePath[];
   allowsAncestry: () => boolean;
   allowsScope: () => boolean;
-  scopeCache: Map<number, NativeScope>;
-  pathCache: (NativeNodePath | undefined)[] | undefined;
+  scopeCache: Map<number, NativeScope> | undefined;
+  pathCache: NodeCache<NativeNodePath> | undefined;
   cacheAncestorPaths: boolean;
   ancestryDepthLimit: number;
   assertControl: (capability: ControlFlowCapability) => void;
   capabilities: RouteCapabilities;
-  provenance: { degradations: number };
 };
 export function makePath(
   runtime: PathRuntime,
@@ -450,7 +450,6 @@ export class NodePathImpl implements NativeNodePath {
     let glueHasCopy = false;
     let glueMapping: EditCommand['mapping'] = 'Sourceless';
     let glueNames: string[] = [];
-    const degraded = this.#degraded;
     // All gap edits lowered from one structured replacement share an order. This
     // lets deferred source copies distinguish sibling gaps from unrelated edits
     // while preserving the original ordering against other commands.
@@ -487,19 +486,10 @@ export class NodePathImpl implements NativeNodePath {
           flush(part.start);
           cursor = part.end;
         } else if (sameSession) {
-          degraded(
-            `source fragment ${part.start}..${part.end} cannot be kept in place ` +
-              '(out of order or outside the replaced range); deferred to a commit-time copy',
-            part,
-          );
           glue.push({ start: part.start, end: part.end });
           glueHasCopy = true;
           if (glueMapping === 'Sourceless') glueMapping = 'AnchorBoundaries';
         } else {
-          degraded(
-            `source fragment ${part.start}..${part.end} comes from another phase; copied as text`,
-            part,
-          );
           if (part.text()) glue.push(part.text());
           if (glueMapping === 'Sourceless') glueMapping = 'AnchorBoundaries';
         }
@@ -646,15 +636,12 @@ export class NodePathImpl implements NativeNodePath {
       kind,
       start: offset,
       end: offset,
-      ...realizeContent(this.runtime.session, content, this.#degraded, prefix, suffix),
+      ...realizeContent(this.runtime.session, content, prefix, suffix),
       owner: this.runtime.owner,
       order: this.runtime.nextOrder(),
       [EDIT_OWNER]: this.runtime.ownerIdentity,
     });
   }
-  #degraded = (_message: string, _target: SourceFragment): void => {
-    this.runtime.provenance.degradations++;
-  };
   insertBefore(content: Code): void {
     this.#insert('PrependRight', this.event.start, content);
   }
@@ -823,7 +810,7 @@ function insertionTarget(
 }
 
 function makeScope(runtime: PathRuntime, id: number, parentId: number | null): NativeScope {
-  const cached = runtime.scopeCache.get(id);
+  const cached = runtime.scopeCache?.get(id);
   if (cached) return cached;
   const session = runtime.session;
   const resolve = (name: string): QueryResult['bindings'][number] | undefined => {
@@ -876,7 +863,7 @@ function makeScope(runtime: PathRuntime, id: number, parentId: number | null): N
           kind: 'AppendLeft',
           start: metadata.start,
           end: metadata.start,
-          ...realizeContent(session, content, undefined, wrapping ? '{\n' : '\n;\n', suffix),
+          ...realizeContent(session, content, wrapping ? '{\n' : '\n;\n', suffix),
           owner: runtime.owner,
           order: runtime.nextOrder(),
           [EDIT_OWNER]: runtime.ownerIdentity,
@@ -981,7 +968,7 @@ function makeScope(runtime: PathRuntime, id: number, parentId: number | null): N
       return replacement;
     },
   };
-  runtime.scopeCache.set(id, scope);
+  (runtime.scopeCache ??= new Map()).set(id, scope);
   return scope;
 }
 
