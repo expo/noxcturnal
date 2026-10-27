@@ -1,5 +1,6 @@
 import { alias, expandSubscriptions } from '../pipeline/route-utils';
 import { NodeCache } from './node-cache';
+import { withRouteHandlers } from './route-handler-pool';
 import { CHILD_ROLES } from '../generated/event-schema';
 import { createEditor, EDIT_OWNER, type OwnedEdit } from './editor';
 import {
@@ -738,28 +739,30 @@ export function createDispatcher(
       }
     };
   };
-  const routedThunks: ((event: NativeEvent) => void)[] =
-    batch.routeDeliveryCount === 0
-      ? []
-      : dispatchRoutes.map((route, index) => {
-          if (dispatchRoutes.length === 1)
-            return route.fast ? compileStaticRoute(route) : compileCheckedRoute(route);
-          return event => {
-            const handler = route.fast ? compileStaticRoute(route) : compileCheckedRoute(route);
-            routedThunks[index] = handler;
-            handler(event);
-          };
-        });
   return {
     entries,
     flushInsertions,
     run() {
       for (const entry of entries) resetSkippedTraversal(entry.skipped);
-      dispatchRoutedEvents(
-        batch,
-        routedThunks!,
-        cacheEvents ? event => session.cacheEvent(event) : undefined,
-      );
+      const onEvent = cacheEvents ? (event: NativeEvent) => session.cacheEvent(event) : undefined;
+      if (batch.routeDeliveryCount === 0) {
+        dispatchRoutedEvents(batch, [], onEvent);
+      } else if (dispatchRoutes.length === 1) {
+        const route = dispatchRoutes[0];
+        dispatchRoutedEvents(
+          batch,
+          [route.fast ? compileStaticRoute(route) : compileCheckedRoute(route)],
+          onEvent,
+        );
+      } else {
+        withRouteHandlers(
+          dispatchRoutes,
+          route => (route.fast ? compileStaticRoute(route) : compileCheckedRoute(route)),
+          handlers => {
+            dispatchRoutedEvents(batch, handlers, onEvent);
+          },
+        );
+      }
     },
   };
 }
