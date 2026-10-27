@@ -1,5 +1,7 @@
 # @noxcturnal/noxcturnal-linux-x64-musl
 
+## 0.1.11
+
 ## 0.1.10
 
 ## 0.1.9
