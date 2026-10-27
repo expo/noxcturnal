@@ -2768,28 +2768,39 @@ function proxyObserver2(component) {
       vars: [key],
     };
   };
-  for (var _key2 in component.properties) {
-    _loopResult = _loop(_key2);
-    _key2 = _loopResult.vars[0];
+  for (var key in component.properties) {
+    _loopResult = _loop(key);
+    key = _loopResult.vars[0];
   }
   return component;
 }
 function proxyObserver2(component) {
   var _loopResult8;
-  var _loop7 = () => {
-    var base = component.properties[key].observer;
-    component.properties[key].observer = () => {
-      base.apply(this);
+  var _loop7;
+  var _loopResult10;
+  var _loop9 = key => {
+    _loop7 = () => {
+      var base = component.properties[key].observer;
+      component.properties[key].observer = () => {
+        base.apply(this);
+      };
+      return {
+        type: 'normal',
+        vars: [],
+      };
     };
-    return {
-      type: 'normal',
-      vars: [],
-    };
-  };
-  for (var _key of component.properties)
     while (1) {
       _loopResult8 = _loop7();
     }
+    return {
+      type: 'normal',
+      vars: [key],
+    };
+  };
+  for (var key of component.properties) {
+    _loopResult10 = _loop9(key);
+    key = _loopResult10.vars[0];
+  }
   return component;
 }`,
     modes: [
