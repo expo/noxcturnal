@@ -18,7 +18,9 @@ use crate::event_types::NodeField;
 use crate::generated::event_schema::{ast_kind_protocol_id, field_key_name, node_type_name};
 use crate::protocol::constants::FieldMask;
 use crate::protocol::manifest::{CompiledManifest, CompiledPredicate, CompiledScalar, VisitSide};
-use crate::protocol::routed::{PackedWords, encode_routed_envelope, routed_shape_flags};
+use crate::protocol::routed::{
+    PackedWords, encode_routed_envelope, routed_shape_flags, routed_type_tag,
+};
 use crate::syntax::classification::source_type;
 
 use super::fields::{
@@ -462,8 +464,13 @@ impl RoutedEventCollector<'_> {
                 _ => node.scope_id(),
             }
         });
-        self.words
-            .extend([sequence, id.index() as u32, protocol_id, start, end]);
+        self.words.extend([
+            sequence,
+            id.index() as u32,
+            routed_type_tag(protocol_id, matched_exit_carrier),
+            start,
+            end,
+        ]);
         if self.manifest.include_traversal {
             // Event sequence follows this walk, independently of node IDs and
             // source anchors. Its matching leave backpatches the exclusive end.

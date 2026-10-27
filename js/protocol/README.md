@@ -16,3 +16,9 @@ the exclusive subtree end in event-sequence coordinates. The existing sequence
 word is the start. Exit records preserve their enter start for later skip calls. This
 metadata is not a retention capability and must not force a retained index.
 Indexed collection leaves the shape flag unset and preserves lazy table loading.
+
+In routed enter records, the type word's high bit marks a matched exit carrier;
+the remaining bits identify the node type. Only these enters survive in the
+decoder's exit stack. Native routing emits matching exits in structural order,
+so the stack is bounded by nesting depth rather than the number or maximum ID of
+visited nodes. Node IDs validate each pair; spans do not participate in pairing.

@@ -932,8 +932,9 @@ export function compileNestedVisitor(visitor: NestedVisitor): CompiledNestedRout
   const compiled: CompiledNestedRoutes = {
     manifest: packRouteManifest(
       routes,
-      true,
-      true,
+      requirements.ancestry != null,
+      requirements.scope === true ||
+        requirements.controlFlow?.includes('dynamic-subscriptions') === true,
       0,
       childRetention,
       retainedFields,

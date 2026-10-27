@@ -1,7 +1,7 @@
 import type { RouteCapabilities } from '../pipeline/types';
 import { decodeConstant, decodeString } from '../protocol/value-transport';
 import { parserFilename } from '../adapters/classification';
-import { CHILD_ROLES, FIELD_KEY_IDS, NODE_TYPES } from '../generated/event-schema';
+import { CHILD_ROLES, SCALAR_FIELDS, NODE_TYPES } from '../generated/event-schema';
 import {
   native,
   type NativeIndexedSessionBinding,
@@ -27,19 +27,22 @@ import type {
 } from '../types';
 import { commitWithDedupe } from './editor';
 import { adaptBindingFact, toNodeView } from './node-utils';
+import { NodeCache } from './node-cache';
 import { alias, querySubscriptions } from '../pipeline/route-utils';
 
+// Summaries carry no scalar payload to merge when a routed event replaces them.
+const SUMMARY_FIELDS: NativeEvent['fields'] = [];
 export class NativeTransformSession {
   #closed = false;
   #sourceText: InstanceType<typeof native.NativeSourceText> | null = null;
-  #eventCache: (NativeEvent | undefined)[] = [];
+  #eventCache = new NodeCache<NativeEvent>();
   #queryCache = new WeakMap<QueryRequest, { request: QueryRequest; result: QueryResult }>();
   #globalReferencesCache = new Map<string, SemanticReferenceView[]>();
   #globalBindingReferencesCache = new Map<string, SemanticReferenceView[]>();
   #childrenCache = new Map<number, number[]>();
   #childIdsCache = new Map<number, Set<number>>();
   #childRoleCache = new Map<number, Map<number, number[]>>();
-  #prefetchedChildTypes = new Set<string>();
+  #prefetchedChildTypes: Set<string> | null = null;
   #native: NativeIndexedSessionBinding | null = null;
   #nativeFilename: string;
   #scopeParents: Uint32Array | null = null;
@@ -107,17 +110,22 @@ export class NativeTransformSession {
   }
   cacheEvent(event: NativeEvent): void {
     if (event.side === 'enter') {
-      const existing = this.#eventCache[event.id] as
+      const existing = this.#eventCache.get(event.id) as
         | (NativeEvent & Record<string, unknown>)
         | undefined;
-      if (existing != null) {
+      if (existing != null && existing.fields !== SUMMARY_FIELDS) {
         const target = event as NativeEvent & Record<string, unknown>;
-        for (const field of Object.keys(existing))
-          if (FIELD_KEY_IDS.has(field) && !(field in target)) target[field] = existing[field];
+        // Replays preserve scalar payloads, without enumerating structural
+        // metadata or allocating an object-key array for every cached node.
+        const fields = SCALAR_FIELDS[event.type];
+        if (fields)
+          for (const field of fields)
+            if (Object.hasOwn(existing, field) && !(field in target))
+              target[field] = existing[field];
       }
-      this.#eventCache[event.id] = event;
-      if (event.parentId != null) {
-        const parent = this.#eventCache[event.parentId];
+      this.#eventCache.set(event.id, event);
+      if (this.#prefetchedChildTypes != null && event.parentId != null) {
+        const parent = this.#eventCache.get(event.parentId);
         if (parent && this.#isPrefetchedChildType(parent.type)) {
           let children = this.#childrenCache.get(event.parentId);
           if (children == null) {
@@ -137,25 +145,13 @@ export class NativeTransformSession {
   /** Mark child-complete ancestor types whose edges are carried by the routed
    * envelope, avoiding a synchronous native prefetch on structural access. */
   seedRetainedChildTypes(types: readonly string[]): void {
-    for (const type of types) this.#prefetchedChildTypes.add(type);
+    for (const type of types) (this.#prefetchedChildTypes ??= new Set()).add(type);
   }
   #isPrefetchedChildType(parentType: string): boolean {
+    if (!this.#prefetchedChildTypes) return false;
     for (const type of this.#prefetchedChildTypes)
       if (type === parentType || alias(type, parentType)) return true;
     return false;
-  }
-  /** Pre-size the event cache to the parse's node count: scattered id stores into a
-   * short array degrade to dictionary elements in V8; a packed array stays fast. */
-  reserveEventCache(nodeCount: number): void {
-    if (this.#eventCache.length < nodeCount) {
-      const previous = this.#eventCache;
-      this.#eventCache = new Array<NativeEvent | undefined>(nodeCount).fill(undefined);
-      for (let id = 0; id < previous.length; id++)
-        if (previous[id] !== undefined) this.#eventCache[id] = previous[id];
-    }
-  }
-  get nodeCapacity(): number {
-    return this.#eventCache.length;
   }
   nodeView(event: NativeEvent): NodeView {
     return toNodeView(event);
@@ -270,7 +266,7 @@ export class NativeTransformSession {
     const resolved = new Map<number, NodeView>();
     const missing: InspectRequest[] = [];
     for (const request of requests) {
-      const cached = this.#eventCache[request.nodeId];
+      const cached = this.#eventCache.get(request.nodeId);
       if (cached && request.fields.every(field => cached.fields.some(item => item.key === field))) {
         resolved.set(request.nodeId, toNodeView(cached));
       } else if (request.fields.length === 0) {
@@ -393,7 +389,7 @@ export class NativeTransformSession {
       this.#childRoleCache.set(parentId, new Map());
     }
     for (const event of batch.events) {
-      this.#eventCache[event.id] = event;
+      this.#eventCache.set(event.id, event);
     }
     for (const edge of nativeBatch.edges) {
       let children = this.#childrenCache.get(edge.parentId);
@@ -420,7 +416,7 @@ export class NativeTransformSession {
   }
   event(nodeId: number): NativeEvent | undefined {
     this.#assertOpen();
-    const cached = this.#eventCache[nodeId];
+    const cached = this.#eventCache.get(nodeId);
     if (cached) return cached;
     const data = this.#binding('node.summary').nodeSummaryBuffer(nodeId);
     if (data.byteLength !== 7 * 4) return undefined;
@@ -432,7 +428,8 @@ export class NativeTransformSession {
     this.#assertOpen();
     for (let offset = 0; offset < entries.length; offset += 8) {
       const nodeId = entries[offset]!;
-      if (this.#eventCache[nodeId] === undefined) this.#cacheSummary(nodeId, entries, offset + 1);
+      if (this.#eventCache.get(nodeId) === undefined)
+        this.#cacheSummary(nodeId, entries, offset + 1);
     }
   }
   #cacheSummary(nodeId: number, words: Uint32Array, offset: number): NativeEvent | undefined {
@@ -454,9 +451,9 @@ export class NativeTransformSession {
             parentType: parentTypeId === 0xffffffff ? undefined : NODE_TYPES[parentTypeId],
             scopeId: words[offset + 5]!,
             scopeParentId: scopeParentId === 0xffffffff ? undefined : scopeParentId,
-            fields: [],
+            fields: SUMMARY_FIELDS,
           };
-    if (event) this.#eventCache[nodeId] = event;
+    if (event) this.#eventCache.set(nodeId, event);
     return event;
   }
   /** The scope owning the nearest binding visible from `scopeId`, or null.
