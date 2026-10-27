@@ -1,4 +1,7 @@
+import { spawnSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 import { expect, test } from 'vitest';
+import { nativePreflightOptions } from '../../js/native/binding';
 import { compile, execute, importCode } from './runtime';
 
 test('React Refresh instrumentation preserves component execution and registers it', () => {
@@ -104,3 +107,122 @@ for (const expression of ['() => later', 'async () => later', '(() => later)']) 
     expect(calculate(9)).toBe(9);
   });
 }
+
+test.each([
+  {
+    name: 'function in an if body',
+    source: `if (true)
+      function App() { const [value] = useState(3); return value; }
+      globalThis.result = App();`,
+    expected: 3,
+    signatures: 1,
+  },
+  {
+    name: 'function in a skipped if body',
+    source: `if (false)
+      function App() { const [value] = useState(3); return value; }
+      globalThis.result = typeof App;`,
+    expected: 'undefined',
+    signatures: 0,
+  },
+  {
+    name: 'var in an if body',
+    source: `if (true)
+      var App = function () { const [value] = useState(3); return value; };
+      globalThis.result = App();`,
+    expected: 3,
+    signatures: 1,
+  },
+  {
+    name: 'var in a for initializer',
+    source: `const out = [];
+      for (var App = function () { const [value] = useState(3); return value; }, i = 0; i < 2; i++)
+        out.push(App());
+      globalThis.result = out;`,
+    expected: [3, 3],
+    signatures: 1,
+  },
+])(
+  'Refresh attaches a signature to a $name without aborting',
+  ({ source, expected, signatures }) => {
+    const bindings = { useState: (value: number) => [value, () => {}] };
+    expect(execute(source, {}, bindings).result).toEqual(expected);
+    const require = createRequire(import.meta.url);
+    const binding = Object.keys(require.cache).find(filename =>
+      /noxcturnal\.[^/]+\.node$/.test(filename),
+    );
+    expect(binding).toBeTypeOf('string');
+    const options = nativePreflightOptions({ reactRefresh: {}, helpers: { mode: 'inline' } });
+    // Each input can abort natively. A single batch would stop at the first input
+    // and leave the other insertion positions untested.
+    const child = spawnSync(process.execPath, [], {
+      encoding: 'utf8',
+      timeout: 10_000,
+      input: `
+      const output = require(${JSON.stringify(binding)}).nativePreflightTransform(
+        ${JSON.stringify(source)}, 'input.js', ${JSON.stringify(options)});
+      if (output.status !== 'complete') throw new Error(JSON.stringify(output));
+      const context = {};
+      let signatures = 0;
+      const factory = () => (component) => {
+        if (typeof component === 'function') signatures++;
+        return component;
+      };
+      new Function('$RefreshSig$', '$RefreshReg$', 'useState', 'globalThis', output.code)(
+        factory, () => {}, value => [value, () => {}], context);
+      process.stdout.write(JSON.stringify({ value: context.result, signatures }));
+    `,
+    });
+    expect(child.error, child.stderr).toBeUndefined();
+    expect(child.signal, child.stderr).toBeNull();
+    expect(child.status, child.stderr).toBe(0);
+    // This also catches release builds dropping an unconsumed signature insertion.
+    expect(JSON.parse(child.stdout)).toEqual({ value: expected, signatures });
+  },
+);
+
+test.each([false, true])('Refresh retains a loop-local signature factory (braced=%s)', braced => {
+  const expression = `out.push(function App() {
+    const [value] = useState(1);
+    return value;
+  });`;
+  const source = `const out = [];
+    for (const signature of [() => fn => fn, () => fn => fn])
+      ${braced ? `{ ${expression} }` : expression}
+    globalThis.result = out.map(read => read());`;
+  const result = execute(
+    source,
+    { reactRefresh: { refreshSig: 'signature' } },
+    {
+      useState: (value: number) => [value, () => {}],
+      $RefreshReg$: () => {},
+    },
+  );
+  expect(result.result).toEqual([1, 1]);
+});
+
+test('Refresh keeps skipped signature factories unevaluated', () => {
+  const source = `let calls=0; const signature=()=>{calls++;return fn=>fn};
+    if (false) var App=function(){useState(1);};
+    for(let i=0;i<0;i++) (function Other(){useState(2);});
+    globalThis.result=calls;`;
+  expect(
+    execute(source, { reactRefresh: { refreshSig: 'signature' } }, { $RefreshReg$: () => {} })
+      .result,
+  ).toBe(0);
+});
+
+test('Refresh for-initializer signatures preserve inferred names and mutable self references', () => {
+  const source = `const out=[];
+    for(var App=function(){useState(1);return [App.name,App===globalThis.saved]},i=0;i<1;i++) {
+      globalThis.saved=App;out.push(App.name,App());const read=App;App=()=>0;out.push(read());
+    }
+    globalThis.result=out;`;
+  expect(
+    execute(
+      source,
+      { reactRefresh: {} },
+      { useState: () => [], $RefreshReg$: () => {}, $RefreshSig$: () => fn => fn },
+    ).result,
+  ).toEqual(['App', ['App', true], ['App', false]]);
+});

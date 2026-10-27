@@ -461,8 +461,42 @@ impl<'a> ReactRefresh<'a> {
                 && let Some(ident) = declarator.id().get_binding_identifier()
             {
                 let id_binding = BoundIdentifier::from_binding_ident(ident);
-                self.handle_function_in_variable_declarator(&id_binding, &binding, arguments, ctx);
-                return;
+                if !matches!(ctx.ancestor(2), Ancestor::ForStatementInit(_)) {
+                    self.handle_function_in_variable_declarator(
+                        &id_binding,
+                        &binding,
+                        arguments,
+                        ctx,
+                    );
+                    return;
+                }
+                // A for initializer is not a statement-list item. Infer the
+                // original function name through a property initializer, then
+                // associate its signature in the initializer expression itself.
+                // A named function would introduce a different self binding.
+                let span = expr.span();
+                let value = expr.take_in(ctx);
+                let object = Expression::new_object_expression(
+                    span,
+                    [ObjectPropertyKind::new_object_property(
+                        span,
+                        PropertyKind::Init,
+                        PropertyKey::new_static_identifier(span, ident.name, ctx),
+                        value,
+                        false,
+                        false,
+                        false,
+                        ctx,
+                    )],
+                    ctx,
+                );
+                *expr = Expression::new_static_member_expression(
+                    span,
+                    object,
+                    IdentifierName::new(span, ident.name, ctx),
+                    false,
+                    ctx,
+                );
             }
         }
 

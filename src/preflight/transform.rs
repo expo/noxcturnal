@@ -796,6 +796,9 @@ fn transform_with_function_map(
         if let Some(reason) = detector.failure_reason(&options) {
             return Ok(fatal(reason, [] as [String; 0]));
         }
+        if options.react_refresh == Some(true) {
+            super::statements::prepare_refresh(allocator, &mut program);
+        }
         let semantic = {
             SemanticBuilder::new_compiler()
                 .with_build_nodes(

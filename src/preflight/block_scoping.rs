@@ -174,12 +174,9 @@ impl<'a> VisitMut<'a> for CapturedLoopAstLowerer<'a> {
     }
 
     fn visit_statement(&mut self, statement: &mut Statement<'a>) {
-        if let Some(mut helpers) = self.lower_root(statement) {
+        if let Some(helpers) = self.lower_root(statement) {
             if !helpers.is_empty() {
-                let ast = AstBuilder::new(self.allocator);
-                let span = statement.span();
-                helpers.push(statement.take_in(&ast));
-                *statement = Statement::new_block_statement(span, helpers, &ast);
+                super::statements::prepend(self.allocator, statement, helpers);
             }
         } else if self.error.is_none() {
             walk_mut::walk_statement(self, statement);

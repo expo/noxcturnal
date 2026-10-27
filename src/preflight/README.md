@@ -20,6 +20,10 @@ the owning ordinary function.
 Decline with pristine input when direct eval inside an arrow selected for
 conversion would observe a different implicit function environment.
 
+Keep Refresh signature statements in the original control-flow environment.
+Supply a local statement list for adjacent insertions; loop-header initializers
+must remain expressions.
+
 ## Identity during rewriting
 
 Source spans carry mapping provenance. Multiple generated nodes can share a span,

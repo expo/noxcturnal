@@ -13,6 +13,7 @@ mod optimize;
 pub mod options;
 mod parameters;
 mod regexp;
+mod statements;
 pub mod transform;
 
 pub use options::NativePreflightOptions;
