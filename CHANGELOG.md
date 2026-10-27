@@ -1,5 +1,29 @@
 # noxcturnal
 
+## 0.1.11
+
+### Patch Changes
+
+- Avoid file-wide live arguments capture and repeated Refresh body scans. Skip irrelevant capture analysis, reuse generated capture templates, and omit unused capture callbacks, by [@kitten](https://github.com/kitten) (See [#88](https://github.com/expo/noxcturnal/pull/88))
+- Keep captured-loop helpers inside braceless enclosing loops and conditionals, preserving outer bindings and labeled control flow, by [@kitten](https://github.com/kitten) (See [#88](https://github.com/expo/noxcturnal/pull/88))
+- Hydrate retained child graphs in one native batch and keep packed child edges in JavaScript, reducing indices and allocations for structural visitor access, by [@kitten](https://github.com/kitten) (See [#82](https://github.com/expo/noxcturnal/pull/82))
+- Share compiled child-demand plans across files and select and hydrate child roots natively, avoiding temporary JavaScript event replay during prefetch, by [@kitten](https://github.com/kitten) (See [#86](https://github.com/expo/noxcturnal/pull/86))
+- Add composable native visitor selectors for field predicates and immediate parent/child relationships, including indexed list children. Existing route-name visitors remain supported. Match conditions filter delivery before callback payloads and child prefetch without granting data access, by [@kitten](https://github.com/kitten) (See [#90](https://github.com/expo/noxcturnal/pull/90))
+- Return a pristine compatibility bailout for unsupported decorated class expressions instead of reporting successful output with decorators left in JavaScript. Invalid input still throws, by [@kitten](https://github.com/kitten) (See [#88](https://github.com/expo/noxcturnal/pull/88))
+- Terminate lowered Flow enum declarations so following statements cannot merge with their runtime initializer, by [@kitten](https://github.com/kitten) (See [#88](https://github.com/expo/noxcturnal/pull/88))
+- Preserve lexical arguments placement and live binding reads and writes in parameter, object-rest parameter, and async arrow lowering, by [@kitten](https://github.com/kitten) (See [#88](https://github.com/expo/noxcturnal/pull/88))
+- Reduce native materialization work by reusing syntax-selection AST counts, resolving child roles only when requested, skipping initial cache invalidation, and collecting binding references in shared storage, by [@kitten](https://github.com/kitten) (See [#81](https://github.com/expo/noxcturnal/pull/81))
+- Recognize parenthesized static callee roots in `calleePath` and `calleeGlobal` fields and predicates, consistent with static member paths. Child selectors continue to follow immediate AST relationships, by [@kitten](https://github.com/kitten) (See [#91](https://github.com/expo/noxcturnal/pull/91))
+- Compile phase permissions, plugin order, and artifact requirements once, and lazily bind visitor handlers while sharing runtime helpers across files, by [@kitten](https://github.com/kitten) (See [#84](https://github.com/expo/noxcturnal/pull/84))
+- Evaluate custom React Refresh factories at component creation and keep generated HOC temporaries inside parameter defaults, preserving local factory bindings and independent signatures across calls, by [@kitten](https://github.com/kitten) (See [#89](https://github.com/expo/noxcturnal/pull/89))
+- Keep React Refresh signatures inside single control-flow bodies and attach signatures in for initializers without native insertion failures or changing inferred function names, by [@kitten](https://github.com/kitten) (See [#88](https://github.com/expo/noxcturnal/pull/88))
+- Remove obsolete event-driven child-cache seeding now that child hydration uses native packed graphs exclusively, by [@kitten](https://github.com/kitten) (See [#87](https://github.com/expo/noxcturnal/pull/87))
+- Reuse route-handler scratch state across synchronous transforms, while isolating reentrant transforms and clearing per-file bindings on every exit, by [@kitten](https://github.com/kitten) (See [#85](https://github.com/expo/noxcturnal/pull/85))
+- Reduce scope and binding lookup allocations by sharing immutable facts, compacting visibility and ownership transport, and avoiding reference hydration for presence checks, by [@kitten](https://github.com/kitten) (See [#83](https://github.com/expo/noxcturnal/pull/83))
+- Reuse compiled native routing manifests across files for immutable prepared plans while preserving fresh validation of raw buffers and independent session lifetimes, by [@kitten](https://github.com/kitten) (See [#79](https://github.com/expo/noxcturnal/pull/79))
+- Reduce source-map rendering work at edit commits and when mapping relocated source fragments, preserving map-only changes and Unicode positions, by [@kitten](https://github.com/kitten) (See [#77](https://github.com/expo/noxcturnal/pull/77))
+- Reduce visitor replay allocations with sparse node caches, depth-bounded exit tracking, shared nested replay state, and leaner retained event packing, by [@kitten](https://github.com/kitten) (See [#78](https://github.com/expo/noxcturnal/pull/78))
+
 ## 0.1.10
 
 ### Patch Changes
