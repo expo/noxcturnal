@@ -139,7 +139,9 @@ write the same key, and an undeclared write or read throws. Written metadata is 
 
 Scope and module queries (`globals`, `imports`, `exports`, `constants`, `calls`, `captures`, and
 `bindings`) must be declared in `contract.queries`. An undeclared query throws, and a sibling
-plugin's declaration does not authorize it.
+plugin's declaration does not authorize it. Metadata ownership and query capabilities
+compile with the pipeline definition. Create a new plugin definition to change
+them; query selectors can still vary within the declared categories.
 
 ### Matching member expressions
 

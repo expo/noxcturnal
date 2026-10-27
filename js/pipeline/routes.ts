@@ -1,4 +1,5 @@
 import { shareManifest } from '../native/manifest';
+import { ArtifactDemand, phaseArtifactDemand } from './artifacts';
 import {
   CHILD_ROLES,
   NODE_TYPE_IDS,
@@ -39,7 +40,6 @@ import type {
   ControlFlowCapability,
   NativeFieldKey,
   NativeNodeType,
-  QueryRequest,
   ScalarPredicate,
   ScalarValue,
 } from '../types';
@@ -129,7 +129,7 @@ function bodyEditFields(type: string, fields: readonly NativeFieldKey[]): Native
 function synthesizeVisitorPlan(
   plugin: NativePlugin<any, any>,
   resolved: readonly ResolvedVisitor[],
-): PreparedPluginPlan & { metadataWrites?: readonly string[]; queries?: readonly QueryRequest[] } {
+): PreparedPluginPlan {
   const subscriptions: VisitorRouteSpec[] = [];
   const fields: Record<string, NativeFieldKey[]> = {};
   const children: Record<string, string[]> = {};
@@ -352,19 +352,27 @@ function typedCapabilities(defined: DefinedVisitor<any>): RouteCapabilities {
       attach(concreteRouteTypes(defined.route), contract.children);
       childRules = rules;
     }
+    const ancestorFields = ancestryRules(
+      contract.ancestry,
+      'fields',
+    ) as RouteCapabilities['ancestorFields'];
+    const ancestorChildRules = ancestryRules(contract.ancestry, 'children');
     capabilities = {
       scope: contract.scope,
       ancestry: contract.ancestry,
-      ancestorFields: ancestryRules(
-        contract.ancestry,
-        'fields',
-      ) as RouteCapabilities['ancestorFields'],
-      ancestorChildRules: ancestryRules(contract.ancestry, 'children'),
+      ancestorFields,
+      ancestorChildRules,
       childRules,
       controlFlow: contract.controlFlow,
       declaredFields: contract.fields,
       childFields,
       comments: contract.comments,
+      cacheAncestorPaths:
+        typeof contract.ancestry?.mode !== 'number' &&
+        (Object.values(ancestorFields ?? {}).some(fields => (fields?.length ?? 0) > 0) ||
+          Object.values(ancestorChildRules ?? {}).some(roles => (roles?.length ?? 0) > 0)),
+      ancestryDepthLimit:
+        contract.ancestry == null ? Infinity : ancestryReach(contract.ancestry.mode),
     };
     typedCapabilitiesCache.set(defined, capabilities);
   }
@@ -516,11 +524,21 @@ function pluginPlan(plugin: NativePlugin<any, any>): PreparedPluginPlan {
   plan = synthesizeVisitorPlan(plugin, plugin.visitors == null ? [] : resolveTypedVisitors(plugin));
   // Plugin-contract requirements union with the visitor-derived plan.
   if (plugin.contract != null) {
-    plan.metadataWrites = [
-      ...new Set([...(plan.metadataWrites ?? []), ...(plugin.contract.metadata?.writes ?? [])]),
-    ];
+    const writes = plugin.contract.metadata?.writes;
+    if (writes?.length) plan.metadataWrites = new Set(writes);
     plan.queries = [...(plan.queries ?? []), ...(plugin.contract.queries ?? [])];
   }
+  let queryCapabilities: Set<string> | undefined;
+  // Permissions and native retention describe the same fixed definition.
+  for (const request of plan.queries ?? []) {
+    for (const capability in request) {
+      if (!Object.hasOwn(request, capability)) continue;
+      const value = request[capability as keyof typeof request];
+      if (Array.isArray(value) ? value.length > 0 : value === true)
+        (queryCapabilities ??= new Set<string>()).add(capability);
+    }
+  }
+  plan.queryCapabilities = queryCapabilities;
   pluginPlans.set(plugin, plan);
   return plan;
 }
@@ -566,9 +584,17 @@ export function preparePhase(phase: PipelinePhase): PreparedPhase {
   const fieldRequests: Record<string, string[]> = {};
   let includeParent = false;
   let includeScope = false;
+  let metadataConflict: string | undefined;
+  const metadataOwners = new Map<string, NativePlugin<any, any>>();
 
   for (const plugin of activePlugins) {
     const plan = plans.get(plugin)!;
+    for (const key of plan.metadataWrites ?? []) {
+      const owner = metadataOwners.get(key);
+      if (owner && owner !== plugin)
+        metadataConflict ??= `metadata key ${key} is owned by both ${owner.name} and ${plugin.name}`;
+      metadataOwners.set(key, plugin);
+    }
     for (const type of plan.subscriptions) {
       subscriptions.add(type);
     }
@@ -633,8 +659,10 @@ export function preparePhase(phase: PipelinePhase): PreparedPhase {
     ...new Set(activePlugins.flatMap(plugin => Object.keys(plans.get(plugin)?.children ?? {}))),
   ];
   const prepared: PreparedPhase = {
+    artifactDemand: ArtifactDemand.None,
     activePlugins,
     plans,
+    metadataConflict,
     subscriptions,
     fieldRequests,
     includeParent,
@@ -652,6 +680,7 @@ export function preparePhase(phase: PipelinePhase): PreparedPhase {
     dispatchRoutes: routed.dispatchRoutes,
     manifest: routed.manifest,
   };
+  prepared.artifactDemand = phaseArtifactDemand(prepared);
   preparedPhases.set(phase, prepared);
   return prepared;
 }
@@ -753,6 +782,7 @@ function compilePhaseRoutes(
     const open = openGroups.get(bucket);
     if (open != null && route.fast && open.contract === contract) {
       open.members.push({
+        pluginId: route.pluginId,
         plugin: route.plugin,
         callbacks: route.callbacks,
         capabilities: route.capabilities,
@@ -771,7 +801,12 @@ function compilePhaseRoutes(
       fast: route.fast,
       contract,
       members: [
-        { plugin: route.plugin, callbacks: route.callbacks, capabilities: route.capabilities },
+        {
+          pluginId: route.pluginId,
+          plugin: route.plugin,
+          callbacks: route.callbacks,
+          capabilities: route.capabilities,
+        },
       ],
     };
     openGroups.set(bucket, grouped);

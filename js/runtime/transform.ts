@@ -14,7 +14,7 @@ import {
 } from '../pipeline/routes';
 import { Bailout, createDispatcher } from './dispatch';
 import { SourceVersionStore } from './source-versions';
-import { ArtifactDemand, hasSemanticDemand } from '../pipeline/artifacts';
+import { hasSemanticDemand } from '../pipeline/artifacts';
 import type { IntentRegistration } from './fragments';
 import {
   native,
@@ -164,40 +164,6 @@ function nativePhaseBatch(
     batch.push({ phase: pipeline.phases[index], index });
   }
   return batch;
-}
-
-const SEMANTIC_ROUTE_FIELDS = new Set([
-  'global',
-  'read',
-  'write',
-  'bindingScopeId',
-  'calleeGlobal',
-  'rootGlobal',
-]);
-
-function routeFieldNeedsSemantics(nodeType: string, field: string): boolean {
-  return SEMANTIC_ROUTE_FIELDS.has(field) && (field !== 'write' || nodeType === 'Identifier');
-}
-
-function phaseArtifactDemand(base: ArtifactDemand, prepared: PreparedPhase): ArtifactDemand {
-  let demand = base;
-  if (prepared.includeParent) demand |= ArtifactDemand.StructuralParents;
-  if (prepared.structuralParentTypes.length > 0) demand |= ArtifactDemand.StructuralChildren;
-  if (prepared.includeScope) demand |= ArtifactDemand.LexicalScopes;
-  if (prepared.retentionCapabilities & (1 << 1)) demand |= ArtifactDemand.DirectScalarFields;
-  if (prepared.retentionCapabilities & (1 << 5)) demand |= ArtifactDemand.ModuleFacts;
-  if (
-    prepared.retentionCapabilities & ((1 << 0) | (1 << 2)) ||
-    prepared.compiledRoutes.some(
-      route =>
-        route.payloadFields.some(field => routeFieldNeedsSemantics(route.nodeType, field)) ||
-        Object.keys(route.predicates).some(field =>
-          routeFieldNeedsSemantics(route.nodeType, field),
-        ),
-    )
-  )
-    demand |= ArtifactDemand.BindingsReferences;
-  return demand;
 }
 
 const retainedChainRoot: RetainedChainNode = { children: new WeakMap() };
@@ -673,7 +639,7 @@ export function transform(
         (phaseIndex + 1 <= retainedThroughPhase &&
           nextPhase?.native == null &&
           !phasePlan[phaseIndex + 1].requiresPrintedInput);
-      const artifactDemand = phaseArtifactDemand(executionPlan.artifactDemand, prepared);
+      const artifactDemand = executionPlan.artifactDemand | prepared.artifactDemand;
       const requiresIndex =
         retainedSession != null ||
         requiresIndexBase ||
@@ -740,6 +706,7 @@ export function transform(
         phase,
         activePlugins,
         plans,
+        prepared.metadataConflict,
         batch,
         edits,
         metadata,
@@ -752,7 +719,8 @@ export function transform(
         options.pluginData,
       );
       let phaseSourceHints: ReadonlySet<string> | undefined;
-      for (const plugin of activePlugins) {
+      for (let pluginId = 0; pluginId < activePlugins.length; pluginId++) {
+        const plugin = activePlugins[pluginId];
         const state = plugin.createState?.({
           filename,
           options,
@@ -761,17 +729,16 @@ export function transform(
           pluginData: options.pluginData,
         });
         allStates.push({ plugin, state, cleaned: false });
-        dispatch.contexts.get(plugin)!.state = state;
-        plugin.pre?.(dispatch.contexts.get(plugin)!.context, state);
+        const entry = dispatch.entries[pluginId];
+        entry.state = state;
+        plugin.pre?.(entry.context, state);
       }
-      const decisions = new Map<NativePlugin<any, any>, TransformDecision>();
-      for (const plugin of activePlugins) {
-        const entry = dispatch.contexts.get(plugin)!;
-        const decision = plugin.analyze?.(entry.context, entry.state) ?? {
-          status: 'supported',
-          analysis: undefined,
-        };
-        decisions.set(plugin, decision);
+      let decisions: TransformDecision[] | undefined;
+      for (let pluginId = 0; pluginId < activePlugins.length; pluginId++) {
+        const plugin = activePlugins[pluginId];
+        const entry = dispatch.entries[pluginId];
+        const decision = plugin.analyze?.(entry.context, entry.state);
+        if (decision == null) continue;
         if (decision.status === 'unsupported') {
           if (decision.location)
             diagnostics.push({
@@ -785,6 +752,7 @@ export function transform(
           throw new Bailout(`${plugin.name}:${decision.reason}`);
         }
         if (decision.status === 'irrelevant') entry.stopped = true;
+        (decisions ??= [])[pluginId] = decision;
       }
       // Analysis may reject a plugin using semantic facts. Its visitors no longer
       // need structural hydration; pre/analyze nested traversals hydrate themselves.
@@ -792,20 +760,23 @@ export function transform(
         batch,
         dispatchRoutes.map(route =>
           route.members
-            .filter(member => !dispatch.contexts.get(member.plugin)!.stopped)
+            .filter(member => !dispatch.entries[member.pluginId].stopped)
             .map(member => member.capabilities),
         ),
       );
-      for (const plugin of activePlugins) {
-        const decision = decisions.get(plugin)!;
-        if (decision.status === 'supported') {
-          const entry = dispatch.contexts.get(plugin)!;
-          plugin.apply?.(entry.context, decision.analysis, entry.state);
+      for (let pluginId = 0; pluginId < activePlugins.length; pluginId++) {
+        const plugin = activePlugins[pluginId];
+        const decision = decisions?.[pluginId];
+        if (decision == null || decision.status === 'supported') {
+          const entry = dispatch.entries[pluginId];
+          plugin.apply?.(entry.context, decision?.analysis, entry.state);
         }
       }
       dispatch.run();
-      for (const plugin of activePlugins)
-        plugin.post?.(dispatch.contexts.get(plugin)!.context, dispatch.contexts.get(plugin)!.state);
+      for (let pluginId = 0; pluginId < activePlugins.length; pluginId++) {
+        const entry = dispatch.entries[pluginId];
+        activePlugins[pluginId].post?.(entry.context, entry.state);
+      }
       for (const plugin of activePlugins) {
         const pluginEffect = plugin.editEffect;
         if (pluginEffect === 'none' && edits.some(edit => edit.owner === plugin.name))

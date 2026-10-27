@@ -1,3 +1,5 @@
+import type { PreparedPhase } from './types';
+
 /**
  * Derived products that a phase may demand from an immutable source version.
  *
@@ -58,4 +60,49 @@ export function planArtifacts(
 
 export function hasSemanticDemand(demand: ArtifactDemand): boolean {
   return (closeArtifactDemand(demand) & SEMANTICS) !== 0;
+}
+
+const SEMANTIC_ROUTE_FIELDS = new Set([
+  'global',
+  'read',
+  'write',
+  'bindingScopeId',
+  'calleeGlobal',
+  'rootGlobal',
+]);
+
+function routeFieldNeedsSemantics(nodeType: string, field: string): boolean {
+  return SEMANTIC_ROUTE_FIELDS.has(field) && (field !== 'write' || nodeType === 'Identifier');
+}
+
+/** Compile definition-derived requirements once, independently of a file's
+ * source version and the execution boundary's base demand. */
+export function phaseArtifactDemand(
+  prepared: Pick<
+    PreparedPhase,
+    | 'includeParent'
+    | 'structuralParentTypes'
+    | 'includeScope'
+    | 'retentionCapabilities'
+    | 'compiledRoutes'
+  >,
+): ArtifactDemand {
+  let demand = ArtifactDemand.None;
+  if (prepared.includeParent) demand |= ArtifactDemand.StructuralParents;
+  if (prepared.structuralParentTypes.length > 0) demand |= ArtifactDemand.StructuralChildren;
+  if (prepared.includeScope) demand |= ArtifactDemand.LexicalScopes;
+  if (prepared.retentionCapabilities & (1 << 1)) demand |= ArtifactDemand.DirectScalarFields;
+  if (prepared.retentionCapabilities & (1 << 5)) demand |= ArtifactDemand.ModuleFacts;
+  if (
+    prepared.retentionCapabilities & ((1 << 0) | (1 << 2)) ||
+    prepared.compiledRoutes.some(
+      route =>
+        route.payloadFields.some(field => routeFieldNeedsSemantics(route.nodeType, field)) ||
+        Object.keys(route.predicates).some(field =>
+          routeFieldNeedsSemantics(route.nodeType, field),
+        ),
+    )
+  )
+    demand |= ArtifactDemand.BindingsReferences;
+  return demand;
 }
