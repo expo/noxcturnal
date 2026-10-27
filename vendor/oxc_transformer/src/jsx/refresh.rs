@@ -548,7 +548,7 @@ impl<'a> ReactRefresh<'a> {
                         value,
                         false,
                         false,
-                        true,
+                        name == "__proto__",
                         ctx,
                     )],
                     ctx,
