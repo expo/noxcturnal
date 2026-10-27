@@ -29,3 +29,19 @@ parents. CSR edges have one entry per child under its structural or projected
 parent, in native child order. Recursive requests expand retained roles by node
 identity and transfer each child's scalar facts once, including when several
 requested roots reach it.
+
+Route flag bit 1 declares an internal immediate-parent type filter. After the eight-word route header,
+a nonempty count and concrete parent type IDs precede the scalar predicates. Routes without
+this flag keep their existing layout. Parent types affect matching only; they neither request
+ancestry transport nor add retained capabilities.
+
+Route flag bit 2 adds a structural selector after the optional parent filter and before route
+predicates. Its recursive encoding is `[variantCount, ...variants]`. Each variant starts with
+`[typeId, predicateCount, hasParent, childCount]`, followed by ordinary compiled predicates, an
+optional parent selector, and children encoded as `[roleId, indexOrMax, ...selector]`. Variants
+are alternatives; predicates, parent, and child conditions within a variant are conjunctive.
+The callback always receives the route root. Child conditions are existential unless an index
+is given. Limits are eight levels and 4096 variant records per manifest. Decode validates every
+field, role, index, and bound before walking. Simple root predicates and parent type conditions
+lower to the existing route filters. Indexed replay reuses the generated role graph; selector
+requirements never authorize callback data access.

@@ -28,11 +28,33 @@ pub(crate) enum CompiledScalar {
 }
 
 #[derive(Clone)]
+pub(crate) struct CompiledSelector {
+    pub(crate) variants: Vec<SelectorVariant>,
+}
+
+#[derive(Clone)]
+pub(crate) struct SelectorVariant {
+    pub(crate) node_type_id: u32,
+    pub(crate) predicates: Vec<CompiledPredicate>,
+    pub(crate) parent: Option<Box<CompiledSelector>>,
+    pub(crate) children: Vec<SelectorChild>,
+}
+
+#[derive(Clone)]
+pub(crate) struct SelectorChild {
+    pub(crate) role_id: u32,
+    pub(crate) index: Option<u32>,
+    pub(crate) selector: CompiledSelector,
+}
+
+#[derive(Clone)]
 pub(crate) struct CompiledRoute {
     pub(crate) id: u32,
     pub(crate) node_type_id: u32,
     pub(crate) side: VisitSide,
     pub(crate) predicates: Vec<CompiledPredicate>,
+    pub(crate) parent_types: Option<NodeTypeSet>,
+    pub(crate) selector: Option<CompiledSelector>,
     pub(crate) payload_field_ids: Vec<u32>,
     /// `payload_field_ids` as a mask, so a matching route's payload selection is one
     /// word and coalescing several matched routes is a bitwise union.
@@ -43,6 +65,8 @@ pub(crate) struct CompiledRoute {
 pub(crate) struct CompiledManifest {
     pub(crate) routes_by_type: Vec<Vec<CompiledRoute>>,
     pub(crate) program_only: bool,
+    pub(crate) has_parent_filters: bool,
+    pub(crate) has_selectors: bool,
     pub(crate) include_parent: bool,
     pub(crate) include_scope: bool,
     pub(crate) include_exit: bool,
@@ -170,6 +194,7 @@ pub(crate) fn decode_route_manifest(
     }
     let word_limit = strings_offset / 4;
     let mut cursor = 7;
+    let mut selector_budget = 4096;
     let mut seen_ids = FxHashSet::default();
     let mut routes_by_type = vec![Vec::new(); NODE_TYPE_COUNT + 1];
     for _ in 0..route_count {
@@ -214,7 +239,7 @@ pub(crate) fn decode_route_manifest(
                 "duplicate compiled route id",
             ));
         }
-        if route_flags & !1 != 0
+        if route_flags & !7 != 0
             || predicate_count > MAX_ROUTE_PREDICATES
             || payload_count > MAX_ROUTE_PAYLOAD_FIELDS
         {
@@ -223,63 +248,80 @@ pub(crate) fn decode_route_manifest(
                 "invalid compiled route limits",
             ));
         }
-        let mut predicates = Vec::with_capacity(predicate_count);
-        for _ in 0..predicate_count {
-            if cursor + 3 > word_limit {
+        let mut parent_types = if route_flags & 2 != 0 {
+            if cursor >= word_limit {
                 return Err(Error::new(
                     Status::InvalidArg,
-                    "truncated compiled predicate",
+                    "truncated parent type filter",
                 ));
             }
-            let field_id = word(cursor);
-            let operation = word(cursor + 1);
-            let value_count = word(cursor + 2) as usize;
-            cursor += 3;
-            if field_key_name(field_id).is_none()
-                || !predicate_field_supported(node_type_id, field_id)
-                || operation > 2
-                || (operation == 0 && value_count != 1)
-                || (operation == 2 && value_count != 1)
-                || value_count > MAX_PREDICATE_VALUES
-                || cursor + value_count * 2 > word_limit
-            {
-                return Err(Error::new(Status::InvalidArg, "invalid compiled predicate"));
+            let count = word(cursor) as usize;
+            cursor += 1;
+            if count == 0 || count > NODE_TYPE_COUNT || cursor + count > word_limit {
+                return Err(Error::new(Status::InvalidArg, "invalid parent type filter"));
             }
-            let mut values = Vec::with_capacity(value_count);
-            for _ in 0..value_count {
-                let tag = word(cursor);
-                let payload = word(cursor + 1);
-                cursor += 2;
-                values.push(match tag {
-                    0 => CompiledScalar::String(
-                        strings
-                            .get(payload as usize)
-                            .ok_or_else(|| {
-                                Error::new(Status::InvalidArg, "invalid predicate string id")
-                            })?
-                            .clone(),
-                    ),
-                    1 => CompiledScalar::Number(
-                        strings
-                            .get(payload as usize)
-                            .ok_or_else(|| {
-                                Error::new(Status::InvalidArg, "invalid predicate number id")
-                            })?
-                            .parse::<f64>()
-                            .map_err(|_| {
-                                Error::new(Status::InvalidArg, "invalid predicate number")
-                            })?,
-                    ),
-                    2 => CompiledScalar::Boolean(payload != 0),
-                    3 if payload == 0 => CompiledScalar::Null,
-                    _ => return Err(Error::new(Status::InvalidArg, "invalid predicate scalar")),
-                });
+            let mut types = NodeTypeSet::default();
+            for _ in 0..count {
+                let type_id = word(cursor);
+                cursor += 1;
+                if type_id == 0 || type_id as usize > NODE_TYPE_COUNT || !types.insert(type_id) {
+                    return Err(Error::new(Status::InvalidArg, "invalid parent type id"));
+                }
             }
-            predicates.push(CompiledPredicate {
-                field_id,
-                operation,
-                values,
-            });
+            Some(types)
+        } else {
+            None
+        };
+        let mut selector = if route_flags & 4 != 0 {
+            Some(decode_selector(
+                &word,
+                &mut cursor,
+                word_limit,
+                &strings,
+                0,
+                &mut selector_budget,
+            )?)
+        } else {
+            None
+        };
+        let mut predicates = decode_predicates(
+            &word,
+            &mut cursor,
+            word_limit,
+            &strings,
+            node_type_id,
+            predicate_count,
+        )?;
+        // A selector's root is already fixed by the route. Lower simple cases
+        // to the existing scalar/type filters, avoiding a structural stack.
+        if let Some(selection) = &mut selector {
+            selection
+                .variants
+                .retain(|variant| variant.node_type_id == node_type_id);
+            if selection.variants.len() == 1 {
+                let variant = &mut selection.variants[0];
+                predicates.append(&mut variant.predicates);
+                if parent_types.is_none()
+                    && variant.parent.as_ref().is_some_and(|parent| {
+                        !parent.variants.is_empty()
+                            && parent.variants.iter().all(|variant| {
+                                variant.predicates.is_empty()
+                                    && variant.parent.is_none()
+                                    && variant.children.is_empty()
+                            })
+                    })
+                {
+                    let mut types = NodeTypeSet::default();
+                    for parent in &variant.parent.as_ref().expect("checked parent").variants {
+                        types.insert(parent.node_type_id);
+                    }
+                    parent_types = Some(types);
+                    variant.parent = None;
+                }
+                if variant.parent.is_none() && variant.children.is_empty() {
+                    selector = None;
+                }
+            }
         }
         if cursor + payload_count > word_limit {
             return Err(Error::new(
@@ -304,6 +346,8 @@ pub(crate) fn decode_route_manifest(
             node_type_id,
             side,
             predicates,
+            parent_types,
+            selector,
             payload_field_ids,
             payload_mask,
             comments_inner: route_flags & 1 != 0,
@@ -490,7 +534,7 @@ pub(crate) fn decode_route_manifest(
         .any(|route| route.side == VisitSide::Exit);
     let include_parent = flags & 1 != 0;
     let include_scope = flags & 2 != 0;
-    let merged_field_mask_by_type = routes_by_type
+    let mut merged_field_mask_by_type = routes_by_type
         .iter()
         .zip(&retained_fields_by_type)
         .map(|(routes, retained_field_ids)| {
@@ -507,6 +551,43 @@ pub(crate) fn decode_route_manifest(
                 .fold(FieldMask::none(), |mask, field_id| mask.with(field_id))
         })
         .collect::<Vec<_>>();
+    fn selector_fields(
+        selector: &CompiledSelector,
+        fields: &mut [FieldMask],
+        roles: &mut [ChildRoleMask],
+    ) {
+        for variant in &selector.variants {
+            for predicate in &variant.predicates {
+                fields[variant.node_type_id as usize] =
+                    fields[variant.node_type_id as usize].with(predicate.field_id);
+            }
+            if let Some(parent) = &variant.parent {
+                selector_fields(parent, fields, roles);
+            }
+            for child in &variant.children {
+                let mask = &mut roles[variant.node_type_id as usize];
+                if !mask.wildcard && !mask.role_ids.contains(&child.role_id) {
+                    mask.role_ids.push(child.role_id);
+                }
+                if crate::generated::event_schema::child_role_projects_formal_parameters(
+                    child.role_id,
+                ) {
+                    roles[node_type_id("FormalParameters").expect("generated type") as usize]
+                        .wildcard = true;
+                }
+                selector_fields(&child.selector, fields, roles);
+            }
+        }
+    }
+    for route in routes_by_type.iter().flatten() {
+        if let Some(selector) = &route.selector {
+            selector_fields(
+                selector,
+                &mut merged_field_mask_by_type,
+                &mut child_role_mask_by_parent_type,
+            );
+        }
+    }
     let write_field_id = field_key_id("write");
     let semantic_mask = semantic_field_keys
         .iter()
@@ -546,6 +627,14 @@ pub(crate) fn decode_route_manifest(
             .flatten()
             .any(|route| route.comments_inner);
     Ok(CompiledManifest {
+        has_selectors: routes_by_type
+            .iter()
+            .flatten()
+            .any(|route| route.selector.is_some()),
+        has_parent_filters: routes_by_type
+            .iter()
+            .flatten()
+            .any(|route| route.parent_types.is_some()),
         program_only: routes_by_type[node_type_id("Program").expect("Program type") as usize].len()
             == route_count,
         routes_by_type,
@@ -565,4 +654,168 @@ pub(crate) fn decode_route_manifest(
         needs_semantics,
         needs_comments,
     })
+}
+
+fn decode_predicates(
+    word: &impl Fn(usize) -> u32,
+    cursor: &mut usize,
+    word_limit: usize,
+    strings: &[String],
+    node_type_id: u32,
+    predicate_count: usize,
+) -> Result<Vec<CompiledPredicate>> {
+    if predicate_count > MAX_ROUTE_PREDICATES {
+        return Err(Error::new(
+            Status::InvalidArg,
+            "selector predicate limit exceeded",
+        ));
+    }
+    let mut predicates = Vec::with_capacity(predicate_count);
+    for _ in 0..predicate_count {
+        if *cursor + 3 > word_limit {
+            return Err(Error::new(
+                Status::InvalidArg,
+                "truncated compiled predicate",
+            ));
+        }
+        let field_id = word(*cursor);
+        let operation = word(*cursor + 1);
+        let value_count = word(*cursor + 2) as usize;
+        *cursor += 3;
+        if field_key_name(field_id).is_none()
+            || !predicate_field_supported(node_type_id, field_id)
+            || operation > 2
+            || (operation == 0 && value_count != 1)
+            || (operation == 2 && value_count != 1)
+            || value_count > MAX_PREDICATE_VALUES
+            || *cursor + value_count * 2 > word_limit
+        {
+            return Err(Error::new(Status::InvalidArg, "invalid compiled predicate"));
+        }
+        let mut values = Vec::with_capacity(value_count);
+        for _ in 0..value_count {
+            let tag = word(*cursor);
+            let payload = word(*cursor + 1);
+            *cursor += 2;
+            values.push(match tag {
+                0 => CompiledScalar::String(
+                    strings
+                        .get(payload as usize)
+                        .ok_or_else(|| {
+                            Error::new(Status::InvalidArg, "invalid predicate string id")
+                        })?
+                        .clone(),
+                ),
+                1 => CompiledScalar::Number(
+                    strings
+                        .get(payload as usize)
+                        .ok_or_else(|| {
+                            Error::new(Status::InvalidArg, "invalid predicate number id")
+                        })?
+                        .parse::<f64>()
+                        .map_err(|_| Error::new(Status::InvalidArg, "invalid predicate number"))?,
+                ),
+                2 => CompiledScalar::Boolean(payload != 0),
+                3 if payload == 0 => CompiledScalar::Null,
+                _ => return Err(Error::new(Status::InvalidArg, "invalid predicate scalar")),
+            });
+        }
+        predicates.push(CompiledPredicate {
+            field_id,
+            operation,
+            values,
+        });
+    }
+    Ok(predicates)
+}
+
+fn decode_selector(
+    word: &impl Fn(usize) -> u32,
+    cursor: &mut usize,
+    word_limit: usize,
+    strings: &[String],
+    depth: usize,
+    remaining: &mut usize,
+) -> Result<CompiledSelector> {
+    if depth >= 8 || *cursor >= word_limit {
+        return Err(Error::new(
+            Status::InvalidArg,
+            "invalid selector depth or header",
+        ));
+    }
+    let count = word(*cursor) as usize;
+    *cursor += 1;
+    if count > *remaining {
+        return Err(Error::new(Status::InvalidArg, "selector limit exceeded"));
+    }
+    *remaining -= count;
+    let mut variants = Vec::with_capacity(count);
+    for _ in 0..count {
+        if *cursor + 4 > word_limit {
+            return Err(Error::new(Status::InvalidArg, "truncated selector"));
+        }
+        let node_type_id = word(*cursor);
+        let predicate_count = word(*cursor + 1) as usize;
+        let has_parent = word(*cursor + 2);
+        let child_count = word(*cursor + 3) as usize;
+        *cursor += 4;
+        if node_type_id == 0
+            || node_type_id as usize > NODE_TYPE_COUNT
+            || has_parent > 1
+            || child_count > CHILD_ROLE_COUNT
+        {
+            return Err(Error::new(Status::InvalidArg, "invalid selector"));
+        }
+        let predicates = decode_predicates(
+            word,
+            cursor,
+            word_limit,
+            strings,
+            node_type_id,
+            predicate_count,
+        )?;
+        let parent = if has_parent != 0 {
+            Some(Box::new(decode_selector(
+                word,
+                cursor,
+                word_limit,
+                strings,
+                depth + 1,
+                remaining,
+            )?))
+        } else {
+            None
+        };
+        let mut children = Vec::with_capacity(child_count);
+        let mut seen_roles = FxHashSet::default();
+        for _ in 0..child_count {
+            if *cursor + 2 > word_limit {
+                return Err(Error::new(Status::InvalidArg, "truncated selector child"));
+            }
+            let role_id = word(*cursor);
+            let index = word(*cursor + 1);
+            *cursor += 2;
+            if child_role_parent_type_id(role_id) != Some(node_type_id)
+                || !seen_roles.insert(role_id)
+                || index != u32::MAX && child_role_cardinality(role_id) != Some(2)
+            {
+                return Err(Error::new(
+                    Status::InvalidArg,
+                    "invalid selector child role or index",
+                ));
+            }
+            children.push(SelectorChild {
+                role_id,
+                index: (index != u32::MAX).then_some(index),
+                selector: decode_selector(word, cursor, word_limit, strings, depth + 1, remaining)?,
+            });
+        }
+        variants.push(SelectorVariant {
+            node_type_id,
+            predicates,
+            parent,
+            children,
+        });
+    }
+    Ok(CompiledSelector { variants })
 }

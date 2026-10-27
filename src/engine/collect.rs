@@ -336,6 +336,15 @@ pub(crate) fn materialize_program<'a>(
     let child_role_masks = retention_manifest
         .or(compiled_manifest)
         .map(|manifest| manifest.child_role_mask_by_parent_type.as_slice());
+    // Matching may need selected edges when an index is already being built.
+    // This internal retention does not grant JavaScript child access.
+    let retention_capabilities = retention_capabilities
+        | if child_role_masks.is_some_and(|masks| masks.iter().any(|mask| mask.requests_children()))
+        {
+            RETAIN_CHILDREN
+        } else {
+            0
+        };
     let needs_semantics = retention_manifest.is_some_and(|manifest| manifest.needs_semantics)
         || compiled_manifest.is_some_and(|manifest| manifest.needs_semantics)
         || (retention_manifest.is_some() || compiled_manifest.is_some())

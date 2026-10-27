@@ -3,7 +3,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::generated::event_schema::field_key_name;
 use crate::protocol::manifest::{
-    CompiledManifest, CompiledPredicate, CompiledRoute, CompiledScalar, VisitSide,
+    CompiledManifest, CompiledPredicate, CompiledRoute, CompiledScalar, CompiledSelector, VisitSide,
 };
 use crate::protocol::routed::{
     PackedWords, encode_routed_envelope, routed_shape_flags, routed_type_tag,
@@ -82,6 +82,38 @@ fn routed_buffer_from_range(
     writer.finish(manifest, index.len() as u32, index, scope_parents)
 }
 
+fn retained_selector_matches(
+    selector: &CompiledSelector,
+    index: &RetainedIndex,
+    node_id: u32,
+) -> bool {
+    let Some(type_id) = index.type_id(node_id) else {
+        return false;
+    };
+    selector.variants.iter().any(|variant| {
+        variant.node_type_id == type_id
+            && variant
+                .predicates
+                .iter()
+                .all(|predicate| retained_predicate_matches(predicate, index, node_id, type_id))
+            && variant.parent.as_ref().is_none_or(|parent| {
+                index
+                    .parent_id(node_id)
+                    .is_some_and(|id| retained_selector_matches(parent, index, id))
+            })
+            && variant.children.iter().all(|child| {
+                index
+                    .child_edges(node_id)
+                    .filter(|(_, role)| *role == child.role_id)
+                    .enumerate()
+                    .any(|(position, (id, _))| {
+                        child.index.is_none_or(|index| index as usize == position)
+                            && retained_selector_matches(&child.selector, index, id)
+                    })
+            })
+    })
+}
+
 struct RetainedRouteWriter<'a> {
     words: PackedWords,
     string_ids: FxHashMap<&'a str, u32>,
@@ -147,10 +179,18 @@ impl<'a> RetainedRouteWriter<'a> {
             .iter()
             .filter(|route| side == VisitSide::Enter || route.side == side)
         {
-            if route
-                .predicates
-                .iter()
-                .all(|predicate| retained_predicate_matches(predicate, index, node_id, protocol_id))
+            if route.parent_types.as_ref().is_none_or(|types| {
+                index
+                    .parent_id(node_id)
+                    .and_then(|parent| index.type_id(parent))
+                    .is_some_and(|parent| types.contains(parent))
+            }) && route
+                .selector
+                .as_ref()
+                .is_none_or(|selector| retained_selector_matches(selector, index, node_id))
+                && route.predicates.iter().all(|predicate| {
+                    retained_predicate_matches(predicate, index, node_id, protocol_id)
+                })
             {
                 if route.side == side {
                     matched_routes.push(route.id);
@@ -544,6 +584,8 @@ mod tests {
                         VisitSide::Enter
                     },
                     predicates: Vec::new(),
+                    parent_types: None,
+                    selector: None,
                     payload_mask: payload_field_ids
                         .iter()
                         .fold(FieldMask::none(), |mask, &id| mask.with(id)),

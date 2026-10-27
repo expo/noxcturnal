@@ -27,7 +27,11 @@ import type {
   ResolvedVisitor,
   RouteCapabilities,
 } from './types';
-import { packRouteManifest, type NativeRouteManifestEntry } from '../protocol/manifest';
+import {
+  packRouteManifest,
+  type NativeRouteManifestEntry,
+  type NativeSelector,
+} from '../protocol/manifest';
 import type {
   ChildContract,
   DefinedVisitor,
@@ -35,6 +39,7 @@ import type {
   NativePlugin,
   PipelinePhase,
   StoredVisitorContract,
+  StoredVisitorSelector,
   VisitorRouteSpec,
 } from '../contracts/visitor';
 import type {
@@ -50,6 +55,7 @@ const validatedVisitors = new WeakSet<DefinedVisitor<any>>();
 function validateDefinedVisitor(pluginName: string, defined: DefinedVisitor<any>): void {
   if (validatedVisitors.has(defined)) return;
   validateRouteSpec(pluginName, 'visitor route', defined.route);
+  if (defined.selector) compileSelector(defined.selector, pluginName);
   validatePredicates(pluginName, {
     where: defined.contract.where == null ? undefined : { [defined.route]: defined.contract.where },
     controlFlow: defined.contract.controlFlow,
@@ -98,6 +104,83 @@ function validateDefinedVisitor(pluginName: string, defined: DefinedVisitor<any>
   validatedVisitors.add(defined);
 }
 
+const compiledSelectors = new WeakMap<StoredVisitorSelector, NativeSelector>();
+
+function compileSelector(
+  selector: StoredVisitorSelector,
+  plugin: string,
+  depth = 0,
+): NativeSelector {
+  if (depth >= 8) throw new Error(`${plugin}: visitor selector depth exceeded`);
+  const cached = compiledSelectors.get(selector);
+  if (cached) return cached;
+  validateRouteSpec(plugin, 'selector route', selector.route);
+  validatePredicates(plugin, {
+    where: selector.where == null ? undefined : { [selector.route]: selector.where },
+  });
+  const parent = selector.parent ? compileSelector(selector.parent, plugin, depth + 1) : undefined;
+  const roles = Object.entries(selector.children ?? {});
+  const types = concreteRouteTypes(selector.route);
+  for (const [role, child] of roles) {
+    const declarations = types.flatMap(type => CHILD_ROLES[type]?.[role] ?? []);
+    if (role === '*' || declarations.length === 0)
+      throw new Error(`${plugin}: unknown selector child role ${role}`);
+    const allowed = new Set(declarations.flatMap(declaration => declaration.types));
+    if (concreteRouteTypes(child.route).some(type => !allowed.has(type)))
+      throw new Error(`${plugin}: selector child role ${role} cannot deliver ${child.route}`);
+    if (
+      child.index !== undefined &&
+      (!Number.isSafeInteger(child.index) ||
+        child.index < 0 ||
+        child.index >= 0xffffffff ||
+        declarations.some(declaration => !declaration.list))
+    )
+      throw new Error(`${plugin}: selector index requires a nonnegative integer and a list role`);
+  }
+  const compiledChildren = roles.map(([role, child]) => ({
+    role,
+    index: child.index,
+    selector: compileSelector(child, plugin, depth + 1),
+  }));
+  const compiled: NativeSelector = {
+    variants: typedRouteExpansion({ route: selector.route } as DefinedVisitor<any>, selector.where)
+      .map(({ nodeType, predicates }) => ({
+        nodeType,
+        predicates,
+        parent,
+        // Roles absent on an alias variant cannot satisfy the selector.
+        children: compiledChildren.filter(child => CHILD_ROLES[nodeType]?.[child.role] != null),
+      }))
+      .filter(variant => variant.children.length === roles.length),
+  };
+  compiledSelectors.set(selector, compiled);
+  return compiled;
+}
+
+function attachSelectorRequirements(
+  selector: NativeSelector,
+  children: Record<string, string[]>,
+  fields: Record<string, NativeFieldKey[]>,
+  seen = new Set<NativeSelector>(),
+): void {
+  if (seen.has(selector)) return;
+  seen.add(selector);
+  for (const variant of selector.variants) {
+    mergeFieldRequests(fields, {
+      [variant.nodeType]: Object.keys(variant.predicates) as NativeFieldKey[],
+    });
+    if (variant.parent) attachSelectorRequirements(variant.parent, children, fields, seen);
+    for (const child of variant.children) {
+      mergeChildRoleRequests(children, { [variant.nodeType]: [child.role] });
+      // Projected parameter lists need the wrapper's edges while collecting.
+      attachChildProjectionDependencies(children, variant.nodeType, {
+        [child.role]: { route: '*' },
+      });
+      attachSelectorRequirements(child.selector, children, fields, seen);
+    }
+  }
+}
+
 function resolveTypedVisitors(plugin: NativePlugin<any, any>): ResolvedVisitor[] {
   const resolved: ResolvedVisitor[] = [];
   for (const defined of plugin.visitors!) {
@@ -134,6 +217,7 @@ function synthesizeVisitorPlan(
   const subscriptions: VisitorRouteSpec[] = [];
   const fields: Record<string, NativeFieldKey[]> = {};
   const children: Record<string, string[]> = {};
+  const selectorChildren: Record<string, string[]> = {};
   const controlFlow = new Set<ControlFlowCapability>();
   let scope = false;
   let retainComments = false;
@@ -157,6 +241,12 @@ function synthesizeVisitorPlan(
       );
       if (applicable.length > 0) mergeFieldRequests(fields, { [concrete]: applicable });
     }
+    if (definition.selector)
+      attachSelectorRequirements(
+        compileSelector(definition.selector, plugin.name),
+        selectorChildren,
+        fields,
+      );
     attachDeclaredChildren(
       children,
       fields,
@@ -195,6 +285,7 @@ function synthesizeVisitorPlan(
 
   return {
     subscriptions,
+    selectorChildren,
     retainComments,
     fields: fields as PreparedPluginPlan['fields'],
     children: Object.keys(children).length > 0 ? children : undefined,
@@ -488,6 +579,7 @@ export function accumulateRetention(
   for (const plugin of plugins) {
     const plan = plans.get(plugin);
     mergeChildRoleRequests(facts.childRoles, plan?.children);
+    mergeChildRoleRequests(facts.childRoles, plan?.selectorChildren);
     mergeChildRoleRequests(facts.childRoles, plan?.ancestryChildren);
   }
   for (const plugin of plugins) {
@@ -764,6 +856,9 @@ function compilePhaseRoutes(
             side,
             order: pluginId,
             predicates,
+            selector: definition.selector
+              ? compileSelector(definition.selector, plugin.name)
+              : undefined,
             payloadFields: bodyEditFields(nodeType, definition.contract.fields),
             comments: definition.contract.comments,
             plugin,
@@ -784,7 +879,7 @@ function compilePhaseRoutes(
   const openGroups = new Map<string, DispatchRoute>();
   for (const route of routes) {
     const bucket = `${route.nodeType}:${route.side}`;
-    const contract = `${route.fast}:${stableJson(route.predicates)}:${route.payloadFields.join(',')}:${route.comments ?? ''}`;
+    const contract = `${stableJson(route.selector ?? null)}:${route.fast}:${stableJson(route.predicates)}:${route.payloadFields.join(',')}:${route.comments ?? ''}`;
     const open = openGroups.get(bucket);
     if (open != null && route.fast && open.contract === contract) {
       open.members.push({
@@ -802,6 +897,7 @@ function compilePhaseRoutes(
       side: route.side,
       order: route.order,
       predicates: route.predicates,
+      selector: route.selector,
       payloadFields: route.payloadFields,
       comments: route.comments,
       fast: route.fast,
@@ -904,6 +1000,7 @@ export function compileNestedVisitor(visitor: NestedVisitor): CompiledNestedRout
     predicates: Record<string, ScalarPredicate>;
     callbacks: readonly Handler<any>[];
     comments: 'inner' | undefined;
+    selector: NativeSelector | undefined;
   }[] = [];
   const capabilities: RouteCapabilities[] = [];
   const payloads: (readonly NativeFieldKey[])[] = [];
@@ -944,6 +1041,7 @@ export function compileNestedVisitor(visitor: NestedVisitor): CompiledNestedRout
           predicates,
           callbacks: [callback as Handler<any>],
           comments: defined.contract.comments,
+          selector: defined.selector ? compileSelector(defined.selector, 'nested') : undefined,
         });
         capabilities.push(caps);
         payloads.push(bodyEditFields(nodeType, defined.contract.fields));
@@ -957,6 +1055,7 @@ export function compileNestedVisitor(visitor: NestedVisitor): CompiledNestedRout
     side: variant.side,
     order: 0,
     predicates: variant.predicates,
+    selector: variant.selector,
     payloadFields: payloads[id],
     comments: variant.comments,
   }));
@@ -972,6 +1071,7 @@ export function compileNestedVisitor(visitor: NestedVisitor): CompiledNestedRout
   mergeFieldRequests(retainedFields, ancestorFields);
   const childRetention: Record<string, string[]> = {};
   mergeChildRoleRequests(childRetention, requirements.children);
+  mergeChildRoleRequests(childRetention, requirements.selectorChildren);
   mergeChildRoleRequests(childRetention, requirements.ancestryChildren);
   const compiled: CompiledNestedRoutes = {
     childPrefetch: compileChildPrefetch(
@@ -1002,7 +1102,7 @@ export function compileNestedVisitor(visitor: NestedVisitor): CompiledNestedRout
 
 function assertNestedFieldsDeclared(
   plugin: NativePlugin<any, any>,
-  plan: Pick<PreparedPluginPlan, 'fields'> | undefined,
+  plan: Pick<PreparedPluginPlan, 'fields' | 'children' | 'selectorChildren'> | undefined,
   routes: readonly NativeRouteManifestEntry[],
 ): void {
   for (const route of routes) {
@@ -1015,12 +1115,36 @@ function assertNestedFieldsDeclared(
         throw new Error(
           `${plugin.name}: nested traversal requires declared field ${route.nodeType}.${field}`,
         );
+    if (route.selector) {
+      const fields: Record<string, NativeFieldKey[]> = {};
+      const children: Record<string, string[]> = {};
+      attachSelectorRequirements(route.selector, children, fields);
+      for (const [type, required] of Object.entries(fields)) {
+        const declared = plan?.fields?.[type as NativeNodeType] ?? [];
+        for (const field of required)
+          if (!declared.includes(field))
+            throw new Error(
+              `${plugin.name}: nested selector requires declared field ${type}.${field}`,
+            );
+      }
+      for (const [type, required] of Object.entries(children)) {
+        const declared = [
+          ...(plan?.children?.[type] ?? []),
+          ...(plan?.selectorChildren?.[type] ?? []),
+        ];
+        for (const role of required)
+          if (!declared.includes('*') && !declared.includes(role))
+            throw new Error(
+              `${plugin.name}: nested selector requires declared child role ${type}.${role}`,
+            );
+      }
+    }
   }
 }
 
 export function nestedManifest(
   plugin: NativePlugin<any, any>,
-  plan: Pick<PreparedPluginPlan, 'fields'> | undefined,
+  plan: Pick<PreparedPluginPlan, 'fields' | 'children' | 'selectorChildren'> | undefined,
   compiled: CompiledNestedRoutes,
 ): Buffer {
   assertNestedFieldsDeclared(plugin, plan, compiled.routes);

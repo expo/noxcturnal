@@ -1056,3 +1056,67 @@ test('rejects out-of-order and unclosed exit carriers', () => {
     /unclosed routed exit carriers/,
   );
 });
+
+test('structural selectors retain only requested roles and reject malformed selector words', () => {
+  const manifest = packRouteManifest(
+    [
+      {
+        id: 0,
+        pluginId: 0,
+        nodeType: 'AssignmentExpression',
+        side: 'enter',
+        order: 0,
+        predicates: {},
+        payloadFields: [],
+        selector: {
+          variants: [
+            {
+              nodeType: 'AssignmentExpression',
+              predicates: {},
+              children: [
+                {
+                  role: 'left',
+                  selector: {
+                    variants: [
+                      {
+                        nodeType: 'Identifier',
+                        predicates: { name: { equals: 'exports' } },
+                        children: [],
+                      },
+                    ],
+                  },
+                },
+              ],
+            },
+          ],
+        },
+      },
+    ],
+    false,
+    false,
+  );
+  const source = 'exports=one; other=exports;';
+  const direct = decodeRoutedEnvelope(native.materializeRoutedBuffer(source, 'input.js', manifest));
+  const session = new NativeTransformSession(source, 'input.js', {}, manifest);
+  try {
+    const retained = session.nextRoutedPacked(manifest);
+    assert.equal(direct.routeDeliveryCount, retained.routeDeliveryCount);
+    const seen: string[] = [];
+    dispatchRoutedEvents(retained, [event => seen.push(source.slice(event.start, event.end))]);
+    assert.deepEqual(seen, ['exports=one']);
+  } finally {
+    session.close();
+  }
+  // Header (7), route header (8), selector count (1), variant header (4),
+  // then the child role/index. Assignment.left is a single role.
+  for (const [offset, value, message] of [
+    [80, 0, /role/],
+    [84, 0, /index/],
+    [60, 0xffffffff, /limit/],
+    [68, 65, /predicate/],
+  ] as const) {
+    const invalid = Buffer.from(manifest);
+    invalid.writeUInt32LE(value, offset);
+    assert.throws(() => native.materializeRoutedBuffer(source, 'input.js', invalid), message);
+  }
+});

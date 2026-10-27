@@ -43,6 +43,7 @@ export type PreparedPluginPlan = {
   ancestryChildren?: Readonly<Partial<Record<string, readonly string[]>>>;
   ancestryTypes?: readonly NativeNodeType[];
   children?: Readonly<Partial<Record<string, readonly string[]>>>;
+  selectorChildren?: Readonly<Partial<Record<string, readonly string[]>>>;
   resolvedVisitors: readonly ResolvedVisitor[];
 };
 

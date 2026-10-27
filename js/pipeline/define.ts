@@ -1,6 +1,7 @@
 import type {
   DefinedNativePlugin,
   DefinedVisitor,
+  StoredVisitorSelector,
   NativePipeline,
   NativePipelineDefinition,
   NativePlugin,
@@ -141,9 +142,40 @@ function bindVisitorParameters(
     bindVisitorParameters(pluginName, inner, values, seen),
   );
   const nestedChanged = nested.some((inner, index) => inner !== contract.nested[index]);
-  if (where === contract.where && !nestedChanged) return visitor;
+  const bindSelector = (selector: StoredVisitorSelector): StoredVisitorSelector =>
+    Object.freeze({
+      ...selector,
+      where:
+        selector.where == null
+          ? undefined
+          : Object.freeze(
+              Object.fromEntries(
+                Object.entries(selector.where).map(([field, predicate]) => [
+                  field,
+                  predicate == null
+                    ? predicate
+                    : bindPredicate(pluginName, field, predicate, values, seen),
+                ]),
+              ),
+            ),
+      parent: selector.parent == null ? undefined : bindSelector(selector.parent),
+      children:
+        selector.children == null
+          ? undefined
+          : Object.freeze(
+              Object.fromEntries(
+                Object.entries(selector.children).map(([role, child]) => [
+                  role,
+                  bindSelector(child),
+                ]),
+              ),
+            ),
+    });
+  const selector = visitor.selector == null ? undefined : bindSelector(visitor.selector);
+  if (where === contract.where && !nestedChanged && selector === visitor.selector) return visitor;
   return Object.freeze({
     ...visitor,
+    selector,
     contract: Object.freeze({ ...contract, where, nested: Object.freeze(nested) }),
   });
 }

@@ -20,7 +20,9 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use crate::event_types::NodeField;
 use crate::generated::event_schema::{ast_kind_protocol_id, field_key_name, node_type_name};
 use crate::protocol::constants::FieldMask;
-use crate::protocol::manifest::{CompiledManifest, CompiledPredicate, CompiledScalar, VisitSide};
+use crate::protocol::manifest::{
+    CompiledManifest, CompiledPredicate, CompiledScalar, CompiledSelector, VisitSide,
+};
 use crate::protocol::routed::{
     PackedWords, encode_routed_envelope, routed_shape_flags, routed_type_tag,
 };
@@ -116,6 +118,8 @@ pub(super) fn materialize_routed_program<'a>(
         counts: RoutedCounts::default(),
         route_scratch: Vec::new(),
         parent_ids: FxHashSet::default(),
+        selector_stack: manifest.has_selectors.then(Vec::new),
+        parent_types: (manifest.has_parent_filters && semantic_return.is_none()).then(Vec::new),
         member_writes: MemberWriteStack::new(tracks_member_writes(
             Some(manifest),
             manifest.retention_capabilities,
@@ -248,6 +252,28 @@ fn stateless_parent_summaries(
     words
 }
 
+fn for_each_role_child<'a>(
+    kind: AstKind<'a>,
+    role_id: u32,
+    callback: &mut impl FnMut(AstKind<'a>, Option<AstKind<'a>>),
+) {
+    use crate::generated::event_schema::{
+        child_role_id_for_edge, child_role_projects_formal_parameters, for_each_ast_child,
+    };
+    for_each_ast_child(kind, &mut |child| {
+        if child_role_id_for_edge(kind, child) != Some(role_id) {
+            return;
+        }
+        if child_role_projects_formal_parameters(role_id)
+            && matches!(child, AstKind::FormalParameters(_))
+        {
+            for_each_ast_child(child, &mut |parameter| callback(parameter, Some(child)));
+        } else {
+            callback(child, None);
+        }
+    });
+}
+
 struct RoutedEventCollector<'a> {
     source: &'a str,
     manifest: &'a CompiledManifest,
@@ -266,12 +292,21 @@ struct RoutedEventCollector<'a> {
     counts: RoutedCounts,
     route_scratch: Vec<u32>,
     parent_ids: FxHashSet<u32>,
+    parent_types: Option<Vec<u32>>,
+    selector_stack: Option<Vec<SelectorFrame<'a>>>,
     member_writes: MemberWriteStack<'a>,
     member_paths: MemberPathInterner,
     comments: Option<&'a [Comment]>,
 }
 
-impl RoutedEventCollector<'_> {
+#[derive(Clone, Copy)]
+struct SelectorFrame<'a> {
+    kind: AstKind<'a>,
+    write: bool,
+    root_write: bool,
+}
+
+impl<'a> RoutedEventCollector<'a> {
     fn close_bounds(&mut self, kind: AstKind<'_>) {
         if self
             .open_bounds
@@ -354,9 +389,157 @@ impl RoutedEventCollector<'_> {
             .any(|expected| compiled_scalar_matches(expected, scalar_type, value))
     }
 
+    fn selector_matches(
+        &mut self,
+        selector: &CompiledSelector,
+        kind: AstKind<'a>,
+        write: bool,
+        root_write: bool,
+    ) -> bool {
+        let type_id = ast_kind_protocol_id(kind);
+        selector.variants.iter().any(|variant| {
+            if variant.node_type_id != type_id {
+                return false;
+            }
+            let declaration_kind = if let AstKind::VariableDeclaration(declaration) = kind {
+                Some(declaration.kind)
+            } else {
+                self.selector_stack.as_ref().and_then(|stack| {
+                    stack.iter().rev().find_map(|frame| {
+                        if let AstKind::VariableDeclaration(declaration) = frame.kind {
+                            Some(declaration.kind)
+                        } else {
+                            None
+                        }
+                    })
+                })
+            };
+            let fallback = variant
+                .predicates
+                .iter()
+                .filter(|predicate| {
+                    !has_direct_predicate_scalar(
+                        type_id,
+                        field_key_name(predicate.field_id).expect("validated field"),
+                    )
+                })
+                .fold(FieldMask::none(), |mask, predicate| {
+                    mask.with(predicate.field_id)
+                });
+            let mut values = if fallback.is_empty() {
+                Vec::new()
+            } else {
+                fields(
+                    kind,
+                    declaration_kind,
+                    self.source,
+                    write,
+                    root_write,
+                    self.scoping,
+                    fallback,
+                )
+            };
+            normalize_routed_fields(&mut values, self.utf16);
+            if !variant.predicates.iter().all(|predicate| {
+                let name = field_key_name(predicate.field_id).expect("validated field");
+                if name != "memberPath"
+                    && let Some(actual) = direct_predicate_scalar(
+                        kind,
+                        declaration_kind,
+                        self.scoping,
+                        name,
+                        write,
+                        root_write,
+                    )
+                {
+                    compiled_predicate_matches(predicate, actual)
+                } else {
+                    self.predicate_matches(predicate, &values, kind, write, root_write)
+                }
+            }) {
+                return false;
+            }
+            if let Some(parent_selector) = &variant.parent {
+                let Some(frame) = self.selector_stack.as_mut().and_then(Vec::pop) else {
+                    return false;
+                };
+                let matched = self.selector_matches(
+                    parent_selector,
+                    frame.kind,
+                    frame.write,
+                    frame.root_write,
+                );
+                self.selector_stack
+                    .as_mut()
+                    .expect("selector stack")
+                    .push(frame);
+                if !matched {
+                    return false;
+                }
+            }
+            variant.children.iter().all(|child| {
+                let mut position = 0;
+                let mut matched = false;
+                let mut inspect = |candidate, projected_parent: Option<AstKind<'a>>| {
+                    let current = position;
+                    position += 1;
+                    if matched || child.index.is_some_and(|index| index != current) {
+                        return;
+                    }
+                    self.selector_stack
+                        .as_mut()
+                        .expect("selector stack")
+                        .push(SelectorFrame {
+                            kind,
+                            write,
+                            root_write,
+                        });
+                    let (parent, parent_write, parent_root_write) =
+                        if let Some(parent) = projected_parent {
+                            let parent_write =
+                                super::member::mutation_target_child(parent, kind, write);
+                            let parent_root_write = super::member::member_write_root_child(
+                                parent, kind, write, root_write,
+                            );
+                            self.selector_stack.as_mut().expect("selector stack").push(
+                                SelectorFrame {
+                                    kind: parent,
+                                    write: parent_write,
+                                    root_write: parent_root_write,
+                                },
+                            );
+                            (parent, parent_write, parent_root_write)
+                        } else {
+                            (kind, write, root_write)
+                        };
+                    let child_write =
+                        super::member::mutation_target_child(candidate, parent, parent_write);
+                    let child_root_write = super::member::member_write_root_child(
+                        candidate,
+                        parent,
+                        parent_write,
+                        parent_root_write,
+                    );
+                    matched = self.selector_matches(
+                        &child.selector,
+                        candidate,
+                        child_write,
+                        child_root_write,
+                    );
+                    if projected_parent.is_some() {
+                        self.selector_stack.as_mut().expect("selector stack").pop();
+                    }
+                    self.selector_stack.as_mut().expect("selector stack").pop();
+                };
+                for_each_role_child(kind, child.role_id, &mut inspect);
+                matched
+            })
+        })
+    }
+
     fn emit(
         &mut self,
-        kind: AstKind<'_>,
+        kind: AstKind<'a>,
         side: VisitSide,
         member_write: bool,
         member_root_write: bool,
@@ -409,15 +592,31 @@ impl RoutedEventCollector<'_> {
             .filter(|route| side == VisitSide::Enter || route.side == side)
         {
             debug_assert_eq!(route.node_type_id, protocol_id);
-            if route.predicates.iter().all(|predicate| {
-                self.predicate_matches(
-                    predicate,
-                    &predicate_fields,
-                    kind,
-                    member_write,
-                    member_root_write,
-                )
-            }) {
+            let parent_matches = route.parent_types.as_ref().is_none_or(|types| {
+                let parent_type = if let Some(nodes) = self.nodes {
+                    (kind.node_id().index() != 0)
+                        .then(|| ast_kind_protocol_id(nodes.parent_kind(kind.node_id())))
+                } else {
+                    self.parent_types
+                        .as_ref()
+                        .and_then(|stack| stack.last().copied())
+                };
+                parent_type.is_some_and(|parent| types.contains(parent))
+            });
+            if parent_matches
+                && route.selector.as_ref().is_none_or(|selector| {
+                    self.selector_matches(selector, kind, member_write, member_root_write)
+                })
+                && route.predicates.iter().all(|predicate| {
+                    self.predicate_matches(
+                        predicate,
+                        &predicate_fields,
+                        kind,
+                        member_write,
+                        member_root_write,
+                    )
+                })
+            {
                 if route.side == side {
                     matched_route_ids.push(route.id);
                 } else {
@@ -711,9 +910,25 @@ impl<'a> Visit<'a> for RoutedEventCollector<'a> {
         }
         self.node_count += 1;
         self.emit(kind, VisitSide::Enter, member_write, member_root_write);
+        if let Some(stack) = &mut self.selector_stack {
+            stack.push(SelectorFrame {
+                kind,
+                write: member_write,
+                root_write: member_root_write,
+            });
+        }
+        if let Some(stack) = &mut self.parent_types {
+            stack.push(ast_kind_protocol_id(kind));
+        }
     }
 
     fn leave_node(&mut self, kind: AstKind<'a>) {
+        if let Some(stack) = &mut self.selector_stack {
+            stack.pop();
+        }
+        if let Some(stack) = &mut self.parent_types {
+            stack.pop();
+        }
         if self.manifest.include_traversal {
             self.close_bounds(kind);
         }
@@ -786,6 +1001,8 @@ mod tests {
                         node_type_id: type_id,
                         side: VisitSide::Enter,
                         predicates: Vec::new(),
+                        parent_types: None,
+                        selector: None,
                         payload_field_ids: Vec::new(),
                         payload_mask: FieldMask::none(),
                         comments_inner: false,
@@ -810,6 +1027,148 @@ mod tests {
                     })
                     .collect::<Vec<_>>();
                 assert_eq!(bounds, [(1, 5), (4, 5), (5, 9), (8, 9)]);
+            }
+        }
+    }
+    #[test]
+    fn parent_matching_uses_ast_structure_with_shared_and_reordered_anchors() {
+        use crate::generated::event_schema::field_ids;
+        use crate::protocol::constants::NodeTypeSet;
+        struct SharedAnchors;
+        impl<'a> VisitMut<'a> for SharedAnchors {
+            fn visit_span(&mut self, span: &mut Span) {
+                *span = Span::default();
+            }
+        }
+        let source = "let outer = 1; function f(){ const inner = 2; }";
+        for semantics in [false, true] {
+            for shared in [false, true] {
+                let allocator = Allocator::default();
+                let mut parsed =
+                    Parser::new(&allocator, source, source_type("input.js", source).unwrap())
+                        .parse();
+                parsed.program.body.reverse();
+                if shared {
+                    SharedAnchors.visit_program(&mut parsed.program);
+                }
+                let bytes = [ROUTE_MANIFEST_MAGIC, 0, 0, 0, 32, 0, 0, 0]
+                    .into_iter()
+                    .flat_map(u32::to_le_bytes)
+                    .collect::<Vec<_>>();
+                let mut manifest = decode_route_manifest(&bytes).unwrap();
+                manifest.program_only = false;
+                manifest.has_parent_filters = true;
+                manifest.has_selectors = true;
+                manifest.needs_semantics = semantics;
+                let mut parents = NodeTypeSet::default();
+                parents.insert(node_type_id("Program").unwrap());
+                let type_id = node_type_id("VariableDeclaration").unwrap();
+                manifest.merged_field_mask_by_type[type_id as usize] =
+                    FieldMask::none().with(field_ids::KIND);
+                manifest.routes_by_type[type_id as usize].push(CompiledRoute {
+                    id: 0,
+                    node_type_id: type_id,
+                    side: VisitSide::Enter,
+                    predicates: Vec::new(),
+                    parent_types: Some(parents),
+                    selector: Some(CompiledSelector {
+                        variants: vec![crate::protocol::manifest::SelectorVariant {
+                            node_type_id: type_id,
+                            predicates: Vec::new(),
+                            parent: None,
+                            children: vec![crate::protocol::manifest::SelectorChild {
+                                role_id: crate::generated::event_schema::child_role_id(
+                                    type_id,
+                                    "declarations",
+                                )
+                                .unwrap(),
+                                index: Some(0),
+                                selector: CompiledSelector {
+                                    variants: vec![crate::protocol::manifest::SelectorVariant {
+                                        node_type_id: node_type_id("VariableDeclarator").unwrap(),
+                                        predicates: Vec::new(),
+                                        parent: None,
+                                        children: vec![crate::protocol::manifest::SelectorChild {
+                                            role_id: crate::generated::event_schema::child_role_id(
+                                                node_type_id("VariableDeclarator").unwrap(),
+                                                "id",
+                                            )
+                                            .unwrap(),
+                                            index: None,
+                                            selector: CompiledSelector {
+                                                variants: vec![
+                                                    crate::protocol::manifest::SelectorVariant {
+                                                        node_type_id: node_type_id("Identifier")
+                                                            .unwrap(),
+                                                        predicates: vec![CompiledPredicate {
+                                                            field_id: field_ids::NAME,
+                                                            operation: 0,
+                                                            values: vec![CompiledScalar::String(
+                                                                "outer".into(),
+                                                            )],
+                                                        }],
+                                                        parent: None,
+                                                        children: Vec::new(),
+                                                    },
+                                                ],
+                                            },
+                                        }],
+                                    }],
+                                },
+                            }],
+                        }],
+                    }),
+                    payload_field_ids: vec![field_ids::KIND],
+                    payload_mask: FieldMask::none().with(field_ids::KIND),
+                    comments_inner: false,
+                });
+                manifest.child_role_mask_by_parent_type[type_id as usize]
+                    .role_ids
+                    .push(
+                        crate::generated::event_schema::child_role_id(type_id, "declarations")
+                            .unwrap(),
+                    );
+                let declarator = node_type_id("VariableDeclarator").unwrap();
+                manifest.child_role_mask_by_parent_type[declarator as usize]
+                    .role_ids
+                    .push(crate::generated::event_schema::child_role_id(declarator, "id").unwrap());
+                manifest.merged_field_mask_by_type[node_type_id("Identifier").unwrap() as usize] =
+                    FieldMask::none().with(field_ids::NAME);
+                let routed = materialize_routed_program(
+                    source,
+                    &allocator,
+                    &parsed.program,
+                    &manifest,
+                    None,
+                    None,
+                )
+                .unwrap();
+                let parts = crate::engine::collect::materialize_program(
+                    source,
+                    &allocator,
+                    &parsed.program,
+                    Some(&manifest),
+                    None,
+                    false,
+                    None,
+                )
+                .unwrap();
+                let retained = crate::engine::retained::routed_buffer_from_index(
+                    &manifest,
+                    &parts.retained_index,
+                    &[],
+                    None,
+                )
+                .unwrap();
+                for output in [routed, retained] {
+                    let word =
+                        |offset| u32::from_le_bytes(output[offset..offset + 4].try_into().unwrap());
+                    assert_eq!(word(12), 1);
+                    assert_eq!(word(16), 1);
+                    assert_eq!(word(20), 1);
+                    assert_eq!(word(32), 3);
+                    assert_eq!(&output[36..39], b"let");
+                }
             }
         }
     }

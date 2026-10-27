@@ -6,8 +6,17 @@ import {
   NODE_TYPES,
   PREDICATE_FIELDS,
 } from '../generated/event-schema';
-import type { ScalarPredicate, ScalarValue } from '../types';
+import type { NativeNodeType, ScalarPredicate, ScalarValue } from '../types';
 import { ROUTE_MANIFEST_MAGIC, paddingFor } from './constants';
+
+export interface NativeSelector {
+  variants: readonly {
+    nodeType: string;
+    predicates: Readonly<Record<string, ScalarPredicate>>;
+    parent?: NativeSelector;
+    children: readonly { role: string; index?: number; selector: NativeSelector }[];
+  }[];
+}
 
 export interface NativeRouteManifestEntry {
   id: number;
@@ -17,6 +26,8 @@ export interface NativeRouteManifestEntry {
   order: number;
   predicates: Readonly<Record<string, ScalarPredicate>>;
   payloadFields: readonly string[];
+  parentTypes?: readonly NativeNodeType[];
+  selector?: NativeSelector;
   comments?: 'inner';
 }
 
@@ -131,22 +142,8 @@ export function packRouteManifest(
     0,
     concreteChildEntries.length,
   ];
-  for (const route of routes) {
-    const predicates = Object.entries(route.predicates);
-    if (predicates.length > 64 || route.payloadFields.length > 64)
-      throw new Error(`compiled route ${route.id} exceeds field limits`);
-    words.push(
-      route.id,
-      requiredId(NODE_TYPE_IDS, route.nodeType, 'node type'),
-      route.side === 'exit' ? 1 : 0,
-      route.pluginId,
-      route.order,
-      route.comments === 'inner' ? 1 : 0,
-      predicates.length,
-      route.payloadFields.length,
-    );
-    for (const [field, predicate] of predicates) {
-      // Predicates reaching the manifest are validated, so no parameter survives.
+  const packPredicates = (predicates: Readonly<Record<string, ScalarPredicate>>) => {
+    for (const [field, predicate] of Object.entries(predicates)) {
       const values: readonly ScalarValue[] =
         'equals' in predicate
           ? [predicate.equals as ScalarValue]
@@ -165,6 +162,56 @@ export function packRouteManifest(
         else words.push(3, 0);
       }
     }
+  };
+  let selectorNodes = 0;
+  const packSelector = (selector: NativeSelector, depth = 0): void => {
+    if (depth >= 8 || (selectorNodes += selector.variants.length) > 4096)
+      throw new Error('compiled selector limit exceeded');
+    words.push(selector.variants.length);
+    for (const variant of selector.variants) {
+      words.push(
+        requiredId(NODE_TYPE_IDS, variant.nodeType, 'selector node type'),
+        Object.keys(variant.predicates).length,
+        Number(variant.parent != null),
+        variant.children.length,
+      );
+      packPredicates(variant.predicates);
+      if (variant.parent) packSelector(variant.parent, depth + 1);
+      for (const child of variant.children) {
+        const role = CHILD_ROLES[variant.nodeType]?.[child.role];
+        if (!role) throw new Error('unknown selector child role');
+        words.push(role.id, child.index ?? 0xffffffff);
+        packSelector(child.selector, depth + 1);
+      }
+    }
+  };
+  for (const route of routes) {
+    const predicates = Object.entries(route.predicates);
+    if (predicates.length > 64 || route.payloadFields.length > 64)
+      throw new Error(`compiled route ${route.id} exceeds field limits`);
+    words.push(
+      route.id,
+      requiredId(NODE_TYPE_IDS, route.nodeType, 'node type'),
+      route.side === 'exit' ? 1 : 0,
+      route.pluginId,
+      route.order,
+      Number(route.comments === 'inner') |
+        (Number(route.parentTypes != null) << 1) |
+        (Number(route.selector != null) << 2),
+      predicates.length,
+      route.payloadFields.length,
+    );
+    if (route.parentTypes != null) {
+      if (route.parentTypes.length === 0 || route.parentTypes.length >= NODE_TYPES.length)
+        throw new Error('invalid parent type filter');
+      const types = [...new Set(route.parentTypes)];
+      words.push(
+        types.length,
+        ...types.map(type => requiredId(NODE_TYPE_IDS, type, 'parent type')),
+      );
+    }
+    if (route.selector) packSelector(route.selector);
+    packPredicates(route.predicates);
     for (const field of route.payloadFields) words.push(requiredId(FIELD_KEY_IDS, field, 'field'));
   }
   for (const entry of concreteChildEntries) {

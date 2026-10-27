@@ -131,6 +131,61 @@ count as the syntax they mention. A plugin rejected here skips every hook, inclu
 and `cleanup`. The list must be nonempty and contain only known features. Keep the condition
 conservative, and use `analyze` for semantic checks.
 
+### Selecting visitors by structure
+
+The first argument to `defineVisitor` may be a selector. Existing route-name calls remain valid.
+A selector describes what matches; the second argument declares what data the callback receives:
+
+```ts
+defineVisitor(
+  {
+    route: 'AssignmentExpression',
+    children: {
+      left: {
+        route: 'Identifier',
+        where: { name: { equals: 'exports' }, global: { equals: true } },
+      },
+    },
+  },
+  {},
+  (assignment, state) => {
+    state.hasCjsExports = true;
+  },
+);
+
+defineVisitor(
+  { route: 'VariableDeclaration', parent: { route: 'Program' } },
+  { fields: ['kind'] },
+  declaration => {
+    // Only declarations directly in Program.body reach this callback.
+  },
+);
+```
+
+Selectors compose `route`, `where`, `parent`, and named `children`. Routes support the same aliases
+and `|` composites as ordinary visitors. All conditions must hold. `parent` means the immediate AST
+parent; it never restricts traversal into that parent's subtree. Exports inside an IIFE still match
+an assignment selector. Wrappers exposed by the parser are explicit nodes, and `Program` has no parent.
+
+A list child condition matches any node in the role unless `index` selects a zero-based position in
+its generated child order. For example, `children: { arguments: { route: 'Identifier', index: 0,
+where: { name: { equals: 'target' } } } }` tests the first argument. Missing children and out-of-range
+positions do not match. Positions are counted before filtering by the child route or predicates.
+An index is invalid on a single-child role. Relationships can be nested up to eight selector levels; recursive wildcards and arbitrary ancestor searches are not supported.
+
+The selector filters visitor roots. Child data declared in the callback contract still includes
+every child allowed by that contract, not just the child that satisfied the selector.
+
+Matching happens natively before payload packing and JavaScript child prefetch. Matching a child
+or ancestor does not grant `getChild`, `parentPath`, scope access, or payload fields. Declare those
+separately in the callback contract when needed. Unknown selector keys are rejected. A contract's
+existing `where` predicates remain supported and combine with selector conditions. Selectors also apply to exit and nested visitors.
+
+Pure structural matching needs no semantic analysis or retained index. Semantic predicates such
+as `global` still require analysis. When another capability requires an index, the plan retains
+only the roles and fields needed for matching and callback data. Declare nested visitors through
+`nested` so their selector requirements are included before collecting the snapshot.
+
 ### Metadata and queries
 
 A plugin declares the metadata keys it writes and reads in `contract.metadata`. Two plugins cannot

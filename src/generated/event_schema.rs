@@ -1084,16 +1084,18 @@ pub(crate) fn child_role_id_for_edge(
     parent: oxc_ast::AstKind<'_>,
     child: oxc_ast::AstKind<'_>,
 ) -> Option<u32> {
-    let child_id = child.node_id();
+    use oxc_allocator::{GetAddress, UnstableAddress};
+    // Immutable traversal keeps inline and arena nodes stationary.
+    let child_address = child.address();
     match parent {
         oxc_ast::AstKind::AccessorProperty(parent) => {
-            if parent.key.node_id() == child_id {
+            if parent.key.address() == child_address {
                 return Some(1);
             }
             if parent
                 .value
                 .as_ref()
-                .is_some_and(|edge| edge.node_id() == child_id)
+                .is_some_and(|edge| edge.address() == child_address)
             {
                 return Some(2);
             }
@@ -1103,7 +1105,7 @@ pub(crate) fn child_role_id_for_edge(
             if parent
                 .rest
                 .as_ref()
-                .is_some_and(|edge| edge.node_id() == child_id)
+                .is_some_and(|edge| edge.unstable_address() == child_address)
             {
                 return Some(3);
             }
@@ -1124,7 +1126,7 @@ pub(crate) fn child_role_id_for_edge(
             if parent
                 .rest
                 .as_ref()
-                .is_some_and(|edge| edge.node_id() == child_id)
+                .is_some_and(|edge| edge.unstable_address() == child_address)
             {
                 return Some(5);
             }
@@ -1134,67 +1136,67 @@ pub(crate) fn child_role_id_for_edge(
             None
         }
         oxc_ast::AstKind::ArrowFunctionExpression(parent) => {
-            if parent.body.node_id() == child_id {
+            if parent.body.address() == child_address {
                 return Some(6);
             }
-            if parent.params.node_id() == child_id {
+            if parent.params.unstable_address() == child_address {
                 return Some(7);
             }
             None
         }
         oxc_ast::AstKind::AssignmentExpression(parent) => {
-            if parent.left.node_id() == child_id {
+            if parent.left.address() == child_address {
                 return Some(8);
             }
-            if parent.right.node_id() == child_id {
+            if parent.right.address() == child_address {
                 return Some(9);
             }
             None
         }
         oxc_ast::AstKind::AssignmentPattern(parent) => {
-            if parent.left.node_id() == child_id {
+            if parent.left.address() == child_address {
                 return Some(10);
             }
-            if parent.right.node_id() == child_id {
+            if parent.right.address() == child_address {
                 return Some(11);
             }
             None
         }
         oxc_ast::AstKind::AssignmentTargetPropertyProperty(parent) => {
-            if parent.name.node_id() == child_id {
+            if parent.name.address() == child_address {
                 return Some(12);
             }
-            if parent.binding.node_id() == child_id {
+            if parent.binding.address() == child_address {
                 return Some(13);
             }
             None
         }
         oxc_ast::AstKind::AwaitExpression(parent) => {
-            if parent.argument.node_id() == child_id {
+            if parent.argument.address() == child_address {
                 return Some(14);
             }
             None
         }
         oxc_ast::AstKind::BinaryExpression(parent) => {
-            if parent.left.node_id() == child_id {
+            if parent.left.address() == child_address {
                 return Some(15);
             }
-            if parent.right.node_id() == child_id {
+            if parent.right.address() == child_address {
                 return Some(16);
             }
             None
         }
         oxc_ast::AstKind::BindingProperty(parent) => {
-            if parent.key.node_id() == child_id {
+            if parent.key.address() == child_address {
                 return Some(17);
             }
-            if parent.value.node_id() == child_id {
+            if parent.value.address() == child_address {
                 return Some(18);
             }
             None
         }
         oxc_ast::AstKind::BindingRestElement(parent) => {
-            if parent.argument.node_id() == child_id {
+            if parent.argument.address() == child_address {
                 return Some(19);
             }
             None
@@ -1207,7 +1209,7 @@ pub(crate) fn child_role_id_for_edge(
             None
         }
         oxc_ast::AstKind::CallExpression(parent) => {
-            if parent.callee.node_id() == child_id {
+            if parent.callee.address() == child_address {
                 return Some(22);
             }
             if matches!(ast_kind_protocol_id(child), 2 | 4 | 5 | 7 | 9 | 10 | 12..=26 | 33 | 35..=37 | 68 | 73..=75 | 82 | 93..=100 | 103 | 107 | 109 | 175 | 176 | 180 | 184)
@@ -1217,26 +1219,26 @@ pub(crate) fn child_role_id_for_edge(
             None
         }
         oxc_ast::AstKind::CatchClause(parent) => {
-            if parent.body.node_id() == child_id {
+            if parent.body.unstable_address() == child_address {
                 return Some(23);
             }
             None
         }
         oxc_ast::AstKind::Class(parent) => {
-            if parent.body.node_id() == child_id {
+            if parent.body.unstable_address() == child_address {
                 return Some(24);
             }
             if parent
                 .id
                 .as_ref()
-                .is_some_and(|edge| edge.node_id() == child_id)
+                .is_some_and(|edge| edge.unstable_address() == child_address)
             {
                 return Some(26);
             }
             if parent
                 .heritage
                 .as_ref()
-                .is_some_and(|edge| edge.expression.node_id() == child_id)
+                .is_some_and(|edge| edge.expression.address() == child_address)
             {
                 return Some(27);
             }
@@ -1252,49 +1254,49 @@ pub(crate) fn child_role_id_for_edge(
             None
         }
         oxc_ast::AstKind::ComputedMemberExpression(parent) => {
-            if parent.object.node_id() == child_id {
+            if parent.object.address() == child_address {
                 return Some(29);
             }
-            if parent.expression.node_id() == child_id {
+            if parent.expression.address() == child_address {
                 return Some(30);
             }
             None
         }
         oxc_ast::AstKind::ConditionalExpression(parent) => {
-            if parent.alternate.node_id() == child_id {
+            if parent.alternate.address() == child_address {
                 return Some(31);
             }
-            if parent.consequent.node_id() == child_id {
+            if parent.consequent.address() == child_address {
                 return Some(32);
             }
-            if parent.test.node_id() == child_id {
+            if parent.test.address() == child_address {
                 return Some(33);
             }
             None
         }
         oxc_ast::AstKind::DoWhileStatement(parent) => {
-            if parent.body.node_id() == child_id {
+            if parent.body.address() == child_address {
                 return Some(34);
             }
-            if parent.test.node_id() == child_id {
+            if parent.test.address() == child_address {
                 return Some(35);
             }
             None
         }
         oxc_ast::AstKind::ExportAllDeclaration(parent) => {
-            if parent.source.node_id() == child_id {
+            if parent.source.unstable_address() == child_address {
                 return Some(36);
             }
             None
         }
         oxc_ast::AstKind::ExportDefaultDeclaration(parent) => {
-            if parent.declaration.node_id() == child_id {
+            if parent.declaration.address() == child_address {
                 return Some(37);
             }
             None
         }
         oxc_ast::AstKind::ExportDeclaration(parent) => {
-            if parent.declaration.node_id() == child_id {
+            if parent.declaration.address() == child_address {
                 return Some(38);
             }
             None
@@ -1306,7 +1308,7 @@ pub(crate) fn child_role_id_for_edge(
             None
         }
         oxc_ast::AstKind::ExportFromDeclaration(parent) => {
-            if parent.source.node_id() == child_id {
+            if parent.source.unstable_address() == child_address {
                 return Some(39);
             }
             if matches!(ast_kind_protocol_id(child), 92) {
@@ -1315,31 +1317,31 @@ pub(crate) fn child_role_id_for_edge(
             None
         }
         oxc_ast::AstKind::ExpressionStatement(parent) => {
-            if parent.expression.node_id() == child_id {
+            if parent.expression.address() == child_address {
                 return Some(41);
             }
             None
         }
         oxc_ast::AstKind::ForInStatement(parent) => {
-            if parent.body.node_id() == child_id {
+            if parent.body.address() == child_address {
                 return Some(42);
             }
             None
         }
         oxc_ast::AstKind::ForOfStatement(parent) => {
-            if parent.body.node_id() == child_id {
+            if parent.body.address() == child_address {
                 return Some(43);
             }
             None
         }
         oxc_ast::AstKind::ForStatement(parent) => {
-            if parent.body.node_id() == child_id {
+            if parent.body.address() == child_address {
                 return Some(44);
             }
             if parent
                 .test
                 .as_ref()
-                .is_some_and(|edge| edge.node_id() == child_id)
+                .is_some_and(|edge| edge.address() == child_address)
             {
                 return Some(45);
             }
@@ -1349,11 +1351,11 @@ pub(crate) fn child_role_id_for_edge(
             if parent
                 .initializer
                 .as_ref()
-                .is_some_and(|edge| edge.node_id() == child_id)
+                .is_some_and(|edge| edge.as_ref().address() == child_address)
             {
                 return Some(47);
             }
-            if parent.pattern.node_id() == child_id {
+            if parent.pattern.address() == child_address {
                 return Some(48);
             }
             if matches!(ast_kind_protocol_id(child), 181) {
@@ -1362,7 +1364,7 @@ pub(crate) fn child_role_id_for_edge(
             None
         }
         oxc_ast::AstKind::FormalParameterRest(parent) => {
-            if parent.rest.node_id() == child_id {
+            if parent.rest.unstable_address() == child_address {
                 return Some(49);
             }
             None
@@ -1371,18 +1373,18 @@ pub(crate) fn child_role_id_for_edge(
             if parent
                 .body
                 .as_ref()
-                .is_some_and(|edge| edge.node_id() == child_id)
+                .is_some_and(|edge| edge.unstable_address() == child_address)
             {
                 return Some(50);
             }
             if parent
                 .id
                 .as_ref()
-                .is_some_and(|edge| edge.node_id() == child_id)
+                .is_some_and(|edge| edge.unstable_address() == child_address)
             {
                 return Some(51);
             }
-            if parent.params.node_id() == child_id {
+            if parent.params.unstable_address() == child_address {
                 return Some(52);
             }
             None
@@ -1401,20 +1403,20 @@ pub(crate) fn child_role_id_for_edge(
             if parent
                 .alternate
                 .as_ref()
-                .is_some_and(|edge| edge.node_id() == child_id)
+                .is_some_and(|edge| edge.address() == child_address)
             {
                 return Some(55);
             }
-            if parent.consequent.node_id() == child_id {
+            if parent.consequent.address() == child_address {
                 return Some(56);
             }
-            if parent.test.node_id() == child_id {
+            if parent.test.address() == child_address {
                 return Some(57);
             }
             None
         }
         oxc_ast::AstKind::ImportDeclaration(parent) => {
-            if parent.source.node_id() == child_id {
+            if parent.source.unstable_address() == child_address {
                 return Some(58);
             }
             if matches!(ast_kind_protocol_id(child), 84..=86) {
@@ -1423,31 +1425,31 @@ pub(crate) fn child_role_id_for_edge(
             None
         }
         oxc_ast::AstKind::ImportExpression(parent) => {
-            if parent.source.node_id() == child_id {
+            if parent.source.address() == child_address {
                 return Some(60);
             }
             None
         }
         oxc_ast::AstKind::LabeledStatement(parent) => {
-            if parent.body.node_id() == child_id {
+            if parent.body.address() == child_address {
                 return Some(61);
             }
             None
         }
         oxc_ast::AstKind::LogicalExpression(parent) => {
-            if parent.left.node_id() == child_id {
+            if parent.left.address() == child_address {
                 return Some(62);
             }
-            if parent.right.node_id() == child_id {
+            if parent.right.address() == child_address {
                 return Some(63);
             }
             None
         }
         oxc_ast::AstKind::MethodDefinition(parent) => {
-            if parent.key.node_id() == child_id {
+            if parent.key.address() == child_address {
                 return Some(65);
             }
-            if parent.value.node_id() == child_id {
+            if parent.value.unstable_address() == child_address {
                 return Some(66);
             }
             if matches!(ast_kind_protocol_id(child), 181) {
@@ -1456,7 +1458,7 @@ pub(crate) fn child_role_id_for_edge(
             None
         }
         oxc_ast::AstKind::NewExpression(parent) => {
-            if parent.callee.node_id() == child_id {
+            if parent.callee.address() == child_address {
                 return Some(68);
             }
             if matches!(ast_kind_protocol_id(child), 2 | 4 | 5 | 7 | 9 | 10 | 12..=26 | 33 | 35..=37 | 68 | 73..=75 | 82 | 93..=100 | 103 | 107 | 109 | 175 | 176 | 180 | 184)
@@ -1469,7 +1471,7 @@ pub(crate) fn child_role_id_for_edge(
             if parent
                 .rest
                 .as_ref()
-                .is_some_and(|edge| edge.node_id() == child_id)
+                .is_some_and(|edge| edge.unstable_address() == child_address)
             {
                 return Some(69);
             }
@@ -1488,7 +1490,7 @@ pub(crate) fn child_role_id_for_edge(
             if parent
                 .rest
                 .as_ref()
-                .is_some_and(|edge| edge.node_id() == child_id)
+                .is_some_and(|edge| edge.unstable_address() == child_address)
             {
                 return Some(71);
             }
@@ -1498,28 +1500,28 @@ pub(crate) fn child_role_id_for_edge(
             None
         }
         oxc_ast::AstKind::ObjectProperty(parent) => {
-            if parent.key.node_id() == child_id {
+            if parent.key.address() == child_address {
                 return Some(72);
             }
-            if parent.value.node_id() == child_id {
+            if parent.value.address() == child_address {
                 return Some(73);
             }
             None
         }
         oxc_ast::AstKind::PrivateFieldExpression(parent) => {
-            if parent.object.node_id() == child_id {
+            if parent.object.address() == child_address {
                 return Some(74);
             }
-            if parent.field.node_id() == child_id {
+            if parent.field.unstable_address() == child_address {
                 return Some(75);
             }
             None
         }
         oxc_ast::AstKind::PrivateInExpression(parent) => {
-            if parent.left.node_id() == child_id {
+            if parent.left.unstable_address() == child_address {
                 return Some(76);
             }
-            if parent.right.node_id() == child_id {
+            if parent.right.address() == child_address {
                 return Some(77);
             }
             None
@@ -1535,13 +1537,13 @@ pub(crate) fn child_role_id_for_edge(
             None
         }
         oxc_ast::AstKind::PropertyDefinition(parent) => {
-            if parent.key.node_id() == child_id {
+            if parent.key.address() == child_address {
                 return Some(81);
             }
             if parent
                 .value
                 .as_ref()
-                .is_some_and(|edge| edge.node_id() == child_id)
+                .is_some_and(|edge| edge.address() == child_address)
             {
                 return Some(82);
             }
@@ -1554,41 +1556,41 @@ pub(crate) fn child_role_id_for_edge(
             if parent
                 .argument
                 .as_ref()
-                .is_some_and(|edge| edge.node_id() == child_id)
+                .is_some_and(|edge| edge.address() == child_address)
             {
                 return Some(83);
             }
             None
         }
         oxc_ast::AstKind::SpreadElement(parent) => {
-            if parent.argument.node_id() == child_id {
+            if parent.argument.address() == child_address {
                 return Some(84);
             }
             None
         }
         oxc_ast::AstKind::StaticMemberExpression(parent) => {
-            if parent.object.node_id() == child_id {
+            if parent.object.address() == child_address {
                 return Some(85);
             }
-            if parent.property.node_id() == child_id {
+            if parent.property.unstable_address() == child_address {
                 return Some(86);
             }
             None
         }
         oxc_ast::AstKind::SwitchStatement(parent) => {
-            if parent.discriminant.node_id() == child_id {
+            if parent.discriminant.address() == child_address {
                 return Some(87);
             }
             None
         }
         oxc_ast::AstKind::TSEnumDeclaration(parent) => {
-            if parent.id.node_id() == child_id {
+            if parent.id.unstable_address() == child_address {
                 return Some(88);
             }
             None
         }
         oxc_ast::AstKind::TSInterfaceDeclaration(parent) => {
-            if parent.id.node_id() == child_id {
+            if parent.id.unstable_address() == child_address {
                 return Some(89);
             }
             None
@@ -1604,58 +1606,58 @@ pub(crate) fn child_role_id_for_edge(
             if parent
                 .body
                 .as_ref()
-                .is_some_and(|edge| edge.node_id() == child_id)
+                .is_some_and(|edge| edge.unstable_address() == child_address)
             {
                 return Some(91);
             }
             None
         }
         oxc_ast::AstKind::TSNamespaceDeclaration(parent) => {
-            if parent.body.node_id() == child_id {
+            if parent.body.address() == child_address {
                 return Some(91);
             }
             None
         }
         oxc_ast::AstKind::TSTypeAliasDeclaration(parent) => {
-            if parent.id.node_id() == child_id {
+            if parent.id.unstable_address() == child_address {
                 return Some(92);
             }
             None
         }
         oxc_ast::AstKind::ThrowStatement(parent) => {
-            if parent.argument.node_id() == child_id {
+            if parent.argument.address() == child_address {
                 return Some(93);
             }
             None
         }
         oxc_ast::AstKind::TryStatement(parent) => {
-            if parent.block.node_id() == child_id {
+            if parent.block.unstable_address() == child_address {
                 return Some(94);
             }
             if parent
                 .finalizer
                 .as_ref()
-                .is_some_and(|edge| edge.node_id() == child_id)
+                .is_some_and(|edge| edge.unstable_address() == child_address)
             {
                 return Some(95);
             }
             if parent
                 .handler
                 .as_ref()
-                .is_some_and(|edge| edge.node_id() == child_id)
+                .is_some_and(|edge| edge.unstable_address() == child_address)
             {
                 return Some(96);
             }
             None
         }
         oxc_ast::AstKind::UnaryExpression(parent) => {
-            if parent.argument.node_id() == child_id {
+            if parent.argument.address() == child_address {
                 return Some(97);
             }
             None
         }
         oxc_ast::AstKind::UpdateExpression(parent) => {
-            if parent.argument.node_id() == child_id {
+            if parent.argument.address() == child_address {
                 return Some(98);
             }
             None
@@ -1667,29 +1669,29 @@ pub(crate) fn child_role_id_for_edge(
             None
         }
         oxc_ast::AstKind::VariableDeclarator(parent) => {
-            if parent.id.node_id() == child_id {
+            if parent.id.address() == child_address {
                 return Some(100);
             }
             if parent
                 .init
                 .as_ref()
-                .is_some_and(|edge| edge.node_id() == child_id)
+                .is_some_and(|edge| edge.address() == child_address)
             {
                 return Some(101);
             }
             None
         }
         oxc_ast::AstKind::WhileStatement(parent) => {
-            if parent.body.node_id() == child_id {
+            if parent.body.address() == child_address {
                 return Some(102);
             }
-            if parent.test.node_id() == child_id {
+            if parent.test.address() == child_address {
                 return Some(103);
             }
             None
         }
         oxc_ast::AstKind::WithStatement(parent) => {
-            if parent.body.node_id() == child_id {
+            if parent.body.address() == child_address {
                 return Some(104);
             }
             None
@@ -1698,13 +1700,1432 @@ pub(crate) fn child_role_id_for_edge(
             if parent
                 .argument
                 .as_ref()
-                .is_some_and(|edge| edge.node_id() == child_id)
+                .is_some_and(|edge| edge.address() == child_address)
             {
                 return Some(105);
             }
             None
         }
         _ => None,
+    }
+}
+
+/// Visit immediate AST children, preserving Oxc role order and arena identity.
+pub(crate) fn for_each_ast_child<'a>(
+    kind: oxc_ast::AstKind<'a>,
+    callback: &mut impl FnMut(oxc_ast::AstKind<'a>),
+) {
+    struct Children<'f, F>(&'f mut F);
+    impl<'a, F: FnMut(oxc_ast::AstKind<'a>)> oxc_ast_visit::Visit<'a> for Children<'_, F> {
+        fn visit_program(&mut self, it: &oxc_ast::ast::Program<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::Program(it));
+        }
+        fn visit_identifier_name(&mut self, it: &oxc_ast::ast::IdentifierName<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::IdentifierName(it));
+        }
+        fn visit_identifier_reference(&mut self, it: &oxc_ast::ast::IdentifierReference<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::IdentifierReference(it));
+        }
+        fn visit_binding_identifier(&mut self, it: &oxc_ast::ast::BindingIdentifier<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::BindingIdentifier(it));
+        }
+        fn visit_label_identifier(&mut self, it: &oxc_ast::ast::LabelIdentifier<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::LabelIdentifier(it));
+        }
+        fn visit_this_expression(&mut self, it: &oxc_ast::ast::ThisExpression) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::ThisExpression(it));
+        }
+        fn visit_array_expression(&mut self, it: &oxc_ast::ast::ArrayExpression<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::ArrayExpression(it));
+        }
+        fn visit_elision(&mut self, it: &oxc_ast::ast::Elision) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::Elision(it));
+        }
+        fn visit_object_expression(&mut self, it: &oxc_ast::ast::ObjectExpression<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::ObjectExpression(it));
+        }
+        fn visit_object_property(&mut self, it: &oxc_ast::ast::ObjectProperty<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::ObjectProperty(it));
+        }
+        fn visit_template_literal(&mut self, it: &oxc_ast::ast::TemplateLiteral<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::TemplateLiteral(it));
+        }
+        fn visit_tagged_template_expression(
+            &mut self,
+            it: &oxc_ast::ast::TaggedTemplateExpression<'a>,
+        ) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::TaggedTemplateExpression(it));
+        }
+        fn visit_template_element(&mut self, it: &oxc_ast::ast::TemplateElement<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::TemplateElement(it));
+        }
+        fn visit_computed_member_expression(
+            &mut self,
+            it: &oxc_ast::ast::ComputedMemberExpression<'a>,
+        ) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::ComputedMemberExpression(it));
+        }
+        fn visit_static_member_expression(
+            &mut self,
+            it: &oxc_ast::ast::StaticMemberExpression<'a>,
+        ) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::StaticMemberExpression(it));
+        }
+        fn visit_private_field_expression(
+            &mut self,
+            it: &oxc_ast::ast::PrivateFieldExpression<'a>,
+        ) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::PrivateFieldExpression(it));
+        }
+        fn visit_call_expression(&mut self, it: &oxc_ast::ast::CallExpression<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::CallExpression(it));
+        }
+        fn visit_new_expression(&mut self, it: &oxc_ast::ast::NewExpression<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::NewExpression(it));
+        }
+        fn visit_import_meta(&mut self, it: &oxc_ast::ast::ImportMeta) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::ImportMeta(it));
+        }
+        fn visit_new_target(&mut self, it: &oxc_ast::ast::NewTarget) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::NewTarget(it));
+        }
+        fn visit_spread_element(&mut self, it: &oxc_ast::ast::SpreadElement<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::SpreadElement(it));
+        }
+        fn visit_update_expression(&mut self, it: &oxc_ast::ast::UpdateExpression<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::UpdateExpression(it));
+        }
+        fn visit_unary_expression(&mut self, it: &oxc_ast::ast::UnaryExpression<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::UnaryExpression(it));
+        }
+        fn visit_binary_expression(&mut self, it: &oxc_ast::ast::BinaryExpression<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::BinaryExpression(it));
+        }
+        fn visit_private_in_expression(&mut self, it: &oxc_ast::ast::PrivateInExpression<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::PrivateInExpression(it));
+        }
+        fn visit_logical_expression(&mut self, it: &oxc_ast::ast::LogicalExpression<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::LogicalExpression(it));
+        }
+        fn visit_conditional_expression(&mut self, it: &oxc_ast::ast::ConditionalExpression<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::ConditionalExpression(it));
+        }
+        fn visit_assignment_expression(&mut self, it: &oxc_ast::ast::AssignmentExpression<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::AssignmentExpression(it));
+        }
+        fn visit_array_assignment_target(&mut self, it: &oxc_ast::ast::ArrayAssignmentTarget<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::ArrayAssignmentTarget(it));
+        }
+        fn visit_object_assignment_target(
+            &mut self,
+            it: &oxc_ast::ast::ObjectAssignmentTarget<'a>,
+        ) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::ObjectAssignmentTarget(it));
+        }
+        fn visit_assignment_target_rest(&mut self, it: &oxc_ast::ast::AssignmentTargetRest<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::AssignmentTargetRest(it));
+        }
+        fn visit_assignment_target_with_default(
+            &mut self,
+            it: &oxc_ast::ast::AssignmentTargetWithDefault<'a>,
+        ) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::AssignmentTargetWithDefault(it));
+        }
+        fn visit_assignment_target_property_identifier(
+            &mut self,
+            it: &oxc_ast::ast::AssignmentTargetPropertyIdentifier<'a>,
+        ) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::AssignmentTargetPropertyIdentifier(it));
+        }
+        fn visit_assignment_target_property_property(
+            &mut self,
+            it: &oxc_ast::ast::AssignmentTargetPropertyProperty<'a>,
+        ) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::AssignmentTargetPropertyProperty(it));
+        }
+        fn visit_sequence_expression(&mut self, it: &oxc_ast::ast::SequenceExpression<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::SequenceExpression(it));
+        }
+        fn visit_super(&mut self, it: &oxc_ast::ast::Super) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::Super(it));
+        }
+        fn visit_await_expression(&mut self, it: &oxc_ast::ast::AwaitExpression<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::AwaitExpression(it));
+        }
+        fn visit_chain_expression(&mut self, it: &oxc_ast::ast::ChainExpression<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::ChainExpression(it));
+        }
+        fn visit_parenthesized_expression(
+            &mut self,
+            it: &oxc_ast::ast::ParenthesizedExpression<'a>,
+        ) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::ParenthesizedExpression(it));
+        }
+        fn visit_directive(&mut self, it: &oxc_ast::ast::Directive<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::Directive(it));
+        }
+        fn visit_hashbang(&mut self, it: &oxc_ast::ast::Hashbang<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::Hashbang(it));
+        }
+        fn visit_block_statement(&mut self, it: &oxc_ast::ast::BlockStatement<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::BlockStatement(it));
+        }
+        fn visit_variable_declaration(&mut self, it: &oxc_ast::ast::VariableDeclaration<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::VariableDeclaration(it));
+        }
+        fn visit_variable_declarator(&mut self, it: &oxc_ast::ast::VariableDeclarator<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::VariableDeclarator(it));
+        }
+        fn visit_empty_statement(&mut self, it: &oxc_ast::ast::EmptyStatement) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::EmptyStatement(it));
+        }
+        fn visit_expression_statement(&mut self, it: &oxc_ast::ast::ExpressionStatement<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::ExpressionStatement(it));
+        }
+        fn visit_if_statement(&mut self, it: &oxc_ast::ast::IfStatement<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::IfStatement(it));
+        }
+        fn visit_do_while_statement(&mut self, it: &oxc_ast::ast::DoWhileStatement<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::DoWhileStatement(it));
+        }
+        fn visit_while_statement(&mut self, it: &oxc_ast::ast::WhileStatement<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::WhileStatement(it));
+        }
+        fn visit_for_statement(&mut self, it: &oxc_ast::ast::ForStatement<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::ForStatement(it));
+        }
+        fn visit_for_in_statement(&mut self, it: &oxc_ast::ast::ForInStatement<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::ForInStatement(it));
+        }
+        fn visit_for_of_statement(&mut self, it: &oxc_ast::ast::ForOfStatement<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::ForOfStatement(it));
+        }
+        fn visit_continue_statement(&mut self, it: &oxc_ast::ast::ContinueStatement<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::ContinueStatement(it));
+        }
+        fn visit_break_statement(&mut self, it: &oxc_ast::ast::BreakStatement<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::BreakStatement(it));
+        }
+        fn visit_return_statement(&mut self, it: &oxc_ast::ast::ReturnStatement<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::ReturnStatement(it));
+        }
+        fn visit_with_statement(&mut self, it: &oxc_ast::ast::WithStatement<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::WithStatement(it));
+        }
+        fn visit_switch_statement(&mut self, it: &oxc_ast::ast::SwitchStatement<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::SwitchStatement(it));
+        }
+        fn visit_switch_case(&mut self, it: &oxc_ast::ast::SwitchCase<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::SwitchCase(it));
+        }
+        fn visit_labeled_statement(&mut self, it: &oxc_ast::ast::LabeledStatement<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::LabeledStatement(it));
+        }
+        fn visit_throw_statement(&mut self, it: &oxc_ast::ast::ThrowStatement<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::ThrowStatement(it));
+        }
+        fn visit_try_statement(&mut self, it: &oxc_ast::ast::TryStatement<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::TryStatement(it));
+        }
+        fn visit_catch_clause(&mut self, it: &oxc_ast::ast::CatchClause<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::CatchClause(it));
+        }
+        fn visit_catch_parameter(&mut self, it: &oxc_ast::ast::CatchParameter<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::CatchParameter(it));
+        }
+        fn visit_debugger_statement(&mut self, it: &oxc_ast::ast::DebuggerStatement) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::DebuggerStatement(it));
+        }
+        fn visit_assignment_pattern(&mut self, it: &oxc_ast::ast::AssignmentPattern<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::AssignmentPattern(it));
+        }
+        fn visit_object_pattern(&mut self, it: &oxc_ast::ast::ObjectPattern<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::ObjectPattern(it));
+        }
+        fn visit_binding_property(&mut self, it: &oxc_ast::ast::BindingProperty<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::BindingProperty(it));
+        }
+        fn visit_array_pattern(&mut self, it: &oxc_ast::ast::ArrayPattern<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::ArrayPattern(it));
+        }
+        fn visit_binding_rest_element(&mut self, it: &oxc_ast::ast::BindingRestElement<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::BindingRestElement(it));
+        }
+        fn visit_function(
+            &mut self,
+            it: &oxc_ast::ast::Function<'a>,
+            _flags: oxc_syntax::scope::ScopeFlags,
+        ) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::Function(it));
+        }
+        fn visit_formal_parameters(&mut self, it: &oxc_ast::ast::FormalParameters<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::FormalParameters(it));
+        }
+        fn visit_formal_parameter(&mut self, it: &oxc_ast::ast::FormalParameter<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::FormalParameter(it));
+        }
+        fn visit_formal_parameter_rest(&mut self, it: &oxc_ast::ast::FormalParameterRest<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::FormalParameterRest(it));
+        }
+        fn visit_function_body(&mut self, it: &oxc_ast::ast::FunctionBody<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::FunctionBody(it));
+        }
+        fn visit_arrow_function_expression(
+            &mut self,
+            it: &oxc_ast::ast::ArrowFunctionExpression<'a>,
+        ) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::ArrowFunctionExpression(it));
+        }
+        fn visit_yield_expression(&mut self, it: &oxc_ast::ast::YieldExpression<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::YieldExpression(it));
+        }
+        fn visit_class(&mut self, it: &oxc_ast::ast::Class<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::Class(it));
+        }
+        fn visit_class_body(&mut self, it: &oxc_ast::ast::ClassBody<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::ClassBody(it));
+        }
+        fn visit_method_definition(&mut self, it: &oxc_ast::ast::MethodDefinition<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::MethodDefinition(it));
+        }
+        fn visit_property_definition(&mut self, it: &oxc_ast::ast::PropertyDefinition<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::PropertyDefinition(it));
+        }
+        fn visit_private_identifier(&mut self, it: &oxc_ast::ast::PrivateIdentifier<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::PrivateIdentifier(it));
+        }
+        fn visit_static_block(&mut self, it: &oxc_ast::ast::StaticBlock<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::StaticBlock(it));
+        }
+        fn visit_accessor_property(&mut self, it: &oxc_ast::ast::AccessorProperty<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::AccessorProperty(it));
+        }
+        fn visit_import_expression(&mut self, it: &oxc_ast::ast::ImportExpression<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::ImportExpression(it));
+        }
+        fn visit_import_declaration(&mut self, it: &oxc_ast::ast::ImportDeclaration<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::ImportDeclaration(it));
+        }
+        fn visit_import_specifier(&mut self, it: &oxc_ast::ast::ImportSpecifier<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::ImportSpecifier(it));
+        }
+        fn visit_import_default_specifier(
+            &mut self,
+            it: &oxc_ast::ast::ImportDefaultSpecifier<'a>,
+        ) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::ImportDefaultSpecifier(it));
+        }
+        fn visit_import_namespace_specifier(
+            &mut self,
+            it: &oxc_ast::ast::ImportNamespaceSpecifier<'a>,
+        ) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::ImportNamespaceSpecifier(it));
+        }
+        fn visit_with_clause(&mut self, it: &oxc_ast::ast::WithClause<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::WithClause(it));
+        }
+        fn visit_import_attribute(&mut self, it: &oxc_ast::ast::ImportAttribute<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::ImportAttribute(it));
+        }
+        fn visit_export_declaration(&mut self, it: &oxc_ast::ast::ExportDeclaration<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::ExportDeclaration(it));
+        }
+        fn visit_export_named_declaration(
+            &mut self,
+            it: &oxc_ast::ast::ExportNamedDeclaration<'a>,
+        ) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::ExportNamedDeclaration(it));
+        }
+        fn visit_export_from_declaration(&mut self, it: &oxc_ast::ast::ExportFromDeclaration<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::ExportFromDeclaration(it));
+        }
+        fn visit_export_default_declaration(
+            &mut self,
+            it: &oxc_ast::ast::ExportDefaultDeclaration<'a>,
+        ) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::ExportDefaultDeclaration(it));
+        }
+        fn visit_export_all_declaration(&mut self, it: &oxc_ast::ast::ExportAllDeclaration<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::ExportAllDeclaration(it));
+        }
+        fn visit_export_specifier(&mut self, it: &oxc_ast::ast::ExportSpecifier<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::ExportSpecifier(it));
+        }
+        fn visit_v8_intrinsic_expression(&mut self, it: &oxc_ast::ast::V8IntrinsicExpression<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::V8IntrinsicExpression(it));
+        }
+        fn visit_boolean_literal(&mut self, it: &oxc_ast::ast::BooleanLiteral) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::BooleanLiteral(it));
+        }
+        fn visit_null_literal(&mut self, it: &oxc_ast::ast::NullLiteral) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::NullLiteral(it));
+        }
+        fn visit_numeric_literal(&mut self, it: &oxc_ast::ast::NumericLiteral<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::NumericLiteral(it));
+        }
+        fn visit_string_literal(&mut self, it: &oxc_ast::ast::StringLiteral<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::StringLiteral(it));
+        }
+        fn visit_big_int_literal(&mut self, it: &oxc_ast::ast::BigIntLiteral<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::BigIntLiteral(it));
+        }
+        fn visit_reg_exp_literal(&mut self, it: &oxc_ast::ast::RegExpLiteral<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::RegExpLiteral(it));
+        }
+        fn visit_jsx_element(&mut self, it: &oxc_ast::ast::JSXElement<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::JSXElement(it));
+        }
+        fn visit_jsx_opening_element(&mut self, it: &oxc_ast::ast::JSXOpeningElement<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::JSXOpeningElement(it));
+        }
+        fn visit_jsx_closing_element(&mut self, it: &oxc_ast::ast::JSXClosingElement<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::JSXClosingElement(it));
+        }
+        fn visit_jsx_fragment(&mut self, it: &oxc_ast::ast::JSXFragment<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::JSXFragment(it));
+        }
+        fn visit_jsx_opening_fragment(&mut self, it: &oxc_ast::ast::JSXOpeningFragment) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::JSXOpeningFragment(it));
+        }
+        fn visit_jsx_closing_fragment(&mut self, it: &oxc_ast::ast::JSXClosingFragment) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::JSXClosingFragment(it));
+        }
+        fn visit_jsx_namespaced_name(&mut self, it: &oxc_ast::ast::JSXNamespacedName<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::JSXNamespacedName(it));
+        }
+        fn visit_jsx_member_expression(&mut self, it: &oxc_ast::ast::JSXMemberExpression<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::JSXMemberExpression(it));
+        }
+        fn visit_jsx_expression_container(
+            &mut self,
+            it: &oxc_ast::ast::JSXExpressionContainer<'a>,
+        ) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::JSXExpressionContainer(it));
+        }
+        fn visit_jsx_empty_expression(&mut self, it: &oxc_ast::ast::JSXEmptyExpression) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::JSXEmptyExpression(it));
+        }
+        fn visit_jsx_attribute(&mut self, it: &oxc_ast::ast::JSXAttribute<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::JSXAttribute(it));
+        }
+        fn visit_jsx_spread_attribute(&mut self, it: &oxc_ast::ast::JSXSpreadAttribute<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::JSXSpreadAttribute(it));
+        }
+        fn visit_jsx_identifier(&mut self, it: &oxc_ast::ast::JSXIdentifier<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::JSXIdentifier(it));
+        }
+        fn visit_jsx_spread_child(&mut self, it: &oxc_ast::ast::JSXSpreadChild<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::JSXSpreadChild(it));
+        }
+        fn visit_jsx_text(&mut self, it: &oxc_ast::ast::JSXText<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::JSXText(it));
+        }
+        fn visit_ts_this_parameter(&mut self, it: &oxc_ast::ast::TSThisParameter<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::TSThisParameter(it));
+        }
+        fn visit_ts_enum_declaration(&mut self, it: &oxc_ast::ast::TSEnumDeclaration<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::TSEnumDeclaration(it));
+        }
+        fn visit_ts_enum_body(&mut self, it: &oxc_ast::ast::TSEnumBody<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::TSEnumBody(it));
+        }
+        fn visit_ts_enum_member(&mut self, it: &oxc_ast::ast::TSEnumMember<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::TSEnumMember(it));
+        }
+        fn visit_ts_type_annotation(&mut self, it: &oxc_ast::ast::TSTypeAnnotation<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::TSTypeAnnotation(it));
+        }
+        fn visit_ts_literal_type(&mut self, it: &oxc_ast::ast::TSLiteralType<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::TSLiteralType(it));
+        }
+        fn visit_ts_conditional_type(&mut self, it: &oxc_ast::ast::TSConditionalType<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::TSConditionalType(it));
+        }
+        fn visit_ts_union_type(&mut self, it: &oxc_ast::ast::TSUnionType<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::TSUnionType(it));
+        }
+        fn visit_ts_intersection_type(&mut self, it: &oxc_ast::ast::TSIntersectionType<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::TSIntersectionType(it));
+        }
+        fn visit_ts_parenthesized_type(&mut self, it: &oxc_ast::ast::TSParenthesizedType<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::TSParenthesizedType(it));
+        }
+        fn visit_ts_type_operator(&mut self, it: &oxc_ast::ast::TSTypeOperator<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::TSTypeOperator(it));
+        }
+        fn visit_ts_array_type(&mut self, it: &oxc_ast::ast::TSArrayType<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::TSArrayType(it));
+        }
+        fn visit_ts_indexed_access_type(&mut self, it: &oxc_ast::ast::TSIndexedAccessType<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::TSIndexedAccessType(it));
+        }
+        fn visit_ts_tuple_type(&mut self, it: &oxc_ast::ast::TSTupleType<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::TSTupleType(it));
+        }
+        fn visit_ts_named_tuple_member(&mut self, it: &oxc_ast::ast::TSNamedTupleMember<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::TSNamedTupleMember(it));
+        }
+        fn visit_ts_optional_type(&mut self, it: &oxc_ast::ast::TSOptionalType<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::TSOptionalType(it));
+        }
+        fn visit_ts_rest_type(&mut self, it: &oxc_ast::ast::TSRestType<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::TSRestType(it));
+        }
+        fn visit_ts_any_keyword(&mut self, it: &oxc_ast::ast::TSAnyKeyword) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::TSAnyKeyword(it));
+        }
+        fn visit_ts_string_keyword(&mut self, it: &oxc_ast::ast::TSStringKeyword) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::TSStringKeyword(it));
+        }
+        fn visit_ts_boolean_keyword(&mut self, it: &oxc_ast::ast::TSBooleanKeyword) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::TSBooleanKeyword(it));
+        }
+        fn visit_ts_number_keyword(&mut self, it: &oxc_ast::ast::TSNumberKeyword) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::TSNumberKeyword(it));
+        }
+        fn visit_ts_never_keyword(&mut self, it: &oxc_ast::ast::TSNeverKeyword) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::TSNeverKeyword(it));
+        }
+        fn visit_ts_intrinsic_keyword(&mut self, it: &oxc_ast::ast::TSIntrinsicKeyword) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::TSIntrinsicKeyword(it));
+        }
+        fn visit_ts_unknown_keyword(&mut self, it: &oxc_ast::ast::TSUnknownKeyword) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::TSUnknownKeyword(it));
+        }
+        fn visit_ts_null_keyword(&mut self, it: &oxc_ast::ast::TSNullKeyword) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::TSNullKeyword(it));
+        }
+        fn visit_ts_undefined_keyword(&mut self, it: &oxc_ast::ast::TSUndefinedKeyword) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::TSUndefinedKeyword(it));
+        }
+        fn visit_ts_void_keyword(&mut self, it: &oxc_ast::ast::TSVoidKeyword) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::TSVoidKeyword(it));
+        }
+        fn visit_ts_symbol_keyword(&mut self, it: &oxc_ast::ast::TSSymbolKeyword) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::TSSymbolKeyword(it));
+        }
+        fn visit_ts_this_type(&mut self, it: &oxc_ast::ast::TSThisType) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::TSThisType(it));
+        }
+        fn visit_ts_object_keyword(&mut self, it: &oxc_ast::ast::TSObjectKeyword) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::TSObjectKeyword(it));
+        }
+        fn visit_ts_big_int_keyword(&mut self, it: &oxc_ast::ast::TSBigIntKeyword) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::TSBigIntKeyword(it));
+        }
+        fn visit_ts_type_reference(&mut self, it: &oxc_ast::ast::TSTypeReference<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::TSTypeReference(it));
+        }
+        fn visit_ts_qualified_name(&mut self, it: &oxc_ast::ast::TSQualifiedName<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::TSQualifiedName(it));
+        }
+        fn visit_ts_type_parameter_instantiation(
+            &mut self,
+            it: &oxc_ast::ast::TSTypeParameterInstantiation<'a>,
+        ) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::TSTypeParameterInstantiation(it));
+        }
+        fn visit_ts_type_parameter(&mut self, it: &oxc_ast::ast::TSTypeParameter<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::TSTypeParameter(it));
+        }
+        fn visit_ts_type_parameter_declaration(
+            &mut self,
+            it: &oxc_ast::ast::TSTypeParameterDeclaration<'a>,
+        ) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::TSTypeParameterDeclaration(it));
+        }
+        fn visit_ts_type_alias_declaration(
+            &mut self,
+            it: &oxc_ast::ast::TSTypeAliasDeclaration<'a>,
+        ) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::TSTypeAliasDeclaration(it));
+        }
+        fn visit_ts_class_implements(&mut self, it: &oxc_ast::ast::TSClassImplements<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::TSClassImplements(it));
+        }
+        fn visit_ts_interface_declaration(
+            &mut self,
+            it: &oxc_ast::ast::TSInterfaceDeclaration<'a>,
+        ) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::TSInterfaceDeclaration(it));
+        }
+        fn visit_ts_interface_body(&mut self, it: &oxc_ast::ast::TSInterfaceBody<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::TSInterfaceBody(it));
+        }
+        fn visit_ts_property_signature(&mut self, it: &oxc_ast::ast::TSPropertySignature<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::TSPropertySignature(it));
+        }
+        fn visit_ts_index_signature(&mut self, it: &oxc_ast::ast::TSIndexSignature<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::TSIndexSignature(it));
+        }
+        fn visit_ts_call_signature_declaration(
+            &mut self,
+            it: &oxc_ast::ast::TSCallSignatureDeclaration<'a>,
+        ) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::TSCallSignatureDeclaration(it));
+        }
+        fn visit_ts_method_signature(&mut self, it: &oxc_ast::ast::TSMethodSignature<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::TSMethodSignature(it));
+        }
+        fn visit_ts_construct_signature_declaration(
+            &mut self,
+            it: &oxc_ast::ast::TSConstructSignatureDeclaration<'a>,
+        ) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::TSConstructSignatureDeclaration(it));
+        }
+        fn visit_ts_index_signature_name(&mut self, it: &oxc_ast::ast::TSIndexSignatureName<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::TSIndexSignatureName(it));
+        }
+        fn visit_ts_interface_heritage(&mut self, it: &oxc_ast::ast::TSInterfaceHeritage<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::TSInterfaceHeritage(it));
+        }
+        fn visit_ts_type_predicate(&mut self, it: &oxc_ast::ast::TSTypePredicate<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::TSTypePredicate(it));
+        }
+        fn visit_ts_external_module_declaration(
+            &mut self,
+            it: &oxc_ast::ast::TSExternalModuleDeclaration<'a>,
+        ) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::TSExternalModuleDeclaration(it));
+        }
+        fn visit_ts_namespace_declaration(
+            &mut self,
+            it: &oxc_ast::ast::TSNamespaceDeclaration<'a>,
+        ) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::TSNamespaceDeclaration(it));
+        }
+        fn visit_ts_global_declaration(&mut self, it: &oxc_ast::ast::TSGlobalDeclaration<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::TSGlobalDeclaration(it));
+        }
+        fn visit_ts_module_block(&mut self, it: &oxc_ast::ast::TSModuleBlock<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::TSModuleBlock(it));
+        }
+        fn visit_ts_type_literal(&mut self, it: &oxc_ast::ast::TSTypeLiteral<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::TSTypeLiteral(it));
+        }
+        fn visit_ts_infer_type(&mut self, it: &oxc_ast::ast::TSInferType<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::TSInferType(it));
+        }
+        fn visit_ts_type_query(&mut self, it: &oxc_ast::ast::TSTypeQuery<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::TSTypeQuery(it));
+        }
+        fn visit_ts_import_type(&mut self, it: &oxc_ast::ast::TSImportType<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::TSImportType(it));
+        }
+        fn visit_ts_import_type_qualified_name(
+            &mut self,
+            it: &oxc_ast::ast::TSImportTypeQualifiedName<'a>,
+        ) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::TSImportTypeQualifiedName(it));
+        }
+        fn visit_ts_function_type(&mut self, it: &oxc_ast::ast::TSFunctionType<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::TSFunctionType(it));
+        }
+        fn visit_ts_constructor_type(&mut self, it: &oxc_ast::ast::TSConstructorType<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::TSConstructorType(it));
+        }
+        fn visit_ts_mapped_type(&mut self, it: &oxc_ast::ast::TSMappedType<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::TSMappedType(it));
+        }
+        fn visit_ts_template_literal_type(&mut self, it: &oxc_ast::ast::TSTemplateLiteralType<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::TSTemplateLiteralType(it));
+        }
+        fn visit_ts_as_expression(&mut self, it: &oxc_ast::ast::TSAsExpression<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::TSAsExpression(it));
+        }
+        fn visit_ts_satisfies_expression(&mut self, it: &oxc_ast::ast::TSSatisfiesExpression<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::TSSatisfiesExpression(it));
+        }
+        fn visit_ts_type_assertion(&mut self, it: &oxc_ast::ast::TSTypeAssertion<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::TSTypeAssertion(it));
+        }
+        fn visit_ts_import_equals_declaration(
+            &mut self,
+            it: &oxc_ast::ast::TSImportEqualsDeclaration<'a>,
+        ) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::TSImportEqualsDeclaration(it));
+        }
+        fn visit_ts_external_module_reference(
+            &mut self,
+            it: &oxc_ast::ast::TSExternalModuleReference<'a>,
+        ) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::TSExternalModuleReference(it));
+        }
+        fn visit_ts_non_null_expression(&mut self, it: &oxc_ast::ast::TSNonNullExpression<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::TSNonNullExpression(it));
+        }
+        fn visit_decorator(&mut self, it: &oxc_ast::ast::Decorator<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::Decorator(it));
+        }
+        fn visit_ts_export_assignment(&mut self, it: &oxc_ast::ast::TSExportAssignment<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::TSExportAssignment(it));
+        }
+        fn visit_ts_namespace_export_declaration(
+            &mut self,
+            it: &oxc_ast::ast::TSNamespaceExportDeclaration<'a>,
+        ) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::TSNamespaceExportDeclaration(it));
+        }
+        fn visit_ts_instantiation_expression(
+            &mut self,
+            it: &oxc_ast::ast::TSInstantiationExpression<'a>,
+        ) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::TSInstantiationExpression(it));
+        }
+        fn visit_js_doc_nullable_type(&mut self, it: &oxc_ast::ast::JSDocNullableType<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::JSDocNullableType(it));
+        }
+        fn visit_js_doc_non_nullable_type(&mut self, it: &oxc_ast::ast::JSDocNonNullableType<'a>) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::JSDocNonNullableType(it));
+        }
+        fn visit_js_doc_unknown_type(&mut self, it: &oxc_ast::ast::JSDocUnknownType) {
+            let it = self.alloc(it);
+            (self.0)(oxc_ast::AstKind::JSDocUnknownType(it));
+        }
+    }
+    let mut visitor = Children(callback);
+    match kind {
+        oxc_ast::AstKind::Program(it) => oxc_ast_visit::walk::walk_program(&mut visitor, it),
+        oxc_ast::AstKind::IdentifierName(it) => {
+            oxc_ast_visit::walk::walk_identifier_name(&mut visitor, it)
+        }
+        oxc_ast::AstKind::IdentifierReference(it) => {
+            oxc_ast_visit::walk::walk_identifier_reference(&mut visitor, it)
+        }
+        oxc_ast::AstKind::BindingIdentifier(it) => {
+            oxc_ast_visit::walk::walk_binding_identifier(&mut visitor, it)
+        }
+        oxc_ast::AstKind::LabelIdentifier(it) => {
+            oxc_ast_visit::walk::walk_label_identifier(&mut visitor, it)
+        }
+        oxc_ast::AstKind::ThisExpression(it) => {
+            oxc_ast_visit::walk::walk_this_expression(&mut visitor, it)
+        }
+        oxc_ast::AstKind::ArrayExpression(it) => {
+            oxc_ast_visit::walk::walk_array_expression(&mut visitor, it)
+        }
+        oxc_ast::AstKind::Elision(it) => oxc_ast_visit::walk::walk_elision(&mut visitor, it),
+        oxc_ast::AstKind::ObjectExpression(it) => {
+            oxc_ast_visit::walk::walk_object_expression(&mut visitor, it)
+        }
+        oxc_ast::AstKind::ObjectProperty(it) => {
+            oxc_ast_visit::walk::walk_object_property(&mut visitor, it)
+        }
+        oxc_ast::AstKind::TemplateLiteral(it) => {
+            oxc_ast_visit::walk::walk_template_literal(&mut visitor, it)
+        }
+        oxc_ast::AstKind::TaggedTemplateExpression(it) => {
+            oxc_ast_visit::walk::walk_tagged_template_expression(&mut visitor, it)
+        }
+        oxc_ast::AstKind::TemplateElement(it) => {
+            oxc_ast_visit::walk::walk_template_element(&mut visitor, it)
+        }
+        oxc_ast::AstKind::ComputedMemberExpression(it) => {
+            oxc_ast_visit::walk::walk_computed_member_expression(&mut visitor, it)
+        }
+        oxc_ast::AstKind::StaticMemberExpression(it) => {
+            oxc_ast_visit::walk::walk_static_member_expression(&mut visitor, it)
+        }
+        oxc_ast::AstKind::PrivateFieldExpression(it) => {
+            oxc_ast_visit::walk::walk_private_field_expression(&mut visitor, it)
+        }
+        oxc_ast::AstKind::CallExpression(it) => {
+            oxc_ast_visit::walk::walk_call_expression(&mut visitor, it)
+        }
+        oxc_ast::AstKind::NewExpression(it) => {
+            oxc_ast_visit::walk::walk_new_expression(&mut visitor, it)
+        }
+        oxc_ast::AstKind::ImportMeta(it) => oxc_ast_visit::walk::walk_import_meta(&mut visitor, it),
+        oxc_ast::AstKind::NewTarget(it) => oxc_ast_visit::walk::walk_new_target(&mut visitor, it),
+        oxc_ast::AstKind::SpreadElement(it) => {
+            oxc_ast_visit::walk::walk_spread_element(&mut visitor, it)
+        }
+        oxc_ast::AstKind::UpdateExpression(it) => {
+            oxc_ast_visit::walk::walk_update_expression(&mut visitor, it)
+        }
+        oxc_ast::AstKind::UnaryExpression(it) => {
+            oxc_ast_visit::walk::walk_unary_expression(&mut visitor, it)
+        }
+        oxc_ast::AstKind::BinaryExpression(it) => {
+            oxc_ast_visit::walk::walk_binary_expression(&mut visitor, it)
+        }
+        oxc_ast::AstKind::PrivateInExpression(it) => {
+            oxc_ast_visit::walk::walk_private_in_expression(&mut visitor, it)
+        }
+        oxc_ast::AstKind::LogicalExpression(it) => {
+            oxc_ast_visit::walk::walk_logical_expression(&mut visitor, it)
+        }
+        oxc_ast::AstKind::ConditionalExpression(it) => {
+            oxc_ast_visit::walk::walk_conditional_expression(&mut visitor, it)
+        }
+        oxc_ast::AstKind::AssignmentExpression(it) => {
+            oxc_ast_visit::walk::walk_assignment_expression(&mut visitor, it)
+        }
+        oxc_ast::AstKind::ArrayAssignmentTarget(it) => {
+            oxc_ast_visit::walk::walk_array_assignment_target(&mut visitor, it)
+        }
+        oxc_ast::AstKind::ObjectAssignmentTarget(it) => {
+            oxc_ast_visit::walk::walk_object_assignment_target(&mut visitor, it)
+        }
+        oxc_ast::AstKind::AssignmentTargetRest(it) => {
+            oxc_ast_visit::walk::walk_assignment_target_rest(&mut visitor, it)
+        }
+        oxc_ast::AstKind::AssignmentTargetWithDefault(it) => {
+            oxc_ast_visit::walk::walk_assignment_target_with_default(&mut visitor, it)
+        }
+        oxc_ast::AstKind::AssignmentTargetPropertyIdentifier(it) => {
+            oxc_ast_visit::walk::walk_assignment_target_property_identifier(&mut visitor, it)
+        }
+        oxc_ast::AstKind::AssignmentTargetPropertyProperty(it) => {
+            oxc_ast_visit::walk::walk_assignment_target_property_property(&mut visitor, it)
+        }
+        oxc_ast::AstKind::SequenceExpression(it) => {
+            oxc_ast_visit::walk::walk_sequence_expression(&mut visitor, it)
+        }
+        oxc_ast::AstKind::Super(it) => oxc_ast_visit::walk::walk_super(&mut visitor, it),
+        oxc_ast::AstKind::AwaitExpression(it) => {
+            oxc_ast_visit::walk::walk_await_expression(&mut visitor, it)
+        }
+        oxc_ast::AstKind::ChainExpression(it) => {
+            oxc_ast_visit::walk::walk_chain_expression(&mut visitor, it)
+        }
+        oxc_ast::AstKind::ParenthesizedExpression(it) => {
+            oxc_ast_visit::walk::walk_parenthesized_expression(&mut visitor, it)
+        }
+        oxc_ast::AstKind::Directive(it) => oxc_ast_visit::walk::walk_directive(&mut visitor, it),
+        oxc_ast::AstKind::Hashbang(it) => oxc_ast_visit::walk::walk_hashbang(&mut visitor, it),
+        oxc_ast::AstKind::BlockStatement(it) => {
+            oxc_ast_visit::walk::walk_block_statement(&mut visitor, it)
+        }
+        oxc_ast::AstKind::VariableDeclaration(it) => {
+            oxc_ast_visit::walk::walk_variable_declaration(&mut visitor, it)
+        }
+        oxc_ast::AstKind::VariableDeclarator(it) => {
+            oxc_ast_visit::walk::walk_variable_declarator(&mut visitor, it)
+        }
+        oxc_ast::AstKind::EmptyStatement(it) => {
+            oxc_ast_visit::walk::walk_empty_statement(&mut visitor, it)
+        }
+        oxc_ast::AstKind::ExpressionStatement(it) => {
+            oxc_ast_visit::walk::walk_expression_statement(&mut visitor, it)
+        }
+        oxc_ast::AstKind::IfStatement(it) => {
+            oxc_ast_visit::walk::walk_if_statement(&mut visitor, it)
+        }
+        oxc_ast::AstKind::DoWhileStatement(it) => {
+            oxc_ast_visit::walk::walk_do_while_statement(&mut visitor, it)
+        }
+        oxc_ast::AstKind::WhileStatement(it) => {
+            oxc_ast_visit::walk::walk_while_statement(&mut visitor, it)
+        }
+        oxc_ast::AstKind::ForStatement(it) => {
+            oxc_ast_visit::walk::walk_for_statement(&mut visitor, it)
+        }
+        oxc_ast::AstKind::ForInStatement(it) => {
+            oxc_ast_visit::walk::walk_for_in_statement(&mut visitor, it)
+        }
+        oxc_ast::AstKind::ForOfStatement(it) => {
+            oxc_ast_visit::walk::walk_for_of_statement(&mut visitor, it)
+        }
+        oxc_ast::AstKind::ContinueStatement(it) => {
+            oxc_ast_visit::walk::walk_continue_statement(&mut visitor, it)
+        }
+        oxc_ast::AstKind::BreakStatement(it) => {
+            oxc_ast_visit::walk::walk_break_statement(&mut visitor, it)
+        }
+        oxc_ast::AstKind::ReturnStatement(it) => {
+            oxc_ast_visit::walk::walk_return_statement(&mut visitor, it)
+        }
+        oxc_ast::AstKind::WithStatement(it) => {
+            oxc_ast_visit::walk::walk_with_statement(&mut visitor, it)
+        }
+        oxc_ast::AstKind::SwitchStatement(it) => {
+            oxc_ast_visit::walk::walk_switch_statement(&mut visitor, it)
+        }
+        oxc_ast::AstKind::SwitchCase(it) => oxc_ast_visit::walk::walk_switch_case(&mut visitor, it),
+        oxc_ast::AstKind::LabeledStatement(it) => {
+            oxc_ast_visit::walk::walk_labeled_statement(&mut visitor, it)
+        }
+        oxc_ast::AstKind::ThrowStatement(it) => {
+            oxc_ast_visit::walk::walk_throw_statement(&mut visitor, it)
+        }
+        oxc_ast::AstKind::TryStatement(it) => {
+            oxc_ast_visit::walk::walk_try_statement(&mut visitor, it)
+        }
+        oxc_ast::AstKind::CatchClause(it) => {
+            oxc_ast_visit::walk::walk_catch_clause(&mut visitor, it)
+        }
+        oxc_ast::AstKind::CatchParameter(it) => {
+            oxc_ast_visit::walk::walk_catch_parameter(&mut visitor, it)
+        }
+        oxc_ast::AstKind::DebuggerStatement(it) => {
+            oxc_ast_visit::walk::walk_debugger_statement(&mut visitor, it)
+        }
+        oxc_ast::AstKind::AssignmentPattern(it) => {
+            oxc_ast_visit::walk::walk_assignment_pattern(&mut visitor, it)
+        }
+        oxc_ast::AstKind::ObjectPattern(it) => {
+            oxc_ast_visit::walk::walk_object_pattern(&mut visitor, it)
+        }
+        oxc_ast::AstKind::BindingProperty(it) => {
+            oxc_ast_visit::walk::walk_binding_property(&mut visitor, it)
+        }
+        oxc_ast::AstKind::ArrayPattern(it) => {
+            oxc_ast_visit::walk::walk_array_pattern(&mut visitor, it)
+        }
+        oxc_ast::AstKind::BindingRestElement(it) => {
+            oxc_ast_visit::walk::walk_binding_rest_element(&mut visitor, it)
+        }
+        oxc_ast::AstKind::Function(it) => oxc_ast_visit::walk::walk_function(
+            &mut visitor,
+            it,
+            oxc_syntax::scope::ScopeFlags::empty(),
+        ),
+        oxc_ast::AstKind::FormalParameters(it) => {
+            oxc_ast_visit::walk::walk_formal_parameters(&mut visitor, it)
+        }
+        oxc_ast::AstKind::FormalParameter(it) => {
+            oxc_ast_visit::walk::walk_formal_parameter(&mut visitor, it)
+        }
+        oxc_ast::AstKind::FormalParameterRest(it) => {
+            oxc_ast_visit::walk::walk_formal_parameter_rest(&mut visitor, it)
+        }
+        oxc_ast::AstKind::FunctionBody(it) => {
+            oxc_ast_visit::walk::walk_function_body(&mut visitor, it)
+        }
+        oxc_ast::AstKind::ArrowFunctionExpression(it) => {
+            oxc_ast_visit::walk::walk_arrow_function_expression(&mut visitor, it)
+        }
+        oxc_ast::AstKind::YieldExpression(it) => {
+            oxc_ast_visit::walk::walk_yield_expression(&mut visitor, it)
+        }
+        oxc_ast::AstKind::Class(it) => oxc_ast_visit::walk::walk_class(&mut visitor, it),
+        oxc_ast::AstKind::ClassBody(it) => oxc_ast_visit::walk::walk_class_body(&mut visitor, it),
+        oxc_ast::AstKind::MethodDefinition(it) => {
+            oxc_ast_visit::walk::walk_method_definition(&mut visitor, it)
+        }
+        oxc_ast::AstKind::PropertyDefinition(it) => {
+            oxc_ast_visit::walk::walk_property_definition(&mut visitor, it)
+        }
+        oxc_ast::AstKind::PrivateIdentifier(it) => {
+            oxc_ast_visit::walk::walk_private_identifier(&mut visitor, it)
+        }
+        oxc_ast::AstKind::StaticBlock(it) => {
+            oxc_ast_visit::walk::walk_static_block(&mut visitor, it)
+        }
+        oxc_ast::AstKind::AccessorProperty(it) => {
+            oxc_ast_visit::walk::walk_accessor_property(&mut visitor, it)
+        }
+        oxc_ast::AstKind::ImportExpression(it) => {
+            oxc_ast_visit::walk::walk_import_expression(&mut visitor, it)
+        }
+        oxc_ast::AstKind::ImportDeclaration(it) => {
+            oxc_ast_visit::walk::walk_import_declaration(&mut visitor, it)
+        }
+        oxc_ast::AstKind::ImportSpecifier(it) => {
+            oxc_ast_visit::walk::walk_import_specifier(&mut visitor, it)
+        }
+        oxc_ast::AstKind::ImportDefaultSpecifier(it) => {
+            oxc_ast_visit::walk::walk_import_default_specifier(&mut visitor, it)
+        }
+        oxc_ast::AstKind::ImportNamespaceSpecifier(it) => {
+            oxc_ast_visit::walk::walk_import_namespace_specifier(&mut visitor, it)
+        }
+        oxc_ast::AstKind::WithClause(it) => oxc_ast_visit::walk::walk_with_clause(&mut visitor, it),
+        oxc_ast::AstKind::ImportAttribute(it) => {
+            oxc_ast_visit::walk::walk_import_attribute(&mut visitor, it)
+        }
+        oxc_ast::AstKind::ExportDeclaration(it) => {
+            oxc_ast_visit::walk::walk_export_declaration(&mut visitor, it)
+        }
+        oxc_ast::AstKind::ExportNamedDeclaration(it) => {
+            oxc_ast_visit::walk::walk_export_named_declaration(&mut visitor, it)
+        }
+        oxc_ast::AstKind::ExportFromDeclaration(it) => {
+            oxc_ast_visit::walk::walk_export_from_declaration(&mut visitor, it)
+        }
+        oxc_ast::AstKind::ExportDefaultDeclaration(it) => {
+            oxc_ast_visit::walk::walk_export_default_declaration(&mut visitor, it)
+        }
+        oxc_ast::AstKind::ExportAllDeclaration(it) => {
+            oxc_ast_visit::walk::walk_export_all_declaration(&mut visitor, it)
+        }
+        oxc_ast::AstKind::ExportSpecifier(it) => {
+            oxc_ast_visit::walk::walk_export_specifier(&mut visitor, it)
+        }
+        oxc_ast::AstKind::V8IntrinsicExpression(it) => {
+            oxc_ast_visit::walk::walk_v8_intrinsic_expression(&mut visitor, it)
+        }
+        oxc_ast::AstKind::BooleanLiteral(it) => {
+            oxc_ast_visit::walk::walk_boolean_literal(&mut visitor, it)
+        }
+        oxc_ast::AstKind::NullLiteral(it) => {
+            oxc_ast_visit::walk::walk_null_literal(&mut visitor, it)
+        }
+        oxc_ast::AstKind::NumericLiteral(it) => {
+            oxc_ast_visit::walk::walk_numeric_literal(&mut visitor, it)
+        }
+        oxc_ast::AstKind::StringLiteral(it) => {
+            oxc_ast_visit::walk::walk_string_literal(&mut visitor, it)
+        }
+        oxc_ast::AstKind::BigIntLiteral(it) => {
+            oxc_ast_visit::walk::walk_big_int_literal(&mut visitor, it)
+        }
+        oxc_ast::AstKind::RegExpLiteral(it) => {
+            oxc_ast_visit::walk::walk_reg_exp_literal(&mut visitor, it)
+        }
+        oxc_ast::AstKind::JSXElement(it) => oxc_ast_visit::walk::walk_jsx_element(&mut visitor, it),
+        oxc_ast::AstKind::JSXOpeningElement(it) => {
+            oxc_ast_visit::walk::walk_jsx_opening_element(&mut visitor, it)
+        }
+        oxc_ast::AstKind::JSXClosingElement(it) => {
+            oxc_ast_visit::walk::walk_jsx_closing_element(&mut visitor, it)
+        }
+        oxc_ast::AstKind::JSXFragment(it) => {
+            oxc_ast_visit::walk::walk_jsx_fragment(&mut visitor, it)
+        }
+        oxc_ast::AstKind::JSXOpeningFragment(it) => {
+            oxc_ast_visit::walk::walk_jsx_opening_fragment(&mut visitor, it)
+        }
+        oxc_ast::AstKind::JSXClosingFragment(it) => {
+            oxc_ast_visit::walk::walk_jsx_closing_fragment(&mut visitor, it)
+        }
+        oxc_ast::AstKind::JSXNamespacedName(it) => {
+            oxc_ast_visit::walk::walk_jsx_namespaced_name(&mut visitor, it)
+        }
+        oxc_ast::AstKind::JSXMemberExpression(it) => {
+            oxc_ast_visit::walk::walk_jsx_member_expression(&mut visitor, it)
+        }
+        oxc_ast::AstKind::JSXExpressionContainer(it) => {
+            oxc_ast_visit::walk::walk_jsx_expression_container(&mut visitor, it)
+        }
+        oxc_ast::AstKind::JSXEmptyExpression(it) => {
+            oxc_ast_visit::walk::walk_jsx_empty_expression(&mut visitor, it)
+        }
+        oxc_ast::AstKind::JSXAttribute(it) => {
+            oxc_ast_visit::walk::walk_jsx_attribute(&mut visitor, it)
+        }
+        oxc_ast::AstKind::JSXSpreadAttribute(it) => {
+            oxc_ast_visit::walk::walk_jsx_spread_attribute(&mut visitor, it)
+        }
+        oxc_ast::AstKind::JSXIdentifier(it) => {
+            oxc_ast_visit::walk::walk_jsx_identifier(&mut visitor, it)
+        }
+        oxc_ast::AstKind::JSXSpreadChild(it) => {
+            oxc_ast_visit::walk::walk_jsx_spread_child(&mut visitor, it)
+        }
+        oxc_ast::AstKind::JSXText(it) => oxc_ast_visit::walk::walk_jsx_text(&mut visitor, it),
+        oxc_ast::AstKind::TSThisParameter(it) => {
+            oxc_ast_visit::walk::walk_ts_this_parameter(&mut visitor, it)
+        }
+        oxc_ast::AstKind::TSEnumDeclaration(it) => {
+            oxc_ast_visit::walk::walk_ts_enum_declaration(&mut visitor, it)
+        }
+        oxc_ast::AstKind::TSEnumBody(it) => {
+            oxc_ast_visit::walk::walk_ts_enum_body(&mut visitor, it)
+        }
+        oxc_ast::AstKind::TSEnumMember(it) => {
+            oxc_ast_visit::walk::walk_ts_enum_member(&mut visitor, it)
+        }
+        oxc_ast::AstKind::TSTypeAnnotation(it) => {
+            oxc_ast_visit::walk::walk_ts_type_annotation(&mut visitor, it)
+        }
+        oxc_ast::AstKind::TSLiteralType(it) => {
+            oxc_ast_visit::walk::walk_ts_literal_type(&mut visitor, it)
+        }
+        oxc_ast::AstKind::TSConditionalType(it) => {
+            oxc_ast_visit::walk::walk_ts_conditional_type(&mut visitor, it)
+        }
+        oxc_ast::AstKind::TSUnionType(it) => {
+            oxc_ast_visit::walk::walk_ts_union_type(&mut visitor, it)
+        }
+        oxc_ast::AstKind::TSIntersectionType(it) => {
+            oxc_ast_visit::walk::walk_ts_intersection_type(&mut visitor, it)
+        }
+        oxc_ast::AstKind::TSParenthesizedType(it) => {
+            oxc_ast_visit::walk::walk_ts_parenthesized_type(&mut visitor, it)
+        }
+        oxc_ast::AstKind::TSTypeOperator(it) => {
+            oxc_ast_visit::walk::walk_ts_type_operator(&mut visitor, it)
+        }
+        oxc_ast::AstKind::TSArrayType(it) => {
+            oxc_ast_visit::walk::walk_ts_array_type(&mut visitor, it)
+        }
+        oxc_ast::AstKind::TSIndexedAccessType(it) => {
+            oxc_ast_visit::walk::walk_ts_indexed_access_type(&mut visitor, it)
+        }
+        oxc_ast::AstKind::TSTupleType(it) => {
+            oxc_ast_visit::walk::walk_ts_tuple_type(&mut visitor, it)
+        }
+        oxc_ast::AstKind::TSNamedTupleMember(it) => {
+            oxc_ast_visit::walk::walk_ts_named_tuple_member(&mut visitor, it)
+        }
+        oxc_ast::AstKind::TSOptionalType(it) => {
+            oxc_ast_visit::walk::walk_ts_optional_type(&mut visitor, it)
+        }
+        oxc_ast::AstKind::TSRestType(it) => {
+            oxc_ast_visit::walk::walk_ts_rest_type(&mut visitor, it)
+        }
+        oxc_ast::AstKind::TSAnyKeyword(it) => {
+            oxc_ast_visit::walk::walk_ts_any_keyword(&mut visitor, it)
+        }
+        oxc_ast::AstKind::TSStringKeyword(it) => {
+            oxc_ast_visit::walk::walk_ts_string_keyword(&mut visitor, it)
+        }
+        oxc_ast::AstKind::TSBooleanKeyword(it) => {
+            oxc_ast_visit::walk::walk_ts_boolean_keyword(&mut visitor, it)
+        }
+        oxc_ast::AstKind::TSNumberKeyword(it) => {
+            oxc_ast_visit::walk::walk_ts_number_keyword(&mut visitor, it)
+        }
+        oxc_ast::AstKind::TSNeverKeyword(it) => {
+            oxc_ast_visit::walk::walk_ts_never_keyword(&mut visitor, it)
+        }
+        oxc_ast::AstKind::TSIntrinsicKeyword(it) => {
+            oxc_ast_visit::walk::walk_ts_intrinsic_keyword(&mut visitor, it)
+        }
+        oxc_ast::AstKind::TSUnknownKeyword(it) => {
+            oxc_ast_visit::walk::walk_ts_unknown_keyword(&mut visitor, it)
+        }
+        oxc_ast::AstKind::TSNullKeyword(it) => {
+            oxc_ast_visit::walk::walk_ts_null_keyword(&mut visitor, it)
+        }
+        oxc_ast::AstKind::TSUndefinedKeyword(it) => {
+            oxc_ast_visit::walk::walk_ts_undefined_keyword(&mut visitor, it)
+        }
+        oxc_ast::AstKind::TSVoidKeyword(it) => {
+            oxc_ast_visit::walk::walk_ts_void_keyword(&mut visitor, it)
+        }
+        oxc_ast::AstKind::TSSymbolKeyword(it) => {
+            oxc_ast_visit::walk::walk_ts_symbol_keyword(&mut visitor, it)
+        }
+        oxc_ast::AstKind::TSThisType(it) => {
+            oxc_ast_visit::walk::walk_ts_this_type(&mut visitor, it)
+        }
+        oxc_ast::AstKind::TSObjectKeyword(it) => {
+            oxc_ast_visit::walk::walk_ts_object_keyword(&mut visitor, it)
+        }
+        oxc_ast::AstKind::TSBigIntKeyword(it) => {
+            oxc_ast_visit::walk::walk_ts_big_int_keyword(&mut visitor, it)
+        }
+        oxc_ast::AstKind::TSTypeReference(it) => {
+            oxc_ast_visit::walk::walk_ts_type_reference(&mut visitor, it)
+        }
+        oxc_ast::AstKind::TSQualifiedName(it) => {
+            oxc_ast_visit::walk::walk_ts_qualified_name(&mut visitor, it)
+        }
+        oxc_ast::AstKind::TSTypeParameterInstantiation(it) => {
+            oxc_ast_visit::walk::walk_ts_type_parameter_instantiation(&mut visitor, it)
+        }
+        oxc_ast::AstKind::TSTypeParameter(it) => {
+            oxc_ast_visit::walk::walk_ts_type_parameter(&mut visitor, it)
+        }
+        oxc_ast::AstKind::TSTypeParameterDeclaration(it) => {
+            oxc_ast_visit::walk::walk_ts_type_parameter_declaration(&mut visitor, it)
+        }
+        oxc_ast::AstKind::TSTypeAliasDeclaration(it) => {
+            oxc_ast_visit::walk::walk_ts_type_alias_declaration(&mut visitor, it)
+        }
+        oxc_ast::AstKind::TSClassImplements(it) => {
+            oxc_ast_visit::walk::walk_ts_class_implements(&mut visitor, it)
+        }
+        oxc_ast::AstKind::TSInterfaceDeclaration(it) => {
+            oxc_ast_visit::walk::walk_ts_interface_declaration(&mut visitor, it)
+        }
+        oxc_ast::AstKind::TSInterfaceBody(it) => {
+            oxc_ast_visit::walk::walk_ts_interface_body(&mut visitor, it)
+        }
+        oxc_ast::AstKind::TSPropertySignature(it) => {
+            oxc_ast_visit::walk::walk_ts_property_signature(&mut visitor, it)
+        }
+        oxc_ast::AstKind::TSIndexSignature(it) => {
+            oxc_ast_visit::walk::walk_ts_index_signature(&mut visitor, it)
+        }
+        oxc_ast::AstKind::TSCallSignatureDeclaration(it) => {
+            oxc_ast_visit::walk::walk_ts_call_signature_declaration(&mut visitor, it)
+        }
+        oxc_ast::AstKind::TSMethodSignature(it) => {
+            oxc_ast_visit::walk::walk_ts_method_signature(&mut visitor, it)
+        }
+        oxc_ast::AstKind::TSConstructSignatureDeclaration(it) => {
+            oxc_ast_visit::walk::walk_ts_construct_signature_declaration(&mut visitor, it)
+        }
+        oxc_ast::AstKind::TSIndexSignatureName(it) => {
+            oxc_ast_visit::walk::walk_ts_index_signature_name(&mut visitor, it)
+        }
+        oxc_ast::AstKind::TSInterfaceHeritage(it) => {
+            oxc_ast_visit::walk::walk_ts_interface_heritage(&mut visitor, it)
+        }
+        oxc_ast::AstKind::TSTypePredicate(it) => {
+            oxc_ast_visit::walk::walk_ts_type_predicate(&mut visitor, it)
+        }
+        oxc_ast::AstKind::TSExternalModuleDeclaration(it) => {
+            oxc_ast_visit::walk::walk_ts_external_module_declaration(&mut visitor, it)
+        }
+        oxc_ast::AstKind::TSNamespaceDeclaration(it) => {
+            oxc_ast_visit::walk::walk_ts_namespace_declaration(&mut visitor, it)
+        }
+        oxc_ast::AstKind::TSGlobalDeclaration(it) => {
+            oxc_ast_visit::walk::walk_ts_global_declaration(&mut visitor, it)
+        }
+        oxc_ast::AstKind::TSModuleBlock(it) => {
+            oxc_ast_visit::walk::walk_ts_module_block(&mut visitor, it)
+        }
+        oxc_ast::AstKind::TSTypeLiteral(it) => {
+            oxc_ast_visit::walk::walk_ts_type_literal(&mut visitor, it)
+        }
+        oxc_ast::AstKind::TSInferType(it) => {
+            oxc_ast_visit::walk::walk_ts_infer_type(&mut visitor, it)
+        }
+        oxc_ast::AstKind::TSTypeQuery(it) => {
+            oxc_ast_visit::walk::walk_ts_type_query(&mut visitor, it)
+        }
+        oxc_ast::AstKind::TSImportType(it) => {
+            oxc_ast_visit::walk::walk_ts_import_type(&mut visitor, it)
+        }
+        oxc_ast::AstKind::TSImportTypeQualifiedName(it) => {
+            oxc_ast_visit::walk::walk_ts_import_type_qualified_name(&mut visitor, it)
+        }
+        oxc_ast::AstKind::TSFunctionType(it) => {
+            oxc_ast_visit::walk::walk_ts_function_type(&mut visitor, it)
+        }
+        oxc_ast::AstKind::TSConstructorType(it) => {
+            oxc_ast_visit::walk::walk_ts_constructor_type(&mut visitor, it)
+        }
+        oxc_ast::AstKind::TSMappedType(it) => {
+            oxc_ast_visit::walk::walk_ts_mapped_type(&mut visitor, it)
+        }
+        oxc_ast::AstKind::TSTemplateLiteralType(it) => {
+            oxc_ast_visit::walk::walk_ts_template_literal_type(&mut visitor, it)
+        }
+        oxc_ast::AstKind::TSAsExpression(it) => {
+            oxc_ast_visit::walk::walk_ts_as_expression(&mut visitor, it)
+        }
+        oxc_ast::AstKind::TSSatisfiesExpression(it) => {
+            oxc_ast_visit::walk::walk_ts_satisfies_expression(&mut visitor, it)
+        }
+        oxc_ast::AstKind::TSTypeAssertion(it) => {
+            oxc_ast_visit::walk::walk_ts_type_assertion(&mut visitor, it)
+        }
+        oxc_ast::AstKind::TSImportEqualsDeclaration(it) => {
+            oxc_ast_visit::walk::walk_ts_import_equals_declaration(&mut visitor, it)
+        }
+        oxc_ast::AstKind::TSExternalModuleReference(it) => {
+            oxc_ast_visit::walk::walk_ts_external_module_reference(&mut visitor, it)
+        }
+        oxc_ast::AstKind::TSNonNullExpression(it) => {
+            oxc_ast_visit::walk::walk_ts_non_null_expression(&mut visitor, it)
+        }
+        oxc_ast::AstKind::Decorator(it) => oxc_ast_visit::walk::walk_decorator(&mut visitor, it),
+        oxc_ast::AstKind::TSExportAssignment(it) => {
+            oxc_ast_visit::walk::walk_ts_export_assignment(&mut visitor, it)
+        }
+        oxc_ast::AstKind::TSNamespaceExportDeclaration(it) => {
+            oxc_ast_visit::walk::walk_ts_namespace_export_declaration(&mut visitor, it)
+        }
+        oxc_ast::AstKind::TSInstantiationExpression(it) => {
+            oxc_ast_visit::walk::walk_ts_instantiation_expression(&mut visitor, it)
+        }
+        oxc_ast::AstKind::JSDocNullableType(it) => {
+            oxc_ast_visit::walk::walk_js_doc_nullable_type(&mut visitor, it)
+        }
+        oxc_ast::AstKind::JSDocNonNullableType(it) => {
+            oxc_ast_visit::walk::walk_js_doc_non_nullable_type(&mut visitor, it)
+        }
+        oxc_ast::AstKind::JSDocUnknownType(it) => {
+            oxc_ast_visit::walk::walk_js_doc_unknown_type(&mut visitor, it)
+        }
     }
 }
 

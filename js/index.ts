@@ -10,6 +10,9 @@ export type {
 export type {
   AncestryCapability,
   ChildContract,
+  VisitorSelector,
+  ChildSelector,
+  StoredVisitorSelector,
   Code,
   CodeFactory,
   CodeFragment,
