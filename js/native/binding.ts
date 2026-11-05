@@ -98,7 +98,9 @@ interface NativeBinding {
   NativeParsedSource: new (
     source: string,
     filename: string,
+    sourceFilename?: string,
   ) => {
+    outputPreparation(): { offset: number; content: string } | null;
     syntaxFacts(): string[];
     functionMap(): FunctionMap;
     materializeRouted(manifest: NativeManifest): Buffer;

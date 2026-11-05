@@ -87,7 +87,7 @@ test('native Program boundaries do not mistake leading expressions for directive
       defineNativePipeline({ phases: [{ name: 'program-boundary', plugins: [plugin] }] }),
     );
     assert.equal(result.status, 'complete');
-    assert.equal(result.code, `const injected = true;\n${source}`);
+    assert.equal(result.code, `"use strict";\nconst injected = true;\n${source}`);
   }
 });
 
@@ -499,7 +499,10 @@ test('ensureReplace claims a range once under a shared intent key', () => {
     }),
   );
   assert.equal(result.status, 'complete');
-  assert.equal(result.code, "const { polyfill } = require('module');\nuse(polyfill);\n");
+  assert.equal(
+    result.code,
+    '"use strict";\n' + "const { polyfill } = require('module');\nuse(polyfill);\n",
+  );
 });
 
 test('ensureReplace re-ensures are no-ops in later phases', () => {

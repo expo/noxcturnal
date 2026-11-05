@@ -375,6 +375,9 @@ test('expresses shared-token responsibility over one import statement through an
     }),
   );
   assert.equal(result.status, 'complete');
-  assert.equal(result.code, "const { fetch } = require('whatwg-fetch');\nfetch('/api');\n");
+  assert.equal(
+    result.code,
+    '"use strict";\n' + "const { fetch } = require('whatwg-fetch');\nfetch('/api');\n",
+  );
   assert.deepEqual(result.metadata.dependencies, ['whatwg-fetch']);
 });

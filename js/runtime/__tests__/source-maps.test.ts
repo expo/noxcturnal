@@ -770,22 +770,23 @@ test('keeps both declaration source slices mapped and the inserted name sourcele
     names: result.map.names,
     mappings: result.map.mappings,
   });
-  const functionColumn = result.code.indexOf('function');
-  const nameColumn = result.code.indexOf('_ref');
-  const bodyColumn = result.code.indexOf('{');
-  assert.deepEqual(originalPositionFor(map, { line: 1, column: functionColumn }), {
+  const generatedPosition = (token: string) => {
+    const before = result.code.slice(0, result.code.indexOf(token)).split('\n');
+    return { line: before.length, column: before.at(-1)!.length };
+  };
+  assert.deepEqual(originalPositionFor(map, generatedPosition('function')), {
     source: 'fixture.js',
     line: 1,
     column: source.indexOf('function'),
     name: null,
   });
-  assert.deepEqual(originalPositionFor(map, { line: 1, column: nameColumn }), {
+  assert.deepEqual(originalPositionFor(map, generatedPosition('_ref')), {
     source: null,
     line: null,
     column: null,
     name: null,
   });
-  assert.deepEqual(originalPositionFor(map, { line: 1, column: bodyColumn }), {
+  assert.deepEqual(originalPositionFor(map, generatedPosition('{')), {
     source: 'fixture.js',
     line: 1,
     column: source.indexOf('{'),

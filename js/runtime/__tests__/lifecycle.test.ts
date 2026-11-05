@@ -57,7 +57,7 @@ test('runs ordered phases and reparses edited code', () => {
     }),
   );
   assert.equal(result.status, 'complete');
-  assert.equal(result.code, 'export const value = 2;');
+  assert.equal(result.code, '"use strict";\nexport const value = 2;');
   assert.deepEqual(observations, [2]);
   assert.equal(result.metadata.observed, 2);
   assert.ok(result.map.mappings.length > 0);

@@ -440,6 +440,17 @@ export function transform(
   let syntaxSource: string | null = null;
   let syntaxFacts: ReadonlySet<string> | null = null;
   let parsedSource: NativeParsedSourceBinding | null = null;
+  let outputPreparation: ReturnType<NativeParsedSourceBinding['outputPreparation']> = null;
+  // Body insertions stay inside wrapper sections and precede generated helpers.
+  const outputEdit = (preparation: NonNullable<typeof outputPreparation>): EditCommand => ({
+    kind: 'PrependLeft',
+    start: preparation.offset,
+    end: preparation.offset,
+    content: preparation.content,
+    mapping: 'Sourceless',
+    owner: 'noxcturnal-output',
+    order: 0xffffffff,
+  });
   let reusableRoutedBatch: { manifest: Buffer; batch: RoutedEventBatch } | null = null;
   // Record one native run's per-phase results into diagnostics/metadata and bail
   // on the first phase that did not complete. Shared by the mixed-pipeline loop
@@ -483,12 +494,11 @@ export function transform(
   };
   try {
     if (pipeline.phases.length === 0) {
-      if (options.functionMap) {
-        parsedSource = new native.NativeParsedSource(source, parseFilename);
-        initialFunctionMap = parsedSource.functionMap();
-        parsedSource.validate();
-        parsedSource = null;
-      } else native.validateProgram(source, parseFilename);
+      parsedSource = new native.NativeParsedSource(source, parseFilename, filename);
+      outputPreparation = parsedSource.outputPreparation();
+      if (options.functionMap) initialFunctionMap = parsedSource.functionMap();
+      parsedSource.validate();
+      parsedSource = null;
     }
     // All-native fast path: one crossing runs every phase and returns the final
     // products directly. Using NativePipelineSession here would add session
@@ -519,6 +529,7 @@ export function transform(
       const phase = pipeline.phases[phaseIndex];
       const executionPlan = phasePlan[phaseIndex];
       if (phase.native != null) {
+        outputPreparation = null;
         parsedSource?.close();
         parsedSource = null;
         reusableSession?.close();
@@ -564,11 +575,15 @@ export function transform(
         (options.functionMap && initialFunctionMap == null)
       ) {
         parsedSource?.close();
-        parsedSource = new native.NativeParsedSource(observationSource, parseFilename);
+        parsedSource = new native.NativeParsedSource(observationSource, parseFilename, filename);
         if (options.functionMap && initialFunctionMap == null)
           initialFunctionMap = parsedSource.functionMap();
         if (usesSyntax) syntaxFacts = new Set(parsedSource.syntaxFacts());
         syntaxSource = observationSource;
+      }
+      if (reusableSession == null) {
+        parsedSource ??= new native.NativeParsedSource(observationSource, parseFilename, filename);
+        outputPreparation = parsedSource.outputPreparation();
       }
       const prepared = prepareApplicablePhase(phase, syntaxFacts);
       // A syntax requirement rejects the entire plugin, including lifecycle work.
@@ -779,6 +794,10 @@ export function transform(
         throw new Error(`${phase.name}: phase declared edit effect none but emitted edits`);
       dispatch.flushInsertions();
       const effectiveEdits: EditCommand[] = edits;
+      if (effectiveEdits.length > 0 && outputPreparation != null) {
+        effectiveEdits.push(outputEdit(outputPreparation));
+        outputPreparation = null;
+      }
       if (effectiveEdits.length === 0) {
         if (canReuseForNextPhase) {
           reusableSession = session;
@@ -826,6 +845,19 @@ export function transform(
     parsedSource = null;
     reusableSession?.close();
     openSession = null;
+    // A module with no applicable edits still receives the same output policy.
+    if (outputPreparation != null) {
+      pipelineSession ??= new native.NativePipelineSession(parseFilename, currentSource());
+      const residentPipeline = pipelineSession;
+      const committed = commitWithDedupe([outputEdit(outputPreparation)], data =>
+        residentPipeline.commitDecoded(data, options.sourceMapMode),
+      );
+      currentVersion = sourceVersions.commit(currentVersion, {
+        codeChanged: committed.codeChanged,
+        mapChanged: committed.mapChanged,
+      });
+      outputPreparation = null;
+    }
     // The single terminal crossing: the resident source becomes the final code
     // and every retained layer composes into the final map — with the input map
     // folded in natively — in one call.

@@ -95,7 +95,10 @@ test('composes an unwrap replacement with inner edits from another plugin', () =
     }),
   );
   assert.equal(result.status, 'complete');
-  assert.equal(result.code, `function setup() {\n    const toast = _REQ("./toast");\n}\n`);
+  assert.equal(
+    result.code,
+    `"use strict";\nfunction setup() {\n    const toast = _REQ("./toast");\n}\n`,
+  );
 });
 
 test('composes template slots with glue text and inner edits', () => {
@@ -131,7 +134,10 @@ test('composes template slots with glue text and inner edits', () => {
     }),
   );
   assert.equal(result.status, 'complete');
-  assert.equal(result.code, `var _default = function main() { return _REQ("./impl"); };\n`);
+  assert.equal(
+    result.code,
+    `"use strict";\nvar _default = function main() { return _REQ("./impl"); };\n`,
+  );
 });
 
 test('rejects string coercion of source fragments with guidance', () => {
