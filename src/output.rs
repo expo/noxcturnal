@@ -7,7 +7,7 @@ use oxc_ast::{
 };
 use oxc_ast_visit::{Visit, walk};
 use oxc_span::Span;
-use oxc_syntax::scope::ScopeFlags;
+use oxc_syntax::{module_record::ModuleRecord, scope::ScopeFlags};
 
 pub(crate) const STRICT_DIRECTIVE: &str = "\n\"use strict\";\n";
 
@@ -17,9 +17,23 @@ pub struct NativeOutputPreparation {
     pub content: String,
 }
 
-pub(crate) fn is_module(program: &Program<'_>, has_import_meta: bool, filename: &str) -> bool {
-    filename.ends_with(".mjs")
-        || has_import_meta
+pub(crate) fn is_module(
+    program: &Program<'_>,
+    module_record: &ModuleRecord<'_>,
+    filename: &str,
+) -> bool {
+    if filename.ends_with(".mjs") {
+        return true;
+    }
+    // Oxc already classifies unambiguous JavaScript, including import.meta and
+    // top-level await. Explicit module parse goals and TypeScript need the
+    // compatibility checks below rather than trusting this flag alone.
+    if !program.source_type.is_typescript()
+        && (module_record.has_module_syntax || !program.source_type.is_module())
+    {
+        return module_record.has_module_syntax;
+    }
+    !module_record.import_metas.is_empty()
         || has_static_module_syntax(program)
         || (program.source_type.is_module() && {
             let mut detector = TopLevelAwait(false);
@@ -33,10 +47,10 @@ pub(crate) fn is_module(program: &Program<'_>, has_import_meta: bool, filename: 
 pub(crate) fn prepare(
     source: &str,
     program: &Program<'_>,
-    has_import_meta: bool,
+    module_record: &ModuleRecord<'_>,
     filename: &str,
 ) -> Option<NativeOutputPreparation> {
-    if !is_module(program, has_import_meta, filename)
+    if !is_module(program, module_record, filename)
         || program
             .directives
             .iter()

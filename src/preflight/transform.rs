@@ -477,7 +477,7 @@ fn transform_with_function_map(
             }
             let input_is_module = crate::output::is_module(
                 &parsed.program,
-                !parsed.module_record.import_metas.is_empty(),
+                &parsed.module_record,
                 options.source_filename.as_deref().unwrap_or(&filename),
             );
             let mut program = parsed.program;
@@ -667,7 +667,7 @@ fn transform_with_function_map(
         let parsed = final_program.borrow_dependent();
         crate::output::is_module(
             &parsed.program,
-            !parsed.module_record.import_metas.is_empty(),
+            &parsed.module_record,
             options.source_filename.as_deref().unwrap_or(&filename),
         )
     };

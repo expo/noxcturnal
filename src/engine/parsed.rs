@@ -124,7 +124,7 @@ impl NativeParsedSource {
             crate::output::prepare(
                 &owner.source,
                 &parsed.program,
-                !parsed.module_record.import_metas.is_empty(),
+                &parsed.module_record,
                 self.source_filename.as_deref().unwrap_or(&self.filename),
             )
         }))
