@@ -3055,7 +3055,8 @@ for (let s of strings) {
 }
 `,
     filename: 'input.ts',
-    output: `let Validation;
+    output: `'use strict';
+let Validation;
 (function (_Validation) {
   const lettersRegexp = /^[A-Za-z]+$/;
   const numberRegexp = /^[0-9]+$/;
@@ -3103,7 +3104,8 @@ namespace A {
 }
 `,
     filename: 'input.ts',
-    output: `class A {}
+    output: `'use strict';
+class A {}
 (function (_A) {
   const B = (_A.B = 1);
 })(A || (A = {}));`,
@@ -3126,7 +3128,8 @@ namespace A {
 }
 `,
     filename: 'input.ts',
-    output: `var A = /* @__PURE__ */ (function (A) {
+    output: `'use strict';
+var A = /* @__PURE__ */ (function (A) {
   A[(A['C'] = 2)] = 'C';
   return A;
 })(A || {});
@@ -3604,7 +3607,8 @@ namespace N {
 }
 `,
     filename: 'input.ts',
-    output: `class C {}
+    output: `'use strict';
+class C {}
 let N;
 (function (_N) {
   const { a } = C;
@@ -3707,7 +3711,8 @@ namespace proj.data.util.api {
 }
 `,
     filename: 'input.ts',
-    output: `let X;
+    output: `'use strict';
+let X;
 (function (_X) {
   let Y;
   (function (_Y) {
@@ -3766,7 +3771,8 @@ namespace A {
 }
 `,
     filename: 'input.ts',
-    output: `class A {}
+    output: `'use strict';
+class A {}
 (function (_A) {
   let C;
   (function (_C) {
@@ -3828,7 +3834,8 @@ namespace A {
 }
 `,
     filename: 'input.ts',
-    output: `let N;
+    output: `'use strict';
+let N;
 (function (_N8) {
   let _N7;
   (function (_N9) {

@@ -53,13 +53,17 @@ type ExecutionOutcome =
 /** Compare one explicitly selected Babel transform with one native preflight plan. */
 export function alignBabelTransform(options: BabelAlignmentOptions): StructuralAlignment {
   let flowModule = false;
-  const isFlow = native.classify(options.filename, options.source).syntax === 'flow';
+  const syntax = native.classify(options.filename, options.source).syntax;
+  const isFlow = syntax === 'flow';
+  const isTypeScript = syntax === 'ts' || syntax === 'tsx' || syntax === 'dts';
   const reference = babel.transformSync(options.source, {
     babelrc: false,
     comments: true,
     compact: false,
     configFile: false,
     filename: options.filename,
+    sourceType: isTypeScript ? 'unambiguous' : 'module',
+    ast: isTypeScript,
     plugins: [
       ...(isFlow
         ? [
@@ -82,7 +86,7 @@ export function alignBabelTransform(options: BabelAlignmentOptions): StructuralA
     options.filename,
     options.noxcturnal,
     reference.code,
-    flowModule,
+    flowModule || (isTypeScript && reference.ast?.program.sourceType === 'module'),
   );
 }
 

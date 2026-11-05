@@ -539,3 +539,24 @@ test('Flow module classification keeps the original filename in development JSX'
   expect(code).toContain('fixture.mjs');
   expect(code).not.toContain('fixture.jsx');
 });
+
+test('namespace import aliases do not create ESM evidence', () => {
+  const code = output(
+    `namespace N { export import X = Math.max; }\n${receiverAndWriteProbe}`,
+    { typescript: 'strip' },
+    'fixture.ts',
+  );
+  expect(code).not.toMatch(/use strict/);
+  expect(Function(code + ';return probe;')()()).toEqual([false, false]);
+});
+
+test('TypeScript namespace module evidence enforces strict early errors', () => {
+  const source = 'namespace N { export const value = 1; } with ({}) {}';
+  for (const plan of [
+    defineNativePipeline({ phases: [] }),
+    pipeline({ typescript: 'strip' }),
+    pipeline({ typescript: 'strip', transforms: { blockScoping: true } }),
+  ]) {
+    expect(() => transform(source, 'fixture.ts', plan)).toThrow(/with/);
+  }
+});

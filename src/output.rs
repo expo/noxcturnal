@@ -2,7 +2,10 @@
 use napi_derive::napi;
 use oxc_allocator::Allocator;
 use oxc_ast::{
-    ast::{ForOfStatement, Program, Statement, StringLiteral, TSModuleReference},
+    ast::{
+        Declaration, ForOfStatement, Program, Statement, StringLiteral, TSModuleReference,
+        TSNamespaceDeclarationBody,
+    },
     builder::{AstBuilder, GetAstBuilder},
 };
 use oxc_ast_visit::{Visit, walk};
@@ -34,7 +37,7 @@ pub(crate) fn is_module(
         return module_record.has_module_syntax;
     }
     !module_record.import_metas.is_empty()
-        || has_static_module_syntax(program)
+        || has_static_module_syntax(&program.body)
         || (program.source_type.is_module() && {
             let mut detector = TopLevelAwait(false);
             detector.visit_program(program);
@@ -75,8 +78,13 @@ pub(crate) fn prepare(
     })
 }
 
-fn has_static_module_syntax(program: &Program<'_>) -> bool {
-    program.body.iter().any(|statement| {
+fn has_static_module_syntax(statements: &[Statement<'_>]) -> bool {
+    statements.iter().any(|statement| {
+        if let Statement::ExportDeclaration(export) = statement
+            && let Declaration::TSImportEqualsDeclaration(import) = &export.declaration
+        {
+            return matches!(import.module_reference, TSModuleReference::ExternalModuleReference(_));
+        }
         matches!(statement, Statement::TSImportEqualsDeclaration(declaration)
             if matches!(declaration.module_reference, TSModuleReference::ExternalModuleReference(_)))
         || matches!(
@@ -87,8 +95,25 @@ fn has_static_module_syntax(program: &Program<'_>) -> bool {
                 | Statement::ExportNamedDeclaration(_)
                 | Statement::ExportDefaultDeclaration(_)
                 | Statement::ExportAllDeclaration(_)
-        )
+        ) || match statement {
+            // Babel's unambiguous parser also records exports in TypeScript
+            // containers. Oxc's module record intentionally only covers the root.
+            Statement::TSNamespaceDeclaration(declaration) => namespace_has_module_syntax(&declaration.body),
+            Statement::TSExternalModuleDeclaration(declaration) => declaration.body.as_ref()
+                .is_some_and(|body| has_static_module_syntax(&body.body)),
+            Statement::TSGlobalDeclaration(declaration) => has_static_module_syntax(&declaration.body.body),
+            _ => false,
+        }
     })
+}
+
+fn namespace_has_module_syntax(body: &TSNamespaceDeclarationBody<'_>) -> bool {
+    match body {
+        TSNamespaceDeclarationBody::TSNamespaceDeclaration(declaration) => {
+            namespace_has_module_syntax(&declaration.body)
+        }
+        TSNamespaceDeclarationBody::TSModuleBlock(block) => has_static_module_syntax(&block.body),
+    }
 }
 
 struct TopLevelAwait(bool);
@@ -124,7 +149,7 @@ pub(crate) fn materialize_module_strictness<'a>(
     program: &mut Program<'a>,
     input_is_module: bool,
 ) -> bool {
-    if !(input_is_module || has_static_module_syntax(program))
+    if !(input_is_module || has_static_module_syntax(&program.body))
         || program
             .directives
             .iter()
