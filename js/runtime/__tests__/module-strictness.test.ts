@@ -459,3 +459,83 @@ test.each(['auto', 'jsx'] as const)(
     }
   },
 );
+
+const receiverAndWriteProbe = `function probe(){
+  const target = Object.freeze({value: 1});
+  let threw = false;
+  try { target.value = 2; } catch { threw = true; }
+  return [this === undefined, threw];
+}`;
+
+test.each([
+  'namespace N { export const value = 1; }',
+  'declare module "dep" { export const value: number; }',
+  'namespace Outer.Inner { export const value = 1; }',
+  'namespace Outer { namespace Inner { export type Value = number; } }',
+])('matches Babel module evidence inside TypeScript %s', declaration => {
+  for (const transforms of [undefined, { blockScoping: true }]) {
+    const code = output(
+      `${declaration}\n${receiverAndWriteProbe}`,
+      { typescript: 'strip', transforms },
+      'fixture.ts',
+    );
+    expect(code).toMatch(/use strict/);
+    expect(Function(code + ';return probe;')()()).toEqual([true, true]);
+  }
+});
+
+test.each(['namespace N { const value = 1; }', 'declare module "dep" { const value: number; }'])(
+  'keeps TypeScript containers without module evidence sloppy: %s',
+  declaration => {
+    const code = output(
+      `${declaration}\n${receiverAndWriteProbe}`,
+      { typescript: 'strip' },
+      'fixture.ts',
+    );
+    expect(code).not.toMatch(/use strict/);
+    expect(Function(code + ';return probe;')()()).toEqual([false, false]);
+  },
+);
+
+const flowObserver = defineNativePlugin({
+  name: 'observe-flow-output',
+  editEffect: 'none',
+  pre() {},
+});
+
+test.each([
+  ['', false],
+  ['import type T from "dep";', false],
+  ['export type T = string;', false],
+  ['"use strict"; export type T = string;', true],
+  ['import {type T} from "dep";', true],
+] as const)('uses Hermes module classification for Flow .mjs: %s', (declaration, strict) => {
+  const source = `// @flow\n${declaration}\n${receiverAndWriteProbe}`;
+  for (const phases of [
+    [],
+    [{ name: 'observe', plugins: [flowObserver] }],
+    [{ name: 'native', native: { comments: false } }],
+    [
+      { name: 'before', plugins: [flowObserver] },
+      { name: 'native', native: { comments: false, transforms: { blockScoping: true as const } } },
+      { name: 'after', plugins: [flowObserver] },
+    ],
+  ]) {
+    const result = transform(source, 'fixture.mjs', defineNativePipeline({ phases }));
+    expect(result.status).toBe('complete');
+    if (result.status !== 'complete') throw new Error(result.status);
+    expect(result.code.includes('use strict')).toBe(strict);
+    expect(Function(result.code + ';return probe;')()()).toEqual([strict, strict]);
+  }
+});
+
+test('Flow module classification keeps the original filename in development JSX', () => {
+  const code = output(
+    '// @flow\nconst view = <View/>;',
+    { jsx: 'classic-development' },
+    'fixture.mjs',
+  );
+  expect(code).not.toMatch(/use strict/);
+  expect(code).toContain('fixture.mjs');
+  expect(code).not.toContain('fixture.jsx');
+});
