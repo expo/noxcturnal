@@ -271,6 +271,7 @@ export function transform(
   const phasePlan = compilePhasePlan(pipeline);
   const originalSource = source;
   let parseFilename = parserFilename(filename, options.parser);
+  let moduleFilename: string | undefined;
   let parser = classifyForTransform(parseFilename, source);
   let flowErasureDiagnostic: Diagnostic | undefined;
   let adapterMap: NativeVlqMap | null = null;
@@ -292,6 +293,7 @@ export function transform(
       // its `@flow` comment, so the syntax has to be declared rather than
       // re-derived.
       parseFilename = parserFilename(filename, 'jsx');
+      moduleFilename = parseFilename;
       parser = classifyForTransform(parseFilename, source, 'jsx');
     } else {
       flowErasureDiagnostic = {
@@ -320,6 +322,7 @@ export function transform(
       adapterMap = adapted.map;
       adapterMetadata = adapted.metadata;
       parseFilename = parserFilename(filename, adapted.syntax);
+      if (parser.syntax === 'flow') moduleFilename = parseFilename;
       // The adapter's declared output syntax is authoritative even when it
       // intentionally preserves an `@flow` comment in otherwise plain JS.
       parser = classifyForTransform(parseFilename, source, adapted.syntax);
@@ -494,7 +497,11 @@ export function transform(
   };
   try {
     if (pipeline.phases.length === 0) {
-      parsedSource = new native.NativeParsedSource(source, parseFilename, filename);
+      parsedSource = new native.NativeParsedSource(
+        source,
+        parseFilename,
+        moduleFilename ?? filename,
+      );
       outputPreparation = parsedSource.outputPreparation();
       if (options.functionMap) initialFunctionMap = parsedSource.functionMap();
       parsedSource.validate();
@@ -512,6 +519,7 @@ export function transform(
           ...nativePreflightOptions(phase.native!),
           functionMap: options.functionMap && index === 0,
           sourceFilename: filename,
+          moduleFilename,
         })),
         inputMap?.mappings,
         inputMap?.names,
@@ -547,6 +555,7 @@ export function transform(
             ...nativePreflightOptions(batchPhase.native!),
             functionMap: options.functionMap && initialFunctionMap == null && index === 0,
             sourceFilename: filename,
+            moduleFilename,
           })),
         );
         // The rendered source stays resident; materialized lazily only if a later
@@ -575,14 +584,22 @@ export function transform(
         (options.functionMap && initialFunctionMap == null)
       ) {
         parsedSource?.close();
-        parsedSource = new native.NativeParsedSource(observationSource, parseFilename, filename);
+        parsedSource = new native.NativeParsedSource(
+          observationSource,
+          parseFilename,
+          moduleFilename ?? filename,
+        );
         if (options.functionMap && initialFunctionMap == null)
           initialFunctionMap = parsedSource.functionMap();
         if (usesSyntax) syntaxFacts = new Set(parsedSource.syntaxFacts());
         syntaxSource = observationSource;
       }
       if (reusableSession == null) {
-        parsedSource ??= new native.NativeParsedSource(observationSource, parseFilename, filename);
+        parsedSource ??= new native.NativeParsedSource(
+          observationSource,
+          parseFilename,
+          moduleFilename ?? filename,
+        );
         outputPreparation = parsedSource.outputPreparation();
       }
       const prepared = prepareApplicablePhase(phase, syntaxFacts);

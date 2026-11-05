@@ -12,6 +12,8 @@ pub struct NativePreflightOptions {
     pub function_map: Option<bool>,
     /// Original public filename, separate from the parser dialect path.
     pub source_filename: Option<String>,
+    /// Module parse context after adapting a source dialect, separate from its public filename.
+    pub module_filename: Option<String>,
     pub optimization_module_context: Option<bool>,
     pub react_compiler: Option<bool>,
     pub react_compiler_compilation_mode: Option<String>,

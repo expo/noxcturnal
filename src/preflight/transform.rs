@@ -433,8 +433,9 @@ fn transform_with_function_map(
     // reason. None of them misread TypeScript, so none of them need to move.
     let mut active_source_type = source_type(&filename, &source)?;
     if options
-        .source_filename
+        .module_filename
         .as_deref()
+        .or(options.source_filename.as_deref())
         .is_some_and(|filename| filename.ends_with(".mjs"))
     {
         active_source_type = active_source_type.with_module(true);
@@ -478,7 +479,11 @@ fn transform_with_function_map(
             let input_is_module = crate::output::is_module(
                 &parsed.program,
                 &parsed.module_record,
-                options.source_filename.as_deref().unwrap_or(&filename),
+                options
+                    .module_filename
+                    .as_deref()
+                    .or(options.source_filename.as_deref())
+                    .unwrap_or(&filename),
             );
             let mut program = parsed.program;
             let mut expression_decorator = false;
@@ -668,7 +673,11 @@ fn transform_with_function_map(
         crate::output::is_module(
             &parsed.program,
             &parsed.module_record,
-            options.source_filename.as_deref().unwrap_or(&filename),
+            options
+                .module_filename
+                .as_deref()
+                .or(options.source_filename.as_deref())
+                .unwrap_or(&filename),
         )
     };
     let conditional_jsx_without_work = conditional_jsx && !selects_source_rewrite && {

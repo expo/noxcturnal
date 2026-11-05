@@ -833,8 +833,7 @@ import type, { imp } from "bar";
 <Foo<T>></Foo>
 `,
     filename: 'input.mjs',
-    output: `'use strict';
-// @flow
+    output: `// @flow
 // @flow
 <Foo></Foo>;`,
     modes: [

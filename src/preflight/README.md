@@ -107,12 +107,16 @@ before optimization; text-edit output uses the existing input parse and places
 the directive inside output-section factory wrappers. No additional parse pass
 or consumer-scheduled phase is required.
 
-Classification includes `.mjs` files, static imports/exports, TypeScript
+Classification includes unadapted `.mjs` files, static imports/exports, TypeScript
 `import = require()`, `import.meta`, and top-level `await`/`await using`, while
-excluding nested awaits, dynamic imports, and CommonJS `export =`. Language
-emitters also recognize synthesized JSX imports. Flow follows Hermes' value
+excluding nested awaits, dynamic imports, and CommonJS `export =`. TypeScript
+namespace and ambient-module bodies contribute module declarations as in Babel;
+internal import aliases alone do not. Language emitters also recognize synthesized
+JSX imports. Flow follows Hermes' value
 import/export classification, including value imports with only type specifiers;
-`import type` and `export type` alone remain scripts. Explicit directives and
+`import type` and `export type` alone remain scripts even in `.mjs` files. The
+adapted parser context governs module detection while the original filename is
+retained for diagnostics and JSX metadata. Explicit directives and
 sloppy scripts/CommonJS are preserved.
 
 This is emission policy, independent of parser strictness assumptions and

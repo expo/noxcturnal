@@ -76,7 +76,7 @@ impl<'a> Visit<'a> for SyntaxFacts {
 pub struct NativeParsedSource {
     parsed: Option<OwnedProgram>,
     filename: String,
-    source_filename: Option<String>,
+    module_filename: Option<String>,
     // Syntax selection already walks this immutable tree. Carry its exact
     // allocation counts into semantic analysis instead of counting it again.
     semantic_stats: Cell<Option<Stats>>,
@@ -85,9 +85,9 @@ pub struct NativeParsedSource {
 #[napi]
 impl NativeParsedSource {
     #[napi(constructor)]
-    pub fn new(source: String, filename: String, source_filename: Option<String>) -> Result<Self> {
+    pub fn new(source: String, filename: String, module_filename: Option<String>) -> Result<Self> {
         let mut source_type = source_type(&filename, &source)?;
-        if source_filename
+        if module_filename
             .as_deref()
             .is_some_and(|filename| filename.ends_with(".mjs"))
         {
@@ -111,7 +111,7 @@ impl NativeParsedSource {
         Ok(Self {
             parsed: Some(parsed),
             filename,
-            source_filename,
+            module_filename,
             semantic_stats: Cell::new(None),
         })
     }
@@ -125,7 +125,7 @@ impl NativeParsedSource {
                 &owner.source,
                 &parsed.program,
                 &parsed.module_record,
-                self.source_filename.as_deref().unwrap_or(&self.filename),
+                self.module_filename.as_deref().unwrap_or(&self.filename),
             )
         }))
     }
