@@ -13,7 +13,9 @@ export function greeting(user: User): string { return user.name; }`,
     noxcturnal: {},
   });
   expect(result.canonical).toMatchInlineSnapshot(`
-    "export function greeting(user) {
+    ""use strict";
+
+    export function greeting(user) {
       return user.name;
     }"
   `);

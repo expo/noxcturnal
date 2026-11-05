@@ -7,7 +7,8 @@ test('lowers nullish coalescing', async () => {
       transforms: { nullishCoalescingOperator: { loose: false } },
     }),
   ).toMatchInlineSnapshot(`
-    "var _input;
+    "'use strict';
+    var _input;
     export const value = (_input = input) !== null && _input !== void 0 ? _input : fallback;"
   `);
 });

@@ -7,6 +7,7 @@ import vm from 'node:vm';
 
 import type { PreflightPlan } from '../../js/index';
 import { defineNativePipeline, transform } from '../../js/index';
+import { native } from '../../js/native/binding';
 
 const hermesParser = require('hermes-parser') as {
   parse(source: string, options: Record<string, unknown>): Parameters<typeof generate>[0];
@@ -51,17 +52,38 @@ type ExecutionOutcome =
 
 /** Compare one explicitly selected Babel transform with one native preflight plan. */
 export function alignBabelTransform(options: BabelAlignmentOptions): StructuralAlignment {
+  let flowModule = false;
+  const isFlow = native.classify(options.filename, options.source).syntax === 'flow';
   const reference = babel.transformSync(options.source, {
     babelrc: false,
     comments: true,
     compact: false,
     configFile: false,
     filename: options.filename,
-    plugins: options.plugins,
+    plugins: [
+      ...(isFlow
+        ? [
+            {
+              visitor: {
+                Program(path: babel.NodePath<babel.types.Program>) {
+                  flowModule = path.node.body.some(isValueModuleDeclaration);
+                },
+              },
+            },
+          ]
+        : []),
+      ...options.plugins,
+    ],
     sourceMaps: false,
   });
   if (reference?.code == null) throw new Error('Babel produced no output');
-  return alignOutput(options.source, options.filename, options.noxcturnal, reference.code);
+  return alignOutput(
+    options.source,
+    options.filename,
+    options.noxcturnal,
+    reference.code,
+    flowModule,
+  );
 }
 
 /** Assert a documented Noxcturnal boundary while proving the individual Babel transform accepts it. */
@@ -151,6 +173,8 @@ export function alignHermesFlowTransform(
     sourceType: 'module',
     transformOptions: { TransformEnumSyntax: { enable: true } },
   });
+  const program = babel.types.isFile(ast) ? ast.program : ast;
+  const flowModule = babel.types.isProgram(program) && program.body.some(isValueModuleDeclaration);
   // Keep Hermes' Babel AST through stripping: printing and reparsing it with
   // Babel would reject valid Hermes syntax such as a type parameter named `in`.
   const reference = babel.transformFromAstSync(
@@ -171,6 +195,7 @@ export function alignHermesFlowTransform(
     filename,
     filename.endsWith('x') ? { jsx: 'preserve' } : {},
     reference.code,
+    flowModule,
   );
 }
 
@@ -198,18 +223,16 @@ function alignOutput(
   filename: string,
   plan: PreflightPlan,
   reference: string,
+  flowModule = false,
 ): StructuralAlignment {
   const absoluteFilename = path.resolve(filename);
-  const result = transform(
-    source,
-    absoluteFilename,
-    defineNativePipeline({ phases: [{ name: 'alignment', native: plan }] }),
-  );
+  const pipeline = defineNativePipeline({ phases: [{ name: 'alignment', native: plan }] });
+  const result = transform(source, absoluteFilename, pipeline);
   if (result.status !== 'complete') {
     throw new Error(`Noxcturnal ${result.status}: ${result.reason}`);
   }
 
-  const babelCode = canonicalize(reference, absoluteFilename);
+  const babelCode = canonicalize(reference, absoluteFilename, true, flowModule);
   const noxcturnalCode = canonicalize(result.code, absoluteFilename);
   if (noxcturnalCode !== babelCode) {
     throw new Error(
@@ -219,7 +242,24 @@ function alignOutput(
   return { babel: reference, canonical: babelCode, noxcturnal: result.code };
 }
 
-function canonicalize(source: string, filename: string): string {
+function isValueModuleDeclaration(statement: babel.types.Statement): boolean {
+  if (babel.types.isImportDeclaration(statement)) {
+    return statement.importKind !== 'type' && statement.importKind !== 'typeof';
+  }
+  return (
+    babel.types.isExportDefaultDeclaration(statement) ||
+    ((babel.types.isExportNamedDeclaration(statement) ||
+      babel.types.isExportAllDeclaration(statement)) &&
+      statement.exportKind !== 'type')
+  );
+}
+
+function canonicalize(
+  source: string,
+  filename: string,
+  preserveModuleStrictness = false,
+  knownModule = false,
+): string {
   const ast = babel.parseSync(source, {
     babelrc: false,
     configFile: false,
@@ -228,6 +268,14 @@ function canonicalize(source: string, filename: string): string {
     sourceType: 'unambiguous',
   });
   if (ast == null) throw new Error(`Could not canonicalize ${filename}`);
+  // Native phases materialize ESM strictness; the reference keeps it implicit.
+  if (
+    preserveModuleStrictness &&
+    (knownModule || ast.program.sourceType === 'module') &&
+    !ast.program.directives.some(directive => directive.value.value === 'use strict')
+  ) {
+    ast.program.directives.push(babel.types.directive(babel.types.directiveLiteral('use strict')));
+  }
   scrubPrinterDetails(ast);
   return generate(ast, { comments: false, compact: false }).code.trim();
 }

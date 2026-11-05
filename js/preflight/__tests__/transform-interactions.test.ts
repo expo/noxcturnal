@@ -550,7 +550,7 @@ test('TypeScript enums and namespaces lower past the block-scoping postcondition
   assert.equal(result.status, 'complete');
   assert.doesNotMatch(result.code, /\b(?:let|const)\s/);
   const context: { answer?: unknown } = {};
-  new Function('globalThis', 'require', result.code.replace(/^export /gm, ''))(
+  new Function('globalThis', 'require', result.code.replace(/\bexport /gm, ''))(
     context,
     runtimeRequire,
   );

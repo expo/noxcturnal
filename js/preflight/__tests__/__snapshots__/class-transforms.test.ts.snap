@@ -214,10 +214,10 @@ exports[`every public native transform has an explicit ownership fixture 12`] = 
 
 exports[`every public native transform has an explicit ownership fixture 13`] = `
 {
-  "code": "import*as _value from"pkg";export{_value as value};",
+  "code": ""use strict";import*as _value from"pkg";export{_value as value};",
   "helpers": [],
   "map": {
-    "mappings": "qBAAuB,MAAvB,iBAAY",
+    "mappings": "kCAAuB,MAAvB,iBAAY",
     "names": [],
   },
   "name": "exportNamespaceFrom",

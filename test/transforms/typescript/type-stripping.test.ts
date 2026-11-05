@@ -8,7 +8,8 @@ export function greeting(user: User, status: Status = Status.Ready): string {
   return \`${'${user.name}: ${status}'}\`;
 }`;
   expect(await transformSource(source, 'input.ts', { typescript: 'strip' })).toMatchInlineSnapshot(`
-    "var Status = /* @__PURE__ */ (function (Status) {
+    "'use strict';
+    var Status = /* @__PURE__ */ (function (Status) {
       Status['Ready'] = 'ready';
       return Status;
     })(Status || {});

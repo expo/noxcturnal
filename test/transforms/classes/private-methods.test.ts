@@ -9,7 +9,8 @@ test('lowers private methods', async () => {
       transforms: { privateMethods: true },
     }),
   ).toMatchInlineSnapshot(`
-    "import _babelHelper from '@babel/runtime/helpers/classPrivateFieldLooseBase';
+    "'use strict';
+    import _babelHelper from '@babel/runtime/helpers/classPrivateFieldLooseBase';
     import _babelHelper2 from '@babel/runtime/helpers/classPrivateFieldLooseKey';
     var _classPrivateFieldLooseBase2 = {
       classPrivateFieldLooseBase: _babelHelper,

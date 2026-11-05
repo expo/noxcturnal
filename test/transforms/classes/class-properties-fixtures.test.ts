@@ -4232,7 +4232,8 @@ _defineProperty(A, 'name', 7);`,
             version: '7.29.7',
           },
         },
-        output: `import _defineProperty from '@babel/runtime/helpers/defineProperty';
+        output: `'use strict';
+import _defineProperty from '@babel/runtime/helpers/defineProperty';
 export default param => {
   var _App;
   return (
@@ -4263,7 +4264,8 @@ export default param => {
             version: '7.29.7',
           },
         },
-        output: `export default param => {
+        output: `'use strict';
+export default param => {
   var _App;
   return (
     (_App = class App {
@@ -4307,7 +4309,8 @@ export default class {
             version: '7.29.7',
           },
         },
-        output: `import _defineProperty from '@babel/runtime/helpers/defineProperty';
+        output: `'use strict';
+import _defineProperty from '@babel/runtime/helpers/defineProperty';
 var _Class;
 call(((_Class = class {}), _defineProperty(_Class, 'test', true), _Class));
 export default class _Class2 {}
@@ -4327,7 +4330,8 @@ _defineProperty(_Class2, 'test', true);`,
             version: '7.29.7',
           },
         },
-        output: `var _Class;
+        output: `'use strict';
+var _Class;
 call(((_Class = class {}), (_Class.test = true), _Class));
 export default class _Class2 {}
 _Class2.test = true;`,
@@ -4450,7 +4454,8 @@ export default class MyClass3 {
             version: '7.29.7',
           },
         },
-        output: `import _defineProperty from '@babel/runtime/helpers/defineProperty';
+        output: `'use strict';
+import _defineProperty from '@babel/runtime/helpers/defineProperty';
 class MyClass {
   constructor() {
     _defineProperty(this, 'myAsyncMethod', async () => {
@@ -4487,7 +4492,8 @@ export default class MyClass3 {
             version: '7.29.7',
           },
         },
-        output: `class MyClass {
+        output: `'use strict';
+class MyClass {
   constructor() {
     this.myAsyncMethod = async () => {
       console.log(this);
@@ -4655,7 +4661,8 @@ export default class MyClass2 {
             version: '7.29.7',
           },
         },
-        output: `import _defineProperty from '@babel/runtime/helpers/defineProperty';
+        output: `'use strict';
+import _defineProperty from '@babel/runtime/helpers/defineProperty';
 export class MyClass {}
 _defineProperty(MyClass, 'property', value);
 export default class MyClass2 {}
@@ -4675,7 +4682,8 @@ _defineProperty(MyClass2, 'property', value);`,
             version: '7.29.7',
           },
         },
-        output: `export class MyClass {}
+        output: `'use strict';
+export class MyClass {}
 MyClass.property = value;
 export default class MyClass2 {}
 MyClass2.property = value;`,
@@ -8429,7 +8437,8 @@ class Point {
             version: '7.29.7',
           },
         },
-        output: `import _classPrivateFieldInitSpec from '@babel/runtime/helpers/classPrivateFieldInitSpec';
+        output: `'use strict';
+import _classPrivateFieldInitSpec from '@babel/runtime/helpers/classPrivateFieldInitSpec';
 var _message = /* @__PURE__ */ new WeakMap();
 export class TypeError {
   constructor() {
@@ -8453,7 +8462,8 @@ export class TypeError {
             version: '7.29.7',
           },
         },
-        output: `import _classPrivateFieldLooseKey from '@babel/runtime/helpers/classPrivateFieldLooseKey';
+        output: `'use strict';
+import _classPrivateFieldLooseKey from '@babel/runtime/helpers/classPrivateFieldLooseKey';
 var _message = /* @__PURE__ */ _classPrivateFieldLooseKey('message');
 export class TypeError {
   constructor() {
@@ -12734,7 +12744,8 @@ class Foo {
             version: '7.29.7',
           },
         },
-        output: `export default param => {
+        output: `'use strict';
+export default param => {
   var _App, _props;
   return (
     (_App = class App {
@@ -12768,7 +12779,8 @@ class Foo {
             version: '7.29.7',
           },
         },
-        output: `import _classPrivateFieldLooseKey from '@babel/runtime/helpers/classPrivateFieldLooseKey';
+        output: `'use strict';
+import _classPrivateFieldLooseKey from '@babel/runtime/helpers/classPrivateFieldLooseKey';
 export default param => {
   var _App, _props;
   return (
@@ -24859,7 +24871,8 @@ export default class MyClass2 {
             version: '7.29.7',
           },
         },
-        output: `export class MyClass {}
+        output: `'use strict';
+export class MyClass {}
 var _property = { _: value };
 export default class MyClass2 {}
 var _property2 = { _: value };`,
@@ -24880,7 +24893,8 @@ var _property2 = { _: value };`,
             version: '7.29.7',
           },
         },
-        output: `import _classPrivateFieldLooseKey from '@babel/runtime/helpers/classPrivateFieldLooseKey';
+        output: `'use strict';
+import _classPrivateFieldLooseKey from '@babel/runtime/helpers/classPrivateFieldLooseKey';
 var _property = /* @__PURE__ */ _classPrivateFieldLooseKey('property');
 export class MyClass {}
 Object.defineProperty(MyClass, _property, {
@@ -27570,7 +27584,8 @@ export default class {
             version: '7.29.7',
           },
         },
-        output: `var _Class, _test;
+        output: `'use strict';
+var _Class, _test;
 call(((_Class = class {}), (_test = { _: true }), _Class));
 export default class _Class2 {}
 var _test2 = { _: true };`,
@@ -27591,7 +27606,8 @@ var _test2 = { _: true };`,
             version: '7.29.7',
           },
         },
-        output: `import _classPrivateFieldLooseKey from '@babel/runtime/helpers/classPrivateFieldLooseKey';
+        output: `'use strict';
+import _classPrivateFieldLooseKey from '@babel/runtime/helpers/classPrivateFieldLooseKey';
 var _Class, _test;
 call(
   ((_test = /* @__PURE__ */ _classPrivateFieldLooseKey('test')),
@@ -27739,7 +27755,8 @@ export default class MyClass3 {
             version: '7.29.7',
           },
         },
-        output: `import _classPrivateFieldInitSpec from '@babel/runtime/helpers/classPrivateFieldInitSpec';
+        output: `'use strict';
+import _classPrivateFieldInitSpec from '@babel/runtime/helpers/classPrivateFieldInitSpec';
 var _myAsyncMethod2;
 var _myAsyncMethod = /* @__PURE__ */ new WeakMap();
 class MyClass {
@@ -27782,7 +27799,8 @@ export default class MyClass3 {
             version: '7.29.7',
           },
         },
-        output: `import _classPrivateFieldLooseKey from '@babel/runtime/helpers/classPrivateFieldLooseKey';
+        output: `'use strict';
+import _classPrivateFieldLooseKey from '@babel/runtime/helpers/classPrivateFieldLooseKey';
 var _myAsyncMethod2;
 var _myAsyncMethod = /* @__PURE__ */ _classPrivateFieldLooseKey('myAsyncMethod');
 class MyClass {
@@ -28815,7 +28833,8 @@ class Foo {
             version: '7.29.7',
           },
         },
-        output: `import _defineProperty from '@babel/runtime/helpers/defineProperty';
+        output: `'use strict';
+import _defineProperty from '@babel/runtime/helpers/defineProperty';
 export class TypeError {
   constructor() {
     _defineProperty(this, 'message', void 0);
@@ -28836,7 +28855,8 @@ export class TypeError {
             version: '7.29.7',
           },
         },
-        output: `export class TypeError {
+        output: `'use strict';
+export class TypeError {
   constructor() {
     this.message = void 0;
   }
@@ -31728,7 +31748,8 @@ new ComputedField();`,
             version: '7.29.7',
           },
         },
-        output: `import _defineProperty from '@babel/runtime/helpers/defineProperty';
+        output: `'use strict';
+import _defineProperty from '@babel/runtime/helpers/defineProperty';
 export class Foo extends Bar {
   constructor(..._args) {
     super(..._args);
@@ -31751,7 +31772,8 @@ _defineProperty(Foo, 'foo', {});`,
             version: '7.29.7',
           },
         },
-        output: `export class Foo extends Bar {
+        output: `'use strict';
+export class Foo extends Bar {
   constructor(..._args) {
     super(..._args);
     this.test = args;

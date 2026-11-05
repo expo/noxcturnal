@@ -19,7 +19,8 @@ test('lowers inherited private brands referenced from a static block', async () 
       },
     }),
   ).toMatchInlineSnapshot(`
-    "import _babelHelper from '@babel/runtime/helpers/classPrivateFieldLooseBase';
+    "'use strict';
+    import _babelHelper from '@babel/runtime/helpers/classPrivateFieldLooseBase';
     import _babelHelper2 from '@babel/runtime/helpers/classPrivateFieldLooseKey';
     import _babelHelper3 from '@babel/runtime/helpers/checkInRHS';
     var _classPrivateFieldLooseBase2 = {

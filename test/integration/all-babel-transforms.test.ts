@@ -325,7 +325,10 @@ test('matches Babel when export namespace lowering shares a module with language
     },
   });
   assert.doesNotMatch(noxcturnalCode, /export \* as|\?\.|\?\?/);
-  assert.equal(canonicalize(noxcturnalCode, 'fixture.js'), canonicalize(babelCode, 'fixture.js'));
+  assert.equal(
+    canonicalize(noxcturnalCode, 'fixture.js'),
+    canonicalize(babelCode, 'fixture.js', true),
+  );
 });
 
 test('matches Babel when explicit resource management composes with block scoping', async () => {
@@ -366,7 +369,7 @@ function transformWithBabel(
   return result.code;
 }
 
-function canonicalize(source: string, filename: string): string {
+function canonicalize(source: string, filename: string, preserveModuleStrictness = false): string {
   const ast = babel.parseSync(source, {
     babelrc: false,
     configFile: false,
@@ -374,6 +377,13 @@ function canonicalize(source: string, filename: string): string {
     sourceType: 'module',
   });
   if (ast == null) throw new Error('Could not parse transformed output');
+  if (
+    preserveModuleStrictness &&
+    ast.program.body.some(statement => babel.types.isImportOrExportDeclaration(statement)) &&
+    !ast.program.directives.some(directive => directive.value.value === 'use strict')
+  ) {
+    ast.program.directives.push(babel.types.directive(babel.types.directiveLiteral('use strict')));
+  }
   scrubPrinterDetails(ast);
   return generate(ast, { comments: false, compact: false }).code;
 }

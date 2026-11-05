@@ -1933,7 +1933,8 @@ var _obj15 = _objectDestructuringEmpty(z),
 export let {a, b, c: {d, e: {f = 4}}} = {};
 `,
     filename: 'input.mjs',
-    output: `import _babelHelper from '@babel/runtime/helpers/objectDestructuringEmpty';
+    output: `'use strict';
+import _babelHelper from '@babel/runtime/helpers/objectDestructuringEmpty';
 var _objectDestructuringEmpty2 = { objectDestructuringEmpty: _babelHelper };
 function _objectDestructuringEmpty(t) {
   return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
@@ -2777,7 +2778,8 @@ if (true) ((_ref = [b, a]), (_arr = _toArray(_ref, 2, false)), (a = _arr[0]), (b
 const { Foo, Bar } = NestedObjects
 `,
     filename: 'input.mjs',
-    output: `import _babelHelper from '@babel/runtime/helpers/objectDestructuringEmpty';
+    output: `'use strict';
+import _babelHelper from '@babel/runtime/helpers/objectDestructuringEmpty';
 var _objectDestructuringEmpty2 = { objectDestructuringEmpty: _babelHelper };
 function _objectDestructuringEmpty(t) {
   return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
@@ -3597,7 +3599,8 @@ expect(xs).toEqual([0, 1, 2]);`,
 }
 `,
     filename: 'input.mjs',
-    output: `import _babelHelper from '@babel/runtime/helpers/objectDestructuringEmpty';
+    output: `'use strict';
+import _babelHelper from '@babel/runtime/helpers/objectDestructuringEmpty';
 var _objectDestructuringEmpty2 = { objectDestructuringEmpty: _babelHelper };
 function _objectDestructuringEmpty(t) {
   return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);

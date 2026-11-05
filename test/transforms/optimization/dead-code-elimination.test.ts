@@ -19,7 +19,8 @@ const retainedValue = 1;
 export { retainedValue };
 `;
   expect(await transformSource(source, 'input.js', options)).toMatchInlineSnapshot(`
-    "const retainedValue = 1;
+    "'use strict';
+    const retainedValue = 1;
     export { retainedValue };"
   `);
 });
@@ -32,7 +33,8 @@ export function declaration() { return arrow(); }
 export const expression = function () { return declaration(); };
 `;
   expect(await transformSource(source, 'input.js', options)).toMatchInlineSnapshot(`
-    "function referenced() {
+    "'use strict';
+    function referenced() {
       return 1;
     }
     const arrow = () => referenced();
@@ -53,7 +55,10 @@ const root = () => middle();
 export const value = 1;
 `;
   expect(await transformSource(source, 'input.js', options)).toMatchInlineSnapshot(
-    `"export const value = 1;"`,
+    `
+    "'use strict';
+    export const value = 1;"
+  `,
   );
 });
 
@@ -64,7 +69,8 @@ function right() { return left(); }
 export const value = 1;
 `;
   expect(await transformSource(source, 'input.js', options)).toMatchInlineSnapshot(`
-    "function left() {
+    "'use strict';
+    function left() {
       return right();
     }
     function right() {
@@ -82,7 +88,8 @@ class Example {}
 export const retained = 1;
 `;
   expect(await transformSource(source, 'input.js', options)).toMatchInlineSnapshot(`
-    "const value = compute();
+    "'use strict';
+    const value = compute();
     const object = { method() {} };
     class Example {}
     export const retained = 1;"
@@ -92,7 +99,8 @@ export const retained = 1;
 test('retains a default-exported function declaration', async () => {
   const source = `export default function entry() { return 1; }`;
   expect(await transformSource(source, 'input.js', options)).toMatchInlineSnapshot(`
-    "export default function entry() {
+    "'use strict';
+    export default function entry() {
       return 1;
     }"
   `);
@@ -105,7 +113,8 @@ const defaultValue = function () { return 2; };
 export { named, defaultValue as default };
 `;
   expect(await transformSource(source, 'input.js', options)).toMatchInlineSnapshot(`
-    "const named = () => 1;
+    "'use strict';
+    const named = () => 1;
     const defaultValue = function () {
       return 2;
     };
@@ -132,7 +141,8 @@ const unused = () => 1, retained = sideEffect(), value = 2;
 export { value };
 `;
   expect(await transformSource(source, 'input.js', options)).toMatchInlineSnapshot(`
-    "const retained = sideEffect(),
+    "'use strict';
+    const retained = sideEffect(),
       value = 2;
     export { value };"
   `);
@@ -147,7 +157,10 @@ function outer() {
 export const value = 1;
 `;
   expect(await transformSource(source, 'input.js', options)).toMatchInlineSnapshot(
-    `"export const value = 1;"`,
+    `
+    "'use strict';
+    export const value = 1;"
+  `,
   );
 });
 
@@ -160,7 +173,8 @@ function inspect() {
 export { inspect };
 `;
   expect(await transformSource(source, 'input.js', options)).toMatchInlineSnapshot(`
-    "function inspect() {
+    "'use strict';
+    function inspect() {
       const hidden = () => 42;
       return eval('hidden()');
     }
@@ -177,8 +191,9 @@ globalThis.eval('external()');
 export { marker };
 `;
   expect(await transformSource(source, 'input.js', options)).toMatchInlineSnapshot(`
-    "// eval('comment only')
-    const marker = \"eval('string only')\";
+    "'use strict';
+    // eval('comment only')
+    const marker = "eval('string only')";
     globalThis.eval('external()');
     export { marker };"
   `);
@@ -191,7 +206,8 @@ const unused = () => 42;
 export const value = 1;
 `;
   expect(await transformSource(source, 'input.js', options)).toMatchInlineSnapshot(`
-    "(0, eval)('external()');
+    "'use strict';
+    (0, eval)('external()');
     export const value = 1;"
   `);
 });

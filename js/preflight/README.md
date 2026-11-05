@@ -9,3 +9,8 @@ This directory owns the public configuration contract in `types.ts` and `schema.
 Module context allows dead-code elimination to treat a script as code a bundler may later wrap. It does not change the file's parsing semantics.
 
 Class lowering also handles fields and private state. Optional chaining and nullish coalescing must agree on loose settings. Preserve these relationships when extending the schema.
+
+Module strictness is automatic output preparation, independent of native plan
+selection. Empty and visitor-only pipelines receive the same policy. Scripts and
+CommonJS retain their existing strictness. See the native output contract for
+classification and emission details.

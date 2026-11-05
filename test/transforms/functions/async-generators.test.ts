@@ -9,7 +9,8 @@ test('lowers async generator functions', async () => {
       transforms: { asyncGeneratorFunctions: true },
     }),
   ).toMatchInlineSnapshot(`
-    "import _awaitAsyncGenerator from '@babel/runtime/helpers/awaitAsyncGenerator';
+    "'use strict';
+    import _awaitAsyncGenerator from '@babel/runtime/helpers/awaitAsyncGenerator';
     import _wrapAsyncGenerator from '@babel/runtime/helpers/wrapAsyncGenerator';
     export function values() {
       return _values.apply(this, arguments);

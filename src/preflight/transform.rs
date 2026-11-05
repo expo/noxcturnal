@@ -367,14 +367,6 @@ fn transform_with_function_map(
         let filename = filename.to_ascii_lowercase();
         filename.ends_with(".jsx") || filename.ends_with(".tsx")
     });
-    if !has_active_operation(&options) && options.function_map != Some(true) {
-        return Ok(identity_result(
-            source,
-            standalone_identity_map,
-            normalized_javascript,
-            initial_jsx,
-        ));
-    }
     if options.react_compiler == Some(true) && !cfg!(feature = "react_compiler") {
         return Ok(unsupported("react-compiler-not-built", [] as [String; 0]));
     }
@@ -440,6 +432,13 @@ fn transform_with_function_map(
     // two against what Babel emits. The React Compiler reads JSX for the same
     // reason. None of them misread TypeScript, so none of them need to move.
     let mut active_source_type = source_type(&filename, &source)?;
+    if options
+        .source_filename
+        .as_deref()
+        .is_some_and(|filename| filename.ends_with(".mjs"))
+    {
+        active_source_type = active_source_type.with_module(true);
+    }
     let mut output_normalized_javascript = normalized_javascript;
     if normalized_javascript {
         active_source_type = active_source_type
@@ -476,6 +475,11 @@ fn transform_with_function_map(
                     &parsed.program,
                 ));
             }
+            let input_is_module = crate::output::is_module(
+                &parsed.program,
+                !parsed.module_record.import_metas.is_empty(),
+                options.source_filename.as_deref().unwrap_or(&filename),
+            );
             let mut program = parsed.program;
             let mut expression_decorator = false;
             let has_decorators = if possible_decorators {
@@ -587,6 +591,11 @@ fn transform_with_function_map(
                         // unminified whatever the caller asked for: the final codegen
                         // does the minifying, and readable input keeps the rewrites'
                         // own textual guards honest.
+                        crate::output::materialize_module_strictness(
+                            &language_allocator,
+                            &mut program,
+                            input_is_module,
+                        );
                         let (printed, layer) = render_program(
                             &program,
                             &filename,
@@ -654,14 +663,36 @@ fn transform_with_function_map(
     // Reuse its comment list instead of scanning text (which also matches strings).
     let strip_comments = options.comments == Some(false)
         && !final_program.borrow_dependent().program.comments.is_empty();
-    if !requires_generic_pipeline(&options) {
+    let input_is_module = {
+        let parsed = final_program.borrow_dependent();
+        crate::output::is_module(
+            &parsed.program,
+            !parsed.module_record.import_metas.is_empty(),
+            options.source_filename.as_deref().unwrap_or(&filename),
+        )
+    };
+    let conditional_jsx_without_work = conditional_jsx && !selects_source_rewrite && {
+        let mut detector = JsxDetector(false);
+        detector.visit_program(&final_program.borrow_dependent().program);
+        !detector.0
+    };
+    let generic_pipeline = requires_generic_pipeline(&options) && !conditional_jsx_without_work;
+    if !generic_pipeline {
+        let inserted_strictness = final_program.with_dependent_mut(|owner, parsed| {
+            crate::output::materialize_module_strictness(
+                &owner.allocator,
+                &mut parsed.program,
+                input_is_module,
+            )
+        });
         let checked_scoping = crate::syntax::validation::validate_program(
             &final_program.borrow_dependent().program,
             "native-phase",
             &final_program.borrow_owner().allocator,
         )?
         .scoping;
-        let should_render = options.constant_folding == Some(true)
+        let should_render = inserted_strictness
+            || options.constant_folding == Some(true)
             || options.dead_code_elimination == Some(true)
             || options.compact == Some(true)
             || strip_comments;
@@ -753,22 +784,6 @@ fn transform_with_function_map(
         };
         structural_custom_helper_requests.prepend(object_spread_helper_requests);
         structural_custom_helper_requests.prepend(decorator_helper_requests);
-        if conditional_jsx {
-            let mut detector = JsxDetector(false);
-            detector.visit_program(&program);
-            // A conditional JSX-only phase can return the original bytes
-            // without printing. A fused source rewrite still has work even
-            // when this particular file contains no JSX.
-            if !detector.0 && !selects_source_rewrite {
-                crate::syntax::validation::validate_program(&program, "native-phase", allocator)?;
-                return Ok(identity_result(
-                    source.to_owned(),
-                    standalone_identity_map,
-                    output_normalized_javascript,
-                    false,
-                ));
-            }
-        }
         if options.classes != Some(true)
             && options.class_properties == Some(true)
             && options.class_properties_loose == Some(true)
@@ -1404,6 +1419,7 @@ fn transform_with_function_map(
                 ));
             }
         }
+        let inserted_strictness = crate::output::materialize_module_strictness(allocator, &mut program, input_is_module);
         if options.constant_folding == Some(true) || options.dead_code_elimination == Some(true) {
             optimize::run(
                 allocator,
@@ -1435,7 +1451,8 @@ fn transform_with_function_map(
             || (options.class_properties == Some(true) && options.classes != Some(true))
             || (options.private_methods == Some(true) && options.classes != Some(true))
             || (options.private_property_in_object == Some(true) && options.classes != Some(true));
-        if rewrite_layers.is_empty()
+        if !inserted_strictness
+            && rewrite_layers.is_empty()
             && helper_requests.is_empty()
             && !had_block_scoping_syntax
             && !had_object_spread_syntax
@@ -1793,16 +1810,6 @@ fn validate_option_ownership(options: &NativePreflightOptions) -> Result<()> {
     Ok(())
 }
 
-fn has_active_operation(options: &NativePreflightOptions) -> bool {
-    requires_generic_pipeline(options)
-        || options.compact == Some(true)
-        || options.comments == Some(false)
-        || options.constant_folding == Some(true)
-        || options.dead_code_elimination == Some(true)
-        || options.regexp_look_behind == Some(true)
-        || options.regexp_match_indices == Some(true)
-}
-
 fn requires_generic_pipeline(options: &NativePreflightOptions) -> bool {
     options.react_compiler == Some(true)
         || options.react_refresh == Some(true)
@@ -1922,8 +1929,10 @@ fn render_program(
             let allocator = Allocator::default();
             let last_header = program
                 .directives
-                .last()
-                .map_or(0, |directive| directive.span.end);
+                .iter()
+                .map(|directive| directive.span.end)
+                .max()
+                .unwrap_or(0);
             let mut header = Parser::new(&allocator, "", program.source_type)
                 .parse()
                 .program;

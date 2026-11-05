@@ -24,8 +24,10 @@ test.each(['preserve', 'classic', 'automatic', 'automatic-if-present'] as const)
     const source = 'export const identity = <T>(value: T) => value;';
     const result = transform(source, 'fixture.ts', nativePipeline('fixture.ts', { jsx }).pipeline);
     assert.equal(result.status, 'complete');
-    if (jsx === 'automatic-if-present') assert.equal(result.code, source);
-    else assert.match(result.code, /identity = \(value\) => value/);
+    if (jsx === 'automatic-if-present') {
+      assert.match(result.code, /use strict/);
+      assert.match(result.code, /identity = <T>\(value: T\) => value/);
+    } else assert.match(result.code, /identity = \(value\) => value/);
   },
 );
 

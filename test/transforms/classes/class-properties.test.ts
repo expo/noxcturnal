@@ -9,7 +9,8 @@ test('lowers class properties', async () => {
       transforms: { classProperties: { loose: true } },
     }),
   ).toMatchInlineSnapshot(`
-    "import _defineProperty from '@babel/runtime/helpers/defineProperty';
+    "'use strict';
+    import _defineProperty from '@babel/runtime/helpers/defineProperty';
     export class Counter {
       constructor() {
         this.value = 0;

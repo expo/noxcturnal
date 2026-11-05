@@ -1422,12 +1422,12 @@ function test() {
 }
 `,
     filename: 'input.mjs',
-    output: `if (true) {
+    output: `'use strict';
+if (true) {
   function run() {
     return true;
   }
 }
-
 function test() {
   return run();
 }`,
@@ -4972,7 +4972,8 @@ switch (true) {
 }
 `,
     filename: 'input.js',
-    output: `{
+    output: `'use strict';
+{
   await using foo = null;
 }`,
     modes: [
@@ -5620,7 +5621,8 @@ export function bar() {
 }
 `,
     filename: 'input.mjs',
-    output: `import { foo } from 'somewhere';
+    output: `'use strict';
+import { foo } from 'somewhere';
 // foo might call "bar"
 foo();
 a;

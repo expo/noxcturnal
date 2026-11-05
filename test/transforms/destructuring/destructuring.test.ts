@@ -9,7 +9,8 @@ test('lowers destructuring', async () => {
       transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
-    "import _babelHelper from '@babel/runtime/helpers/slicedToArray';
+    "'use strict';
+    import _babelHelper from '@babel/runtime/helpers/slicedToArray';
     import _babelHelper2 from '@babel/runtime/helpers/toConsumableArray';
     import _babelHelper3 from '@babel/runtime/helpers/objectDestructuringEmpty';
     var _toArray2 = {

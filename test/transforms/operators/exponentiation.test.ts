@@ -6,7 +6,10 @@ test('lowers exponentiation', async () => {
     await transformSource(`export const value = base ** power;`, 'input.js', {
       transforms: { exponentiationOperator: true },
     }),
-  ).toMatchInlineSnapshot(`"export const value = Math.pow(base, power);"`);
+  ).toMatchInlineSnapshot(`
+    "'use strict';
+    export const value = Math.pow(base, power);"
+  `);
 });
 
 test('preserves BigInt exponentiation instead of emitting incompatible Math.pow calls', async () => {
@@ -14,5 +17,8 @@ test('preserves BigInt exponentiation instead of emitting incompatible Math.pow 
     await transformSource(`export const value = 2n ** 64n;`, 'input.js', {
       transforms: { exponentiationOperator: true },
     }),
-  ).toMatchInlineSnapshot(`"export const value = 2n ** 64n;"`);
+  ).toMatchInlineSnapshot(`
+    "'use strict';
+    export const value = 2n ** 64n;"
+  `);
 });

@@ -3006,7 +3006,8 @@ export var [ dd, ee, ...ff ] = ads;
             version: '7.29.7',
           },
         },
-        output: `import _objectWithoutProperties from '@babel/runtime/helpers/objectWithoutProperties';
+        output: `'use strict';
+import _objectWithoutProperties from '@babel/runtime/helpers/objectWithoutProperties';
 // ExportNamedDeclaration
 export var _ref = (0, asdf2),
   { b } = _ref,
@@ -3030,7 +3031,8 @@ export var [dd, ee, ...ff] = ads;`,
             version: '7.29.7',
           },
         },
-        output: `import _objectWithoutProperties from '@babel/runtime/helpers/objectWithoutProperties';
+        output: `'use strict';
+import _objectWithoutProperties from '@babel/runtime/helpers/objectWithoutProperties';
 // ExportNamedDeclaration
 export var _ref = (0, asdf2),
   { b } = _ref,
@@ -3054,7 +3056,8 @@ export var [dd, ee, ...ff] = ads;`,
             version: '7.29.7',
           },
         },
-        output: `import _babelHelper from '@babel/runtime/helpers/objectDestructuringEmpty';
+        output: `'use strict';
+import _babelHelper from '@babel/runtime/helpers/objectDestructuringEmpty';
 import _babelHelper2 from '@babel/runtime/helpers/objectWithoutPropertiesLoose';
 var _objectDestructuringEmpty2 = { objectDestructuringEmpty: _babelHelper };
 function _objectDestructuringEmpty(t) {
@@ -3093,7 +3096,8 @@ export var [dd, ee, ...ff] = ads;`,
             version: '7.29.7',
           },
         },
-        output: `import _babelHelper from '@babel/runtime/helpers/objectDestructuringEmpty';
+        output: `'use strict';
+import _babelHelper from '@babel/runtime/helpers/objectDestructuringEmpty';
 import _babelHelper2 from '@babel/runtime/helpers/objectWithoutPropertiesLoose';
 var _objectDestructuringEmpty2 = { objectDestructuringEmpty: _babelHelper };
 function _objectDestructuringEmpty(t) {
@@ -14539,7 +14543,8 @@ console.log(props);
             version: '7.29.7',
           },
         },
-        output: `import props from 'props';
+        output: `'use strict';
+import props from 'props';
 import _objectDestructuringEmpty from '@babel/runtime/helpers/objectDestructuringEmpty';
 import _extends from '@babel/runtime/helpers/extends';
 console.log(props);
@@ -14564,7 +14569,8 @@ console.log(props);
             version: '7.29.7',
           },
         },
-        output: `import props from 'props';
+        output: `'use strict';
+import props from 'props';
 import _objectDestructuringEmpty from '@babel/runtime/helpers/objectDestructuringEmpty';
 import _extends from '@babel/runtime/helpers/extends';
 console.log(props);
@@ -14589,7 +14595,8 @@ console.log(props);
             version: '7.29.7',
           },
         },
-        output: `import _babelHelper from '@babel/runtime/helpers/objectDestructuringEmpty';
+        output: `'use strict';
+import _babelHelper from '@babel/runtime/helpers/objectDestructuringEmpty';
 import _babelHelper2 from '@babel/runtime/helpers/extends';
 var _objectDestructuringEmpty2 = { objectDestructuringEmpty: _babelHelper };
 function _objectDestructuringEmpty(t) {
@@ -14619,7 +14626,8 @@ console.log(props);
             version: '7.29.7',
           },
         },
-        output: `import _babelHelper from '@babel/runtime/helpers/objectDestructuringEmpty';
+        output: `'use strict';
+import _babelHelper from '@babel/runtime/helpers/objectDestructuringEmpty';
 import _babelHelper2 from '@babel/runtime/helpers/extends';
 var _objectDestructuringEmpty2 = { objectDestructuringEmpty: _babelHelper };
 function _objectDestructuringEmpty(t) {

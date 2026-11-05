@@ -1051,7 +1051,8 @@ for (const elm of array) {
 }
 `,
     filename: 'input.mjs',
-    output: `var _createForOfIteratorHelper = (function () {
+    output: `'use strict';
+var _createForOfIteratorHelper = (function () {
   var arrayLikeToArray = function (r, a) {
       (a == null || a > r.length) && (a = r.length);
       for (var e = 0, n = Array(a); e < a; e++) n[e] = r[e];

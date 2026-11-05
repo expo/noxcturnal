@@ -49,7 +49,8 @@ test('composes the native portion of the legacy Hermes language profile in one p
     }
   `;
   expect(await transformSource(source, 'input.js', hermesV0)).toMatchInlineSnapshot(`
-    "import _asyncToGenerator from '@babel/runtime/helpers/asyncToGenerator';
+    "'use strict';
+    import _asyncToGenerator from '@babel/runtime/helpers/asyncToGenerator';
     import _asyncIterator from '@babel/runtime/helpers/asyncIterator';
     import _awaitAsyncGenerator from '@babel/runtime/helpers/awaitAsyncGenerator';
     import _wrapAsyncGenerator from '@babel/runtime/helpers/wrapAsyncGenerator';
@@ -173,7 +174,8 @@ test('composes the native portion of the modern Hermes language profile', async 
     for (let index = 0; index < 2; index++) queue(() => index);
   `;
   expect(await transformSource(source, 'input.js', hermesV1)).toMatchInlineSnapshot(`
-    "import _asyncIterator from '@babel/runtime/helpers/asyncIterator';
+    "'use strict';
+    import _asyncIterator from '@babel/runtime/helpers/asyncIterator';
     import _awaitAsyncGenerator from '@babel/runtime/helpers/awaitAsyncGenerator';
     import _wrapAsyncGenerator from '@babel/runtime/helpers/wrapAsyncGenerator';
     var _staticBlock;
@@ -233,7 +235,8 @@ test('composes the native portion of the modern Hermes language profile', async 
 test('composes the non-Hermes object rest and spread profile', async () => {
   const source = `export const merge = ({ ignored, ...rest }, extra) => ({ ...rest, ...extra });`;
   expect(await transformSource(source, 'input.js', web)).toMatchInlineSnapshot(`
-    "import _babelHelper from '@babel/runtime/helpers/objectDestructuringEmpty';
+    "'use strict';
+    import _babelHelper from '@babel/runtime/helpers/objectDestructuringEmpty';
     import _babelHelper2 from '@babel/runtime/helpers/objectWithoutPropertiesLoose';
     var _objectDestructuringEmpty2 = { objectDestructuringEmpty: _babelHelper };
     function _objectDestructuringEmpty(t) {
@@ -271,7 +274,8 @@ test('composes TypeScript with the automatic JSX runtime', async () => {
       jsxImportSource: 'react',
     }),
   ).toMatchInlineSnapshot(`
-    "import { jsx as _jsx } from 'react/jsx-runtime';
+    "'use strict';
+    import { jsx as _jsx } from 'react/jsx-runtime';
     export function App({ value }) {
       return /* @__PURE__ */ _jsx(View, { value });
     }"
@@ -286,6 +290,7 @@ test('composes Flow erasure with the classic React runtime', async () => {
   `;
   expect(await transformSource(source, 'App.js', { jsx: 'classic' })).toMatchInlineSnapshot(`
     "// @flow
+    'use strict';
     export function App({ value }) {
       return /* @__PURE__ */ React.createElement(View, { value });
     }"
@@ -309,7 +314,8 @@ test('composes React Compiler with TypeScript and automatic JSX', async () => {
       },
     }),
   ).toMatchInlineSnapshot(`
-    "import { c as _c } from 'react/compiler-runtime';
+    "'use strict';
+    import { c as _c } from 'react/compiler-runtime';
     import { jsx as _jsx } from 'react/jsx-runtime';
     export function App(t0) {
       const $ = _c(3);
@@ -347,7 +353,8 @@ test('composes React Refresh, automatic JSX, and async lowering', async () => {
       transforms: { asyncFunctions: true },
     }),
   ).toMatchInlineSnapshot(`
-    "import { useState } from 'react';
+    "'use strict';
+    import { useState } from 'react';
     import _asyncToGenerator from '@babel/runtime/helpers/asyncToGenerator';
     var _jsxFileName = 'App.jsx';
     import { jsxDEV as _jsxDEV } from 'react/jsx-dev-runtime';
@@ -394,7 +401,8 @@ test('supports inline and runtime helper profiles', async () => {
     }),
   }).toMatchInlineSnapshot(`
     {
-      "inline": "var babelHelpers = (() => {
+      "inline": "'use strict';
+    var babelHelpers = (() => {
       var y = {
           asyncToGenerator: function (r, u) {
             function x(i, f, p, o, a, s, e) {
@@ -442,7 +450,8 @@ test('supports inline and runtime helper profiles', async () => {
       });
       return _read.apply(this, arguments);
     }",
-      "runtime": "import _asyncToGenerator from '@babel/runtime/helpers/asyncToGenerator';
+      "runtime": "'use strict';
+    import _asyncToGenerator from '@babel/runtime/helpers/asyncToGenerator';
     export function read(_x) {
       return _read.apply(this, arguments);
     }

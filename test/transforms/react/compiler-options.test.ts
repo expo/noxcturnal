@@ -26,7 +26,8 @@ test('supports infer compilation mode', async () => {
       jsx: 'preserve',
     }),
   ).toMatchInlineSnapshot(`
-    "import { c as _c } from 'react/compiler-runtime';
+    "'use strict';
+    import { c as _c } from 'react/compiler-runtime';
     export function Greeting(t0) {
       const $ = _c(2);
       const { name } = t0;
@@ -57,7 +58,8 @@ export function useEventListener(listener) {
       reactCompiler: compiler({ panicThreshold: 'none' }),
       jsx: 'preserve',
     }),
-  ).toBe(`import { useEffect, useRef } from 'react';
+  ).toBe(`'use strict';
+import { useEffect, useRef } from 'react';
 export function useEventListener(listener) {
   const listenerRef = useRef(listener);
   listenerRef.current = listener;
@@ -76,7 +78,8 @@ test('supports syntax compilation mode', async () => {
       },
     ),
   ).toMatchInlineSnapshot(`
-    "import { c as _c } from 'react/compiler-runtime';
+    "'use strict';
+    import { c as _c } from 'react/compiler-runtime';
     export function Greeting() {
       'use memo';
       const $ = _c(1);
@@ -99,7 +102,8 @@ test('supports annotation compilation mode', async () => {
       jsx: 'preserve',
     }),
   ).toMatchInlineSnapshot(`
-    "export function Greeting({ name }) {
+    "'use strict';
+    export function Greeting({ name }) {
       const message = 'Hello, ' + name;
       return <Text>{message}</Text>;
     }"
@@ -112,7 +116,8 @@ test('supports all compilation mode', async () => {
       reactCompiler: compiler({ compilationMode: 'all' }),
     }),
   ).toMatchInlineSnapshot(`
-    "export function calculate(value) {
+    "'use strict';
+    export function calculate(value) {
       return value * 2;
     }"
   `);
@@ -125,7 +130,8 @@ test('targets React 17', async () => {
       jsx: 'preserve',
     }),
   ).toMatchInlineSnapshot(`
-    "import { c as _c } from 'react-compiler-runtime';
+    "'use strict';
+    import { c as _c } from 'react-compiler-runtime';
     export function Greeting(t0) {
       const $ = _c(2);
       const { name } = t0;
@@ -150,7 +156,8 @@ test('targets React 18', async () => {
       jsx: 'preserve',
     }),
   ).toMatchInlineSnapshot(`
-    "import { c as _c } from 'react-compiler-runtime';
+    "'use strict';
+    import { c as _c } from 'react-compiler-runtime';
     export function Greeting(t0) {
       const $ = _c(2);
       const { name } = t0;
@@ -175,7 +182,8 @@ test('targets React 19', async () => {
       jsx: 'preserve',
     }),
   ).toMatchInlineSnapshot(`
-    "import { c as _c } from 'react/compiler-runtime';
+    "'use strict';
+    import { c as _c } from 'react/compiler-runtime';
     export function Greeting(t0) {
       const $ = _c(2);
       const { name } = t0;
@@ -200,7 +208,8 @@ test('supports the none panic threshold', async () => {
       jsx: 'preserve',
     }),
   ).toMatchInlineSnapshot(`
-    "import { c as _c } from 'react/compiler-runtime';
+    "'use strict';
+    import { c as _c } from 'react/compiler-runtime';
     export function Greeting(t0) {
       const $ = _c(2);
       const { name } = t0;
@@ -225,7 +234,8 @@ test('supports the critical-errors panic threshold', async () => {
       jsx: 'preserve',
     }),
   ).toMatchInlineSnapshot(`
-    "import { c as _c } from 'react/compiler-runtime';
+    "'use strict';
+    import { c as _c } from 'react/compiler-runtime';
     export function Greeting(t0) {
       const $ = _c(2);
       const { name } = t0;
@@ -250,7 +260,8 @@ test('supports the all-errors panic threshold', async () => {
       jsx: 'preserve',
     }),
   ).toMatchInlineSnapshot(`
-    "import { c as _c } from 'react/compiler-runtime';
+    "'use strict';
+    import { c as _c } from 'react/compiler-runtime';
     export function Greeting(t0) {
       const $ = _c(2);
       const { name } = t0;
@@ -275,7 +286,8 @@ test('can enable source-file cache resets', async () => {
       jsx: 'preserve',
     }),
   ).toMatchInlineSnapshot(`
-    "import { c as _c } from 'react/compiler-runtime';
+    "'use strict';
+    import { c as _c } from 'react/compiler-runtime';
     export function Greeting(t0) {
       const $ = _c(3);
       if ($[0] !== '41b93c60e698291325bbaf4e117cdd33c4f8f530') {
@@ -304,7 +316,8 @@ test('can disable source-file cache resets', async () => {
       jsx: 'preserve',
     }),
   ).toMatchInlineSnapshot(`
-    "import { c as _c } from 'react/compiler-runtime';
+    "'use strict';
+    import { c as _c } from 'react/compiler-runtime';
     export function Greeting(t0) {
       const $ = _c(2);
       const { name } = t0;
@@ -330,7 +343,8 @@ test('honors custom opt-out directives', async () => {
       jsx: 'preserve',
     }),
   ).toMatchInlineSnapshot(`
-    "export function Greeting() {
+    "'use strict';
+    export function Greeting() {
       'use no optimize';
       return <Text />;
     }"
@@ -346,7 +360,8 @@ export function CustomOptOut() { 'widget'; return <Text />; }`;
       jsx: 'preserve',
     }),
   ).toMatchInlineSnapshot(`
-    "export function DefaultOptOut() {
+    "'use strict';
+    export function DefaultOptOut() {
       'use no memo';
       return <Text />;
     }

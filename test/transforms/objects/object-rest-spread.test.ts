@@ -12,7 +12,8 @@ test('lowers object rest and spread', async () => {
       },
     }),
   ).toMatchInlineSnapshot(`
-    "import _babelHelper from '@babel/runtime/helpers/objectDestructuringEmpty';
+    "'use strict';
+    import _babelHelper from '@babel/runtime/helpers/objectDestructuringEmpty';
     import _babelHelper2 from '@babel/runtime/helpers/objectWithoutPropertiesLoose';
     var _objectDestructuringEmpty2 = { objectDestructuringEmpty: _babelHelper };
     function _objectDestructuringEmpty(t) {
