@@ -53,6 +53,8 @@ flowTest('preserves enum member references in surrounding code', async () => {
     ),
   ).toMatchInlineSnapshot(`
     "// @flow
+
+    'use strict';
     const Status = require('flow-enums-runtime').Mirrored(['Active', 'Off']);
     export const active = Status.Active;"
   `);

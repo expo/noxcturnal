@@ -833,7 +833,8 @@ import type, { imp } from "bar";
 <Foo<T>></Foo>
 `,
     filename: 'input.mjs',
-    output: `// @flow
+    output: `'use strict';
+// @flow
 // @flow
 <Foo></Foo>;`,
     modes: [
@@ -965,6 +966,8 @@ export type * from "foo";
 `,
     filename: 'input.mjs',
     output: `// @flow
+
+'use strict';
 function foo1(numVal) {}
 function foo2(numVal) {}
 function foo3(numVal, strVal) {}
