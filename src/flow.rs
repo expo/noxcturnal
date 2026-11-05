@@ -191,6 +191,39 @@ mod tests {
     use super::*;
 
     #[test]
+    fn value_modules_preserve_strictness_and_prologues() {
+        for source in [
+            "// @flow\nimport {type T} from 'dep';function probe(){return this;}",
+            "#!/usr/bin/env node\n// @flow\n'use client';import {type T} from 'dep';function probe(){return this;}",
+            "// @flow\n'use strict';export type T=string;",
+            "// @flow\n'é';import {type T} from 'dep';function probe(){return this;}",
+        ] {
+            let result = erase(source, "fixture.js", None).unwrap();
+            assert_eq!(result.status, "erased");
+            let code = result.code.unwrap();
+            let allocator = oxc_allocator::Allocator::default();
+            let parsed =
+                oxc_parser::Parser::new(&allocator, &code, oxc_span::SourceType::unambiguous())
+                    .parse();
+            assert!(parsed.diagnostics.is_empty(), "{code}");
+            assert_eq!(
+                parsed
+                    .program
+                    .directives
+                    .iter()
+                    .filter(|directive| directive.directive == "use strict")
+                    .count(),
+                1,
+                "{code}"
+            );
+            if source.contains("use client") {
+                assert_eq!(parsed.program.directives[0].directive, "use client");
+            }
+            assert!(result.map.is_some());
+        }
+    }
+
+    #[test]
     fn erases_and_reports_coverage() {
         let result = erase("// @flow\nconst x: number = 1;\n", "a.js", Some("none")).unwrap();
         assert_eq!(result.status, "erased");

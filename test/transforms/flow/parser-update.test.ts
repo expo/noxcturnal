@@ -55,3 +55,31 @@ test('readonly deletion maps retain UTF-16 positions after comments and non-ASCI
     });
   }
 });
+
+test('module directive insertion is unmapped and retains following UTF-16 positions', () => {
+  const source =
+    '#!/usr/bin/env node\n// @flow\n"é";\nimport {type T} from "dep";\nfunction probe(){return this;}';
+  const erased = native.nativeFlowErase(source, 'fixture.js', 'character');
+  expect(erased.status).toBe('erased');
+  const lines = erased.code!.split('\n');
+  const trace = new TraceMap({
+    version: 3,
+    sources: ['fixture.js'],
+    names: erased.map!.names,
+    mappings: erased.map!.mappings,
+  });
+  const strictLine = lines.findIndex(line => line.includes('use strict'));
+  expect(
+    originalPositionFor(trace, {
+      line: strictLine + 1,
+      column: lines[strictLine].indexOf('use strict'),
+    }),
+  ).toEqual({ source: null, line: null, column: null, name: null });
+  const functionLine = lines.findIndex(line => line.includes('function probe'));
+  expect(
+    originalPositionFor(trace, {
+      line: functionLine + 1,
+      column: lines[functionLine].indexOf('function'),
+    }),
+  ).toEqual({ source: 'fixture.js', line: 5, column: 0, name: null });
+});

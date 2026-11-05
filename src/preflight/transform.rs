@@ -3714,6 +3714,33 @@ export function App({{value}}){{
     }
 
     #[test]
+    fn preserves_executable_module_strictness() {
+        for (source, strict) in [
+            ("export function probe(){return this;}", true),
+            ("import 'dep';", true),
+            ("export {};", true),
+            ("const url = import.meta.url;", true),
+            ("await work();", true),
+            ("async function probe(){await work();}", false),
+            ("module.exports = function(){return this;};", false),
+            ("function probe(){return this;}", false),
+        ] {
+            let result = transform(
+                source.into(),
+                "fixture.js".into(),
+                NativePreflightOptions::default(),
+            )
+            .unwrap();
+            assert_eq!(result.status, "complete");
+            assert_eq!(
+                result.code.unwrap().contains("use strict"),
+                strict,
+                "{source}"
+            );
+        }
+    }
+
+    #[test]
     fn detects_jsx_from_the_parsed_ast() {
         let allocator = Allocator::default();
         let parsed = Parser::new(
