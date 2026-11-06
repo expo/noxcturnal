@@ -6,7 +6,8 @@ export const fixtureCases = [
     source: `export * as default from "foo";
 `,
     filename: 'input.mjs',
-    output: `import * as _default from 'foo';
+    output: `'use strict';
+import * as _default from 'foo';
 export { _default as default };`,
     modes: [
       {
@@ -24,7 +25,8 @@ export { _default as default };`,
     source: `export * as foo from "bar";
 `,
     filename: 'input.mjs',
-    output: `import * as _foo from 'bar';
+    output: `'use strict';
+import * as _foo from 'bar';
 export { _foo as foo };`,
     modes: [
       {
@@ -42,7 +44,8 @@ export { _foo as foo };`,
     source: `export * as "some exports" from "foo";
 `,
     filename: 'input.mjs',
-    output: `import * as _someExports from 'foo';
+    output: `'use strict';
+import * as _someExports from 'foo';
 export { _someExports as 'some exports' };`,
     modes: [
       {

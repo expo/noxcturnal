@@ -7,7 +7,10 @@ test('lowers Unicode property escapes', async () => {
       helpers: runtimeHelpers,
       transforms: { regexpUnicodePropertyEscapes: true },
     }),
-  ).toMatchInlineSnapshot(`"export const matcher = /[\\u0000-\\u007F]+/u;"`);
+  ).toMatchInlineSnapshot(`
+    "'use strict';
+    export const matcher = /[\\u0000-\\u007F]+/u;"
+  `);
 });
 
 test('lowers every property missing from regex-syntax Unicode data', async () => {

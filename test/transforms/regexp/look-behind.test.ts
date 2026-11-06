@@ -16,6 +16,6 @@ for (const [name, regexp] of cases) {
       transformSource(`export const matcher = ${regexp};`, 'input.js', {
         transforms: { regexpLookBehind: true },
       }),
-    ).resolves.toBe(`export const matcher = ${regexp};`);
+    ).resolves.toBe(`'use strict';\nexport const matcher = ${regexp};`);
   });
 }

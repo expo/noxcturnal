@@ -48,12 +48,14 @@ describe('withDeclarationName', () => {
       'export default class/* before heritage */extends Base {}',
       'export default class _ref/* before heritage */extends Base {}',
     ],
-  ])('names %s', (input, expected) => assert.equal(nameDeclarations(input), expected));
+  ])('names %s', (input, expected) =>
+    assert.equal(nameDeclarations(input), `"use strict";\n${expected}`),
+  );
 
   test('accepts Unicode and dollar-prefixed identifiers', () => {
     assert.equal(
       nameDeclarations('export default function() {}', '$élan'),
-      'export default function $élan() {}',
+      '"use strict";\nexport default function $élan() {}',
     );
   });
 
@@ -143,7 +145,7 @@ describe('withDeclarationName', () => {
       }),
     );
     assert.equal(result.status, 'complete');
-    assert.equal(result.code, 'export default function _ref() { return 2; }');
+    assert.equal(result.code, '"use strict";\nexport default function _ref() { return 2; }');
   });
 
   test.each([

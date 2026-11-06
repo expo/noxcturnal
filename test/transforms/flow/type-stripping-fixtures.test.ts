@@ -965,6 +965,8 @@ export type * from "foo";
 `,
     filename: 'input.mjs',
     output: `// @flow
+
+'use strict';
 function foo1(numVal) {}
 function foo2(numVal) {}
 function foo3(numVal, strVal) {}

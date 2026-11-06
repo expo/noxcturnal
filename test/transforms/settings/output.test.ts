@@ -7,7 +7,8 @@ test('emits compact output', async () => {
       compact: true,
     }),
   ).toMatchInlineSnapshot(`
-    "export function value() {
+    "'use strict';
+    export function value() {
       return 1 + 2;
     }"
   `);
@@ -16,9 +17,10 @@ test('emits compact output', async () => {
 test('preserves comments by default', async () => {
   expect(await transformSource(`// leading\nexport const value = 1; // trailing`, 'input.js', {}))
     .toMatchInlineSnapshot(`
-    "// leading
-    export const value = 1; // trailing"
-  `);
+      "'use strict';
+      // leading
+      export const value = 1; // trailing"
+    `);
 });
 
 test('removes comments when requested', async () => {
@@ -26,7 +28,10 @@ test('removes comments when requested', async () => {
     await transformSource(`// leading\nexport const value = 1; // trailing`, 'input.js', {
       comments: false,
     }),
-  ).toMatchInlineSnapshot(`"export const value = 1;"`);
+  ).toMatchInlineSnapshot(`
+    "'use strict';
+    export const value = 1;"
+  `);
 });
 
 test('rejects a runtime module with an incompatible helper ABI', async () => {
@@ -45,7 +50,8 @@ test('materializes inline helpers', async () => {
       transforms: { asyncFunctions: true },
     }),
   ).toMatchInlineSnapshot(`
-    "var babelHelpers = (() => {
+    "'use strict';
+    var babelHelpers = (() => {
       var y = {
           asyncToGenerator: function (r, u) {
             function x(i, f, p, o, a, s, e) {

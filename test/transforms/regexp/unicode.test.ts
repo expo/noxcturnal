@@ -7,7 +7,10 @@ test('lowers Unicode regular expressions', async () => {
       helpers: runtimeHelpers,
       transforms: { regexpUnicode: true },
     }),
-  ).toMatchInlineSnapshot(`"export const matcher = /(?:\\uD83D\\uDE00)/;"`);
+  ).toMatchInlineSnapshot(`
+    "'use strict';
+    export const matcher = /(?:\\uD83D\\uDE00)/;"
+  `);
 });
 
 test('lowers Unicode property escapes without a separately selected property transform', async () => {
@@ -54,7 +57,8 @@ test('lowers astral Unicode ignore-case atoms with and without case variants', a
     ),
   ).toMatchInlineSnapshot(
     `
-    "export const emoji = /(?:\\uD83D\\uDE00)/i;
+    "'use strict';
+    export const emoji = /(?:\\uD83D\\uDE00)/i;
     export const deseret = /(?:\\uD801\\uDC00|\\uD801\\uDC28)/i;
     export const deseretClass = /(?:\\uD801\\uDC00|\\uD801\\uDC28)/i;"
   `,

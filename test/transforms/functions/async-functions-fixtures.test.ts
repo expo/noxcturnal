@@ -21,7 +21,8 @@ export default async ([...x]) => {};
 
 `,
     filename: 'input.mjs',
-    output: `var babelHelpers = (() => {
+    output: `'use strict';
+var babelHelpers = (() => {
   var y = {
       asyncToGenerator: function (r, u) {
         function x(i, f, p, o, a, s, e) {
@@ -164,7 +165,8 @@ export default (function () {
     title: 'assumption ignoreFunctionLength true — export default function (input)',
     source: 'export default async function (x) {}',
     filename: 'input.mjs',
-    output: `var babelHelpers = (() => {
+    output: `'use strict';
+var babelHelpers = (() => {
   var y = {
       asyncToGenerator: function (r, u) {
         function x(i, f, p, o, a, s, e) {
@@ -2255,7 +2257,8 @@ async function foo() {
 }
 `,
     filename: 'input.mjs',
-    output: `var babelHelpers = (() => {
+    output: `'use strict';
+var babelHelpers = (() => {
   var y = {
       asyncToGenerator: function (r, u) {
         function x(i, f, p, o, a, s, e) {
@@ -2677,7 +2680,8 @@ var foo = babelHelpers.asyncToGenerator(function* () {
     source: `export default async () => { return await foo(); }
 `,
     filename: 'input.mjs',
-    output: `var babelHelpers = (() => {
+    output: `'use strict';
+var babelHelpers = (() => {
   var y = {
       asyncToGenerator: function (r, u) {
         function x(i, f, p, o, a, s, e) {
@@ -2738,7 +2742,8 @@ export default babelHelpers.asyncToGenerator(function* () {
     source: `export default async function myFunc() {}
 `,
     filename: 'input.mjs',
-    output: `var babelHelpers = (() => {
+    output: `'use strict';
+var babelHelpers = (() => {
   var y = {
       asyncToGenerator: function (r, u) {
         function x(i, f, p, o, a, s, e) {
@@ -2805,7 +2810,8 @@ function _myFunc() {
 export async function foo () { }
 `,
     filename: 'input.mjs',
-    output: `var babelHelpers = (() => {
+    output: `'use strict';
+var babelHelpers = (() => {
   var y = {
       asyncToGenerator: function (r, u) {
         function x(i, f, p, o, a, s, e) {
@@ -2871,7 +2877,8 @@ function _foo() {
     source: `export async function foo () { }
 `,
     filename: 'input.mjs',
-    output: `var babelHelpers = (() => {
+    output: `'use strict';
+var babelHelpers = (() => {
   var y = {
       asyncToGenerator: function (r, u) {
         function x(i, f, p, o, a, s, e) {

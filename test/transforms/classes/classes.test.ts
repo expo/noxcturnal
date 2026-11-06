@@ -5,7 +5,8 @@ test('lowers classes', async () => {
   const source = `export class Counter { add(value) { return value + 1; } }`;
   expect(await transformSource(source, 'input.js', { transforms: { classes: true } }))
     .toMatchInlineSnapshot(`
-      "export let Counter = (() => {
+      "'use strict';
+      export let Counter = (() => {
         'use strict';
         const Counter = function Counter() {
           if (!new.target) throw new TypeError('Cannot call a class as a function');

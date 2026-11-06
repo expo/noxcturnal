@@ -9,7 +9,8 @@ test('lowers named capture groups', async () => {
       transforms: { regexpNamedCaptureGroups: true },
     }),
   ).toMatchInlineSnapshot(`
-    "import _babelHelper from '@babel/runtime/helpers/wrapRegExp';
+    "'use strict';
+    import _babelHelper from '@babel/runtime/helpers/wrapRegExp';
     var _wrapRegExp2 = { wrapRegExp: _babelHelper },
       _wrapRegExp = _wrapRegExp2.wrapRegExp;
     export const matcher = _wrapRegExp(/(a+)/, { word: 1 });"
@@ -23,7 +24,8 @@ test('lowers forward named backreferences after discovering all capture numbers'
       transforms: { regexpNamedCaptureGroups: true },
     }),
   ).toMatchInlineSnapshot(`
-    "import _babelHelper from '@babel/runtime/helpers/wrapRegExp';
+    "'use strict';
+    import _babelHelper from '@babel/runtime/helpers/wrapRegExp';
     var _wrapRegExp2 = { wrapRegExp: _babelHelper },
       _wrapRegExp = _wrapRegExp2.wrapRegExp;
     export const matcher = _wrapRegExp(/\\1(a)/, { word: 1 });"
@@ -41,7 +43,8 @@ test('lowers duplicate named groups in parser-approved alternatives', async () =
       },
     ),
   ).toMatchInlineSnapshot(`
-    "import _babelHelper from '@babel/runtime/helpers/wrapRegExp';
+    "'use strict';
+    import _babelHelper from '@babel/runtime/helpers/wrapRegExp';
     var _wrapRegExp2 = { wrapRegExp: _babelHelper },
       _wrapRegExp = _wrapRegExp2.wrapRegExp;
     export const matcher = _wrapRegExp(/(?:(a)|(b))(?:\\1\\2)/, { word: [1, 2] });"

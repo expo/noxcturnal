@@ -6,6 +6,7 @@ import type { PreflightPlan } from '../preflight/types';
 interface NativePreflightOptionsInput {
   functionMap?: boolean;
   sourceFilename?: string;
+  moduleFilename?: string;
   optimizationModuleContext?: boolean;
   reactCompiler?: boolean;
   reactCompilerCompilationMode?: string;
@@ -98,7 +99,9 @@ interface NativeBinding {
   NativeParsedSource: new (
     source: string,
     filename: string,
+    moduleFilename?: string,
   ) => {
+    outputPreparation(): { offset: number; content: string } | null;
     syntaxFacts(): string[];
     functionMap(): FunctionMap;
     materializeRouted(manifest: NativeManifest): Buffer;

@@ -76,6 +76,7 @@ impl<'a> Visit<'a> for SyntaxFacts {
 pub struct NativeParsedSource {
     parsed: Option<OwnedProgram>,
     filename: String,
+    module_filename: Option<String>,
     // Syntax selection already walks this immutable tree. Carry its exact
     // allocation counts into semantic analysis instead of counting it again.
     semantic_stats: Cell<Option<Stats>>,
@@ -84,8 +85,14 @@ pub struct NativeParsedSource {
 #[napi]
 impl NativeParsedSource {
     #[napi(constructor)]
-    pub fn new(source: String, filename: String) -> Result<Self> {
-        let source_type = source_type(&filename, &source)?;
+    pub fn new(source: String, filename: String, module_filename: Option<String>) -> Result<Self> {
+        let mut source_type = source_type(&filename, &source)?;
+        if module_filename
+            .as_deref()
+            .is_some_and(|filename| filename.ends_with(".mjs"))
+        {
+            source_type = source_type.with_module(true);
+        }
         let parsed = OwnedProgram::new(
             ParseOwner {
                 allocator: Allocator::default(),
@@ -104,8 +111,23 @@ impl NativeParsedSource {
         Ok(Self {
             parsed: Some(parsed),
             filename,
+            module_filename,
             semantic_stats: Cell::new(None),
         })
+    }
+
+    /// Output policy uses the already-owned parse, independently of selected phases.
+    #[napi]
+    pub fn output_preparation(&self) -> Result<Option<crate::output::NativeOutputPreparation>> {
+        let parsed = self.parsed.as_ref().ok_or_else(consumed)?;
+        Ok(parsed.with_dependent(|owner, parsed| {
+            crate::output::prepare(
+                &owner.source,
+                &parsed.program,
+                &parsed.module_record,
+                self.module_filename.as_deref().unwrap_or(&self.filename),
+            )
+        }))
     }
 
     #[napi]
@@ -226,7 +248,7 @@ mod tests {
     use super::*;
 
     fn facts(source: &str) -> Vec<String> {
-        NativeParsedSource::new(source.into(), "input.js".into())
+        NativeParsedSource::new(source.into(), "input.js".into(), None)
             .unwrap()
             .syntax_facts()
             .unwrap()
@@ -254,7 +276,7 @@ mod tests {
 
     #[test]
     fn syntax_features_include_the_highest_protocol_node_id() {
-        let facts = NativeParsedSource::new("type Unknown = (?);".into(), "input.ts".into())
+        let facts = NativeParsedSource::new("type Unknown = (?);".into(), "input.ts".into(), None)
             .unwrap()
             .syntax_facts()
             .unwrap();
@@ -281,7 +303,7 @@ mod tests {
                 "const View = <T,>(value: T) => <Widget value={value} />;",
             ),
         ] {
-            let mut parsed = NativeParsedSource::new(source.into(), filename.into()).unwrap();
+            let mut parsed = NativeParsedSource::new(source.into(), filename.into(), None).unwrap();
             let expected =
                 Stats::count(&parsed.parsed.as_ref().unwrap().borrow_dependent().program);
             let initial_facts = parsed.syntax_facts().unwrap();
@@ -311,9 +333,12 @@ mod tests {
 
     #[test]
     fn cached_syntax_counts_do_not_skip_early_errors() {
-        let mut parsed =
-            NativeParsedSource::new("let duplicate; let duplicate;".into(), "input.js".into())
-                .unwrap();
+        let mut parsed = NativeParsedSource::new(
+            "let duplicate; let duplicate;".into(),
+            "input.js".into(),
+            None,
+        )
+        .unwrap();
         parsed.syntax_facts().unwrap();
         assert!(parsed.validate().is_err());
         assert!(parsed.syntax_facts().is_err());
@@ -324,7 +349,7 @@ mod tests {
     #[test]
     fn validation_consumes_the_parse_and_close_is_idempotent() {
         let mut parsed =
-            NativeParsedSource::new("const value=1;".into(), "input.js".into()).unwrap();
+            NativeParsedSource::new("const value=1;".into(), "input.js".into(), None).unwrap();
         parsed.validate().unwrap();
         assert!(parsed.syntax_facts().is_err());
         parsed.close();

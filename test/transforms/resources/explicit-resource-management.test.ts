@@ -9,7 +9,8 @@ test('lowers explicit resource management', async () => {
       transforms: { explicitResourceManagement: true },
     }),
   ).toMatchInlineSnapshot(`
-    "import _usingCtx2 from '@babel/runtime/helpers/usingCtx';
+    "'use strict';
+    import _usingCtx2 from '@babel/runtime/helpers/usingCtx';
     export function read() {
       try {
         var _usingCtx = _usingCtx2();

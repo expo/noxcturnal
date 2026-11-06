@@ -6,5 +6,8 @@ test('handles sticky regular expressions', async () => {
     await transformSource(`export const matcher = /value/y;`, 'input.js', {
       transforms: { regexpSticky: true },
     }),
-  ).toMatchInlineSnapshot(`"export const matcher = new RegExp('value', 'y');"`);
+  ).toMatchInlineSnapshot(`
+    "'use strict';
+    export const matcher = new RegExp('value', 'y');"
+  `);
 });

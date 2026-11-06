@@ -1,10 +1,9 @@
 //! Native Flow erasure at the napi boundary.
 //!
 //! Hermes parses the file, `hermes-flow` collects the byte ranges Flow syntax
-//! occupies, and those ranges become `Remove` edits committed through the same
-//! piece table every other phase uses. The map that falls out is a pure
-//! deletion map, which is why an erased file needs no adapter-shaped input-map
-//! composition: there is nothing in the output that was not in the input.
+//! occupies, and those ranges become edits committed through the same piece
+//! table every other phase uses. Module strictness is materialized before erasure
+//! can remove value imports with type-only specifiers; its inserted directive is unmapped.
 //!
 //! Behind the `flow_parser` feature. With it off this reports `unsupported`,
 //! the same shape `react-compiler-not-built` uses, and the caller falls back to
@@ -27,8 +26,7 @@ pub struct NativeFlowErasure {
     pub status: String,
     /// Present when `status` is `erased`.
     pub code: Option<String>,
-    /// Present when `status` is `erased`. Deletion-only, so composing it is
-    /// cheap and it never invents a position.
+    /// Present when `status` is `erased`. Generated text is unmapped.
     pub map: Option<NativeVlqMap>,
     /// Why the file was not erased, for the coverage counter: `proposal-syntax`,
     /// `parse-failed`, `unhandled-flow`, and so on.
@@ -111,7 +109,18 @@ pub(crate) fn erase(
 
     let erased_bytes = erasure.erased_bytes();
     let span_count = erasure.edits.len() as u32;
-    let commands = edit_commands(source, &erasure.edits);
+    let mut edits = erasure.edits;
+    if let Some(offset) = erasure.module_directive_offset {
+        edits.insert(
+            0,
+            hermes_flow::Edit {
+                span: offset..offset,
+                content: Some(crate::output::STRICT_DIRECTIVE.into()),
+            },
+        );
+        edits.sort_by_key(|edit| (edit.span.start, edit.span.start != edit.span.end));
+    }
+    let commands = edit_commands(source, &edits);
     let committed = crate::edit::commit::commit(source, filename, commands, mode)?;
 
     return Ok(NativeFlowErasure {
@@ -137,7 +146,9 @@ pub(crate) fn erase(
             let content = edits[at].content.clone();
             at += 1;
             commands.push(EditCommand {
-                kind: if content.is_some() {
+                kind: if start == end {
+                    EditKind::AppendLeft
+                } else if content.is_some() {
                     EditKind::Replace
                 } else {
                     EditKind::Remove
@@ -189,6 +200,39 @@ pub(crate) fn erase(
 #[cfg(all(test, feature = "flow_parser"))]
 mod tests {
     use super::*;
+
+    #[test]
+    fn value_modules_preserve_strictness_and_prologues() {
+        for source in [
+            "// @flow\nimport {type T} from 'dep';function probe(){return this;}",
+            "#!/usr/bin/env node\n// @flow\n'use client';import {type T} from 'dep';function probe(){return this;}",
+            "// @flow\n'use strict';export type T=string;",
+            "// @flow\n'é';import {type T} from 'dep';function probe(){return this;}",
+        ] {
+            let result = erase(source, "fixture.js", None).unwrap();
+            assert_eq!(result.status, "erased");
+            let code = result.code.unwrap();
+            let allocator = oxc_allocator::Allocator::default();
+            let parsed =
+                oxc_parser::Parser::new(&allocator, &code, oxc_span::SourceType::unambiguous())
+                    .parse();
+            assert!(parsed.diagnostics.is_empty(), "{code}");
+            assert_eq!(
+                parsed
+                    .program
+                    .directives
+                    .iter()
+                    .filter(|directive| directive.directive == "use strict")
+                    .count(),
+                1,
+                "{code}"
+            );
+            if source.contains("use client") {
+                assert_eq!(parsed.program.directives[0].directive, "use client");
+            }
+            assert!(result.map.is_some());
+        }
+    }
 
     #[test]
     fn erases_and_reports_coverage() {

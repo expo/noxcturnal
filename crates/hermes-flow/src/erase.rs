@@ -53,6 +53,8 @@ impl Edit {
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Erasure {
     pub edits: Vec<Edit>,
+    /// Where a consumer may materialize strictness before value module syntax disappears.
+    pub module_directive_offset: Option<u32>,
 }
 
 impl Erasure {
@@ -130,6 +132,7 @@ pub fn erase(source: &str, words: &[u32]) -> Result<Erasure, Bail> {
     let mut walk = Walk {
         source: source.as_bytes(),
         edits: Vec::new(),
+        module_directive_offset: None,
         component_scopes: source.contains("component").then(Vec::new),
         names: Names::after(source),
         record_names: Names::records(source),
@@ -139,9 +142,17 @@ pub fn erase(source: &str, words: &[u32]) -> Result<Erasure, Bail> {
         suspension_floor: None,
         suspension: None,
     };
-    walk.node(&mut buffer.cursor())?;
+    let mut cursor = buffer.cursor();
+    if !cursor
+        .node()?
+        .is_some_and(|node| node.kind == kind::PROGRAM)
+    {
+        return Err(Bail::new(BailKind::Malformed, "missing Program root"));
+    }
+    walk.program_body(&mut cursor)?;
 
     Ok(Erasure {
+        module_directive_offset: walk.module_directive_offset,
         edits: merge(walk.edits)?,
     })
 }
@@ -190,6 +201,7 @@ const MAX_FIELDS: usize = 10;
 struct Walk<'a> {
     source: &'a [u8],
     edits: Vec<Edit>,
+    module_directive_offset: Option<u32>,
     /// Earlier runtime references and their containing statements, separately
     /// for every active Program, block, or switch-case statement list. A ref
     /// component's wrapper is inserted before its first reference in that list.
@@ -561,6 +573,77 @@ impl<'a> Walk<'a> {
             self.node(cursor)?;
         }
         self.component_scopes.as_mut().unwrap().pop();
+        Ok(())
+    }
+
+    fn program_body(&mut self, cursor: &mut Cursor<'a>) -> Result<(), Bail> {
+        let count = cursor.list_len()?;
+        if let Some(scopes) = &mut self.component_scopes {
+            scopes.push(ComponentScope::default());
+        }
+        let mut is_module = false;
+        let mut has_strict = false;
+        let mut prologue = true;
+        let mut insertion = None;
+        for _ in 0..count {
+            if let Some(node) = cursor.peek_node()? {
+                insertion.get_or_insert(node.start);
+                is_module |= node.kind == kind::EXPORT_DEFAULT_DECLARATION;
+                if !is_module
+                    && matches!(
+                        node.kind,
+                        kind::IMPORT_DECLARATION
+                            | kind::EXPORT_NAMED_DECLARATION
+                            | kind::EXPORT_ALL_DECLARATION
+                    )
+                {
+                    // Hermes classifies value declarations as ESM even when all
+                    // their specifiers are types and erasure removes the import.
+                    let mut probe = *cursor;
+                    probe.node()?;
+                    for field in NODE_KINDS[node.kind as usize].fields {
+                        if matches!(field.name, "importKind" | "exportKind") {
+                            is_module = probe.label()? == Some(b"value");
+                            break;
+                        }
+                        probe.skip_field(field.ty)?;
+                    }
+                }
+                if prologue {
+                    let directive = if node.kind == kind::EXPRESSION_STATEMENT {
+                        let mut probe = *cursor;
+                        probe.node()?;
+                        if probe
+                            .peek_node()?
+                            .is_some_and(|expression| expression.kind == kind::STRING_LITERAL)
+                        {
+                            probe.skip_field(FieldType::Node)?;
+                            probe.label()?
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    };
+                    if let Some(directive) = directive {
+                        insertion = Some(node.end);
+                        has_strict |= directive == b"use strict";
+                    } else {
+                        prologue = false;
+                    }
+                }
+                if let Some(scopes) = &mut self.component_scopes {
+                    scopes.last_mut().unwrap().statement_start = node.start;
+                }
+            }
+            self.node(cursor)?;
+        }
+        if let Some(scopes) = &mut self.component_scopes {
+            scopes.pop();
+        }
+        if is_module && !has_strict {
+            self.module_directive_offset = insertion;
+        }
         Ok(())
     }
 

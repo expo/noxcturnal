@@ -7,5 +7,8 @@ test('lowers dot-all regular expressions', async () => {
       helpers: runtimeHelpers,
       transforms: { regexpDotAll: true },
     }),
-  ).toMatchInlineSnapshot(`"export const matcher = /a[^]b/;"`);
+  ).toMatchInlineSnapshot(`
+    "'use strict';
+    export const matcher = /a[^]b/;"
+  `);
 });

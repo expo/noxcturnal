@@ -17,7 +17,8 @@ test('compiles React components', async () => {
       jsx: 'preserve',
     }),
   ).toMatchInlineSnapshot(`
-    "import { c as _c } from 'react/compiler-runtime';
+    "'use strict';
+    import { c as _c } from 'react/compiler-runtime';
     export function Greeting(t0) {
       const $ = _c(3);
       if ($[0] !== 'fc62a1d58a79478e0c3bcfde8a6a08d838f2047a') {

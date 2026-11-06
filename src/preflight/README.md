@@ -98,3 +98,27 @@ Helpers use pinned Babel metadata to choose between runtime imports and generate
 Optimization follows Metro's conservative behavior. Folding must preserve value-versus-reference semantics, and dead-code elimination must respect observable bindings, direct `eval`, and `with`. Module context permits bundler-oriented removal of unused script functions without changing parsing semantics.
 
 Use [alignment tests](../../test/alignment/README.md) for canonical Babel and Hermes comparisons and [compliance tests](../../test/README.md) for execution semantics.
+
+## Preserving module strictness
+
+[Output preparation](../output.rs) automatically materializes module strictness,
+independently of selected phases. Native AST emitters call the shared policy
+before optimization; text-edit output uses the existing input parse and places
+the directive inside output-section factory wrappers. No additional parse pass
+or consumer-scheduled phase is required.
+
+Classification includes unadapted `.mjs` files, static imports/exports, TypeScript
+`import = require()`, `import.meta`, and top-level `await`/`await using`, while
+excluding nested awaits, dynamic imports, and CommonJS `export =`. TypeScript
+namespace and ambient-module bodies contribute module declarations as in Babel;
+internal import aliases alone do not. Language emitters also recognize synthesized
+JSX imports. Flow follows Hermes' value
+import/export classification, including value imports with only type specifiers;
+`import type` and `export type` alone remain scripts even in `.mjs` files. The
+adapted parser context governs module detection while the original filename is
+retained for diagnostics and JSX metadata. Explicit directives and
+sloppy scripts/CommonJS are preserved.
+
+This is emission policy, independent of parser strictness assumptions and
+`optimize.moduleContext`. Native output retains ESM semantics even where Expo's
+alternate Babel CommonJS-transform mode deliberately suppresses its directive.

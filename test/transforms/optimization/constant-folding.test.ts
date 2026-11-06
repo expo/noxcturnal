@@ -11,7 +11,8 @@ export const equality = 'x' === 'x';
 export const bitwise = (5 & 3) | 8;
 `;
   expect(await transformSource(source, 'input.js', options)).toMatchInlineSnapshot(`
-    "export const arithmetic = 7;
+    "'use strict';
+    export const arithmetic = 7;
     export const comparison = true;
     export const equality = true;
     export const bitwise = 9;"
@@ -27,7 +28,8 @@ export const complement = ~1;
 export const absent = void 0;
 `;
   expect(await transformSource(source, 'input.js', options)).toMatchInlineSnapshot(`
-    "export const negative = -2;
+    "'use strict';
+    export const negative = -2;
     export const positive = 2;
     export const inverted = true;
     export const complement = -2;
@@ -45,7 +47,8 @@ export const nullishRight = null ?? call();
 export const nullishLeft = 0 ?? call();
 `;
   expect(await transformSource(source, 'input.js', options)).toMatchInlineSnapshot(`
-    "export const orRight = call();
+    "'use strict';
+    export const orRight = call();
     export const orLeft = 'value';
     export const andRight = call();
     export const andLeft = '';
@@ -63,7 +66,8 @@ if (null) discard(); else keep();
 if (false) discard();
 `;
   expect(await transformSource(source, 'input.js', options)).toMatchInlineSnapshot(`
-    "export const yes = consequent();
+    "'use strict';
+    export const yes = consequent();
     export const no = alternate();
     keep();
     keep();"
@@ -78,7 +82,8 @@ export const conditional = value ? left() : right();
 if (value) branch();
 `;
   expect(await transformSource(source, 'input.js', options)).toMatchInlineSnapshot(`
-    "export const binary = value + 1;
+    "'use strict';
+    export const binary = value + 1;
     export const logical = value && call();
     export const conditional = value ? left() : right();
     if (value) branch();"
@@ -112,7 +117,8 @@ export const shiftRightUnsigned = -1 >>> 30;
 export const xor = 6 ^ 3;
 `;
   expect(await transformSource(source, 'input.js', options)).toMatchInlineSnapshot(`
-    "export const remainder = 3;
+    "'use strict';
+    export const remainder = 3;
     export const exponent = 32;
     export const lessEqual = true;
     export const greater = true;
@@ -138,7 +144,8 @@ export const strictlyNotEqual = 1 !== 2;
 export const lexical = 'alpha' < 'beta';
 `;
   expect(await transformSource(source, 'input.js', options)).toMatchInlineSnapshot(`
-    "export const concatenated = 'value: 2';
+    "'use strict';
+    export const concatenated = 'value: 2';
     export const nullString = 'null';
     export const booleanString = 'true value';
     export const looseNumber = true;
@@ -158,7 +165,8 @@ export const sequence = (1, 2, 3 + 4);
 export const nested = (false || (2 + 3)) ? 'yes' : 'no';
 `;
   expect(await transformSource(source, 'input.js', options)).toMatchInlineSnapshot(`
-    "export const grouped = 12;
+    "'use strict';
+    export const grouped = 12;
     export const sequence = (1, 2, 7);
     export const nested = 'yes';"
   `);
@@ -167,7 +175,10 @@ export const nested = (false || (2 + 3)) ? 'yes' : 'no';
 test('retains sequences when any preceding expression cannot be evaluated safely', async () => {
   const source = `export const value = (sideEffect(), 1 + 2);`;
   expect(await transformSource(source, 'input.js', options)).toMatchInlineSnapshot(
-    `"export const value = (sideEffect(), 3);"`,
+    `
+    "'use strict';
+    export const value = (sideEffect(), 3);"
+  `,
   );
 });
 
@@ -179,7 +190,8 @@ export const unsigned = 4294967296 >>> 0;
 export const shifted = 4294967297 << 1;
 `;
   expect(await transformSource(source, 'input.js', options)).toMatchInlineSnapshot(`
-    "export const wrapped = 0;
+    "'use strict';
+    export const wrapped = 0;
     export const signed = -1;
     export const unsigned = 0;
     export const shifted = 2;"
@@ -193,7 +205,8 @@ export function read(undefined, Infinity, NaN) {
 }
 `;
   expect(await transformSource(source, 'input.js', options)).toMatchInlineSnapshot(`
-    "export function read(undefined, Infinity, NaN) {
+    "'use strict';
+    export function read(undefined, Infinity, NaN) {
       return [void 0, 1 / 0, 0 / 0, -1 / 0];
     }"
   `);
@@ -216,7 +229,8 @@ export const supplementaryFirst = '\\u{10000}' < '\\uE000';
 export const bmpFirst = '\\uE000' < '\\u{10000}';
 `;
   expect(await transformSource(source, 'input.js', options)).toMatchInlineSnapshot(`
-    "export const supplementaryFirst = true;
+    "'use strict';
+    export const supplementaryFirst = true;
     export const bmpFirst = false;"
   `);
 });
@@ -235,7 +249,8 @@ export const trailingWhitespace = +'1\u00a0';
 export const byteOrderMarkOnly = !+'\ufeff';
 `;
   expect(await transformSource(source, 'input.js', options)).toMatchInlineSnapshot(`
-    "export const infIsFalsy = true;
+    "'use strict';
+    export const infIsFalsy = true;
     export const negativeInfIsFalsy = true;
     export const infinityIsTruthy = true;
     export const hexadecimal = 16;
@@ -250,7 +265,7 @@ export const byteOrderMarkOnly = !+'\ufeff';
 
 test('leaves wide radix string conversion to the JavaScript runtime', async () => {
   const source = `export const wide = +'0b100000000000000000000000000000000000000000000000000001';`;
-  expect(await transformSource(source, 'input.js', options)).toBe(source);
+  expect(await transformSource(source, 'input.js', options)).toBe(`'use strict';\n${source}`);
 });
 
 test('preserves signed zero through unary, exponentiation, and string conversion folds', async () => {
@@ -261,7 +276,8 @@ export const oddPower = 1 / ((0 * -1) ** 3);
 export const evenPower = 1 / ((0 * -1) ** 2);
 `;
   expect(await transformSource(source, 'input.js', options)).toMatchInlineSnapshot(`
-    "export const literal = 1 / -0;
+    "'use strict';
+    export const literal = 1 / -0;
     export const parsed = 1 / -0;
     export const oddPower = 1 / -0;
     export const evenPower = 1 / 0;"

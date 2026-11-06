@@ -18,7 +18,8 @@ test('lowers async generators stored in class fields and static blocks', async (
       },
     }),
   ).toMatchInlineSnapshot(`
-    "import _asyncIterator from '@babel/runtime/helpers/asyncIterator';
+    "'use strict';
+    import _asyncIterator from '@babel/runtime/helpers/asyncIterator';
     import _awaitAsyncGenerator from '@babel/runtime/helpers/awaitAsyncGenerator';
     import _wrapAsyncGenerator from '@babel/runtime/helpers/wrapAsyncGenerator';
     var _Streams;
@@ -85,7 +86,8 @@ test('preserves captured per-iteration bindings in for-await loops', async () =>
       },
     }),
   ).toMatchInlineSnapshot(`
-    "import _asyncIterator from '@babel/runtime/helpers/asyncIterator';
+    "'use strict';
+    import _asyncIterator from '@babel/runtime/helpers/asyncIterator';
     import _asyncToGenerator from '@babel/runtime/helpers/asyncToGenerator';
     function _iteratorResult(value) {
       if (Object(value) !== value) throw new TypeError('Iterator result is not an object');
@@ -160,7 +162,8 @@ test('lowers await-using while preserving surrounding completion paths', async (
       transforms: { explicitResourceManagement: true, asyncFunctions: true },
     }),
   ).toMatchInlineSnapshot(`
-    "import _usingCtx2 from '@babel/runtime/helpers/usingCtx';
+    "'use strict';
+    import _usingCtx2 from '@babel/runtime/helpers/usingCtx';
     import _asyncToGenerator from '@babel/runtime/helpers/asyncToGenerator';
     export function read(_x) {
       return _read.apply(this, arguments);

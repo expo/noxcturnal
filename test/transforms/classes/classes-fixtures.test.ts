@@ -10121,7 +10121,8 @@ export default class Connection extends EventEmitter {
 }
 `,
     filename: 'input.mjs',
-    output: `import _babelHelper from '@babel/runtime/helpers/construct';
+    output: `'use strict';
+import _babelHelper from '@babel/runtime/helpers/construct';
 import _babelHelper2 from '@babel/runtime/helpers/assertThisInitialized';
 var _construct2 = {
   construct: _babelHelper,
@@ -10233,7 +10234,8 @@ export default class SubFoo extends BaseFoo {
 }
 `,
     filename: 'input.mjs',
-    output: `import _babelHelper from '@babel/runtime/helpers/construct';
+    output: `'use strict';
+import _babelHelper from '@babel/runtime/helpers/construct';
 import _babelHelper2 from '@babel/runtime/helpers/get';
 var _construct2 = { construct: _babelHelper };
 function _construct(t, r, c) {
@@ -10317,7 +10319,8 @@ export default class RandomComponent extends Component {
 }
 `,
     filename: 'input.jsx',
-    output: `import _babelHelper from '@babel/runtime/helpers/construct';
+    output: `'use strict';
+import _babelHelper from '@babel/runtime/helpers/construct';
 var _construct2 = { construct: _babelHelper };
 function _construct(t, r, c) {
   return _construct2.construct(t, r, c);
@@ -10396,7 +10399,8 @@ export default RandomComponent;`,
     source: `export default class {}
 `,
     filename: 'input.mjs',
-    output: `let _Class = (() => {
+    output: `'use strict';
+let _Class = (() => {
   'use strict';
   const _Class = function _Class() {
     if (!new.target) throw new TypeError('Cannot call a class as a function');
@@ -10441,7 +10445,8 @@ export default class a2 extends b {
 }
 `,
     filename: 'input.mjs',
-    output: `import _babelHelper from '@babel/runtime/helpers/construct';
+    output: `'use strict';
+import _babelHelper from '@babel/runtime/helpers/construct';
 var _construct2 = { construct: _babelHelper };
 function _construct(t, r, c) {
   return _construct2.construct(t, r, c);
@@ -11282,7 +11287,8 @@ let B = (__nox_super_12_75 => {
 }
 `,
     filename: 'input.mjs',
-    output: `export default function () {
+    output: `'use strict';
+export default function () {
   return (() => {
     'use strict';
     const Select = function Select() {
@@ -13966,7 +13972,8 @@ let Foo = (__nox_super_0_74 => {
     source: `export default class Foo {}
 `,
     filename: 'input.mjs',
-    output: `let Foo = (() => {
+    output: `'use strict';
+let Foo = (() => {
   'use strict';
   const Foo = function Foo() {
     if (!new.target) throw new TypeError('Cannot call a class as a function');
@@ -13996,7 +14003,8 @@ export default Foo;`,
     source: `export default class extends A {}
 `,
     filename: 'input.mjs',
-    output: `import _babelHelper from '@babel/runtime/helpers/construct';
+    output: `'use strict';
+import _babelHelper from '@babel/runtime/helpers/construct';
 var _construct2 = { construct: _babelHelper };
 function _construct(t, r, c) {
   return _construct2.construct(t, r, c);
@@ -14780,7 +14788,8 @@ class Foo {
 }
 `,
     filename: 'input.mjs',
-    output: `import { a } from './a';
+    output: `'use strict';
+import { a } from './a';
 let Foo = (() => {
   'use strict';
   const Foo = function Foo() {

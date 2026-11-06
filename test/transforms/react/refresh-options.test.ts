@@ -15,7 +15,8 @@ test('uses custom registration and signature identifiers', async () => {
       jsx: 'preserve',
     }),
   ).toMatchInlineSnapshot(`
-    "var _s = signature();
+    "'use strict';
+    var _s = signature();
     export function Counter() {
       _s();
       const [count, setCount] = useState(0);
@@ -35,7 +36,8 @@ test('emits compact hook signatures by default', async () => {
       jsx: 'preserve',
     }),
   ).toMatchInlineSnapshot(`
-    "var _s = $RefreshSig$();
+    "'use strict';
+    var _s = $RefreshSig$();
     export function Counter() {
       _s();
       const [count, setCount] = useState(0);
@@ -55,7 +57,8 @@ test('emits full hook signatures when requested', async () => {
       jsx: 'preserve',
     }),
   ).toMatchInlineSnapshot(`
-    "var _s = $RefreshSig$();
+    "'use strict';
+    var _s = $RefreshSig$();
     export function Counter() {
       _s();
       const [count, setCount] = useState(0);

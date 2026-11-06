@@ -102,7 +102,8 @@ abstract class Foo {
 }
 `,
     filename: 'input.ts',
-    output: `function _decorate(decorators, target, key, descriptor) {
+    output: `'use strict';
+function _decorate(decorators, target, key, descriptor) {
   var argumentCount = arguments.length;
   var result =
     argumentCount < 3
@@ -149,7 +150,8 @@ abstract class Foo {
 }
 `,
     filename: 'input.ts',
-    output: `function _decorate(decorators, target, key, descriptor) {
+    output: `'use strict';
+function _decorate(decorators, target, key, descriptor) {
   var argumentCount = arguments.length;
   var result =
     argumentCount < 3
@@ -195,7 +197,8 @@ _decorate([observable], Foo.prototype, 'id', void 0);`,
 abstract class Foo {}
 `,
     filename: 'input.ts',
-    output: `function _decorate(decorators, target, key, descriptor) {
+    output: `'use strict';
+function _decorate(decorators, target, key, descriptor) {
   var argumentCount = arguments.length;
   var result =
     argumentCount < 3
@@ -350,7 +353,8 @@ _decorate([decorator], Foo.prototype, 'bar', void 0);`,
     source: `export default abstract class {}
 `,
     filename: 'input.ts',
-    output: 'export default class {}',
+    output: `'use strict';
+export default class {}`,
     modes: [
       {
         title: 'default',
@@ -541,7 +545,8 @@ _decorate([decorator], Foo.prototype, 'bar', void 0);`,
 }
 `,
     filename: 'input.ts',
-    output: `export default class Example {
+    output: `'use strict';
+export default class Example {
   arg1;
   constructor(arg1 = null) {
     this.arg1 = arg1;
@@ -760,7 +765,8 @@ export interface I {}
 export type T = number;
 `,
     filename: 'input.ts',
-    output: 'export {};',
+    output: `'use strict';
+export {};`,
     modes: [
       {
         title: 'default',
@@ -775,7 +781,8 @@ export type T = number;
     source: `export declare enum A {}
 `,
     filename: 'input.ts',
-    output: 'export {};',
+    output: `'use strict';
+export {};`,
     modes: [
       {
         title: 'default',
@@ -793,7 +800,8 @@ export declare namespace P {
 }
 `,
     filename: 'input.mjs',
-    output: 'export {};',
+    output: `'use strict';
+export {};`,
     modes: [
       {
         title: 'default',
@@ -978,7 +986,8 @@ export enum E {
 }
 `,
     filename: 'input.ts',
-    output: `export let E = /* @__PURE__ */ (function (E) {
+    output: `'use strict';
+export let E = /* @__PURE__ */ (function (E) {
   E[(E['A'] = 1)] = 'A';
   return E;
 })({});
@@ -1423,7 +1432,8 @@ export declare namespace N {
 export default N;
 `,
     filename: 'input.ts',
-    output: `export class N {
+    output: `'use strict';
+export class N {
   f1(value) {
     value.f2();
   }
@@ -1461,7 +1471,8 @@ declare class Signal2<T = any> {
 export { Signal2 };
 `,
     filename: 'input.ts',
-    output: `function Signal(value) {
+    output: `'use strict';
+function Signal(value) {
   this.value = value;
 }
 export { Signal };
@@ -1528,7 +1539,8 @@ export { Bar as Bar2, C2 as C4 } // only C2->C4
 interface Bar {}
 `,
     filename: 'input.ts',
-    output: `export class C2 {}
+    output: `'use strict';
+export class C2 {}
 export { C2 as C3 };
 var BB = /* @__PURE__ */ (function (BB) {
   BB[(BB['K'] = 0)] = 'K';
@@ -1561,7 +1573,8 @@ export { C2 as C4 };`,
 export default function(choiceField: any, selectedValue: string): void;
 export default function(choiceField: any, selection: number | string) {}`,
     filename: 'input.ts',
-    output: 'export default function (choiceField, selection) {}',
+    output: `'use strict';
+export default function (choiceField, selection) {}`,
     modes: [
       {
         title: 'default',
@@ -1576,7 +1589,8 @@ export default function(choiceField: any, selection: number | string) {}`,
     source: `export default "foo";
 `,
     filename: 'input.ts',
-    output: "export default 'foo';",
+    output: `'use strict';
+export default 'foo';`,
     modes: [
       {
         title: 'default',
@@ -1592,7 +1606,8 @@ export default function(choiceField: any, selection: number | string) {}`,
 export type { None };
 `,
     filename: 'input.ts',
-    output: `var None = /* @__PURE__ */ (function (None) {
+    output: `'use strict';
+var None = /* @__PURE__ */ (function (None) {
   return None;
 })(None || {});
 export {};`,
@@ -1610,7 +1625,8 @@ export {};`,
     source: `export default undefined;
 `,
     filename: 'input.ts',
-    output: 'export default undefined;',
+    output: `'use strict';
+export default undefined;`,
     modes: [
       {
         title: 'default',
@@ -1625,7 +1641,8 @@ export {};`,
     source: `export { bar } from './bar';
 `,
     filename: 'input.ts',
-    output: "export { bar } from './bar';",
+    output: `'use strict';
+export { bar } from './bar';`,
     modes: [
       {
         title: 'default',
@@ -1640,7 +1657,8 @@ export {};`,
     source: `export default Math;
 `,
     filename: 'input.ts',
-    output: 'export default Math;',
+    output: `'use strict';
+export default Math;`,
     modes: [
       {
         title: 'default',
@@ -1657,7 +1675,8 @@ export {};`,
 export import JGraph = joint.dia.Graph;
 `,
     filename: 'input.ts',
-    output: `import * as joint from '@joint/core';
+    output: `'use strict';
+import * as joint from '@joint/core';
 export var JGraph = joint.dia.Graph;`,
     modes: [
       {
@@ -1677,7 +1696,8 @@ export var JGraph = joint.dia.Graph;`,
 ;
 `,
     filename: 'input.ts',
-    output: 'export {};',
+    output: `'use strict';
+export {};`,
     modes: [
       {
         title: 'default',
@@ -1698,7 +1718,8 @@ export type * as "ns2" from './mod';
 ;
 `,
     filename: 'input.ts',
-    output: 'export {};',
+    output: `'use strict';
+export {};`,
     modes: [
       {
         title: 'default',
@@ -1716,7 +1737,8 @@ export type { A };
 ;
 `,
     filename: 'input.ts',
-    output: 'export {};',
+    output: `'use strict';
+export {};`,
     modes: [
       {
         title: 'default',
@@ -1749,7 +1771,8 @@ import C from "C";
 export { A, B, C } // <-- A and B will be removed
 `,
     filename: 'input.ts',
-    output: `import C from 'C';
+    output: `'use strict';
+import C from 'C';
 export { C };`,
     modes: [
       {
@@ -1767,7 +1790,8 @@ export interface I {}
 export default interface A {}
 `,
     filename: 'input.ts',
-    output: 'export {};',
+    output: `'use strict';
+export {};`,
     modes: [
       {
         title: 'default',
@@ -1797,7 +1821,8 @@ export type PromiseRejectCb = (reason?: any) => void;
 
 var a;`,
     filename: 'input.ts',
-    output: `/**
+    output: `'use strict';
+/**
  * @module
  */
 import '../message-bus';
@@ -1833,7 +1858,8 @@ export type PromiseResolveCb<T> = (value?: T | PromiseLike<T>) => void;
 export type PromiseRejectCb = (reason?: any) => void;
 `,
     filename: 'input.ts',
-    output: `/**
+    output: `'use strict';
+/**
  * @module
  */
 import '../message-bus';`,
@@ -1867,7 +1893,8 @@ export type PromiseRejectCb = (reason?: any) => void;
 
 var a;`,
     filename: 'input.ts',
-    output: `var a;
+    output: `'use strict';
+var a;
 export {};`,
     modes: [
       {
@@ -1887,7 +1914,8 @@ export {};`,
 export default N;
 `,
     filename: 'input.ts',
-    output: `export class N {}
+    output: `'use strict';
+export class N {}
 export default N;`,
     modes: [
       {
@@ -1904,7 +1932,8 @@ export default N;`,
 export { type Foo };
 `,
     filename: 'input.ts',
-    output: `class Foo {}
+    output: `'use strict';
+class Foo {}
 export {};`,
     modes: [
       {
@@ -1920,7 +1949,8 @@ export {};`,
     source: `export { type A1, type A2 } from "a"
 `,
     filename: 'input.ts',
-    output: 'export {};',
+    output: `'use strict';
+export {};`,
     modes: [
       {
         title: 'default',
@@ -1935,7 +1965,8 @@ export {};`,
     source: `export { type A1, type A2, A3 } from "a"
 `,
     filename: 'input.ts',
-    output: "export { A3 } from 'a';",
+    output: `'use strict';
+export { A3 } from 'a';`,
     modes: [
       {
         title: 'default',
@@ -1952,7 +1983,8 @@ function f(): void {
 }
 export { f }`,
     filename: 'input.mjs',
-    output: `function f() {}
+    output: `'use strict';
+function f() {}
 export { f };`,
     modes: [
       {
@@ -2067,7 +2099,8 @@ import * as jsx from "fake-jsx-package";
 <div></div>;
 `,
     filename: 'input.tsx',
-    output: `/* @jsx jsx.htm */
+    output: `'use strict';
+/* @jsx jsx.htm */
 // Don't elide htm if a JSX element appears somewhere.
 import * as jsx from 'fake-jsx-package';
 <div></div>;`,
@@ -2092,7 +2125,8 @@ import { htm } from "fake-jsx-package";
 <div></div>;
 `,
     filename: 'input.tsx',
-    output: `/* @jsx htm */
+    output: `'use strict';
+/* @jsx htm */
 // Don't elide htm if a JSX element appears somewhere.
 import { htm } from 'fake-jsx-package';
 <div></div>;`,
@@ -2117,7 +2151,8 @@ import * as jsx from "fake-jsx-package";
 <></>;
 `,
     filename: 'input.tsx',
-    output: `/* @jsxFrag jsx.htm */
+    output: `'use strict';
+/* @jsxFrag jsx.htm */
 // Don't elide htm if a JSX fragment appears somewhere.
 import * as jsx from 'fake-jsx-package';
 <></>;`,
@@ -2142,7 +2177,8 @@ import { htm } from "fake-jsx-package";
 <></>;
 `,
     filename: 'input.tsx',
-    output: `/* @jsxFrag htm */
+    output: `'use strict';
+/* @jsxFrag htm */
 // Don't elide htm if a JSX fragment appears somewhere.
 import { htm } from 'fake-jsx-package';
 <></>;`,
@@ -2165,7 +2201,8 @@ import { htm } from 'fake-jsx-package';
 import "b";
 `,
     filename: 'input.ts',
-    output: `import 'a';
+    output: `'use strict';
+import 'a';
 import 'b';`,
     modes: [
       {
@@ -2184,7 +2221,8 @@ import { h, Fragment, render } from "preact";
 <></>;
 `,
     filename: 'input.tsx',
-    output: `<div></div>;
+    output: `'use strict';
+<div></div>;
 <></>;
 export {};`,
     modes: [
@@ -2204,7 +2242,8 @@ import { Fragment, render } from "preact";
 <></>;
 `,
     filename: 'input.tsx',
-    output: `<></>;
+    output: `'use strict';
+<></>;
 export {};`,
     modes: [
       {
@@ -2222,7 +2261,8 @@ export {};`,
 const x: FooBar = 0;
 `,
     filename: 'input.ts',
-    output: `const x = 0;
+    output: `'use strict';
+const x = 0;
 export {};`,
     modes: [
       {
@@ -2240,7 +2280,8 @@ import * as React from "react";
 <div></div>;
 `,
     filename: 'input.tsx',
-    output: `// Don't elide React if a JSX element appears somewhere.
+    output: `'use strict';
+// Don't elide React if a JSX element appears somewhere.
 import * as React from 'react';
 <div></div>;`,
     modes: [
@@ -2260,7 +2301,8 @@ import * as React from "react";
 <div/>;
 `,
     filename: 'input.tsx',
-    output: `// Don't elide React if a JSX element appears somewhere.
+    output: `'use strict';
+// Don't elide React if a JSX element appears somewhere.
 import * as React from 'react';
 <div />;`,
     modes: [
@@ -2280,7 +2322,8 @@ import * as React from "react";
 <></>;
 `,
     filename: 'input.tsx',
-    output: `// Don't elide React if a JSX fragment appears somewhere.
+    output: `'use strict';
+// Don't elide React if a JSX fragment appears somewhere.
 import * as React from 'react';
 <></>;`,
     modes: [
@@ -2299,7 +2342,8 @@ import * as React from 'react';
 const x: React.T = 0;
 `,
     filename: 'input.ts',
-    output: `const x = 0;
+    output: `'use strict';
+const x = 0;
 export {};`,
     modes: [
       {
@@ -2319,7 +2363,8 @@ import nsb from "./module-b";
 import bar = nsb.foo.bar;
 `,
     filename: 'input.ts',
-    output: 'export {};',
+    output: `'use strict';
+export {};`,
     modes: [
       {
         title: 'default',
@@ -2335,7 +2380,8 @@ import bar = nsb.foo.bar;
 const x: typeof A = 0;
 `,
     filename: 'input.ts',
-    output: `const x = 0;
+    output: `'use strict';
+const x = 0;
 export {};`,
     modes: [
       {
@@ -2355,7 +2401,8 @@ B;
 export type {T, T1};
 `,
     filename: 'input.ts',
-    output: `import { A } from './mod';
+    output: `'use strict';
+import { A } from './mod';
 A;
 import B from './mod';
 B;`,
@@ -2378,7 +2425,8 @@ const x: G = 0;
 const y: H.T = 0;
 `,
     filename: 'input.ts',
-    output: `import { A } from 'm';
+    output: `'use strict';
+import { A } from 'm';
 class Class extends A {}
 const x = 0;
 const y = 0;`,
@@ -2397,7 +2445,8 @@ const y = 0;`,
 const x: A.B = 0;
 `,
     filename: 'input.ts',
-    output: `const x = 0;
+    output: `'use strict';
+const x = 0;
 export {};`,
     modes: [
       {
@@ -2414,7 +2463,8 @@ export {};`,
 const x: B = 0;
 `,
     filename: 'input.ts',
-    output: `const x = 0;
+    output: `'use strict';
+const x = 0;
 export {};`,
     modes: [
       {
@@ -2437,7 +2487,8 @@ const y: B = Used2;
 const z: C | D = Used3;
 `,
     filename: 'input.ts',
-    output: `import 'lib';
+    output: `'use strict';
+import 'lib';
 import { Used } from 'lib';
 import Used2 from 'lib';
 import * as Used3 from 'lib';
@@ -2458,7 +2509,8 @@ const z = Used3;`,
     source: `import { A } from 'lib'
 enum Enum { A };`,
     filename: 'input.ts',
-    output: `var Enum = /* @__PURE__ */ (function (Enum) {
+    output: `'use strict';
+var Enum = /* @__PURE__ */ (function (Enum) {
   Enum[(Enum['A'] = 0)] = 'A';
   return Enum;
 })(Enum || {});
@@ -2477,7 +2529,8 @@ export {};`,
     source: `import { A } from 'lib'
 enum Enum { id = A };`,
     filename: 'input.ts',
-    output: `import { A } from 'lib';
+    output: `'use strict';
+import { A } from 'lib';
 var Enum = (function (Enum) {
   Enum[(Enum['id'] = A)] = 'id';
   return Enum;
@@ -2496,7 +2549,8 @@ var Enum = (function (Enum) {
     source: `import type, { bar } from 'foo';
 `,
     filename: 'input.ts',
-    output: 'export {};',
+    output: `'use strict';
+export {};`,
     modes: [
       {
         title: 'default',
@@ -2511,7 +2565,8 @@ var Enum = (function (Enum) {
     source: `import type from 'foo';
 `,
     filename: 'input.ts',
-    output: 'export {};',
+    output: `'use strict';
+export {};`,
     modes: [
       {
         title: 'default',
@@ -2538,7 +2593,8 @@ import type * as J from "j";
 ;
 `,
     filename: 'input.ts',
-    output: `import 'f';
+    output: `'use strict';
+import 'f';
 import 'g';`,
     modes: [
       {
@@ -2557,7 +2613,8 @@ function Foo(){}
 function Foo2(){}
 `,
     filename: 'input.ts',
-    output: `function Foo() {}
+    output: `'use strict';
+function Foo() {}
 function Foo2() {}
 export {};`,
     modes: [
@@ -2576,7 +2633,8 @@ export {};`,
 import B from "y";
 ;`,
     filename: 'input.ts',
-    output: 'export {};',
+    output: `'use strict';
+export {};`,
     modes: [
       {
         title: 'default',
@@ -2593,7 +2651,8 @@ import type { A, B } from './mod';
 import type * as Types from './mod';
 ;`,
     filename: 'input.ts',
-    output: 'export {};',
+    output: `'use strict';
+export {};`,
     modes: [
       {
         title: 'default',
@@ -2626,7 +2685,8 @@ foo.x;`,
 lib();
 `,
     filename: 'input.ts',
-    output: `const lib = require('lib');
+    output: `'use strict';
+const lib = require('lib');
 lib();`,
     modes: [
       {
@@ -2657,7 +2717,8 @@ import { type L1, L2, type L3 } from "l";
 import x = a;
 `,
     filename: 'input.ts',
-    output: `import 'f';
+    output: `'use strict';
+import 'f';
 import 'g';`,
     modes: [
       {
@@ -2678,7 +2739,8 @@ export class CoreModule {
 }
 `,
     filename: 'input.ts',
-    output: `function _decorate(decorators, target, key, descriptor) {
+    output: `'use strict';
+function _decorate(decorators, target, key, descriptor) {
   var argumentCount = arguments.length;
   var result =
     argumentCount < 3
@@ -2730,7 +2792,8 @@ export { CoreModule };`,
     source: `import { A } from 'lib'
 const obj: { A: A } = { A: 'foo' };`,
     filename: 'input.ts',
-    output: `const obj = { A: 'foo' };
+    output: `'use strict';
+const obj = { A: 'foo' };
 export {};`,
     modes: [
       {
@@ -2749,7 +2812,8 @@ export type { bar };
 export { baz };
 `,
     filename: 'input.ts',
-    output: 'export {};',
+    output: `'use strict';
+export {};`,
     modes: [
       {
         title: 'default',
@@ -2765,7 +2829,8 @@ export { baz };
 Foo1;
 `,
     filename: 'input.ts',
-    output: `import { Foo1 } from 'Foo';
+    output: `'use strict';
+import { Foo1 } from 'Foo';
 Foo1;`,
     modes: [
       {
@@ -2781,7 +2846,8 @@ Foo1;`,
     source: `import { type Foo1, type Foo2 } from "Foo";
 `,
     filename: 'input.ts',
-    output: 'export {};',
+    output: `'use strict';
+export {};`,
     modes: [
       {
         title: 'default',
@@ -2797,7 +2863,8 @@ Foo1;`,
 export { Foo1, Foo2 };
 `,
     filename: 'input.ts',
-    output: 'export {};',
+    output: `'use strict';
+export {};`,
     modes: [
       {
         title: 'default',
@@ -2812,7 +2879,8 @@ export { Foo1, Foo2 };
     source: `import { type A } from "x";
 `,
     filename: 'input.ts',
-    output: 'export {};',
+    output: `'use strict';
+export {};`,
     modes: [
       {
         title: 'default',
@@ -2893,7 +2961,8 @@ let node: b.OptionManager;
 console.log(some);
 `,
     filename: 'input.ts',
-    output: `var AliasModule = LongNameModule;
+    output: `'use strict';
+var AliasModule = LongNameModule;
 const some = 3;
 const bar = AliasModule.foo;
 const baz = AliasModule.Inner.bar;
@@ -2986,7 +3055,8 @@ for (let s of strings) {
 }
 `,
     filename: 'input.ts',
-    output: `let Validation;
+    output: `'use strict';
+let Validation;
 (function (_Validation) {
   const lettersRegexp = /^[A-Za-z]+$/;
   const numberRegexp = /^[0-9]+$/;
@@ -3034,7 +3104,8 @@ namespace A {
 }
 `,
     filename: 'input.ts',
-    output: `class A {}
+    output: `'use strict';
+class A {}
 (function (_A) {
   const B = (_A.B = 1);
 })(A || (A = {}));`,
@@ -3057,7 +3128,8 @@ namespace A {
 }
 `,
     filename: 'input.ts',
-    output: `var A = /* @__PURE__ */ (function (A) {
+    output: `'use strict';
+var A = /* @__PURE__ */ (function (A) {
   A[(A['C'] = 2)] = 'C';
   return A;
 })(A || {});
@@ -3080,7 +3152,8 @@ export namespace N { var x; }
 export default N;
 `,
     filename: 'input.ts',
-    output: `export class N {}
+    output: `'use strict';
+export class N {}
 (function (_N) {
   var x;
 })(N || (N = {}));
@@ -3101,7 +3174,8 @@ export default N;`,
 namespace N { var x }
 `,
     filename: 'input.ts',
-    output: `import N from 'n';
+    output: `'use strict';
+import N from 'n';
 (function (_N) {
   var x;
 })(N || (N = {}));`,
@@ -3311,7 +3385,8 @@ namespace X { var i18n: any; }
 export class i18n {}
 `,
     filename: 'input.ts',
-    output: `let X;
+    output: `'use strict';
+let X;
 (function (_X) {
   var i18n;
 })(X || (X = {}));
@@ -3339,7 +3414,8 @@ export class i18n {}`,
 }
 `,
     filename: 'input.ts',
-    output: `export let N;
+    output: `'use strict';
+export let N;
 (function (_N) {})(N || (N = {}));`,
     modes: [
       {
@@ -3437,7 +3513,8 @@ namespace Platform {
 export { Platform };
 `,
     filename: 'input.ts',
-    output: 'export {};',
+    output: `'use strict';
+export {};`,
     modes: [
       {
         title: 'default',
@@ -3452,7 +3529,8 @@ export { Platform };
     source: `export namespace N { var x }
 `,
     filename: 'input.ts',
-    output: `export let N;
+    output: `'use strict';
+export let N;
 (function (_N) {
   var x;
 })(N || (N = {}));`,
@@ -3529,7 +3607,8 @@ namespace N {
 }
 `,
     filename: 'input.ts',
-    output: `class C {}
+    output: `'use strict';
+class C {}
 let N;
 (function (_N) {
   const { a } = C;
@@ -3570,7 +3649,8 @@ let N;
 }
 `,
     filename: 'input.ts',
-    output: `export let A;
+    output: `'use strict';
+export let A;
 (function (_A) {
   let G = /* @__PURE__ */ (function (G) {
     G[(G['H'] = 0)] = 'H';
@@ -3597,7 +3677,8 @@ export namespace ui.b {
 }
 `,
     filename: 'input.ts',
-    output: `export let ui;
+    output: `'use strict';
+export let ui;
 (function (_ui) {
   let a;
   (function (_a) {
@@ -3630,7 +3711,8 @@ namespace proj.data.util.api {
 }
 `,
     filename: 'input.ts',
-    output: `let X;
+    output: `'use strict';
+let X;
 (function (_X) {
   let Y;
   (function (_Y) {
@@ -3689,7 +3771,8 @@ namespace A {
 }
 `,
     filename: 'input.ts',
-    output: `class A {}
+    output: `'use strict';
+class A {}
 (function (_A) {
   let C;
   (function (_C) {
@@ -3751,7 +3834,8 @@ namespace A {
 }
 `,
     filename: 'input.ts',
-    output: `let N;
+    output: `'use strict';
+let N;
 (function (_N8) {
   let _N7;
   (function (_N9) {
@@ -3815,7 +3899,8 @@ A.z;
 A.w;
 `,
     filename: 'input.ts',
-    output: `export let A = /* @__PURE__ */ (function (A) {
+    output: `'use strict';
+export let A = /* @__PURE__ */ (function (A) {
   A[(A['x'] = 3)] = 'x';
   A['y'] = 'f';
   A[(A['z'] = 16)] = 'z';
@@ -3900,7 +3985,8 @@ export { WhitespaceFlag as WF2 };
 export const before = WhitespaceFlag.before;
 `,
     filename: 'input.ts',
-    output: `var WhitespaceFlag = /* @__PURE__ */ (function (WhitespaceFlag) {
+    output: `'use strict';
+var WhitespaceFlag = /* @__PURE__ */ (function (WhitespaceFlag) {
   WhitespaceFlag[(WhitespaceFlag['before'] = 1)] = 'before';
   WhitespaceFlag[(WhitespaceFlag['after'] = 2)] = 'after';
   return WhitespaceFlag;
@@ -3929,7 +4015,8 @@ export { type WhitespaceFlag as WF2 };
 export const before = WhitespaceFlag.before;
 `,
     filename: 'input.ts',
-    output: `var WhitespaceFlag = /* @__PURE__ */ (function (WhitespaceFlag) {
+    output: `'use strict';
+var WhitespaceFlag = /* @__PURE__ */ (function (WhitespaceFlag) {
   WhitespaceFlag[(WhitespaceFlag['before'] = 1)] = 'before';
   WhitespaceFlag[(WhitespaceFlag['after'] = 2)] = 'after';
   return WhitespaceFlag;
@@ -3951,7 +4038,8 @@ export const before = WhitespaceFlag.before;`,
 let x = A.y;
 `,
     filename: 'input.ts',
-    output: `export let A = /* @__PURE__ */ (function (A) {
+    output: `'use strict';
+export let A = /* @__PURE__ */ (function (A) {
   A[(A['y'] = 0)] = 'y';
   return A;
 })({});
@@ -3974,7 +4062,8 @@ let x = A.y;
 export { A };
 `,
     filename: 'input.ts',
-    output: `var A = /* @__PURE__ */ (function (A) {
+    output: `'use strict';
+var A = /* @__PURE__ */ (function (A) {
   A[(A['y'] = 0)] = 'y';
   return A;
 })(A || {});
@@ -4066,7 +4155,8 @@ A.w;
 A;
 `,
     filename: 'input.ts',
-    output: `export let A = /* @__PURE__ */ (function (A) {
+    output: `'use strict';
+export let A = /* @__PURE__ */ (function (A) {
   A[(A['x'] = 0)] = 'x';
   A[(A['y'] = 1)] = 'y';
   return A;
@@ -4145,7 +4235,8 @@ A;`,
 }
 `,
     filename: 'input.ts',
-    output: `export let Tags;
+    output: `'use strict';
+export let Tags;
 (function (_Tags) {
   let TagsType = /* @__PURE__ */ (function (TagsType) {
     TagsType[(TagsType['Unknown'] = 0)] = 'Unknown';
@@ -4169,7 +4260,8 @@ A;`,
     title: 'regression — 10162 (input)',
     source: 'export default 2;',
     filename: 'input.ts',
-    output: 'export default 2;',
+    output: `'use strict';
+export default 2;`,
     modes: [
       {
         title: 'default',
@@ -4208,7 +4300,8 @@ export class Something {
 }
 `,
     filename: 'input.mjs',
-    output: `export class Something {
+    output: `'use strict';
+export class Something {
   messaging;
   constructor(messaging) {
     this.messaging = messaging;

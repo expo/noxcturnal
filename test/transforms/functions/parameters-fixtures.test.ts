@@ -75,6 +75,7 @@ export function transformFileSync(
 `,
     filename: 'input.mjs',
     output: `// @flow
+'use strict';
 export function transformFileSync(_arg) {
   let filename = arguments.length > 0 ? arguments[0] : void 0;
   let opts = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : {};
@@ -1052,7 +1053,8 @@ function foo(_arg, _arg7) {
   }
 }`,
     filename: 'input.mjs',
-    output: `export class Test {
+    output: `'use strict';
+export class Test {
   invite() {
     let options = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : {};
     const privacy = options.privacy || 'Private';
@@ -3000,7 +3002,8 @@ function g() {
 };
 `,
     filename: 'input.mjs',
-    output: `(function () {
+    output: `'use strict';
+(function () {
   let i = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : '__proto__';
   return (i => {
     for (var i in {});
@@ -3350,7 +3353,8 @@ class Thing {
 }
 `,
     filename: 'input.mjs',
-    output: `import { copy } from './copyPaste';
+    output: `'use strict';
+import { copy } from './copyPaste';
 class Thing {
   handleCopySomething() {
     copy();
@@ -3383,11 +3387,10 @@ export default class App extends Component {
 }
 `,
     filename: 'input.mjs',
-    output: `import args from 'utils/url/args';
-
+    output: `'use strict';
+import args from 'utils/url/args';
 export default class App extends Component {
   exportType = '';
-
   componentDidMount() {
     this.exportType = args.get('type', window.location.href);
   }

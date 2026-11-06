@@ -22,7 +22,8 @@ import ReactDOM from 'react-dom';
         options: {
           jsx: 'classic',
         },
-        output: `// https://github.com/babel/babel/issues/12522
+        output: `'use strict';
+// https://github.com/babel/babel/issues/12522
 ReactDOM.render(
   /* @__PURE__ */ React.createElement('p', null, 'Hello, World!'),
   document.getElementById('root'),
@@ -37,7 +38,8 @@ import ReactDOM from 'react-dom';`,
         options: {
           jsx: 'automatic',
         },
-        output: `import { jsx as _jsx } from 'react/jsx-runtime';
+        output: `'use strict';
+import { jsx as _jsx } from 'react/jsx-runtime';
 // https://github.com/babel/babel/issues/12522
 ReactDOM.render(
   /* @__PURE__ */ _jsx('p', { children: 'Hello, World!' }),
@@ -70,7 +72,8 @@ ReactDOM.render(
         options: {
           jsx: 'classic',
         },
-        output: `// https://github.com/babel/babel/issues/12522
+        output: `'use strict';
+// https://github.com/babel/babel/issues/12522
 import 'react-app-polyfill/ie11';
 import 'react-app-polyfill/stable';
 import ReactDOM from 'react-dom';
@@ -84,7 +87,8 @@ ReactDOM.render(
         options: {
           jsx: 'automatic',
         },
-        output: `// https://github.com/babel/babel/issues/12522
+        output: `'use strict';
+// https://github.com/babel/babel/issues/12522
 import 'react-app-polyfill/ie11';
 import 'react-app-polyfill/stable';
 import ReactDOM from 'react-dom';
@@ -343,7 +347,8 @@ var x = (
         options: {
           jsx: 'classic',
         },
-        output: `function _extends() {
+        output: `'use strict';
+function _extends() {
   return (
     (_extends = Object.assign
       ? Object.assign.bind()
@@ -376,7 +381,8 @@ var x = /* @__PURE__ */ React.createElement(
         options: {
           jsx: 'automatic',
         },
-        output: `import * as react from 'react';
+        output: `'use strict';
+import * as react from 'react';
 import { jsx as _jsx, jsxs as _jsxs } from 'react/jsx-runtime';
 import { createElement as _createElement } from 'react';
 var y = react.createElement('div', { foo: 1 });
@@ -1005,7 +1011,8 @@ var x = <React.Fragment key="foo"></React.Fragment>;`,
         options: {
           jsx: 'classic',
         },
-        output: `import * as React from 'react';
+        output: `'use strict';
+import * as React from 'react';
 var x = /* @__PURE__ */ React.createElement(React.Fragment, { key: 'foo' });`,
       },
       {
@@ -1013,7 +1020,8 @@ var x = /* @__PURE__ */ React.createElement(React.Fragment, { key: 'foo' });`,
         options: {
           jsx: 'automatic',
         },
-        output: `import * as React from 'react';
+        output: `'use strict';
+import * as React from 'react';
 import { jsx as _jsx } from 'react/jsx-runtime';
 var x = /* @__PURE__ */ _jsx(React.Fragment, {}, 'foo');`,
       },
@@ -2838,7 +2846,8 @@ export default function App() {
         options: {
           jsx: 'classic',
         },
-        output: `import React from 'react';
+        output: `'use strict';
+import React from 'react';
 export default function App() {
   return /* @__PURE__ */ React.createElement(
     'div',
@@ -2854,7 +2863,8 @@ export default function App() {
         options: {
           jsx: 'automatic',
         },
-        output: `import React from 'react';
+        output: `'use strict';
+import React from 'react';
 import { jsx as _jsx, jsxs as _jsxs } from 'react/jsx-runtime';
 export default function App() {
   return /* @__PURE__ */ _jsxs('div', {

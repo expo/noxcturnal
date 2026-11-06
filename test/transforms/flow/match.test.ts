@@ -63,6 +63,8 @@ match (value) { 1 if (enabled) => { one(); }, _ => {} }
 export const result = match (value) { 1 if (enabled) => 'one', _ => 'other' };`;
   expect(await transformSource(source, 'input.js', {})).toMatchInlineSnapshot(`
     "// @flow
+
+    'use strict';
     $$gen$m0: {
       if (value === 1) {
         if (enabled) {
@@ -84,6 +86,8 @@ match (read()) { 1 => { one(); }, _ => {} }
 export const result = match (read()) { const value => value };`;
   expect(await transformSource(source, 'input.js', {})).toMatchInlineSnapshot(`
     "// @flow
+
+    'use strict';
     $$gen$m0: {
       const $$gen$m1 = read();
       if ($$gen$m1 === 1) {
@@ -111,6 +115,8 @@ export const result = match (value) {
 };`;
   expect(await transformSource(source, 'input.js', {})).toMatchInlineSnapshot(`
     "// @flow
+
+    'use strict';
     export const result = ($$gen$m0 => {
       if (
         ((typeof $$gen$m0 === 'object' && $$gen$m0 !== null) || typeof $$gen$m0 === 'function') &&
@@ -132,6 +138,8 @@ export const exact = match (value) { [1] => true, _ => false };
 export const remaining = match (value) { [1, ...const rest] => rest, _ => [] };`;
   expect(await transformSource(source, 'input.js', {})).toMatchInlineSnapshot(`
     "// @flow
+
+    'use strict';
     export const exact = Array.isArray(value) && value.length === 1 && value[0] === 1 ? true : false;
     export const remaining = ($$gen$m0 => {
       if (Array.isArray($$gen$m0) && $$gen$m0.length >= 1 && $$gen$m0[0] === 1) {
@@ -149,6 +157,8 @@ export const boxed = match (value) { Box { const item } => item, _ => null };
 export const whole = match (value) { [1] as array => array, _ => null };`;
   expect(await transformSource(source, 'input.js', {})).toMatchInlineSnapshot(`
     "// @flow
+
+    'use strict';
     export const boxed = ($$gen$m0 => {
       if ($$gen$m0 instanceof Box && 'item' in $$gen$m0) {
         const item = $$gen$m0.item;
@@ -176,6 +186,8 @@ export const result = match (value) {
 };`;
   expect(await transformSource(source, 'input.js', {})).toMatchInlineSnapshot(`
     "// @flow
+
+    'use strict';
     export const result =
       value === 1 || value === 2
         ? 'low'
@@ -195,6 +207,8 @@ export const result = match (value) {
 };`;
   expect(await transformSource(source, 'input.js', {})).toMatchInlineSnapshot(`
     "// @flow
+
+    'use strict';
     export const result = ($$gen$m0 => {
       if (
         ((typeof $$gen$m0 === 'object' && $$gen$m0 !== null) || typeof $$gen$m0 === 'function') &&
@@ -215,6 +229,8 @@ match (value) { 1 => { const item: number = 1; }, _ => {} }
 export const result = match (value) { const item if (item as number) => (item: number), _ => 0 };`;
   expect(await transformSource(source, 'input.js', {})).toMatchInlineSnapshot(`
     "// @flow
+
+    'use strict';
     $$gen$m0: {
       if (value === 1) {
         const item = 1;
@@ -278,6 +294,8 @@ export async function direct() {
 }`;
   expect(await transformSource(source, 'input.js', {})).toMatchInlineSnapshot(`
     "// @flow
+
+    'use strict';
     export async function binding() {
       return await (async $$gen$m0 => {
         {
@@ -299,6 +317,8 @@ export function* values() {
 }`;
   expect(await transformSource(source, 'input.js', {})).toMatchInlineSnapshot(`
     "// @flow
+
+    'use strict';
     export function* values() {
       return value === 1 ? yield 1 : 0;
     }"

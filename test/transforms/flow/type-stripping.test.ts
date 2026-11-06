@@ -8,6 +8,8 @@ export function greeting(user: User): string { return user.name; }`;
   expect(await transformSource(source, 'input.js', {})).toMatchInlineSnapshot(`
     "/** @flow */
 
+    'use strict';
+
     export function greeting(user) {
       return user.name;
     }"

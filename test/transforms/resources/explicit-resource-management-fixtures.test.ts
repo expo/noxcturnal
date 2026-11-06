@@ -135,7 +135,8 @@ export class B {}
 using x = null;
 `,
     filename: 'input.js',
-    output: `var babelHelpers = (() => {
+    output: `'use strict';
+var babelHelpers = (() => {
   var y = {
       usingCtx: function (n, l) {
         function v() {
@@ -605,7 +606,8 @@ doSomethingWith(x);
 after;
 `,
     filename: 'input.mjs',
-    output: `var babelHelpers = (() => {
+    output: `'use strict';
+var babelHelpers = (() => {
   var y = {
       usingCtx: function (n, l) {
         function v() {
@@ -713,7 +715,8 @@ try {
   using c = 3;
 }`,
     filename: 'input.js',
-    output: `var babelHelpers = (() => {
+    output: `'use strict';
+var babelHelpers = (() => {
   var y = {
       usingCtx: function (n, l) {
         function v() {
@@ -822,7 +825,8 @@ try {
 }
 `,
     filename: 'input.js',
-    output: `var babelHelpers = (() => {
+    output: `'use strict';
+var babelHelpers = (() => {
   var y = {
       usingCtx: function (n, l) {
         function v() {
@@ -2134,7 +2138,8 @@ await using y = B;
 export { x, y };
 `,
     filename: 'input.mjs',
-    output: `var babelHelpers = (() => {
+    output: `'use strict';
+var babelHelpers = (() => {
   var y = {
       usingCtx: function (n, l) {
         function v() {
@@ -2239,7 +2244,8 @@ try {
 export default class {}
 `,
     filename: 'input.mjs',
-    output: `var babelHelpers = (() => {
+    output: `'use strict';
+var babelHelpers = (() => {
   var y = {
       usingCtx: function (n, l) {
         function v() {
@@ -2344,7 +2350,8 @@ try {
 export default class C {}
 `,
     filename: 'input.mjs',
-    output: `var babelHelpers = (() => {
+    output: `'use strict';
+var babelHelpers = (() => {
   var y = {
       usingCtx: function (n, l) {
         function v() {
@@ -2449,7 +2456,8 @@ try {
 export default doSomething();
 `,
     filename: 'input.mjs',
-    output: `var babelHelpers = (() => {
+    output: `'use strict';
+var babelHelpers = (() => {
   var y = {
       usingCtx: function (n, l) {
         function v() {
@@ -2554,7 +2562,8 @@ try {
 export default function fn() {}
 `,
     filename: 'input.mjs',
-    output: `var babelHelpers = (() => {
+    output: `'use strict';
+var babelHelpers = (() => {
   var y = {
       usingCtx: function (n, l) {
         function v() {
@@ -2667,7 +2676,8 @@ expect(AO.self).toBe(AO);
 expect(BO.self).toBe(BO);
 `,
     filename: 'exec.js',
-    output: `var babelHelpers = (() => {
+    output: `'use strict';
+var babelHelpers = (() => {
   var y = {
       usingCtx: function (n, l) {
         function v() {
@@ -2792,7 +2802,8 @@ export class B { static get self() { return B } }
 A = B = null;
 `,
     filename: 'input.js',
-    output: `var babelHelpers = (() => {
+    output: `'use strict';
+var babelHelpers = (() => {
   var y = {
       usingCtx: function (n, l) {
         function v() {
@@ -2924,7 +2935,8 @@ export class B {}
 using x = null;
 `,
     filename: 'input.mjs',
-    output: `var babelHelpers = (() => {
+    output: `'use strict';
+var babelHelpers = (() => {
   var y = {
       usingCtx: function (n, l) {
         function v() {
