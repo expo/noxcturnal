@@ -1,5 +1,11 @@
 # noxcturnal
 
+## 0.1.12
+
+### Patch Changes
+
+- Automatically preserve module strictness in emitted output, independently of selected transforms or plugins, including empty and visitor-only pipelines. Retain explicit directives and sloppy script/CommonJS behavior, with native handling for TypeScript and Flow module syntax, by [@kitten](https://github.com/kitten) (See [#92](https://github.com/expo/noxcturnal/pull/92))
+
 ## 0.1.11
 
 ### Patch Changes
