@@ -68,6 +68,7 @@ fn decode_packed_words(data: &[u8], strings: Vec<&str>) -> Result<Vec<edit::Edit
             8 => edit::EditKind::Prologue,
             9 => edit::EditKind::Suffix,
             10 => edit::EditKind::Move,
+            11 => edit::EditKind::ProgramEnd,
             _ => return Err(Error::new(Status::InvalidArg, "invalid packed edit kind")),
         };
         let content_id = word(cursor + 3);

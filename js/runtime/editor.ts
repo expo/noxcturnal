@@ -40,11 +40,6 @@ export function createEditor(
   edits: OwnedEdit[],
   owner: string,
   nextOrder: () => number,
-  hooks?: {
-    affects(edit: EditCommand): boolean;
-    reconcile(): void;
-    beforeCommit?(): void;
-  },
   ownerIdentity: object | string = owner,
 ): NativeEditor {
   const source = session.source;
@@ -132,20 +127,17 @@ export function createEditor(
     },
     reset(start, end) {
       let write = 0;
-      let reconcile = false;
       for (const edit of edits) {
         if (
           (edit[EDIT_OWNER] ?? edit.owner) === ownerIdentity &&
           edit.start >= start &&
           edit.end <= end
         ) {
-          if (hooks?.affects(edit)) reconcile = true;
           continue;
         }
         edits[write++] = edit;
       }
       edits.length = write;
-      if (reconcile) hooks!.reconcile();
     },
     indent(prefix = '  ') {
       push('Replace', 0, source.length, operations().indent(prefix));
@@ -174,7 +166,6 @@ export function createEditor(
     },
     slice: (start, end) => source.slice(start, end),
     toString: () => {
-      hooks?.beforeCommit?.();
       return session.commit(edits).code;
     },
     isEmpty: () => margins()[0] === source.length,
@@ -218,15 +209,19 @@ function attributeEditConflict(error: unknown, edits: readonly EditCommand[]): u
     ) ??
     /edit at (\d+)\.\.(\d+) copies removed range (\d+)\.\.(\d+)/.exec(error.message);
   if (!match) return error;
-  const findEdit = (start: number, end: number, exclude?: EditCommand) =>
-    edits.find(
-      edit =>
-        edit !== exclude &&
-        Math.min(edit.start, edit.end) === start &&
-        Math.max(edit.start, edit.end) === end,
-    );
+  const isPlacement = (edit: EditCommand) => edit.kind === 'Prologue' || edit.kind === 'ProgramEnd';
+  const findEdit = (start: number, end: number, exclude?: EditCommand) => {
+    const matches = (edit: EditCommand) =>
+      edit !== exclude &&
+      Math.min(edit.start, edit.end) === start &&
+      Math.max(edit.start, edit.end) === end;
+    return edits.find(edit => !isPlacement(edit) && matches(edit)) ?? edits.find(matches);
+  };
   const sameRange = match[1] === match[3] && match[2] === match[4];
-  const firstEdit = findEdit(Number(match[1]), Number(match[2]));
+  const placementOrder = /output placement order (\d+):/.exec(error.message);
+  const firstEdit = placementOrder
+    ? edits.find(edit => isPlacement(edit) && edit.order === Number(placementOrder[1]))
+    : findEdit(Number(match[1]), Number(match[2]));
   const secondEdit = findEdit(
     Number(match[3]),
     Number(match[4]),
@@ -306,7 +301,7 @@ function dedupeConvergentEdits(edits: readonly EditCommand[]): {
   const kept: EditCommand[] = [];
   for (let index = 0; index < edits.length; index++) {
     const edit = edits[index]!;
-    if (edit.end === edit.start) {
+    if (edit.end === edit.start || edit.kind === 'Prologue' || edit.kind === 'ProgramEnd') {
       kept.push(edit);
       continue;
     }

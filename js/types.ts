@@ -52,10 +52,11 @@ export type EditKind =
   | 'PrependRight'
   | 'AddSourceMapLocation'
   // Output sections: prefix and suffix content assembles around the body instead of
-  // competing with body edits in insertion-affinity order; prologue content joins the
-  // body stream at the directive-prologue boundary in first-ensure order.
+  // competing with body edits in insertion-affinity order. Program placements use
+  // the edited body's prologue and final statement, in first-call order.
   | 'Prefix'
   | 'Prologue'
+  | 'ProgramEnd'
   | 'Suffix'
   // Relocation: the range leaves its place and its original-backed pieces render at
   // `destination` with every contained edit applied.

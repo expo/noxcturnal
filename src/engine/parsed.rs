@@ -118,11 +118,10 @@ impl NativeParsedSource {
 
     /// Output policy uses the already-owned parse, independently of selected phases.
     #[napi]
-    pub fn output_preparation(&self) -> Result<Option<crate::output::NativeOutputPreparation>> {
+    pub fn needs_strict_output(&self) -> Result<bool> {
         let parsed = self.parsed.as_ref().ok_or_else(consumed)?;
-        Ok(parsed.with_dependent(|owner, parsed| {
-            crate::output::prepare(
-                &owner.source,
+        Ok(parsed.with_dependent(|_owner, parsed| {
+            crate::output::needs_strict_output(
                 &parsed.program,
                 &parsed.module_record,
                 self.module_filename.as_deref().unwrap_or(&self.filename),

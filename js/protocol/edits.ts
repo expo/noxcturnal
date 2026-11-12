@@ -13,6 +13,7 @@ const EDIT_KINDS: Record<EditCommand['kind'], number> = {
   Prologue: 8,
   Suffix: 9,
   Move: 10,
+  ProgramEnd: 11,
 };
 
 const EDIT_MAPPINGS: Record<NonNullable<EditCommand['mapping']>, number> = {

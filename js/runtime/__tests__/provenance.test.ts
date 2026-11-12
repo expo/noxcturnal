@@ -823,3 +823,132 @@ test('named RNW, UI, and Hermes-shaped fragments compose contained same-phase ed
     });
   }
 });
+
+test.each(['use client', 'use strict', 'sloppy'])(
+  'program intents compose with whole-program replacements (%s)',
+  directive => {
+    const plugin = defineNativePlugin({
+      name: 'replace-and-assemble',
+      editEffect: 'bindings',
+      post(context) {
+        context.ensureHelper('probe', 'function probe(){return 42;}');
+        context.ensureHelper('probe', 'function probe(){return 42;}');
+        context.prependToProgram('var answer = probe();');
+        context.appendToProgram('module.exports = answer;');
+        context.editor.overwrite(
+          0,
+          context.source.length,
+          '"use generated"; const value = 1;',
+          'sourceless',
+        );
+        context.editor.prepend('capture(function(){\n');
+        context.editor.append('\n});');
+      },
+    });
+    const source = directive === 'sloppy' ? 'const original = 0;' : `"${directive}"; export {};`;
+    const result = transform(
+      source,
+      'fixture.js',
+      defineNativePipeline({ phases: [{ name: 'replace', plugins: [plugin] }] }),
+    );
+    assert.equal(result.status, 'complete');
+    if (result.status !== 'complete') throw new Error('Unexpected bailout');
+    assert.match(result.code, /^capture\(function\(\)\{\n"use generated";/);
+    assert.equal(result.code.includes('use strict'), directive !== 'sloppy');
+    assert.equal(result.code.match(/function probe/g)?.length, 1);
+    assert.ok(result.code.indexOf('function probe') < result.code.indexOf('var answer'));
+    assert.ok(result.code.indexOf('const value') < result.code.indexOf('module.exports'));
+    const module = { exports: 0 };
+    Function('capture', 'module', result.code)((factory: () => void) => factory(), module);
+    assert.equal(module.exports, 42);
+  },
+);
+
+test('program payload copies observe body edits and keep original mappings', () => {
+  const source = '"use client"; function probe(){return 1;} export {};';
+  const start = source.indexOf('function');
+  const end = source.indexOf(' export');
+  let observed = '';
+  const plugin = defineNativePlugin({
+    name: 'copy-helper',
+    editEffect: 'bindings',
+    post(context) {
+      context.prependToProgram(context.sourceSlice(start, end));
+      context.editor.overwrite(source.indexOf('1'), source.indexOf('1') + 1, '42');
+      context.editor.remove(source.indexOf('export'), source.length);
+      context.appendToProgram('module.exports = probe();');
+      observed = context.editor.toString();
+    },
+  });
+  const result = transform(
+    source,
+    'fixture.js',
+    defineNativePipeline({ phases: [{ name: 'copy', plugins: [plugin] }] }),
+  );
+  assert.equal(result.status, 'complete');
+  if (result.status !== 'complete') throw new Error('Unexpected bailout');
+  assert.equal(result.code.match(/return 42/g)?.length, 2);
+  assert.ok(observed.includes('function probe(){return 42;}'));
+  const module = { exports: 0 };
+  Function('module', result.code)(module);
+  assert.equal(module.exports, 42);
+  const prefix = result.code.slice(0, result.code.indexOf('function probe'));
+  const line = prefix.split('\n').length;
+  const column = prefix.split('\n').at(-1)!.length;
+  assert.equal(
+    originalPositionFor(new TraceMap({ version: 3, sources: ['fixture.js'], ...result.map }), {
+      line,
+      column,
+    }).column,
+    start,
+  );
+});
+
+test('program intents do not relax positional insertion conflicts', () => {
+  const plugin = defineNativePlugin({
+    name: 'conflicting-source-edits',
+    editEffect: 'bindings',
+    post(context) {
+      context.prependToProgram('var helper = 1;');
+      context.editor.overwrite(0, context.source.length, 'module.exports = 1;', 'sourceless');
+      context.editor.appendLeft(5, 'conflict');
+    },
+  });
+  assert.throws(
+    () =>
+      transform(
+        '"use client"; export {};',
+        'fixture.js',
+        defineNativePipeline({ phases: [{ name: 'conflict', plugins: [plugin] }] }),
+      ),
+    /overlapping edits/,
+  );
+});
+
+test('program copies include structured body edits without copying other placements', () => {
+  const plugin = defineNativePlugin({
+    name: 'copy-edited-statement',
+    editEffect: 'expression-shape',
+    pre(context) {
+      const statement = context.sourceSlice(0, context.source.length);
+      context.prependToProgram(statement);
+      context.prependToProgram(statement);
+      context.appendToProgram(statement);
+    },
+    visitors: [
+      defineVisitor('NumericLiteral', {}, path => {
+        path.replaceWith(path.context.code.template`${path.getSource()} + 1`);
+      }),
+    ],
+  });
+  const result = transform(
+    'consume(1);',
+    'fixture.js',
+    defineNativePipeline({ phases: [{ name: 'copy', plugins: [plugin] }] }),
+  );
+  assert.equal(result.status, 'complete');
+  if (result.status !== 'complete') throw new Error('Unexpected bailout');
+  const values: number[] = [];
+  Function('consume', result.code)((value: number) => values.push(value));
+  assert.deepEqual(values, [2, 2, 2, 2]);
+});

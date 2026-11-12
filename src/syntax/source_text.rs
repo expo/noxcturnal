@@ -3,7 +3,7 @@ use std::cell::OnceCell;
 
 use napi::{
     Error, Result, Status,
-    bindgen_prelude::{Buffer, Either, Utf16String},
+    bindgen_prelude::{Buffer, Utf16String},
 };
 use napi_derive::napi;
 use oxc_allocator::Allocator;
@@ -18,12 +18,6 @@ pub struct SourceMatch {
     pub end: u32,
     pub captures: Vec<Utf16String>,
     pub content: Option<Utf16String>,
-}
-
-#[napi(object)]
-pub struct SourceTextRange {
-    pub start: u32,
-    pub end: u32,
 }
 
 #[napi]
@@ -142,57 +136,6 @@ impl NativeSourceText {
             output.extend_from_slice(line);
         }
         output.into()
-    }
-
-    /// The first program insertion at an offset gets a leading newline unless it
-    /// starts the file or follows a line break, so it stays on its own line.
-    #[napi]
-    pub fn needs_line_boundary(&self, offset: u32) -> bool {
-        offset > 0 && self.source.get(offset as usize - 1) != Some(&10)
-    }
-
-    /// Text and composite payloads use separate typed batches. Results are in
-    /// text-first order, followed by composite order, without an outer union.
-    ///
-    /// A program insertion always ends with a newline. It also gets a semicolon
-    /// when it is not a terminated statement, or when it contains a slash, so it
-    /// cannot glue onto the next statement or open a comment or a regex. A
-    /// composite counts as terminated only when its last part is text that ends
-    /// a statement; a slash in any part then still forces the semicolon.
-    #[napi]
-    pub fn insertion_suffixes(
-        &self,
-        texts: Vec<Utf16String>,
-        composites: Vec<Vec<Either<Utf16String, SourceTextRange>>>,
-    ) -> Result<Buffer> {
-        let mut separators = Vec::with_capacity(texts.len() + composites.len());
-        for text in texts {
-            separators.push(u8::from(!terminated_insertion(&text) || text.contains(&47)));
-        }
-        for parts in composites {
-            let terminated =
-                matches!(parts.last(), Some(Either::A(text)) if terminated_insertion(text));
-            let mut comment_free = true;
-            if terminated {
-                for part in &parts {
-                    let text: &[u16] = match part {
-                        Either::A(text) => text,
-                        Either::B(range) => self
-                            .source
-                            .get(range.start as usize..range.end as usize)
-                            .ok_or_else(|| {
-                                Error::new(Status::InvalidArg, "invalid source range")
-                            })?,
-                    };
-                    if text.contains(&47) {
-                        comment_free = false;
-                        break;
-                    }
-                }
-            }
-            separators.push(u8::from(!terminated || !comment_free));
-        }
-        Ok(separators.into())
     }
 
     #[napi]
@@ -399,10 +342,6 @@ impl NativeSourceText {
             lines
         })
     }
-}
-
-fn terminated_insertion(text: &[u16]) -> bool {
-    text.iter().rev().find(|&&unit| !is_whitespace(unit)) == Some(&59)
 }
 
 fn is_whitespace(unit: u16) -> bool {

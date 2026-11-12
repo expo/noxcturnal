@@ -1,6 +1,7 @@
 use napi::{Error, Result, Status};
 
 pub(crate) mod commit;
+mod output;
 use napi_derive::napi;
 use rustc_hash::FxHashMap;
 use std::rc::Rc;
@@ -18,9 +19,11 @@ pub enum EditKind {
     /// Output-section content before every body piece (wrapper openers). Later
     /// prefixes render before earlier ones, mirroring repeated `prepend` semantics.
     Prefix,
-    /// Directive-prologue helper content: participates in the body stream at its
-    /// offset with append-left placement, in first-ensure order.
+    /// Program preamble placed after the edited body's directive prologue, in
+    /// first-call order. Its source offset does not control output placement.
     Prologue,
+    /// Program statements placed after the final edited body statement.
+    ProgramEnd,
     /// Output-section content after every body piece (wrapper closers), in call
     /// order.
     Suffix,
@@ -154,8 +157,7 @@ enum KeyRole {
     MoveDestination,
 }
 
-#[cfg(test)]
-pub fn utf16_to_byte(source: &str, offset: u32) -> Result<usize> {
+pub(crate) fn utf16_to_byte(source: &str, offset: u32) -> Result<usize> {
     let target = offset as usize;
     let mut utf16 = 0;
     for (byte, ch) in source.char_indices() {
@@ -340,7 +342,7 @@ pub(crate) fn build_with_roots(
                 (4, false)
             }
             EditKind::Remove | EditKind::Replace => (4, false),
-            EditKind::Prefix | EditKind::Suffix | EditKind::Move => {
+            EditKind::Prefix | EditKind::Suffix | EditKind::Move | EditKind::ProgramEnd => {
                 unreachable!("sections and moves are split off above")
             }
         };
