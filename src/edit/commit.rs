@@ -6,10 +6,24 @@ use crate::sourcemap;
 
 pub fn commit(
     source: &str,
-    _filename: &str,
+    filename: &str,
     commands: Vec<super::EditCommand>,
     mode: Option<&str>,
 ) -> Result<NativeCommitResult> {
+    if commands.iter().any(|command| {
+        matches!(
+            command.kind,
+            super::EditKind::Prologue | super::EditKind::ProgramEnd
+        )
+    }) {
+        let commit = commit_output(source, filename, commands, mode, false)?;
+        let (mappings, names) = sourcemap::compose_layer_chain(&[commit.map.as_ref()])
+            .map_err(crate::engine::compose_error)?;
+        return Ok(NativeCommitResult {
+            code: commit.code,
+            map: NativeVlqMap { mappings, names },
+        });
+    }
     let pieces = super::build(source, commands)?;
     let (code, mappings, names) = if mode == Some("none") {
         (
@@ -40,12 +54,26 @@ pub fn commit_packed_buffer(
 /// `compose_decoded_chain` once the pipeline finishes.
 pub fn commit_decoded_buffer(
     source: &str,
-    _filename: &str,
+    filename: &str,
     data: &[u8],
     mode: Option<&str>,
 ) -> Result<NativeDecodedCommit> {
-    let commands = decode_packed_commands(data)?;
-    let pieces = super::build(source, commands)?;
+    commit_output(source, filename, decode_packed_commands(data)?, mode, false)
+}
+
+pub(crate) fn commit_decoded_commands(
+    source: &str,
+    commands: Vec<super::EditCommand>,
+    mode: Option<&str>,
+) -> Result<NativeDecodedCommit> {
+    commit_decoded_pieces(source, super::build(source, commands)?, mode)
+}
+
+pub(crate) fn commit_decoded_pieces(
+    source: &str,
+    pieces: Vec<super::Piece>,
+    mode: Option<&str>,
+) -> Result<NativeDecodedCommit> {
     let mode = mode.unwrap_or("boundary");
     let (code, layer) = sourcemap::render_decoded_layer(source, &pieces, mode);
     let code_changed = code != source;
@@ -57,6 +85,8 @@ pub fn commit_decoded_buffer(
         map_changed,
     })
 }
+
+pub(crate) use super::output::commit as commit_output;
 
 fn mapping_changed(source: &str, layer: &sourcemap::DecodedLayer, mode: &str) -> Result<bool> {
     // Canonical identity has no names, unmapped segments, or coordinates that

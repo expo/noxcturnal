@@ -549,7 +549,7 @@ pub(crate) fn parse_program_body_offsets(source: &str, filename: &str) -> Result
     ))
 }
 
-fn program_body_offsets(
+pub(crate) fn program_body_offsets(
     program: &oxc_ast::ast::Program<'_>,
     source: &str,
     utf16: Option<&[u32]>,

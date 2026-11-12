@@ -443,17 +443,7 @@ export function transform(
   let syntaxSource: string | null = null;
   let syntaxFacts: ReadonlySet<string> | null = null;
   let parsedSource: NativeParsedSourceBinding | null = null;
-  let outputPreparation: ReturnType<NativeParsedSourceBinding['outputPreparation']> = null;
-  // Body insertions stay inside wrapper sections and precede generated helpers.
-  const outputEdit = (preparation: NonNullable<typeof outputPreparation>): EditCommand => ({
-    kind: 'PrependLeft',
-    start: preparation.offset,
-    end: preparation.offset,
-    content: preparation.content,
-    mapping: 'Sourceless',
-    owner: 'noxcturnal-output',
-    order: 0xffffffff,
-  });
+  let needsStrictOutput = false;
   let reusableRoutedBatch: { manifest: Buffer; batch: RoutedEventBatch } | null = null;
   // Record one native run's per-phase results into diagnostics/metadata and bail
   // on the first phase that did not complete. Shared by the mixed-pipeline loop
@@ -502,7 +492,7 @@ export function transform(
         parseFilename,
         moduleFilename ?? filename,
       );
-      outputPreparation = parsedSource.outputPreparation();
+      needsStrictOutput = parsedSource.needsStrictOutput();
       if (options.functionMap) initialFunctionMap = parsedSource.functionMap();
       parsedSource.validate();
       parsedSource = null;
@@ -537,7 +527,7 @@ export function transform(
       const phase = pipeline.phases[phaseIndex];
       const executionPlan = phasePlan[phaseIndex];
       if (phase.native != null) {
-        outputPreparation = null;
+        needsStrictOutput = false;
         parsedSource?.close();
         parsedSource = null;
         reusableSession?.close();
@@ -600,7 +590,7 @@ export function transform(
           parseFilename,
           moduleFilename ?? filename,
         );
-        outputPreparation = parsedSource.outputPreparation();
+        needsStrictOutput = parsedSource.needsStrictOutput();
       }
       const prepared = prepareApplicablePhase(phase, syntaxFacts);
       // A syntax requirement rejects the entire plugin, including lifecycle work.
@@ -809,12 +799,7 @@ export function transform(
       }
       if (runtimeEditEffect === 'none' && edits.length > 0)
         throw new Error(`${phase.name}: phase declared edit effect none but emitted edits`);
-      dispatch.flushInsertions();
       const effectiveEdits: EditCommand[] = edits;
-      if (effectiveEdits.length > 0 && outputPreparation != null) {
-        effectiveEdits.push(outputEdit(outputPreparation));
-        outputPreparation = null;
-      }
       if (effectiveEdits.length === 0) {
         if (canReuseForNextPhase) {
           reusableSession = session;
@@ -831,8 +816,9 @@ export function transform(
       pipelineSession ??= new native.NativePipelineSession(parseFilename, currentSource());
       const residentPipeline = pipelineSession;
       const committed = commitWithDedupe(effectiveEdits, data =>
-        residentPipeline.commitDecoded(data, options.sourceMapMode),
+        residentPipeline.commitDecoded(data, options.sourceMapMode, needsStrictOutput),
       );
+      needsStrictOutput = false;
       const codeChanged = committed.codeChanged;
       const mapChanged = committed.mapChanged;
       const resultingVersion = sourceVersions.commit(currentVersion, {
@@ -863,17 +849,17 @@ export function transform(
     reusableSession?.close();
     openSession = null;
     // A module with no applicable edits still receives the same output policy.
-    if (outputPreparation != null) {
+    if (needsStrictOutput) {
       pipelineSession ??= new native.NativePipelineSession(parseFilename, currentSource());
       const residentPipeline = pipelineSession;
-      const committed = commitWithDedupe([outputEdit(outputPreparation)], data =>
-        residentPipeline.commitDecoded(data, options.sourceMapMode),
+      const committed = commitWithDedupe([], data =>
+        residentPipeline.commitDecoded(data, options.sourceMapMode, needsStrictOutput),
       );
       currentVersion = sourceVersions.commit(currentVersion, {
         codeChanged: committed.codeChanged,
         mapChanged: committed.mapChanged,
       });
-      outputPreparation = null;
+      needsStrictOutput = false;
     }
     // The single terminal crossing: the resident source becomes the final code
     // and every retained layer composes into the final map — with the input map

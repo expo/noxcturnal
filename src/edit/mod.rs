@@ -1,6 +1,7 @@
 use napi::{Error, Result, Status};
 
 pub(crate) mod commit;
+mod output;
 use napi_derive::napi;
 use rustc_hash::FxHashMap;
 use std::rc::Rc;
@@ -18,9 +19,11 @@ pub enum EditKind {
     /// Output-section content before every body piece (wrapper openers). Later
     /// prefixes render before earlier ones, mirroring repeated `prepend` semantics.
     Prefix,
-    /// Directive-prologue helper content: participates in the body stream at its
-    /// offset with append-left placement, in first-ensure order.
+    /// Program preamble placed after the edited body's directive prologue, in
+    /// first-call order. Its source offset does not control output placement.
     Prologue,
+    /// Program statements placed after the final edited body statement.
+    ProgramEnd,
     /// Output-section content after every body piece (wrapper closers), in call
     /// order.
     Suffix,
@@ -154,8 +157,7 @@ enum KeyRole {
     MoveDestination,
 }
 
-#[cfg(test)]
-pub fn utf16_to_byte(source: &str, offset: u32) -> Result<usize> {
+pub(crate) fn utf16_to_byte(source: &str, offset: u32) -> Result<usize> {
     let target = offset as usize;
     let mut utf16 = 0;
     for (byte, ch) in source.char_indices() {
@@ -186,6 +188,16 @@ pub fn utf16_to_byte(source: &str, offset: u32) -> Result<usize> {
 /// replaced source lower directly into `Original` pieces, and adjacent original
 /// ranges merge.
 pub fn build(source: &str, commands: Vec<EditCommand>) -> Result<Vec<Piece>> {
+    Ok(build_with_roots(source, commands, Vec::new())?.0)
+}
+
+/// Resolve output payload copies against the same immutable edit batch, without
+/// treating their eventual placement as a positional edit or copying other roots.
+pub(crate) fn build_with_roots(
+    source: &str,
+    commands: Vec<EditCommand>,
+    roots: Vec<EditCommand>,
+) -> Result<(Vec<Piece>, Vec<Vec<Piece>>)> {
     #[derive(Default)]
     struct EditGroup {
         count: usize,
@@ -330,7 +342,7 @@ pub fn build(source: &str, commands: Vec<EditCommand>) -> Result<Vec<Piece>> {
                 (4, false)
             }
             EditKind::Remove | EditKind::Replace => (4, false),
-            EditKind::Prefix | EditKind::Suffix | EditKind::Move => {
+            EditKind::Prefix | EditKind::Suffix | EditKind::Move | EditKind::ProgramEnd => {
                 unreachable!("sections and moves are split off above")
             }
         };
@@ -464,7 +476,7 @@ pub fn build(source: &str, commands: Vec<EditCommand>) -> Result<Vec<Piece>> {
     // suffixes accumulate in call order.
     prefix.sort_unstable_by(|a, b| b.0.cmp(&a.0).then(a.1.cmp(&b.1)));
     suffix.sort_unstable();
-    if has_parts {
+    if has_parts || !roots.is_empty() {
         // Deferred copies expand against the whole sorted edit list, so this path
         // materializes it before lowering to pieces.
         let mut edits = Vec::with_capacity(keys.len());
@@ -546,7 +558,7 @@ pub fn build(source: &str, commands: Vec<EditCommand>) -> Result<Vec<Piece>> {
                 order: Some(key.order),
             });
         }
-        let mut expansions = expand_copies(source, &mut edits)?;
+        let (mut expansions, roots) = expand_copies(source, &mut edits, roots, resolve)?;
         let mut pieces = Vec::with_capacity(edits.len() * 2 + 1 + prefix.len() + suffix.len());
         push_section(&mut pieces, &mut slots, &prefix, 0);
         let mut cursor = 0usize;
@@ -612,7 +624,7 @@ pub fn build(source: &str, commands: Vec<EditCommand>) -> Result<Vec<Piece>> {
         }
         push_original(&mut pieces, cursor, source.len());
         push_section(&mut pieces, &mut slots, &suffix, source.len());
-        return Ok(pieces);
+        return Ok((pieces, roots));
     }
     let mut pieces = Vec::with_capacity(keys.len() * 2 + 1 + prefix.len() + suffix.len());
     push_section(&mut pieces, &mut slots, &prefix, 0);
@@ -640,7 +652,7 @@ pub fn build(source: &str, commands: Vec<EditCommand>) -> Result<Vec<Piece>> {
     }
     push_original(&mut pieces, cursor, source.len());
     push_section(&mut pieces, &mut slots, &suffix, source.len());
-    Ok(pieces)
+    Ok((pieces, Vec::new()))
 }
 
 fn take_command(
@@ -697,6 +709,8 @@ fn push_original(pieces: &mut Vec<Piece>, start: usize, end: usize) {
 /// Expand deferred `Copy` content parts against the sorted edit list into piece
 /// sub-sequences.
 ///
+type CopyExpansions = Vec<Option<Vec<Piece>>>;
+
 /// A copied range expands to its original source slices with every fully-contained
 /// edit applied (zero-width insertions count only strictly inside), so inserted
 /// copies reflect the same phase's edits instead of snapshotting pre-edit text.
@@ -707,7 +721,12 @@ fn push_original(pieces: &mut Vec<Piece>, start: usize, end: usize) {
 /// public UTF-16 offsets so callers can attribute owners.
 ///
 /// Returns the content pieces per edit; only parts-carrying edits get `Some`.
-fn expand_copies(source: &str, edits: &mut [Edit]) -> Result<Vec<Option<Vec<Piece>>>> {
+fn expand_copies(
+    source: &str,
+    edits: &mut [Edit],
+    roots: Vec<EditCommand>,
+    resolve: impl Fn(u32) -> Result<usize>,
+) -> Result<(CopyExpansions, Vec<Vec<Piece>>)> {
     // Index of the nearest ranged edit at or before each position: after the binary
     // search skips everything left of a copied range, this is the only edit that can
     // still straddle the range's start boundary.
@@ -764,7 +783,59 @@ fn expand_copies(source: &str, edits: &mut [Edit]) -> Result<Vec<Option<Vec<Piec
     for index in 0..edits.len() {
         expander.resolve(edits, &mut expansions, index, None)?;
     }
-    Ok(expansions)
+    let mut root_ranges = FxHashMap::<(usize, usize), Rc<[Piece]>>::default();
+    let roots = roots
+        .into_iter()
+        .map(|root| {
+            let origin = resolve(root.start)?;
+            if root.parts.is_empty() {
+                return Ok(vec![Piece::Generated {
+                    text: root.content.unwrap_or_default(),
+                    start: origin,
+                    end: origin,
+                    mapping: root.mapping.unwrap_or(MappingPolicy::Sourceless),
+                    names: root.names.unwrap_or_default(),
+                }]);
+            }
+            let mut pieces = Vec::new();
+            let copier = (root.start, root.end, false, usize::MAX, None);
+            for part in root.parts {
+                match part {
+                    RawContentPart::Text(text) => pieces.push(glue(text, origin)),
+                    RawContentPart::Copy { start, end } => {
+                        let range = (resolve(start)?, resolve(end)?);
+                        if let Some(cached) = root_ranges.get(&range) {
+                            pieces.push(Piece::Splice(Rc::clone(cached)));
+                        } else {
+                            let mut sub = Vec::new();
+                            expander
+                                .expand_range(
+                                    edits,
+                                    &mut expansions,
+                                    range.0,
+                                    range.1,
+                                    copier,
+                                    &mut sub,
+                                )
+                                .map_err(|mut error| {
+                                    error.reason = format!(
+                                        "output placement order {}: {}",
+                                        root.order.unwrap_or(0),
+                                        error.reason
+                                    );
+                                    error
+                                })?;
+                            let shared: Rc<[Piece]> = Rc::from(sub);
+                            pieces.push(Piece::Splice(Rc::clone(&shared)));
+                            root_ranges.insert(range, shared);
+                        }
+                    }
+                }
+            }
+            Ok(pieces)
+        })
+        .collect::<Result<Vec<_>>>()?;
+    Ok((expansions, roots))
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -1215,7 +1286,10 @@ mod tests {
                 order: Some(1),
             });
         }
-        let expansions = expand_copies(&source, &mut edits).unwrap();
+        let (expansions, _) = expand_copies(&source, &mut edits, Vec::new(), |offset| {
+            utf16_to_byte(&source, offset)
+        })
+        .unwrap();
         // Each two-byte copy contains one insertion between its original x's.
         // Check every distinct range: merely completing would also pass if the
         // expansion cache incorrectly reused the first range for all copies.
@@ -1272,7 +1346,10 @@ mod tests {
                 order: Some(1),
             });
         }
-        let expansions = expand_copies(&source, &mut edits).unwrap();
+        let (expansions, _) = expand_copies(&source, &mut edits, Vec::new(), |offset| {
+            utf16_to_byte(&source, offset)
+        })
+        .unwrap();
         // Move holes remove text only at its old location. Copies must retain
         // all original bytes, including those covered by the holes.
         for (index, expansion) in expansions[..COUNT].iter().enumerate() {

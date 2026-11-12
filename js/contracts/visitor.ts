@@ -146,13 +146,13 @@ export interface PluginContext {
   /** Revisit the program with stateful visitors; their state is mandatory. */
   revisitProgram<State>(visitors: readonly DefinedVisitor<State>[], state: State): void;
   /**
-   * Insert statements after the Program's shebang, leading comments, and directive
+   * Insert statements after the edited Program's shebang, leading comments, and directive
    * prologue. Insertions join the body stream in first-call order, inside output
    * wrappers created with `editor.prepend()` and `editor.append()`.
    */
   prependToProgram(code: Code): void;
   /**
-   * Insert statements after the final Program statement and before its trailing
+   * Insert statements after the final edited Program statement and before its trailing
    * comments and output suffixes created with `editor.append()`.
    */
   appendToProgram(code: Code): void;
@@ -204,6 +204,7 @@ export interface NativeEditor {
   overwrite(start: number, end: number, content: string, mapping?: CodeFragment['mapping']): void;
   remove(start: number, end: number): void;
   move(start: number, end: number, destination: number): void;
+  /** Reset owned source edits in a range. A full-program reset also removes owned program placements. */
   reset(start: number, end: number): void;
   indent(prefix?: string): void;
   trim(): void;

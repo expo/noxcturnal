@@ -25,7 +25,8 @@ and parent identities, never source spans, and skips scalar/comment payloads.
 The first hydration fuses selection with child packing. Sessions with existing
 child caches return root IDs so JavaScript can filter already hydrated parents.
 
-Module output preparation reads the already-owned parse before materialization
-consumes it. Its source coordinates describe an output insertion, not AST
-identity. The runtime forwards that insertion to the ordinary edit commit, inside
-factory wrappers, or emits it at finalization when no phase edits the input.
+Output assembly reads strictness intent from the already-owned input parse before
+materialization consumes it. Visitor commits share the edit layer's output
+assembler for strict directives, helpers, program preambles and epilogues, and
+wrapper sections. Placement follows the edited body's syntax. Its map layers
+become resident together only after every stage succeeds.

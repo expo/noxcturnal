@@ -9,7 +9,9 @@ use crate::sourcemap;
 
 mod child_roots;
 mod collect;
+pub(crate) use collect::program_body_offsets;
 mod fields;
+pub(crate) use fields::utf16_index;
 mod manifest;
 mod member;
 pub use manifest::NativeCompiledManifest;
@@ -70,7 +72,7 @@ pub fn compose_decoded_chain(layers: &[&[u8]]) -> Result<NativeVlqMap> {
     Ok(NativeVlqMap { mappings, names })
 }
 
-fn compose_error(error: sourcemap::DecodedMapError) -> Error {
+pub(crate) fn compose_error(error: sourcemap::DecodedMapError) -> Error {
     match error {
         sourcemap::DecodedMapError::Invalid => {
             Error::new(Status::InvalidArg, "invalid decoded map layer chain")

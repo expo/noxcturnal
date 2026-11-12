@@ -1,7 +1,7 @@
 use napi::{Error, Result, Status, bindgen_prelude::Buffer};
 use napi_derive::napi;
 
-use crate::edit::commit::commit_decoded_buffer;
+use crate::edit::commit::commit_output;
 use crate::event_types::NativeVlqMap;
 use crate::preflight::transform::transform_resident as preflight_transform;
 use crate::preflight::{NativePreflightOptions, NativePreflightResult};
@@ -129,6 +129,7 @@ impl NativePipelineSession {
         &mut self,
         data: Buffer,
         source_map_mode: Option<String>,
+        needs_strict_output: Option<bool>,
     ) -> Result<NativePipelineCommit> {
         // Borrow the held source rather than take it: a commit can fail on an
         // edit conflict, and `commitWithDedupe` retries against the same source,
@@ -137,17 +138,20 @@ impl NativePipelineSession {
             .current
             .as_deref()
             .ok_or_else(|| incomplete("pipeline source already consumed"))?;
-        let commit =
-            commit_decoded_buffer(source, &self.filename, &data, source_map_mode.as_deref())?;
+        let commit = commit_output(
+            source,
+            &self.filename,
+            crate::protocol::edits::decode_packed_commands(&data)?,
+            source_map_mode.as_deref(),
+            needs_strict_output.unwrap_or(false),
+        )?;
         let code_changed = commit.code_changed;
         let map_changed = commit.map_changed;
-        let layer = commit.map.to_vec();
-        let has_effect = code_changed || map_changed;
+        if code_changed || map_changed {
+            self.layers.push(commit.map.to_vec());
+        }
         if code_changed {
             self.current = Some(commit.code);
-        }
-        if has_effect {
-            self.layers.push(layer);
         }
         Ok(NativePipelineCommit {
             code_changed,

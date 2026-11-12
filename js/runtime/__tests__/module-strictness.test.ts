@@ -560,3 +560,147 @@ test('TypeScript namespace module evidence enforces strict early errors', () => 
     expect(() => transform(source, 'fixture.ts', plan)).toThrow(/with/);
   }
 });
+
+test.each(['use client', 'use dom', 'use server', 'use strict'])(
+  'whole-program replacement preserves strictness after %s',
+  directive => {
+    const replacement = 'module.exports = function(){return this === undefined;};';
+    const replace = defineNativePlugin({
+      name: 'replace-program',
+      editEffect: 'bindings',
+      post(context) {
+        context.editor.overwrite(0, context.source.length, replacement, 'sourceless');
+      },
+    });
+    const result = transform(
+      `"${directive}"; export default function App() {}`,
+      'fixture.js',
+      defineNativePipeline({ phases: [{ name: 'proxy', plugins: [replace] }] }),
+    );
+    expect(result.status).toBe('complete');
+    if (result.status !== 'complete') throw new Error(result.status);
+    expect(result.code).toBe('"use strict";\n' + replacement);
+    const module = { exports: undefined as unknown };
+    Function('module', result.code)(module);
+    const probe = module.exports as () => boolean;
+    expect(probe()).toBe(true);
+    expect(
+      originalPositionFor(new TraceMap({ version: 3, sources: ['fixture.js'], ...result.map }), {
+        line: 2,
+        column: 0,
+      }).source,
+    ).toBeNull();
+  },
+);
+
+test.each([
+  { name: 'generated module', replacement: 'export const value = 1;' },
+  { name: 'generated directive', replacement: '"use server"; module.exports = 1;' },
+  { name: 'generated hashbang', replacement: '#!/usr/bin/env node\nmodule.exports = 1;' },
+  { name: 'generated strict directive', replacement: '"use strict"; module.exports = 1;' },
+])('prepares $name after a whole-program replacement', ({ replacement }) => {
+  const replace = defineNativePlugin({
+    name: 'replace-output',
+    editEffect: 'bindings',
+    post(context) {
+      context.editor.overwrite(0, context.source.length, replacement, 'sourceless');
+    },
+  });
+  const result = transform(
+    '#!/usr/bin/env node\n"use client"; export {};',
+    'fixture.js',
+    defineNativePipeline({ phases: [{ name: 'replace', plugins: [replace] }] }),
+  );
+  expect(result.status).toBe('complete');
+  if (result.status !== 'complete') throw new Error(result.status);
+  const anchor = replacement.startsWith('#!')
+    ? replacement.indexOf('\n')
+    : replacement.startsWith('"use server";')
+      ? '"use server";'.length
+      : 0;
+  expect(result.code).toBe(
+    replacement.startsWith('"use strict";')
+      ? replacement
+      : replacement.slice(0, anchor) +
+          (anchor ? '\n' : '') +
+          '"use strict";\n' +
+          replacement.slice(anchor),
+  );
+  expect(result.code.match(/use strict/g)).toHaveLength(1);
+});
+
+test('partial replacement prepares strictness inside wrapper sections for the next phase', () => {
+  const source = '"use client"; export function probe(){return this === undefined;}';
+  let observed = '';
+  const wrap = defineNativePlugin({
+    name: 'replace-prologue-and-wrap',
+    editEffect: 'bindings',
+    post(context) {
+      context.editor.overwrite(0, '"use client"; export '.length, '"use server"; ', 'sourceless');
+      context.editor.prepend('capture(function(){\n');
+      context.editor.append('\nreturn probe;});');
+    },
+  });
+  const observer = defineNativePlugin({
+    name: 'observe-prepared-output',
+    editEffect: 'none',
+    pre(context) {
+      observed = context.source;
+    },
+  });
+  const result = transform(
+    source,
+    'fixture.js',
+    defineNativePipeline({
+      phases: [
+        { name: 'wrap', plugins: [wrap] },
+        { name: 'observe', plugins: [observer] },
+      ],
+    }),
+  );
+  expect(result.status).toBe('complete');
+  if (result.status !== 'complete') throw new Error(result.status);
+  expect(observed).toBe(result.code);
+  expect(result.code).toMatch(/^capture\(function\(\)\{\n"use server";\n"use strict";/);
+  let probe: (() => boolean) | undefined;
+  Function(
+    'capture',
+    result.code,
+  )((factory: () => () => boolean) => {
+    probe = factory();
+  });
+  expect(probe!()).toBe(true);
+  const generatedLine = result.code
+    .slice(0, result.code.indexOf('function probe'))
+    .split('\n').length;
+  const generatedColumn = result.code.split('\n')[generatedLine - 1].indexOf('function probe');
+  expect(
+    originalPositionFor(new TraceMap({ version: 3, sources: ['fixture.js'], ...result.map }), {
+      line: generatedLine,
+      column: generatedColumn,
+    }),
+  ).toMatchObject({ line: 1, column: source.indexOf('function probe') });
+});
+
+test('replacement preserves explicit script strictness', () => {
+  const replace = defineNativePlugin({
+    name: 'replace-strict-script',
+    editEffect: 'bindings',
+    post(context) {
+      context.editor.overwrite(
+        0,
+        context.source.length,
+        'function probe(){return this === undefined;}',
+        'sourceless',
+      );
+    },
+  });
+  const result = transform(
+    '"use strict"; function original(){}',
+    'fixture.js',
+    defineNativePipeline({ phases: [{ name: 'replace', plugins: [replace] }] }),
+  );
+  expect(result.status).toBe('complete');
+  if (result.status !== 'complete') throw new Error(result.status);
+  expect(Function(result.code + ';return probe;')()()).toBe(true);
+});

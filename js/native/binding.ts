@@ -101,7 +101,7 @@ interface NativeBinding {
     filename: string,
     moduleFilename?: string,
   ) => {
-    outputPreparation(): { offset: number; content: string } | null;
+    needsStrictOutput(): boolean;
     syntaxFacts(): string[];
     functionMap(): FunctionMap;
     materializeRouted(manifest: NativeManifest): Buffer;
@@ -116,13 +116,8 @@ interface NativeBinding {
     generateUid(name: string, filename: string): string;
     whitespace(): number[];
     indent(prefix: string): string;
-    needsLineBoundary(offset: number): boolean;
     startsLine(offset: number): boolean;
     linePrefixIntervals(start: number, end: number): Buffer;
-    insertionSuffixes(
-      texts: readonly string[],
-      composites: readonly (readonly (string | { start: number; end: number })[])[],
-    ): Buffer;
     locations(start: number, end: number): number[];
     locationOffset(line: number, column: number): number;
     matches(
@@ -297,6 +292,7 @@ interface NativeBinding {
     commitDecoded(
       data: Buffer,
       sourceMapMode?: string,
+      needsStrictOutput?: boolean,
     ): {
       codeChanged: boolean;
       mapChanged: boolean;
