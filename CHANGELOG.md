@@ -1,5 +1,11 @@
 # noxcturnal
 
+## 0.1.13
+
+### Patch Changes
+
+- Compose strict directives, helpers, and program preambles and epilogues against the edited body so whole-program and prologue replacements do not consume their insertion anchors. Preserve wrapper scope, safe statement boundaries, deduplication, and source-map provenance while keeping positional edit conflicts fatal, by [@kitten](https://github.com/kitten) (See [#94](https://github.com/expo/noxcturnal/pull/94))
+
 ## 0.1.12
 
 ### Patch Changes
