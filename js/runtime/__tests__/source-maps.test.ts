@@ -278,9 +278,9 @@ test('keeps a wholly generated module unmapped when it declares itself sourceles
   };
   const declared = mappingsFor('sourceless');
   assert.ok(
-    declared
-      .split(';')
-      .every(line => line.split(',').every((segment: string) => segment.length <= 1)),
+    decodedMappings(
+      new TraceMap({ version: 3, sources: ['fixture.js'], names: [], mappings: declared }),
+    ).every(line => line.every(segment => segment.length === 1)),
     `a sourceless module must stay unmapped: ${declared}`,
   );
   // Omitting the policy anchors it instead, which is why the proxy plugins downstream
