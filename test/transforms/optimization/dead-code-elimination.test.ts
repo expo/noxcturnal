@@ -291,6 +291,35 @@ test('removes unreachable recursive groups and their dependencies', async () => 
   expect(output).not.toContain('const self');
 });
 
+test('removes unused primitive initializers but retains effects and throwing reads', async () => {
+  const output = await transformSource(
+    `
+    const unusedNumber=123, unusedString='text', unusedBoolean=false, unusedNull=null, unusedBigInt=1n;
+    const call=effect(), getter=object.value, throwing=missing;
+    const throwingBigInt=1n/0n;
+    export const result=1;
+  `,
+    'input.js',
+    options,
+  );
+  expect(output).not.toContain('unused');
+  for (const retained of ['effect()', 'object.value', 'missing', '1n / 0n'])
+    expect(output).toContain(retained);
+});
+
+test('keeps resource declarations and exported primitive values', async () => {
+  const output = await transformSource(
+    `
+    using resource=123;
+    export const value=123;
+  `,
+    'input.js',
+    options,
+  );
+  expect(output).toContain('using resource = 123');
+  expect(output).toContain('export const value = 123');
+});
+
 test('retains cycles visible to script globals and eval', async () => {
   for (const source of [
     'function left(){return right()}function right(){return left()}',

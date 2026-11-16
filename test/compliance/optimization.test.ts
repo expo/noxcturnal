@@ -619,3 +619,13 @@ test('live recursive groups, eval-only roots, and primitive exports remain obser
     [true, true, 123],
   );
 });
+
+test('removing unused values does not create a strict directive', () => {
+  const source = `
+    function run(){const unused=123;"use strict";return this===undefined;}
+    globalThis.result=run();
+  `;
+  const plan = { optimize: { deadCodeElimination: true } };
+  expect(compile(source, plan)).not.toContain('unused');
+  expect(execute<{ result: boolean }>(source, plan).result).toBe(false);
+});
