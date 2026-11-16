@@ -1,5 +1,11 @@
 # noxcturnal
 
+## 0.1.14
+
+### Patch Changes
+
+- Improve dead-code elimination for unreachable branches, recursive functions, and unused declarations, by [@kitten](https://github.com/kitten) (See [#96](https://github.com/expo/noxcturnal/pull/96))
+
 ## 0.1.13
 
 ### Patch Changes
