@@ -44,7 +44,7 @@ pub(super) fn run<'a>(
         .visit_program(program);
     }
     if dead_code_elimination {
-        eliminate_dead_functions(program, module_context, checked_scoping);
+        eliminate_dead_bindings(program, module_context, checked_scoping);
     }
 }
 
@@ -348,7 +348,7 @@ fn expression_has_failed_operand(expression: &Expression<'_>, failed: &FxHashSet
     }
 }
 
-fn eliminate_dead_functions(
+fn eliminate_dead_bindings(
     program: &mut Program<'_>,
     module_context: bool,
     checked_scoping: Option<Scoping>,
@@ -373,7 +373,7 @@ fn eliminate_dead_functions(
     // Use the checked graph only for an unchanged program. Otherwise the rebuild
     // refreshes symbol cells after preceding transforms; older IDs can refer to
     // a different binding.
-    let mut collector = DeadFunctionCandidateCollector {
+    let mut collector = DeadBindingCandidateCollector {
         scoping: &scoping,
         // Bundlers may wrap this script after optimization. Its bindings are
         // then private even though the parser correctly uses script semantics.
@@ -387,13 +387,13 @@ fn eliminate_dead_functions(
         return;
     }
     let mut analysis =
-        DeadFunctionDependencyAnalysis::new(&collector.candidates, &collector.roots, &scoping);
+        DeadBindingDependencyAnalysis::new(&collector.candidates, &collector.roots, &scoping);
     analysis.visit_program(program);
     let unused = analysis.peel();
-    DeadFunctionRemover { unused }.visit_program(program);
+    DeadBindingRemover { unused }.visit_program(program);
 }
 
-struct DeadFunctionCandidateCollector<'s> {
+struct DeadBindingCandidateCollector<'s> {
     scoping: &'s Scoping,
     script: bool,
     candidates: FxHashSet<SymbolId>,
@@ -401,7 +401,7 @@ struct DeadFunctionCandidateCollector<'s> {
     with_depth: usize,
 }
 
-impl DeadFunctionCandidateCollector<'_> {
+impl DeadBindingCandidateCollector<'_> {
     fn candidate(&mut self, symbol_id: SymbolId, function_declaration: bool) {
         self.candidates.insert(symbol_id);
         let scope = self.scoping.symbol_scope_id(symbol_id);
@@ -424,7 +424,7 @@ impl DeadFunctionCandidateCollector<'_> {
     }
 }
 
-impl<'a> Visit<'a> for DeadFunctionCandidateCollector<'_> {
+impl<'a> Visit<'a> for DeadBindingCandidateCollector<'_> {
     fn visit_with_statement(&mut self, statement: &WithStatement<'a>) {
         self.with_depth += 1;
         walk::walk_with_statement(self, statement);
@@ -449,13 +449,7 @@ impl<'a> Visit<'a> for DeadFunctionCandidateCollector<'_> {
             }
             Declaration::VariableDeclaration(declaration) => {
                 for declarator in &declaration.declarations {
-                    if matches!(
-                        declarator.init,
-                        Some(
-                            Expression::FunctionExpression(_)
-                                | Expression::ArrowFunctionExpression(_)
-                        )
-                    ) && let Some(symbol_id) = declarator
+                    if let Some(symbol_id) = declarator
                         .id
                         .get_binding_identifier()
                         .and_then(|id| id.symbol_id.get())
@@ -478,6 +472,30 @@ impl<'a> Visit<'a> for DeadFunctionCandidateCollector<'_> {
         walk::walk_function(self, function, flags);
     }
 
+    fn visit_variable_declaration(&mut self, declaration: &VariableDeclaration<'a>) {
+        if declaration.kind.is_var() {
+            for declarator in &declaration.declarations {
+                if declarator.init.is_none()
+                    && let Some(symbol_id) = declarator
+                        .id
+                        .get_binding_identifier()
+                        .and_then(|id| id.symbol_id.get())
+                {
+                    // Live temporaries need no cleanup and would only enlarge
+                    // the dependency graph used to peel dead functions.
+                    if self
+                        .scoping
+                        .get_resolved_reference_ids(symbol_id)
+                        .is_empty()
+                    {
+                        self.candidate(symbol_id, false);
+                    }
+                }
+            }
+        }
+        walk::walk_variable_declaration(self, declaration);
+    }
+
     fn visit_variable_declarator(&mut self, declaration: &VariableDeclarator<'a>) {
         if matches!(
             declaration.init,
@@ -493,7 +511,7 @@ impl<'a> Visit<'a> for DeadFunctionCandidateCollector<'_> {
     }
 }
 
-struct DeadFunctionDependencyAnalysis<'s> {
+struct DeadBindingDependencyAnalysis<'s> {
     candidates: &'s FxHashSet<SymbolId>,
     scoping: &'s Scoping,
     owner: Option<SymbolId>,
@@ -501,7 +519,7 @@ struct DeadFunctionDependencyAnalysis<'s> {
     outgoing: FxHashMap<SymbolId, Vec<SymbolId>>,
 }
 
-impl<'s> DeadFunctionDependencyAnalysis<'s> {
+impl<'s> DeadBindingDependencyAnalysis<'s> {
     fn new(
         candidates: &'s FxHashSet<SymbolId>,
         roots: &FxHashSet<SymbolId>,
@@ -551,7 +569,7 @@ impl<'s> DeadFunctionDependencyAnalysis<'s> {
     }
 }
 
-impl<'a> Visit<'a> for DeadFunctionDependencyAnalysis<'_> {
+impl<'a> Visit<'a> for DeadBindingDependencyAnalysis<'_> {
     fn visit_function(&mut self, function: &Function<'a>, flags: ScopeFlags) {
         let owner = (function.r#type == FunctionType::FunctionDeclaration)
             .then(|| function.id.as_ref().and_then(|id| id.symbol_id.get()))
@@ -607,31 +625,39 @@ impl<'a> Visit<'a> for DeadFunctionDependencyAnalysis<'_> {
     }
 }
 
-struct DeadFunctionRemover {
+struct DeadBindingRemover {
     unused: FxHashSet<SymbolId>,
 }
 
-impl DeadFunctionRemover {
-    fn unused_binding<'a>(&self, declaration: &oxc_ast::ast::VariableDeclarator<'a>) -> bool {
+impl DeadBindingRemover {
+    fn unused_binding<'a>(
+        &self,
+        declaration: &oxc_ast::ast::VariableDeclarator<'a>,
+        var: bool,
+    ) -> bool {
         declaration
             .id
             .get_binding_identifier()
             .and_then(|identifier| identifier.symbol_id.get())
             .is_some_and(|symbol_id| self.unused.contains(&symbol_id))
-            && matches!(
-                declaration.init,
-                Some(Expression::FunctionExpression(_) | Expression::ArrowFunctionExpression(_))
-            )
+            && ((var && declaration.init.is_none())
+                || matches!(
+                    declaration.init,
+                    Some(
+                        Expression::FunctionExpression(_) | Expression::ArrowFunctionExpression(_)
+                    )
+                ))
     }
 
     fn remove_declarators(&mut self, declaration: &mut VariableDeclaration<'_>) {
+        let var = declaration.kind.is_var();
         declaration
             .declarations
-            .retain(|declarator| !self.unused_binding(declarator));
+            .retain(|declarator| !self.unused_binding(declarator, var));
     }
 }
 
-impl<'a> VisitMut<'a> for DeadFunctionRemover {
+impl<'a> VisitMut<'a> for DeadBindingRemover {
     fn visit_statements(&mut self, statements: &mut oxc_allocator::Vec<'a, Statement<'a>>) {
         walk_mut::walk_statements(self, statements);
         for statement in &mut *statements {

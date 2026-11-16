@@ -574,3 +574,36 @@ test.each([false, true])(
     expect(execute<{ result: number[] }>(source, options).result).toEqual([42, 7]);
   },
 );
+
+test('DCE preserves hoisted vars observed by eval, closures, and writes', () => {
+  const source = `
+    function run() {
+      if(false){var byEval=fail(), byClosure=fail(), written=fail(), redundant=fail();}
+      written=2;
+      const read=()=>byClosure;
+      return [eval('byEval'), read(), written];
+    }
+    globalThis.result=run();
+  `;
+  const options = {
+    optimize: { constantFolding: true, deadCodeElimination: true, moduleContext: true },
+  };
+  expect(execute<{ result: unknown[] }>(source, options).result).toEqual([undefined, undefined, 2]);
+  expect(compile(source, options)).toContain('redundant');
+});
+
+test('unused-hoist cleanup retains closure reads and write-only bindings', () => {
+  const source = `
+    function run(){
+      if(false){var captured=fail(), written=fail(), redundant=fail();}
+      written=2;
+      return [(()=>captured)(),written];
+    }
+    globalThis.result=run();
+  `;
+  const options = {
+    optimize: { constantFolding: true, deadCodeElimination: true, moduleContext: true },
+  };
+  expect(compile(source, options)).not.toContain('redundant');
+  expect(execute<{ result: unknown[] }>(source, options).result).toEqual([undefined, 2]);
+});

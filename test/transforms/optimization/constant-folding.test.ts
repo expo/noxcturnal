@@ -363,7 +363,8 @@ test.each([
     });
     expect(output).not.toContain('DEV_ONLY');
     expect(output).not.toContain('if (false)');
-    expect(output).toContain('var kept');
+    if (deadCodeElimination) expect(output).not.toContain('var kept');
+    else expect(output).toContain('var kept');
   }
 });
 
@@ -422,4 +423,48 @@ test('restores sloppy Annex B behavior after leaving a strict class', async () =
   expect(output).not.toContain('STRICT_ONLY');
   expect(output).toContain('SLOPPY_ONLY');
   expect(output).toContain('if (false)');
+});
+
+test.each([
+  {
+    name: 'module-private script',
+    source: 'if(false){var redundant=require("DEV_ONLY")}module.exports=1;',
+    filename: 'input.js',
+  },
+  {
+    name: 'ESM',
+    source: 'export const value=1;if(false){var redundant=require("DEV_ONLY")}',
+    filename: 'input.js',
+  },
+  {
+    name: 'function local',
+    source: 'function run(){if(false){var redundant=require("DEV_ONLY")}return 1}run();',
+    filename: 'input.js',
+  },
+])('drops unused hoisted vars in $name', async ({ source, filename }) => {
+  const output = await transformSource(source, filename, {
+    optimize: { constantFolding: true, deadCodeElimination: true, moduleContext: true },
+  });
+  expect(output).not.toContain('redundant');
+  expect(output).not.toContain('DEV_ONLY');
+});
+
+test.each([
+  { name: 'script global', source: 'if(false){var visible=fail()}', moduleContext: false },
+  {
+    name: 'exported var',
+    source: 'export var visible;if(false){var visible=fail()}',
+    moduleContext: true,
+  },
+  {
+    name: 'export specifier',
+    source: 'if(false){var visible=fail()}export {visible}',
+    moduleContext: true,
+  },
+])('preserves observable hoisted declarations: $name', async ({ source, moduleContext }) => {
+  const output = await transformSource(source, 'input.js', {
+    optimize: { constantFolding: true, deadCodeElimination: true, moduleContext },
+  });
+  expect(output).toContain('var visible');
+  expect(output).not.toContain('fail');
 });
