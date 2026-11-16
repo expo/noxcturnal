@@ -3,7 +3,7 @@ use oxc_allocator::{Address, Allocator, GetAddress, TakeIn};
 use oxc_ast::builder::GetAstBuilder;
 use oxc_ast::{
     ast::{
-        BindingIdentifier, BindingPattern, CallExpression, Class, Declaration, ExportDeclaration,
+        BindingIdentifier, BindingPattern, Class, Declaration, ExportDeclaration,
         ExportDefaultDeclaration, ExportDefaultDeclarationKind, Expression, Function, FunctionType,
         IdentifierReference, NumberBase, Program, Statement, VariableDeclaration,
         VariableDeclarationKind, VariableDeclarator, WithStatement,
@@ -381,10 +381,9 @@ fn eliminate_dead_functions(
         candidates: FxHashSet::default(),
         roots: FxHashSet::default(),
         with_depth: 0,
-        direct_eval: false,
     };
     collector.visit_program(program);
-    if collector.direct_eval || collector.candidates.is_empty() {
+    if collector.candidates.is_empty() {
         return;
     }
     let mut analysis =
@@ -400,7 +399,6 @@ struct DeadFunctionCandidateCollector<'s> {
     candidates: FxHashSet<SymbolId>,
     roots: FxHashSet<SymbolId>,
     with_depth: usize,
-    direct_eval: bool,
 }
 
 impl DeadFunctionCandidateCollector<'_> {
@@ -411,7 +409,11 @@ impl DeadFunctionCandidateCollector<'_> {
         // Script globals are externally observable, including lexical bindings
         // read by indirect eval. Sloppy block functions can implicitly write an
         // outer Annex B binding, and with makes initialization targets dynamic.
-        if (self.script && scope == self.scoping.root_scope_id())
+        // Semantic scope flags propagate direct eval to its lexical ancestors.
+        // Sibling scopes remain eligible; eval-visible functions keep their
+        // dependencies live through the ordinary candidate graph.
+        if flags.contains_direct_eval()
+            || (self.script && scope == self.scoping.root_scope_id())
             || self.with_depth > 0
             || (function_declaration
                 && !flags.is_strict_mode()
@@ -423,17 +425,6 @@ impl DeadFunctionCandidateCollector<'_> {
 }
 
 impl<'a> Visit<'a> for DeadFunctionCandidateCollector<'_> {
-    fn visit_call_expression(&mut self, call: &CallExpression<'a>) {
-        if !call.optional
-            && matches!(call.callee.get_inner_expression(), Expression::Identifier(identifier) if identifier.name == "eval")
-        {
-            // Inspect parsed identifiers, including escaped and parenthesized
-            // spellings. Runtime strings can reference any lexical binding.
-            self.direct_eval = true;
-        }
-        walk::walk_call_expression(self, call);
-    }
-
     fn visit_with_statement(&mut self, statement: &WithStatement<'a>) {
         self.with_depth += 1;
         walk::walk_with_statement(self, statement);

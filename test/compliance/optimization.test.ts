@@ -548,3 +548,29 @@ test('strict dead branches preserve vars, selected lexical blocks, and scope str
     'inner',
   ]);
 });
+
+test.each([false, true])(
+  'eval protects visible bindings but permits sibling DCE (moduleContext=%s)',
+  moduleContext => {
+    const source = `
+    function inspect() {
+      "use strict";
+      const hidden = () => 40;
+      function nested() { return (\\u0065val)('hidden() + ancestor()'); }
+      return nested();
+    }
+    function ancestor() { function helper() { return 2; } return helper(); }
+    function unrelated() {
+      function dead() { require('DEV_ONLY'); }
+      return 7;
+    }
+    globalThis.result = [inspect(), unrelated()];
+  `;
+    const options = { optimize: { deadCodeElimination: true, moduleContext } };
+    const code = compile(source, options);
+    expect(code).not.toContain('DEV_ONLY');
+    expect(code).toContain('hidden');
+    expect(code).toContain('function ancestor');
+    expect(execute<{ result: number[] }>(source, options).result).toEqual([42, 7]);
+  },
+);
