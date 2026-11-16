@@ -608,6 +608,34 @@ test('unused-hoist cleanup retains closure reads and write-only bindings', () =>
   expect(execute<{ result: unknown[] }>(source, options).result).toEqual([undefined, 2]);
 });
 
+test('unreachable cleanup preserves function hoisting, lexical TDZ, vars, and finally', () => {
+  const source = `
+    function run(){
+      'use strict';
+      const events=[];
+      try { return [hoisted(), typeof fromWhile, events]; require('DEV_ONLY'); }
+      finally { events.push('finally'); }
+      function hoisted(){ return 42; }
+      while(false){var fromWhile=fail();}
+    }
+    function tdz(){
+      const read=()=>later;
+      return read();
+      let later=require('DEV_ONLY');
+    }
+    let threw=false;try{tdz();}catch(error){threw=error instanceof ReferenceError;}
+    globalThis.result=[run(),threw];
+  `;
+  const plan = {
+    optimize: { constantFolding: true, deadCodeElimination: true, moduleContext: true },
+  };
+  expect(compile(source, plan)).not.toContain('DEV_ONLY');
+  expect(execute<{ result: unknown[] }>(source, plan).result).toEqual([
+    [42, 'undefined', ['finally']],
+    true,
+  ]);
+});
+
 test('live recursive groups, eval-only roots, and primitive exports remain observable', async () => {
   const source = `
     function even(n){return n===0 || odd(n-1);}
@@ -628,4 +656,74 @@ test('removing unused values does not create a strict directive', () => {
   const plan = { optimize: { deadCodeElimination: true } };
   expect(compile(source, plan)).not.toContain('unused');
   expect(execute<{ result: boolean }>(source, plan).result).toBe(false);
+});
+
+test('false loops preserve initializer order, lexical scope, and destructured vars', () => {
+  const source = `
+    const events=[];
+    let outer='outer';
+    for(let outer=(events.push('init'),1);false;events.push('update')){events.push('body');}
+    while(false){var {a, b:[c]}=fail();}
+    globalThis.result=[outer,events,a,c];
+  `;
+  const plan = { optimize: { deadCodeElimination: true, moduleContext: true } };
+  expect(compile(source, plan)).not.toContain('while');
+  expect(execute<{ result: unknown[] }>(source, plan).result).toEqual([
+    'outer',
+    ['init'],
+    undefined,
+    undefined,
+  ]);
+});
+
+test('abrupt cleanup preserves lexical TDZs, hoisted functions, and labeled control flow', () => {
+  const source = `
+    function check(kind){
+      const read=()=>kind==='class'?Later:later;
+      return read();
+      class Later extends fail(){}
+      const {later}=fail();
+    }
+    const caught=[];
+    for(const kind of ['class','const']){try{check(kind)}catch(error){caught.push(error instanceof ReferenceError)}}
+    const events=[];
+    outer:for(let i=0;i<2;i++){
+      for(let j=0;j<2;j++){events.push(i);continue outer;require('DEV_ONLY_CONTINUE');}
+      require('DEV_ONLY_AFTER_LOOP');
+    }
+    once:{events.push('break');break once;require('DEV_ONLY_BREAK');}
+    function throws(){throw 7;require('DEV_ONLY_THROW');}
+    try{throws()}catch(error){events.push(error)}
+    globalThis.result=[caught,events];
+  `;
+  const plan = { optimize: { deadCodeElimination: true, moduleContext: true } };
+  const code = compile(source, plan);
+  for (const marker of ['DEV_ONLY_CONTINUE', 'DEV_ONLY_BREAK', 'DEV_ONLY_THROW'])
+    expect(code).not.toContain(marker);
+  expect(execute<{ result: unknown[] }>(source, plan).result).toEqual([
+    [true, true],
+    [0, 1, 'break', 7],
+  ]);
+});
+
+test('unreachable declarations remain visible to eval without running their initializers', () => {
+  const source = `
+    function readVar(){return eval('hoisted');var hoisted=require('DEV_ONLY_VAR');}
+    function readLexical(){return eval('lexical');const lexical=require('DEV_ONLY_LEXICAL');}
+    let threw=false;try{readLexical()}catch(error){threw=error instanceof ReferenceError;}
+    globalThis.result=[readVar(),threw];
+  `;
+  const plan = { optimize: { deadCodeElimination: true, moduleContext: true } };
+  expect(compile(source, plan)).not.toContain('DEV_ONLY');
+  expect(execute<{ result: unknown[] }>(source, plan).result).toEqual([undefined, true]);
+});
+
+test('unreachable sloppy block functions retain their Annex B outer bindings', () => {
+  const source = `
+    function run(){return hidden;{function hidden(){}require('SLOPPY_KEEP');}}
+    globalThis.result=run();
+  `;
+  const plan = { optimize: { deadCodeElimination: true, moduleContext: true } };
+  expect(compile(source, plan)).toContain('SLOPPY_KEEP');
+  expect(execute<{ result: unknown }>(source, plan).result).toBe(undefined);
 });

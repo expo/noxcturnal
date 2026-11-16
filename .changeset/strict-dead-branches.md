@@ -2,4 +2,4 @@
 'noxcturnal': patch
 ---
 
-Remove dead dependencies from strict-mode branches and improve unused-code elimination.
+Improve dead-code elimination for unreachable branches, recursive functions, and unused declarations.
