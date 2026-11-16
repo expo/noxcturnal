@@ -353,13 +353,8 @@ fn eliminate_dead_bindings(
     module_context: bool,
     checked_scoping: Option<Scoping>,
 ) {
-    // Metro's Babel pass repeatedly removes unreferenced function bindings and
-    // recrawls scope until reaching a fixed point. Rebuilding the complete
-    // semantic graph on every layer makes a dead chain quadratic. Compute the
-    // same peeling fixed point from one semantic graph instead: removing an
-    // unreferenced candidate subtracts all references originating in its body,
-    // which may make the functions it called removable next. Cycles retain an
-    // incoming reference exactly as they do in Metro's binding-based pass.
+    // Follow candidate dependencies from observable roots. Reference-count
+    // peeling alone cannot reclaim an unreachable recursive group.
     // Validation's graph is reusable only when no AST pass has run since it.
     let scoping = if let Some(scoping) = checked_scoping {
         scoping
@@ -389,7 +384,7 @@ fn eliminate_dead_bindings(
     let mut analysis =
         DeadBindingDependencyAnalysis::new(&collector.candidates, &collector.roots, &scoping);
     analysis.visit_program(program);
-    let unused = analysis.peel();
+    let unused = analysis.unreachable();
     DeadBindingRemover { unused }.visit_program(program);
 }
 
@@ -515,7 +510,7 @@ struct DeadBindingDependencyAnalysis<'s> {
     candidates: &'s FxHashSet<SymbolId>,
     scoping: &'s Scoping,
     owner: Option<SymbolId>,
-    incoming: FxHashMap<SymbolId, usize>,
+    roots: FxHashSet<SymbolId>,
     outgoing: FxHashMap<SymbolId, Vec<SymbolId>>,
 }
 
@@ -529,37 +524,22 @@ impl<'s> DeadBindingDependencyAnalysis<'s> {
             candidates,
             scoping,
             owner: None,
-            incoming: candidates
-                .iter()
-                .map(|id| (*id, usize::from(roots.contains(id))))
-                .collect(),
+            roots: roots.intersection(candidates).copied().collect(),
             outgoing: FxHashMap::default(),
         }
     }
 
-    fn peel(mut self) -> FxHashSet<SymbolId> {
-        let mut pending: Vec<SymbolId> = self
-            .incoming
-            .iter()
-            .filter_map(|(id, count)| (*count == 0).then_some(*id))
-            .collect();
-        let mut unused = FxHashSet::default();
+    fn unreachable(mut self) -> FxHashSet<SymbolId> {
+        let mut pending: Vec<SymbolId> = self.roots.drain().collect();
+        let mut live = FxHashSet::default();
         while let Some(owner) = pending.pop() {
-            if !unused.insert(owner) {
-                continue;
-            }
-            for target in self.outgoing.remove(&owner).unwrap_or_default() {
-                let count = self
-                    .incoming
-                    .get_mut(&target)
-                    .expect("candidate reference must have an incoming count");
-                *count -= 1;
-                if *count == 0 {
-                    pending.push(target);
-                }
+            if live.insert(owner)
+                && let Some(dependencies) = self.outgoing.remove(&owner)
+            {
+                pending.extend(dependencies);
             }
         }
-        unused
+        self.candidates.difference(&live).copied().collect()
     }
 
     fn with_owner(&mut self, owner: SymbolId, visit: impl FnOnce(&mut Self)) {
@@ -615,12 +595,10 @@ impl<'a> Visit<'a> for DeadBindingDependencyAnalysis<'_> {
         else {
             return;
         };
-        *self
-            .incoming
-            .get_mut(&target)
-            .expect("candidate reference must have an incoming count") += 1;
         if let Some(owner) = self.owner {
             self.outgoing.entry(owner).or_default().push(target);
+        } else {
+            self.roots.insert(target);
         }
     }
 }

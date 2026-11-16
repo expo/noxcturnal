@@ -607,3 +607,15 @@ test('unused-hoist cleanup retains closure reads and write-only bindings', () =>
   expect(compile(source, options)).not.toContain('redundant');
   expect(execute<{ result: unknown[] }>(source, options).result).toEqual([undefined, 2]);
 });
+
+test('live recursive groups, eval-only roots, and primitive exports remain observable', async () => {
+  const source = `
+    function even(n){return n===0 || odd(n-1);}
+    function odd(n){return n!==0 && even(n-1);}
+    function inspect(){const hidden=123;return eval('hidden');}
+    export const result=[even(4),odd(3),inspect()];
+  `;
+  expect((await executeModule(source, { optimize: { deadCodeElimination: true } })).result).toEqual(
+    [true, true, 123],
+  );
+});

@@ -62,7 +62,7 @@ export const value = 1;
   );
 });
 
-test('retains mutually-referencing cycles', async () => {
+test('removes mutually-referencing cycles with no observable root', async () => {
   const source = `
 function left() { return right(); }
 function right() { return left(); }
@@ -70,12 +70,6 @@ export const value = 1;
 `;
   expect(await transformSource(source, 'input.js', options)).toMatchInlineSnapshot(`
     "'use strict';
-    function left() {
-      return right();
-    }
-    function right() {
-      return left();
-    }
     export const value = 1;"
   `);
 });
@@ -278,4 +272,32 @@ test('module-local DCE preserves script parsing semantics', async () => {
   });
   expect(output).not.toContain('function unused');
   expect(output).toContain('module.exports =');
+});
+
+test('removes unreachable recursive groups and their dependencies', async () => {
+  const output = await transformSource(
+    `
+    function left(){return right() + require('DEV_ONLY')}
+    function right(){return left()}
+    const self=()=>self();
+    export const result=1;
+  `,
+    'input.js',
+    options,
+  );
+  expect(output).not.toContain('DEV_ONLY');
+  expect(output).not.toContain('function left');
+  expect(output).not.toContain('function right');
+  expect(output).not.toContain('const self');
+});
+
+test('retains cycles visible to script globals and eval', async () => {
+  for (const source of [
+    'function left(){return right()}function right(){return left()}',
+    'function left(){return right()}function right(){return left()}eval("left");export {};',
+  ]) {
+    const output = await transformSource(source, 'input.js', options);
+    expect(output).toContain('function left');
+    expect(output).toContain('function right');
+  }
 });
