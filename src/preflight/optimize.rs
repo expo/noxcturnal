@@ -3,18 +3,19 @@ use oxc_allocator::{Address, Allocator, GetAddress, TakeIn};
 use oxc_ast::builder::GetAstBuilder;
 use oxc_ast::{
     ast::{
-        BindingIdentifier, BindingPattern, CallExpression, Class, Declaration, ExportDeclaration,
-        ExportDefaultDeclaration, ExportDefaultDeclarationKind, Expression, Function, FunctionType,
-        IdentifierReference, NumberBase, Program, Statement, VariableDeclaration,
-        VariableDeclarationKind, VariableDeclarator, WithStatement,
+        BindingIdentifier, BindingPattern, Class, Declaration, ExportDeclaration,
+        ExportDefaultDeclaration, ExportDefaultDeclarationKind, Expression, ForStatementInit,
+        Function, FunctionType, IdentifierReference, NumberBase, Program, Statement,
+        VariableDeclaration, VariableDeclarationKind, VariableDeclarator, WithStatement,
     },
     builder::AstBuilder,
 };
 use oxc_ast_visit::{Visit, VisitMut, walk, walk_mut};
 use oxc_semantic::{Scoping, SemanticBuilder, SymbolId};
 use oxc_span::GetSpan;
-use oxc_syntax::scope::ScopeFlags;
+use oxc_syntax::scope::{ScopeFlags, ScopeId};
 use rustc_hash::{FxHashMap, FxHashSet};
+use std::cell::Cell;
 
 use crate::semantic::constant_eval::{EvaluatedConstant, evaluate_expression};
 
@@ -33,28 +34,123 @@ pub(super) fn run<'a>(
         !constant_folding || checked_scoping.is_none(),
         "folding invalidates checked scoping"
     );
+    let mut checked_scoping = checked_scoping;
     if constant_folding {
-        ConstantFolder {
-            ast: AstBuilder::new(allocator),
-            failed: FxHashSet::default(),
-            addition_depth: 0,
+        if dead_code_elimination {
+            let mut folder = ConstantFolder::<true, true>::new(allocator);
+            folder.visit_program(program);
+            if folder.changed {
+                checked_scoping = None;
+            }
+        } else {
+            ConstantFolder::<true, false>::new(allocator).visit_program(program);
         }
-        .visit_program(program);
     }
     if dead_code_elimination {
-        eliminate_dead_functions(program, module_context, checked_scoping);
+        eliminate_dead_bindings(
+            allocator,
+            program,
+            module_context,
+            checked_scoping,
+            !constant_folding,
+        );
     }
 }
 
-struct ConstantFolder<'a> {
+struct ConstantFolder<'a, const FOLDING: bool, const DEAD_CODE: bool> {
     ast: AstBuilder<'a>,
     // Parser-only and newly built expressions have no unique semantic IDs.
     // Boxed expression addresses remain stable during this arena traversal.
     failed: FxHashSet<Address>,
     addition_depth: usize,
+    // Scopes nested inside the outermost strict scope are strict too.
+    strict_depth: usize,
+    changed: bool,
 }
 
-impl<'a> ConstantFolder<'a> {
+impl<'a, const FOLDING: bool, const DEAD_CODE: bool> ConstantFolder<'a, FOLDING, DEAD_CODE> {
+    fn new(allocator: &'a Allocator) -> Self {
+        Self {
+            ast: AstBuilder::new(allocator),
+            failed: FxHashSet::default(),
+            addition_depth: 0,
+            strict_depth: 0,
+            changed: false,
+        }
+    }
+
+    fn bindings(
+        &self,
+        statement: &Statement<'a>,
+    ) -> Option<oxc_allocator::Vec<'a, VariableDeclarator<'a>>> {
+        let mut bindings = HoistedBindingCollector {
+            ast: &self.ast,
+            declarations: oxc_allocator::Vec::new_in(&self.ast),
+            block_function: false,
+            strict: self.strict_depth > 0,
+            var_pattern: false,
+        };
+        bindings.visit_statement(statement);
+        (!bindings.block_function).then_some(bindings.declarations)
+    }
+
+    fn declaration(
+        &self,
+        span: oxc_span::Span,
+        kind: VariableDeclarationKind,
+        declarations: oxc_allocator::Vec<'a, VariableDeclarator<'a>>,
+    ) -> Statement<'a> {
+        if declarations.is_empty() {
+            Statement::new_empty_statement(span, &self.ast)
+        } else {
+            Statement::new_variable_declaration(span, kind, declarations, false, &self.ast)
+        }
+    }
+
+    fn remove_false_loop(&mut self, statement: &mut Statement<'a>) {
+        let (test, body) = match statement {
+            Statement::WhileStatement(loop_) => (Some(&loop_.test), &loop_.body),
+            Statement::ForStatement(loop_) => (loop_.test.as_ref(), &loop_.body),
+            _ => return,
+        };
+        // Only literal/constant tests with no effects or throwing reads qualify.
+        if !test
+            .and_then(evaluate_expression)
+            .is_some_and(|test| !test.truthy())
+        {
+            return;
+        }
+        let Some(bindings) = self.bindings(body) else {
+            return;
+        };
+        let span = statement.span();
+        let mut replacement = oxc_allocator::Vec::new_in(&self.ast);
+        if let Statement::ForStatement(loop_) = statement
+            && let Some(init) = loop_.init.take()
+        {
+            replacement.push(match init {
+                ForStatementInit::VariableDeclaration(declaration) => {
+                    Statement::VariableDeclaration(declaration)
+                }
+                expression => Statement::new_expression_statement(
+                    span,
+                    expression.into_expression(),
+                    &self.ast,
+                ),
+            });
+        }
+        if !bindings.is_empty() {
+            replacement.push(self.declaration(span, VariableDeclarationKind::Var, bindings));
+        }
+        *statement = if replacement.is_empty() {
+            Statement::new_empty_statement(span, &self.ast)
+        } else {
+            // The for initializer retains its lexical scope and executes once.
+            Statement::new_block_statement(span, replacement, &self.ast)
+        };
+        self.changed = true;
+    }
+
     // Conditional/logical evaluation performs GetValue and does not trigger
     // anonymous-function named evaluation. Preserve that context when selecting
     // an operand; plain references would change calls, delete, typeof, and names.
@@ -121,8 +217,14 @@ impl<'a> ConstantFolder<'a> {
     }
 }
 
-impl<'a> VisitMut<'a> for ConstantFolder<'a> {
+impl<'a, const FOLDING: bool, const DEAD_CODE: bool> VisitMut<'a>
+    for ConstantFolder<'a, FOLDING, DEAD_CODE>
+{
     fn visit_expression(&mut self, expression: &mut Expression<'a>) {
+        if !FOLDING {
+            walk_mut::walk_expression(self, expression);
+            return;
+        }
         let addition = matches!(expression, Expression::BinaryExpression(binary) if binary.operator == oxc_syntax::operator::BinaryOperator::Addition);
         self.addition_depth += usize::from(addition);
         walk_mut::walk_expression(self, expression);
@@ -202,11 +304,115 @@ impl<'a> VisitMut<'a> for ConstantFolder<'a> {
         }
     }
 
+    fn enter_scope(&mut self, flags: ScopeFlags, _scope_id: &Cell<Option<ScopeId>>) {
+        if self.strict_depth > 0 || flags.is_strict_mode() {
+            self.strict_depth += 1;
+        }
+    }
+
+    fn leave_scope(&mut self) {
+        self.strict_depth = self.strict_depth.saturating_sub(1);
+    }
+
+    fn visit_statements(&mut self, statements: &mut oxc_allocator::Vec<'a, Statement<'a>>) {
+        walk_mut::walk_statements(self, statements);
+        if !DEAD_CODE {
+            return;
+        }
+        let Some(end) = statements.iter().position(|statement| {
+            matches!(
+                statement,
+                Statement::ReturnStatement(_)
+                    | Statement::ThrowStatement(_)
+                    | Statement::BreakStatement(_)
+                    | Statement::ContinueStatement(_)
+            )
+        }) else {
+            return;
+        };
+        if end + 1 == statements.len() {
+            return;
+        }
+        // Keep declaration instantiation even when execution cannot reach it.
+        // Direct functions are initialized on entry; lexical declarations must
+        // retain their TDZ, but their unreachable initializers can disappear.
+        let trailing = statements.split_off(end + 1);
+        for statement in trailing {
+            if statement.is_module_declaration()
+                || matches!(statement, Statement::FunctionDeclaration(_))
+            {
+                statements.push(statement);
+                continue;
+            }
+            let span = statement.span();
+            let mut lexical = HoistedBindingCollector {
+                ast: &self.ast,
+                declarations: oxc_allocator::Vec::new_in(&self.ast),
+                block_function: false,
+                strict: self.strict_depth > 0,
+                var_pattern: true,
+            };
+            match &statement {
+                Statement::VariableDeclaration(declaration)
+                    if matches!(
+                        declaration.kind,
+                        VariableDeclarationKind::Let | VariableDeclarationKind::Const
+                    ) =>
+                {
+                    for declarator in &declaration.declarations {
+                        lexical.visit_binding_pattern(&declarator.id);
+                    }
+                    statements.push(self.declaration(
+                        span,
+                        VariableDeclarationKind::Let,
+                        lexical.declarations,
+                    ));
+                }
+                Statement::ClassDeclaration(class) => {
+                    if let Some(id) = &class.id {
+                        lexical.visit_binding_identifier(id);
+                    }
+                    statements.push(self.declaration(
+                        span,
+                        VariableDeclarationKind::Let,
+                        lexical.declarations,
+                    ));
+                }
+                Statement::VariableDeclaration(declaration) if !declaration.kind.is_var() => {
+                    statements.push(statement);
+                    continue;
+                }
+                _ => {
+                    let Some(bindings) = self.bindings(&statement) else {
+                        statements.push(statement);
+                        continue;
+                    };
+                    if !bindings.is_empty() {
+                        statements.push(self.declaration(
+                            span,
+                            VariableDeclarationKind::Var,
+                            bindings,
+                        ));
+                    }
+                }
+            }
+            self.changed = true;
+        }
+    }
+
     fn visit_statement(&mut self, statement: &mut Statement<'a>) {
         walk_mut::walk_statement(self, statement);
+        if DEAD_CODE {
+            self.remove_false_loop(statement);
+        }
+        if !FOLDING {
+            return;
+        }
         let Statement::IfStatement(if_statement) = statement else {
             return;
         };
+        // Direct if functions are Annex B syntax; keep their selected-branch
+        // assignment behavior as well as their outer declaration instantiation.
         if matches!(if_statement.consequent, Statement::FunctionDeclaration(_))
             || matches!(
                 if_statement.alternate,
@@ -227,6 +433,7 @@ impl<'a> VisitMut<'a> for ConstantFolder<'a> {
             ast: &self.ast,
             declarations: oxc_allocator::Vec::new_in(&self.ast),
             block_function: false,
+            strict: self.strict_depth > 0,
             var_pattern: false,
         };
         if let Some(discarded) = discarded {
@@ -269,6 +476,7 @@ struct HoistedBindingCollector<'s, 'a> {
     ast: &'s AstBuilder<'a>,
     declarations: oxc_allocator::Vec<'a, VariableDeclarator<'a>>,
     block_function: bool,
+    strict: bool,
     var_pattern: bool,
 }
 
@@ -293,7 +501,8 @@ impl<'a> Visit<'a> for HoistedBindingCollector<'_, 'a> {
     }
 
     fn visit_function(&mut self, function: &Function<'a>, _flags: ScopeFlags) {
-        self.block_function |= function.r#type == FunctionType::FunctionDeclaration;
+        // The containing scope controls Annex B, not the function's own directive.
+        self.block_function |= !self.strict && function.r#type == FunctionType::FunctionDeclaration;
     }
 
     fn visit_binding_identifier(&mut self, identifier: &BindingIdentifier<'a>) {
@@ -329,18 +538,15 @@ fn expression_has_failed_operand(expression: &Expression<'_>, failed: &FxHashSet
     }
 }
 
-fn eliminate_dead_functions(
-    program: &mut Program<'_>,
+fn eliminate_dead_bindings<'a>(
+    allocator: &'a Allocator,
+    program: &mut Program<'a>,
     module_context: bool,
     checked_scoping: Option<Scoping>,
+    control_flow: bool,
 ) {
-    // Metro's Babel pass repeatedly removes unreferenced function bindings and
-    // recrawls scope until reaching a fixed point. Rebuilding the complete
-    // semantic graph on every layer makes a dead chain quadratic. Compute the
-    // same peeling fixed point from one semantic graph instead: removing an
-    // unreferenced candidate subtracts all references originating in its body,
-    // which may make the functions it called removable next. Cycles retain an
-    // incoming reference exactly as they do in Metro's binding-based pass.
+    // Follow candidate dependencies from observable roots. Reference-count
+    // peeling alone cannot reclaim an unreachable recursive group.
     // Validation's graph is reusable only when no AST pass has run since it.
     let scoping = if let Some(scoping) = checked_scoping {
         scoping
@@ -354,7 +560,7 @@ fn eliminate_dead_functions(
     // Use the checked graph only for an unchanged program. Otherwise the rebuild
     // refreshes symbol cells after preceding transforms; older IDs can refer to
     // a different binding.
-    let mut collector = DeadFunctionCandidateCollector {
+    let mut collector = DeadBindingCandidateCollector {
         scoping: &scoping,
         // Bundlers may wrap this script after optimization. Its bindings are
         // then private even though the parser correctly uses script semantics.
@@ -362,57 +568,137 @@ fn eliminate_dead_functions(
         candidates: FxHashSet::default(),
         roots: FxHashSet::default(),
         with_depth: 0,
-        direct_eval: false,
+        control_flow,
+        needs_control_flow: false,
     };
     collector.visit_program(program);
-    if collector.direct_eval || collector.candidates.is_empty() {
+    if collector.needs_control_flow {
+        // Collection stops at the first potential edit; collecting a plan that
+        // would immediately be discarded wastes a walk of the remaining tree.
+        drop(collector);
+        let mut folder = ConstantFolder::<false, true>::new(allocator);
+        folder.visit_program(program);
+        let checked = if folder.changed { None } else { Some(scoping) };
+        eliminate_dead_bindings(allocator, program, module_context, checked, false);
+        return;
+    }
+    if collector.candidates.is_empty() {
         return;
     }
     let mut analysis =
-        DeadFunctionDependencyAnalysis::new(&collector.candidates, &collector.roots, &scoping);
+        DeadBindingDependencyAnalysis::new(&collector.candidates, &collector.roots, &scoping);
     analysis.visit_program(program);
-    let unused = analysis.peel();
-    DeadFunctionRemover { unused }.visit_program(program);
+    let unused = analysis.unreachable();
+    DeadBindingRemover {
+        unused,
+        ast: AstBuilder::new(allocator),
+    }
+    .visit_program(program);
 }
 
-struct DeadFunctionCandidateCollector<'s> {
+fn function_initializer(expression: &Expression<'_>) -> bool {
+    matches!(
+        expression.get_inner_expression(),
+        Expression::FunctionExpression(_) | Expression::ArrowFunctionExpression(_)
+    )
+}
+
+fn primitive_initializer(expression: &Expression<'_>) -> bool {
+    matches!(
+        expression.get_inner_expression(),
+        Expression::NumericLiteral(_)
+            | Expression::StringLiteral(_)
+            | Expression::BooleanLiteral(_)
+            | Expression::NullLiteral(_)
+            | Expression::BigIntLiteral(_)
+    )
+}
+
+struct DeadBindingCandidateCollector<'s> {
     scoping: &'s Scoping,
     script: bool,
     candidates: FxHashSet<SymbolId>,
     roots: FxHashSet<SymbolId>,
     with_depth: usize,
-    direct_eval: bool,
+    control_flow: bool,
+    needs_control_flow: bool,
 }
 
-impl DeadFunctionCandidateCollector<'_> {
-    fn candidate(&mut self, symbol_id: SymbolId, function_declaration: bool) {
-        self.candidates.insert(symbol_id);
+impl DeadBindingCandidateCollector<'_> {
+    fn observable(&self, symbol_id: SymbolId, function_declaration: bool) -> bool {
+        if self.roots.contains(&symbol_id) {
+            return true;
+        }
         let scope = self.scoping.symbol_scope_id(symbol_id);
         let flags = self.scoping.scope_flags(scope);
-        // Script globals are externally observable, including lexical bindings
-        // read by indirect eval. Sloppy block functions can implicitly write an
-        // outer Annex B binding, and with makes initialization targets dynamic.
-        if (self.script && scope == self.scoping.root_scope_id())
+        // Script globals, eval-visible bindings, and sloppy Annex B assignments
+        // can be observed without an ordinary local read.
+        flags.contains_direct_eval()
+            || (self.script && scope == self.scoping.root_scope_id())
             || self.with_depth > 0
             || (function_declaration
                 && !flags.is_strict_mode()
                 && !flags.intersects(ScopeFlags::Var))
-        {
+    }
+
+    fn candidate(&mut self, symbol_id: SymbolId, function_declaration: bool) {
+        if self.observable(symbol_id, function_declaration) {
             self.roots.insert(symbol_id);
         }
+        self.candidates.insert(symbol_id);
     }
 }
 
-impl<'a> Visit<'a> for DeadFunctionCandidateCollector<'_> {
-    fn visit_call_expression(&mut self, call: &CallExpression<'a>) {
-        if !call.optional
-            && matches!(call.callee.get_inner_expression(), Expression::Identifier(identifier) if identifier.name == "eval")
-        {
-            // Inspect parsed identifiers, including escaped and parenthesized
-            // spellings. Runtime strings can reference any lexical binding.
-            self.direct_eval = true;
+impl<'a> Visit<'a> for DeadBindingCandidateCollector<'_> {
+    fn visit_statement(&mut self, statement: &Statement<'a>) {
+        if !self.needs_control_flow {
+            walk::walk_statement(self, statement);
         }
-        walk::walk_call_expression(self, call);
+    }
+
+    fn visit_statements(&mut self, statements: &oxc_allocator::Vec<'a, Statement<'a>>) {
+        // Detect potential edits in the existing walk. Most functions end with
+        // their return and need neither a cleanup pass nor a semantic rebuild.
+        if self.control_flow && !self.needs_control_flow {
+            self.needs_control_flow = statements
+                .iter()
+                .take(statements.len().saturating_sub(1))
+                .any(|statement| {
+                    matches!(
+                        statement,
+                        Statement::ReturnStatement(_)
+                            | Statement::ThrowStatement(_)
+                            | Statement::BreakStatement(_)
+                            | Statement::ContinueStatement(_)
+                    )
+                });
+        }
+        if !self.needs_control_flow {
+            walk::walk_statements(self, statements);
+        }
+    }
+
+    fn visit_while_statement(&mut self, statement: &oxc_ast::ast::WhileStatement<'a>) {
+        if self.control_flow && !self.needs_control_flow {
+            self.needs_control_flow =
+                evaluate_expression(&statement.test).is_some_and(|test| !test.truthy());
+        }
+        if !self.needs_control_flow {
+            walk::walk_while_statement(self, statement);
+        }
+    }
+
+    fn visit_for_statement(&mut self, statement: &oxc_ast::ast::ForStatement<'a>) {
+        if self.control_flow && !self.needs_control_flow {
+            self.needs_control_flow = statement
+                .test
+                .as_ref()
+                .and_then(evaluate_expression)
+                .is_some_and(|test| !test.truthy());
+        }
+        if !self.needs_control_flow {
+            walk::walk_for_statement(self, statement);
+        }
     }
 
     fn visit_with_statement(&mut self, statement: &WithStatement<'a>) {
@@ -439,19 +725,19 @@ impl<'a> Visit<'a> for DeadFunctionCandidateCollector<'_> {
             }
             Declaration::VariableDeclaration(declaration) => {
                 for declarator in &declaration.declarations {
-                    if matches!(
-                        declarator.init,
-                        Some(
-                            Expression::FunctionExpression(_)
-                                | Expression::ArrowFunctionExpression(_)
-                        )
-                    ) && let Some(symbol_id) = declarator
+                    if let Some(symbol_id) = declarator
                         .id
                         .get_binding_identifier()
                         .and_then(|id| id.symbol_id.get())
                     {
                         self.roots.insert(symbol_id);
                     }
+                }
+                if declaration.declarations.iter().all(|declarator| {
+                    declarator.id.get_binding_identifier().is_some()
+                        && declarator.init.as_ref().is_none_or(primitive_initializer)
+                }) {
+                    return;
                 }
             }
             _ => {}
@@ -468,30 +754,52 @@ impl<'a> Visit<'a> for DeadFunctionCandidateCollector<'_> {
         walk::walk_function(self, function, flags);
     }
 
-    fn visit_variable_declarator(&mut self, declaration: &VariableDeclarator<'a>) {
+    fn visit_variable_declaration(&mut self, declaration: &VariableDeclaration<'a>) {
         if matches!(
-            declaration.init,
-            Some(Expression::FunctionExpression(_) | Expression::ArrowFunctionExpression(_))
-        ) && let Some(symbol_id) = declaration
-            .id
-            .get_binding_identifier()
-            .and_then(|id| id.symbol_id.get())
-        {
-            self.candidate(symbol_id, false);
+            declaration.kind,
+            VariableDeclarationKind::Var
+                | VariableDeclarationKind::Let
+                | VariableDeclarationKind::Const
+        ) {
+            for declarator in &declaration.declarations {
+                let function = declarator.init.as_ref().is_some_and(function_initializer);
+                if !function && !declarator.init.as_ref().is_none_or(primitive_initializer) {
+                    continue;
+                }
+                let Some(symbol_id) = declarator
+                    .id
+                    .get_binding_identifier()
+                    .and_then(|id| id.symbol_id.get())
+                else {
+                    continue;
+                };
+                if function {
+                    self.candidate(symbol_id, false);
+                } else if self
+                    .scoping
+                    .get_resolved_reference_ids(symbol_id)
+                    .is_empty()
+                    && !self.observable(symbol_id, false)
+                {
+                    // Primitive values have no dependencies. Referenced or
+                    // observable values need no graph entry at all.
+                    self.candidates.insert(symbol_id);
+                }
+            }
         }
-        walk::walk_variable_declarator(self, declaration);
+        walk::walk_variable_declaration(self, declaration);
     }
 }
 
-struct DeadFunctionDependencyAnalysis<'s> {
+struct DeadBindingDependencyAnalysis<'s> {
     candidates: &'s FxHashSet<SymbolId>,
     scoping: &'s Scoping,
     owner: Option<SymbolId>,
-    incoming: FxHashMap<SymbolId, usize>,
+    roots: FxHashSet<SymbolId>,
     outgoing: FxHashMap<SymbolId, Vec<SymbolId>>,
 }
 
-impl<'s> DeadFunctionDependencyAnalysis<'s> {
+impl<'s> DeadBindingDependencyAnalysis<'s> {
     fn new(
         candidates: &'s FxHashSet<SymbolId>,
         roots: &FxHashSet<SymbolId>,
@@ -501,37 +809,22 @@ impl<'s> DeadFunctionDependencyAnalysis<'s> {
             candidates,
             scoping,
             owner: None,
-            incoming: candidates
-                .iter()
-                .map(|id| (*id, usize::from(roots.contains(id))))
-                .collect(),
+            roots: roots.intersection(candidates).copied().collect(),
             outgoing: FxHashMap::default(),
         }
     }
 
-    fn peel(mut self) -> FxHashSet<SymbolId> {
-        let mut pending: Vec<SymbolId> = self
-            .incoming
-            .iter()
-            .filter_map(|(id, count)| (*count == 0).then_some(*id))
-            .collect();
-        let mut unused = FxHashSet::default();
+    fn unreachable(mut self) -> FxHashSet<SymbolId> {
+        let mut pending: Vec<SymbolId> = self.roots.drain().collect();
+        let mut live = FxHashSet::default();
         while let Some(owner) = pending.pop() {
-            if !unused.insert(owner) {
-                continue;
-            }
-            for target in self.outgoing.remove(&owner).unwrap_or_default() {
-                let count = self
-                    .incoming
-                    .get_mut(&target)
-                    .expect("candidate reference must have an incoming count");
-                *count -= 1;
-                if *count == 0 {
-                    pending.push(target);
-                }
+            if live.insert(owner)
+                && let Some(dependencies) = self.outgoing.remove(&owner)
+            {
+                pending.extend(dependencies);
             }
         }
-        unused
+        self.candidates.difference(&live).copied().collect()
     }
 
     fn with_owner(&mut self, owner: SymbolId, visit: impl FnOnce(&mut Self)) {
@@ -541,7 +834,7 @@ impl<'s> DeadFunctionDependencyAnalysis<'s> {
     }
 }
 
-impl<'a> Visit<'a> for DeadFunctionDependencyAnalysis<'_> {
+impl<'a> Visit<'a> for DeadBindingDependencyAnalysis<'_> {
     fn visit_function(&mut self, function: &Function<'a>, flags: ScopeFlags) {
         let owner = (function.r#type == FunctionType::FunctionDeclaration)
             .then(|| function.id.as_ref().and_then(|id| id.symbol_id.get()))
@@ -557,18 +850,18 @@ impl<'a> Visit<'a> for DeadFunctionDependencyAnalysis<'_> {
     }
 
     fn visit_variable_declarator(&mut self, declaration: &VariableDeclarator<'a>) {
-        let owner = matches!(
-            declaration.init,
-            Some(Expression::FunctionExpression(_) | Expression::ArrowFunctionExpression(_))
-        )
-        .then(|| {
-            declaration
-                .id
-                .get_binding_identifier()
-                .and_then(|id| id.symbol_id.get())
-        })
-        .flatten()
-        .filter(|id| self.candidates.contains(id));
+        let owner = declaration
+            .init
+            .as_ref()
+            .is_some_and(function_initializer)
+            .then(|| {
+                declaration
+                    .id
+                    .get_binding_identifier()
+                    .and_then(|id| id.symbol_id.get())
+            })
+            .flatten()
+            .filter(|id| self.candidates.contains(id));
         if let Some(owner) = owner {
             self.with_owner(owner, |analysis| {
                 walk::walk_variable_declarator(analysis, declaration);
@@ -587,41 +880,51 @@ impl<'a> Visit<'a> for DeadFunctionDependencyAnalysis<'_> {
         else {
             return;
         };
-        *self
-            .incoming
-            .get_mut(&target)
-            .expect("candidate reference must have an incoming count") += 1;
         if let Some(owner) = self.owner {
             self.outgoing.entry(owner).or_default().push(target);
+        } else {
+            self.roots.insert(target);
         }
     }
 }
 
-struct DeadFunctionRemover {
+struct DeadBindingRemover<'a> {
     unused: FxHashSet<SymbolId>,
+    ast: AstBuilder<'a>,
 }
 
-impl DeadFunctionRemover {
-    fn unused_binding<'a>(&self, declaration: &oxc_ast::ast::VariableDeclarator<'a>) -> bool {
+impl DeadBindingRemover<'_> {
+    fn unused_binding<'a>(
+        &self,
+        declaration: &oxc_ast::ast::VariableDeclarator<'a>,
+        ordinary: bool,
+    ) -> bool {
         declaration
             .id
             .get_binding_identifier()
             .and_then(|identifier| identifier.symbol_id.get())
             .is_some_and(|symbol_id| self.unused.contains(&symbol_id))
-            && matches!(
-                declaration.init,
-                Some(Expression::FunctionExpression(_) | Expression::ArrowFunctionExpression(_))
-            )
+            && ((ordinary && declaration.init.is_none())
+                || declaration
+                    .init
+                    .as_ref()
+                    .is_some_and(|init| function_initializer(init) || primitive_initializer(init)))
     }
 
     fn remove_declarators(&mut self, declaration: &mut VariableDeclaration<'_>) {
+        let ordinary = matches!(
+            declaration.kind,
+            VariableDeclarationKind::Var
+                | VariableDeclarationKind::Let
+                | VariableDeclarationKind::Const
+        );
         declaration
             .declarations
-            .retain(|declarator| !self.unused_binding(declarator));
+            .retain(|declarator| !self.unused_binding(declarator, ordinary));
     }
 }
 
-impl<'a> VisitMut<'a> for DeadFunctionRemover {
+impl<'a> VisitMut<'a> for DeadBindingRemover<'a> {
     fn visit_statements(&mut self, statements: &mut oxc_allocator::Vec<'a, Statement<'a>>) {
         walk_mut::walk_statements(self, statements);
         for statement in &mut *statements {
@@ -638,6 +941,12 @@ impl<'a> VisitMut<'a> for DeadFunctionRemover {
             Statement::VariableDeclaration(declaration) => !declaration.declarations.is_empty(),
             _ => true,
         });
+        if let Some(Statement::ExpressionStatement(expression)) = statements.first()
+            && matches!(expression.expression, Expression::StringLiteral(_))
+        {
+            let barrier = Statement::new_empty_statement(expression.span, &self.ast);
+            statements.insert(0, barrier);
+        }
     }
 }
 

@@ -299,7 +299,7 @@ test('runs Metro-compatible constant folding and DCE as one native postflight', 
   assert.doesNotMatch(result.code, /sideEffect/);
 });
 
-test('computes chained dead functions to a fixed point while retaining referenced cycles', () => {
+test('removes dead chains and unreachable cycles', () => {
   const result = transform(
     [
       '(function(module) {',
@@ -326,8 +326,8 @@ test('computes chained dead functions to a fixed point while retaining reference
 
   assert.equal(result.status, 'complete');
   assert.doesNotMatch(result.code, /dead\d/);
-  assert.match(result.code, /function cycleA\(\)/);
-  assert.match(result.code, /function cycleB\(\)/);
+  assert.doesNotMatch(result.code, /function cycleA\(\)/);
+  assert.doesNotMatch(result.code, /function cycleB\(\)/);
 });
 
 test('retains dependencies reached from an exported function', () => {
@@ -466,4 +466,23 @@ test('lowers block scoping through the native preflight capability', () => {
     column: source.indexOf('pristine'),
     name: null,
   });
+});
+
+test('retains recursive groups exposed through a CommonJS wrapper', () => {
+  const result = transform(
+    `
+    (function(module){
+      function left(n){return n===0 || right(n-1)}
+      function right(n){return n!==0 && left(n-1)}
+      module.exports=left;
+    })(module);
+  `,
+    'fixture.js',
+    defineNativePipeline({
+      phases: [{ name: 'optimization', native: { optimize: { deadCodeElimination: true } } }],
+    }),
+  );
+  assert.equal(result.status, 'complete');
+  assert.match(result.code, /function left/);
+  assert.match(result.code, /function right/);
 });

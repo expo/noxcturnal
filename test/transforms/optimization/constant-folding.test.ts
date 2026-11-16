@@ -1,3 +1,5 @@
+import { originalPositionFor, TraceMap } from '@jridgewell/trace-mapping';
+import { defineNativePipeline, transform } from '../../../js';
 import { expect, test } from 'vitest';
 import { transformSource } from '../transform';
 
@@ -336,3 +338,133 @@ test.each([false, true])(
     expect(output).toContain('return value;');
   },
 );
+
+test.each([
+  { name: 'ESM', source: 'export const value=1;' },
+  { name: 'strict script', source: '"use strict";module.exports=1;' },
+  { name: 'nested strict function', source: 'function run(){"use strict";BODY} run();' },
+  {
+    name: 'inherited function strictness',
+    source: 'function run(){"use strict";function nested(){BODY}nested();}run();',
+  },
+  {
+    name: 'inherited module strictness',
+    source: 'export function run(){function nested(){BODY}nested();}',
+  },
+  { name: 'class static block', source: 'class C { static {BODY} }' },
+  { name: 'strict arrow', source: 'const run=()=>{"use strict";BODY};run();' },
+  { name: 'class method', source: 'class C { run(){BODY} } new C().run();' },
+])('removes dead block functions and dependencies in $name', async ({ source }) => {
+  const branch = 'if(false){function hidden(){};var kept;require("DEV_ONLY")}';
+  const input = source.includes('BODY') ? source.replace('BODY', branch) : source + branch;
+  for (const deadCodeElimination of [false, true]) {
+    const output = await transformSource(input, 'input.js', {
+      optimize: { constantFolding: true, deadCodeElimination, moduleContext: true },
+    });
+    expect(output).not.toContain('DEV_ONLY');
+    expect(output).not.toContain('if (false)');
+    if (deadCodeElimination) expect(output).not.toContain('var kept');
+    else expect(output).toContain('var kept');
+  }
+});
+
+test('retains sloppy block functions even when their own body is strict', async () => {
+  const output = await transformSource(
+    `
+    function strict() { "use strict"; if(false){function gone(){};require('STRICT_ONLY')} }
+    strict();
+    if(false){function hidden(){"use strict";} require('SLOPPY_ONLY')}
+    consume(hidden);
+  `,
+    'input.js',
+    options,
+  );
+  expect(output).not.toContain('STRICT_ONLY');
+  expect(output).toContain('SLOPPY_ONLY');
+  expect(output).toContain('if (false)');
+});
+
+test('preserves selected block function scope and source locations', () => {
+  const source = `"use strict";
+if (false) { function hidden() {} require('DEV_ONLY'); }
+else { function selected() { return 42; } globalThis.result = selected(); }
+`;
+  const result = transform(
+    source,
+    'input.js',
+    defineNativePipeline({ phases: [{ name: 'optimization', native: options }] }),
+  );
+  expect(result.status).toBe('complete');
+  if (result.status !== 'complete') throw new Error('expected complete');
+  expect(result.code).not.toContain('DEV_ONLY');
+  expect(result.code).toContain('function selected');
+  const lines = result.code.split('\n');
+  const line = lines.findIndex(line => line.includes('globalThis.result'));
+  const map = new TraceMap({ version: 3, sources: ['input.js'], ...result.map! });
+  expect(
+    originalPositionFor(map, { line: line + 1, column: lines[line]!.indexOf('globalThis') }),
+  ).toMatchObject({
+    source: 'input.js',
+    line: 3,
+    column: source.split('\n')[2]!.indexOf('globalThis'),
+  });
+});
+
+test('restores sloppy Annex B behavior after leaving a strict class', async () => {
+  const output = await transformSource(
+    `
+    class C { static { if(false){function gone(){};require('STRICT_ONLY')} } }
+    if(false){function hidden(){};require('SLOPPY_ONLY')}
+    consume(hidden);
+  `,
+    'input.js',
+    { optimize: { constantFolding: true, deadCodeElimination: true, moduleContext: true } },
+  );
+  expect(output).not.toContain('STRICT_ONLY');
+  expect(output).toContain('SLOPPY_ONLY');
+  expect(output).toContain('if (false)');
+});
+
+test.each([
+  {
+    name: 'module-private script',
+    source: 'if(false){var redundant=require("DEV_ONLY")}module.exports=1;',
+    filename: 'input.js',
+  },
+  {
+    name: 'ESM',
+    source: 'export const value=1;if(false){var redundant=require("DEV_ONLY")}',
+    filename: 'input.js',
+  },
+  {
+    name: 'function local',
+    source: 'function run(){if(false){var redundant=require("DEV_ONLY")}return 1}run();',
+    filename: 'input.js',
+  },
+])('drops unused hoisted vars in $name', async ({ source, filename }) => {
+  const output = await transformSource(source, filename, {
+    optimize: { constantFolding: true, deadCodeElimination: true, moduleContext: true },
+  });
+  expect(output).not.toContain('redundant');
+  expect(output).not.toContain('DEV_ONLY');
+});
+
+test.each([
+  { name: 'script global', source: 'if(false){var visible=fail()}', moduleContext: false },
+  {
+    name: 'exported var',
+    source: 'export var visible;if(false){var visible=fail()}',
+    moduleContext: true,
+  },
+  {
+    name: 'export specifier',
+    source: 'if(false){var visible=fail()}export {visible}',
+    moduleContext: true,
+  },
+])('preserves observable hoisted declarations: $name', async ({ source, moduleContext }) => {
+  const output = await transformSource(source, 'input.js', {
+    optimize: { constantFolding: true, deadCodeElimination: true, moduleContext },
+  });
+  expect(output).toContain('var visible');
+  expect(output).not.toContain('fail');
+});

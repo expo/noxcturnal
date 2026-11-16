@@ -1,6 +1,7 @@
 import { expect, test } from 'vitest';
 import { transformSource } from '../transform';
-import { TransformSyntaxError } from '../../../js/index';
+import { originalPositionFor, TraceMap } from '@jridgewell/trace-mapping';
+import { defineNativePipeline, transform, TransformSyntaxError } from '../../../js/index';
 
 const options = { optimize: { deadCodeElimination: true } } as const;
 
@@ -62,7 +63,7 @@ export const value = 1;
   );
 });
 
-test('retains mutually-referencing cycles', async () => {
+test('removes mutually-referencing cycles with no observable root', async () => {
   const source = `
 function left() { return right(); }
 function right() { return left(); }
@@ -70,12 +71,6 @@ export const value = 1;
 `;
   expect(await transformSource(source, 'input.js', options)).toMatchInlineSnapshot(`
     "'use strict';
-    function left() {
-      return right();
-    }
-    function right() {
-      return left();
-    }
     export const value = 1;"
   `);
 });
@@ -278,4 +273,103 @@ test('module-local DCE preserves script parsing semantics', async () => {
   });
   expect(output).not.toContain('function unused');
   expect(output).toContain('module.exports =');
+});
+
+test('removes unreachable recursive groups and their dependencies', async () => {
+  const output = await transformSource(
+    `
+    function left(){return right() + require('DEV_ONLY')}
+    function right(){return left()}
+    const self=()=>self();
+    export const result=1;
+  `,
+    'input.js',
+    options,
+  );
+  expect(output).not.toContain('DEV_ONLY');
+  expect(output).not.toContain('function left');
+  expect(output).not.toContain('function right');
+  expect(output).not.toContain('const self');
+});
+
+test('removes unused primitive initializers but retains effects and throwing reads', async () => {
+  const output = await transformSource(
+    `
+    const unusedNumber=123, unusedString='text', unusedBoolean=false, unusedNull=null, unusedBigInt=1n;
+    const call=effect(), getter=object.value, throwing=missing;
+    const throwingBigInt=1n/0n;
+    export const result=1;
+  `,
+    'input.js',
+    options,
+  );
+  expect(output).not.toContain('unused');
+  for (const retained of ['effect()', 'object.value', 'missing', '1n / 0n'])
+    expect(output).toContain(retained);
+});
+
+test('removes unreachable statements and constant-false loops while preserving for initialization', async () => {
+  const output = await transformSource(
+    `
+    export function run(effect){
+      while(false){var fromWhile=require('DEV_ONLY_WHILE')}
+      for(effect();false;effect()){var fromFor=require('DEV_ONLY_FOR')}
+      return [fromWhile,fromFor];
+      require('DEV_ONLY_RETURN');
+    }
+  `,
+    'input.js',
+    options,
+  );
+  expect(output).not.toContain('DEV_ONLY');
+  expect(output).not.toContain('while');
+  expect(output).not.toContain('for (');
+  expect(output).toContain('effect();');
+  expect(output).toContain('fromWhile');
+  expect(output).toContain('fromFor');
+});
+
+test('keeps resource declarations and exported primitive values', async () => {
+  const output = await transformSource(
+    `
+    using resource=123;
+    export const value=123;
+  `,
+    'input.js',
+    options,
+  );
+  expect(output).toContain('using resource = 123');
+  expect(output).toContain('export const value = 123');
+});
+
+test('retains cycles visible to script globals and eval', async () => {
+  for (const source of [
+    'function left(){return right()}function right(){return left()}',
+    'function left(){return right()}function right(){return left()}eval("left");export {};',
+  ]) {
+    const output = await transformSource(source, 'input.js', options);
+    expect(output).toContain('function left');
+    expect(output).toContain('function right');
+  }
+});
+
+test('preserves source locations after removing a false loop', () => {
+  const source = `export function run(input) {
+  while(false){require('DEV_ONLY')}
+  return input;
+}`;
+  const result = transform(
+    source,
+    'input.js',
+    defineNativePipeline({ phases: [{ name: 'optimization', native: options }] }),
+  );
+  expect(result.status).toBe('complete');
+  if (result.status !== 'complete') throw new Error('expected complete');
+  expect(result.code).not.toContain('DEV_ONLY');
+  const lines = result.code.split('\n');
+  const line = lines.findIndex(line => line.includes('return input'));
+  const map = new TraceMap({ version: 3, sources: ['input.js'], ...result.map! });
+  expect(
+    originalPositionFor(map, { line: line + 1, column: lines[line]!.indexOf('return') }),
+  ).toMatchObject({ source: 'input.js', line: 3, column: 2 });
 });
