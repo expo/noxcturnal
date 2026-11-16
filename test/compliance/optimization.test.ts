@@ -519,3 +519,32 @@ test('unreachable vars retain hoisting without evaluating destructuring or cross
     }).result,
   ).toEqual([undefined, undefined, undefined, undefined, 'undefined', 'undefined']);
 });
+
+test('strict dead branches preserve vars, selected lexical blocks, and scope strictness', () => {
+  const source = `
+    function strict() {
+      "use strict";
+      let selected = 'outer';
+      if (false) { function hidden() {} var kept = fail(); require('DEV_ONLY'); }
+      if (true) { let selected = 'inner'; globalThis.selected = selected; }
+      else { function discarded() {} var other = fail(); }
+      let threw = false;
+      try { hidden; } catch (error) { threw = error instanceof ReferenceError; }
+      return [kept, other, selected, threw];
+    }
+    function sloppy() {
+      if (false) { function hidden() {} }
+      return hidden;
+    }
+    globalThis.result = [strict(), sloppy(), globalThis.selected];
+  `;
+  const options = {
+    optimize: { constantFolding: true, deadCodeElimination: true, moduleContext: true },
+  };
+  expect(compile(source, options)).not.toContain('DEV_ONLY');
+  expect(execute<{ result: unknown[] }>(source, options).result).toEqual([
+    [undefined, undefined, 'outer', true],
+    undefined,
+    'inner',
+  ]);
+});

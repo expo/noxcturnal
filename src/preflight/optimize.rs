@@ -13,8 +13,9 @@ use oxc_ast::{
 use oxc_ast_visit::{Visit, VisitMut, walk, walk_mut};
 use oxc_semantic::{Scoping, SemanticBuilder, SymbolId};
 use oxc_span::GetSpan;
-use oxc_syntax::scope::ScopeFlags;
+use oxc_syntax::scope::{ScopeFlags, ScopeId};
 use rustc_hash::{FxHashMap, FxHashSet};
+use std::cell::Cell;
 
 use crate::semantic::constant_eval::{EvaluatedConstant, evaluate_expression};
 
@@ -38,6 +39,7 @@ pub(super) fn run<'a>(
             ast: AstBuilder::new(allocator),
             failed: FxHashSet::default(),
             addition_depth: 0,
+            strict_depth: 0,
         }
         .visit_program(program);
     }
@@ -52,6 +54,8 @@ struct ConstantFolder<'a> {
     // Boxed expression addresses remain stable during this arena traversal.
     failed: FxHashSet<Address>,
     addition_depth: usize,
+    // Scopes nested inside the outermost strict scope are strict too.
+    strict_depth: usize,
 }
 
 impl<'a> ConstantFolder<'a> {
@@ -202,11 +206,23 @@ impl<'a> VisitMut<'a> for ConstantFolder<'a> {
         }
     }
 
+    fn enter_scope(&mut self, flags: ScopeFlags, _scope_id: &Cell<Option<ScopeId>>) {
+        if self.strict_depth > 0 || flags.is_strict_mode() {
+            self.strict_depth += 1;
+        }
+    }
+
+    fn leave_scope(&mut self) {
+        self.strict_depth = self.strict_depth.saturating_sub(1);
+    }
+
     fn visit_statement(&mut self, statement: &mut Statement<'a>) {
         walk_mut::walk_statement(self, statement);
         let Statement::IfStatement(if_statement) = statement else {
             return;
         };
+        // Direct if functions are Annex B syntax; keep their selected-branch
+        // assignment behavior as well as their outer declaration instantiation.
         if matches!(if_statement.consequent, Statement::FunctionDeclaration(_))
             || matches!(
                 if_statement.alternate,
@@ -227,6 +243,7 @@ impl<'a> VisitMut<'a> for ConstantFolder<'a> {
             ast: &self.ast,
             declarations: oxc_allocator::Vec::new_in(&self.ast),
             block_function: false,
+            strict: self.strict_depth > 0,
             var_pattern: false,
         };
         if let Some(discarded) = discarded {
@@ -269,6 +286,7 @@ struct HoistedBindingCollector<'s, 'a> {
     ast: &'s AstBuilder<'a>,
     declarations: oxc_allocator::Vec<'a, VariableDeclarator<'a>>,
     block_function: bool,
+    strict: bool,
     var_pattern: bool,
 }
 
@@ -293,7 +311,8 @@ impl<'a> Visit<'a> for HoistedBindingCollector<'_, 'a> {
     }
 
     fn visit_function(&mut self, function: &Function<'a>, _flags: ScopeFlags) {
-        self.block_function |= function.r#type == FunctionType::FunctionDeclaration;
+        // The containing scope controls Annex B, not the function's own directive.
+        self.block_function |= !self.strict && function.r#type == FunctionType::FunctionDeclaration;
     }
 
     fn visit_binding_identifier(&mut self, identifier: &BindingIdentifier<'a>) {
